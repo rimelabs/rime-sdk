@@ -26,6 +26,17 @@ asyncio.run(main())
 ```
 
 Omit `api_key` to read `RIME_API_KEY`. The default model is `coda`.
+The SDK selects its standard endpoint. Only `coda` is currently supported.
+For a custom deployment of that model, set `endpoint`:
+
+```python
+client = Rime(model="coda", endpoint="coda.api.customer-name.rime.ai")
+```
+
+Use a hostname with an optional port, such as `host:8443`. Omit the scheme and path.
+Connections always use TLS; the default port is `443`.
+The endpoint applies to speech, voices, and languages for this client.
+
 The default voice is `clementine`; the default language is `en`.
 `tts.stream()` also accepts `AsyncIterable[str]`. Do not await the factory.
 It starts work when you enter its async context or request the first chunk.

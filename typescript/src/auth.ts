@@ -16,9 +16,10 @@ export interface Token {
 export async function exchangeKey(
   key: string,
   signal: AbortSignal,
+  configuration: Readonly<typeof policy> = policy,
 ): Promise<Token> {
   try {
-    const response = await fetch(policy.exchangeUrl, {
+    const response = await fetch(configuration.exchangeUrl, {
       method: "POST",
       redirect: "error",
       signal,
@@ -26,7 +27,7 @@ export async function exchangeKey(
         Authorization: `Api-Key ${key}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ audience: policy.audience }),
+      body: JSON.stringify({ audience: configuration.audience }),
     });
     if (response.status !== 200) {
       // The refresh timeout ends when this function rejects. Cancel the body
@@ -70,7 +71,7 @@ export async function exchangeKey(
       typeof body.expires_in !== "number" ||
       !Number.isFinite(body.expires_in) ||
       body.expires_in <= 0 ||
-      body.audience !== policy.audience
+      body.audience !== configuration.audience
     )
       throw new RimeAuthenticationError(
         "Credential exchange returned an invalid token",
@@ -94,7 +95,10 @@ export class Credentials {
   private refreshAt = 0;
   private controller = new AbortController();
   private closed = false;
-  constructor(private key: string) {}
+  constructor(
+    private key: string,
+    private readonly configuration: Readonly<typeof policy> = policy,
+  ) {}
   async metadata(signal: AbortSignal): Promise<string> {
     // TEMPORARY until Themis is ready: replace this body with the call below.
     // return this.themisMetadata(signal);
@@ -114,21 +118,21 @@ export class Credentials {
             timeoutController.abort(
               new RimeTimeoutError("Credential acquisition timed out"),
             ),
-          policy.authTimeout * 1000,
+          this.configuration.authTimeout * 1000,
         );
         const combined = AbortSignal.any([
           this.controller.signal,
           timeoutController.signal,
         ]);
         this.refresh = abortable(
-          authentication.exchangeKey(this.key, combined),
+          authentication.exchangeKey(this.key, combined, this.configuration),
           combined,
         )
           .then((token) => {
             if (
               !token.value ||
               token.expiresAt <= Date.now() / 1000 ||
-              token.audience !== policy.audience
+              token.audience !== this.configuration.audience
             )
               throw new RimeAuthenticationError(
                 "Credential exchange returned an invalid token",

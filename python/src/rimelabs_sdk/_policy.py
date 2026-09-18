@@ -1,7 +1,8 @@
 """Private policy. The Themis wire contract is an implementation assumption."""
 
 import math
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 
 from ._errors import RimeInputError
 
@@ -27,6 +28,31 @@ class Policy:
 
 
 POLICY = Policy()
+
+
+def resolve(model: str, endpoint: str | None) -> Policy:
+    # Add model defaults here only when its transport contract is supported.
+    if model != "coda":
+        raise RimeInputError("This SDK supports model='coda'")
+    if endpoint is None:
+        return replace(POLICY)
+    error = "endpoint must be a hostname with an optional port (1-65535), without a scheme or path"
+    if not isinstance(endpoint, str):
+        raise RimeInputError(error)
+    host, separator, port = endpoint.partition(":")
+    if (
+        not host
+        or len(host) > 253
+        or any(
+            not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?", label)
+            for label in host.split(".")
+        )
+    ):
+        raise RimeInputError(error)
+    if separator and (not re.fullmatch(r"[0-9]{1,5}", port) or not 1 <= int(port) <= 65535):
+        raise RimeInputError(error)
+    host = host.lower()
+    return replace(POLICY, target=f"{host}:{int(port) if separator else 443}", audience=host)
 
 
 def timeout(value, inherited=None):
