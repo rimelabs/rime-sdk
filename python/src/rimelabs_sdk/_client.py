@@ -25,15 +25,18 @@ from ._stream import _CONSTRUCTION_KEY, AudioStream
 
 class Rime:
     def __init__(
-        self, *, api_key: str | None = None, model: str = "coda", timeout: float | None = None
+        self,
+        *,
+        api_key: str | None = None,
+        model: str = "coda",
+        endpoint: str | None = None,
+        timeout: float | None = None,
     ):
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():
             raise RimeAuthenticationError("Provide api_key or set RIME_API_KEY")
-        if model != "coda":
-            raise RimeInputError("This SDK supports model='coda'")
         self._timeout = _policy.timeout(timeout)
-        self._policy = _policy.POLICY
+        self._policy = _policy.resolve(model, endpoint)
         self._credentials = Credentials(key, self._policy)
         self._channel: grpc.aio.Channel | None = None
         self._loop: asyncio.AbstractEventLoop | None = None

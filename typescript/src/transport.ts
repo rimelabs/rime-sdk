@@ -35,8 +35,8 @@ export function rpcError(
   );
 }
 export const transport = {
-  makeClient: () =>
-    new grpc.Client(policy.target, grpc.credentials.createSsl(), {
+  makeClient: (target: string) =>
+    new grpc.Client(target, grpc.credentials.createSsl(), {
       "grpc.enable_retries": 0,
       "grpc.max_receive_message_length": policy.receiveBytes,
       "grpc.max_send_message_length": policy.sentenceBytes + 65536,

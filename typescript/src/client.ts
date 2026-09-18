@@ -1,7 +1,7 @@
 import { AudioFormat } from "./audio.js";
 import { AudioStream, constructionKey, type TextSource } from "./stream.js";
 import { Credentials } from "./auth.js";
-import { policy, timeout, nonempty, abortable } from "./policy.js";
+import { policy, resolve, timeout, nonempty, abortable } from "./policy.js";
 import {
   transport,
   connect,
@@ -21,6 +21,7 @@ import {
 export interface RimeOptions {
   apiKey?: string | null;
   model?: string;
+  endpoint?: string | null;
   timeout?: number | null;
 }
 export interface SynthesisOptions {
@@ -36,6 +37,7 @@ export interface VoiceListOptions extends DiscoveryOptions {
   language?: string | null;
 }
 export class Rime {
+  private readonly deployment: Readonly<typeof policy>;
   private credentials: Credentials;
   private client: Connection | null = null;
   private closed = false;
@@ -57,10 +59,9 @@ export class Rime {
         : options.apiKey;
     if (typeof key !== "string" || !key.trim())
       throw new RimeAuthenticationError("Provide apiKey or set RIME_API_KEY");
-    if ((options.model ?? "coda") !== "coda")
-      throw new RimeInputError("This SDK supports model='coda'");
     this.defaultTimeout = timeout(options.timeout);
-    this.credentials = new Credentials(key);
+    this.deployment = resolve(options.model ?? "coda", options.endpoint);
+    this.credentials = new Credentials(key, this.deployment);
     this.tts = { stream: (text, options = {}) => this.stream(text, options) };
     this.voices = {
       list: async (options = {}) => {
@@ -81,7 +82,7 @@ export class Rime {
     this.checkOpen();
     const auth = await this.credentials.metadata(signal);
     this.checkOpen();
-    this.client ??= transport.makeClient();
+    this.client ??= transport.makeClient(this.deployment.target);
     await connect(this.client, signal);
     return { client: this.client, metadata: metadata(auth) };
   }

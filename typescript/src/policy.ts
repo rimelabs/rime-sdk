@@ -15,6 +15,38 @@ export const policy = {
   discoveryTimeout: 10,
   cleanupTimeout: 2,
 };
+export function resolve(
+  model: string,
+  endpoint?: string | null,
+): Readonly<typeof policy> {
+  // Add model defaults here only when its transport contract is supported.
+  if (model !== "coda")
+    throw new RimeInputError("This SDK supports model='coda'");
+  if (endpoint === undefined || endpoint === null) return { ...policy };
+  const error =
+    "endpoint must be a hostname with an optional port (1-65535), without a scheme or path";
+  if (typeof endpoint !== "string" || /\s/.test(endpoint))
+    throw new RimeInputError(error);
+  const [host, port, extra] = endpoint.split(":");
+  if (
+    !host ||
+    host.length > 253 ||
+    extra !== undefined ||
+    host
+      .split(".")
+      .some(
+        (label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label),
+      ) ||
+    (port !== undefined &&
+      (!/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535))
+  )
+    throw new RimeInputError(error);
+  return {
+    ...policy,
+    target: `${host.toLowerCase()}:${port === undefined ? 443 : Number(port)}`,
+    audience: host.toLowerCase(),
+  };
+}
 export function timeout(
   value: unknown,
   inherited: number | null = null,
