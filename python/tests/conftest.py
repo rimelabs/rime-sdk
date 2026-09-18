@@ -10,6 +10,8 @@ from rime_sdk import Rime, _auth, _policy, _transport
 
 @pytest.fixture
 async def setup(monkeypatch):
+    # Keep exercising the retained Themis path while direct auth is temporary.
+    monkeypatch.setattr(_auth.Credentials, "metadata", _auth.Credentials._themis_metadata)
     async with FakeService() as service:
         policy = replace(
             _policy.POLICY, target=service.target, first_audio_timeout=0.2, progress_timeout=0.2

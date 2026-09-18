@@ -16,7 +16,7 @@ import {
 } from "../dist/index.js";
 import { SentenceBuffer, ready } from "../dist/sentences.js";
 import { Converter } from "../dist/audio.js";
-import { authentication } from "../dist/auth.js";
+import { authentication, Credentials } from "../dist/auth.js";
 import { transport, rpcError } from "../dist/transport.js";
 import { policy } from "../dist/policy.js";
 import { FakeService } from "./service.mjs";
@@ -33,6 +33,9 @@ async function collect(stream) {
   return Buffer.concat(chunks);
 }
 async function setup(fn) {
+  // Keep exercising the retained Themis path while direct auth is temporary.
+  const oldMetadata = Credentials.prototype.metadata;
+  Credentials.prototype.metadata = Credentials.prototype.themisMetadata;
   const service = await new FakeService().start();
   const oldFactory = transport.makeClient,
     oldExchange = authentication.exchangeKey;
@@ -53,8 +56,16 @@ async function setup(fn) {
     service.close();
     transport.makeClient = oldFactory;
     authentication.exchangeKey = oldExchange;
+    Credentials.prototype.metadata = oldMetadata;
   }
 }
+test("temporary bearer auth", async () => {
+  const credentials = new Credentials("test-key");
+  const signal = new AbortController().signal;
+  assert.equal(await credentials.metadata(signal), "Bearer test-key");
+  await credentials.close();
+  await assert.rejects(credentials.metadata(signal), /closed/);
+});
 for (const fixture of fixtures)
   for (const size of contract.chunk_sizes)
     test(`sentences ${fixture.id} / ${size}`, async () => {
@@ -397,7 +408,7 @@ for (const [status, errorType] of [
     let timer;
     try {
       await assert.rejects(
-        credentials.metadata(new AbortController().signal),
+        credentials.themisMetadata(new AbortController().signal),
         errorType,
       );
       await Promise.race([

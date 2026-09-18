@@ -60,7 +60,10 @@ Catch `RimeError` or one of `RimeAuthenticationError`, `RimePermissionError`,
 Cancellation cannot stop application code that waits on an unrelated promise.
 The SDK stops its RPC and limits how long it waits for source cleanup.
 
-The API-key exchange currently follows the assumed private contract in
+Authentication temporarily sends the API key directly as a bearer token.
+Restore the commented call in `auth.ts` when Themis is ready.
+
+The retained API-key exchange follows the assumed private contract in
 [authentication](../docs/authentication.md). It has local tests, but no live
 service validation. Browser use is not supported.
 

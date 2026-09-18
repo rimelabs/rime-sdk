@@ -13,6 +13,14 @@ from rime_sdk import (
 )
 
 
+async def test_temporary_bearer_auth():
+    credentials = _auth.Credentials("test-key", _policy.POLICY)
+    assert await credentials.metadata() == (("authorization", "Bearer test-key"),)
+    await credentials.close()
+    with pytest.raises(RimeAuthenticationError, match="closed"):
+        await credentials.metadata()
+
+
 @pytest.mark.parametrize(
     "status,body,error",
     [

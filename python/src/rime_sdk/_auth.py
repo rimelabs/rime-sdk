@@ -100,6 +100,13 @@ class Credentials:
         return token
 
     async def metadata(self):
+        # TEMPORARY until Themis is ready: replace this body with the call below.
+        # return await self._themis_metadata()
+        if self._closed:
+            raise RimeAuthenticationError("Credentials are closed")
+        return (("authorization", "Bearer " + self._key),)
+
+    async def _themis_metadata(self):
         if self._closed:
             raise RimeAuthenticationError("Credentials are closed")
         token = self._token

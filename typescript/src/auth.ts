@@ -96,6 +96,14 @@ export class Credentials {
   private closed = false;
   constructor(private key: string) {}
   async metadata(signal: AbortSignal): Promise<string> {
+    // TEMPORARY until Themis is ready: replace this body with the call below.
+    // return this.themisMetadata(signal);
+    if (this.closed)
+      throw new RimeAuthenticationError("Credentials are closed");
+    signal.throwIfAborted();
+    return `Bearer ${this.key}`;
+  }
+  async themisMetadata(signal: AbortSignal): Promise<string> {
     if (this.closed)
       throw new RimeAuthenticationError("Credentials are closed");
     if (!this.token || Date.now() / 1000 >= this.refreshAt) {
