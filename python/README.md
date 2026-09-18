@@ -8,7 +8,7 @@ uv add /path/to/rime-sdk/python
 
 ```python
 import asyncio
-from rime_sdk import Rime, AudioFormat
+from rimelabs_sdk import Rime, AudioFormat
 
 async def main():
     async with Rime(api_key="your-api-key") as client:

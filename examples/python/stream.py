@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 
-from rime_sdk import Rime
+from rimelabs_sdk import Rime
 
 
 async def text():

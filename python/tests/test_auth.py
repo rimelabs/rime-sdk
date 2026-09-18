@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from rime_sdk import (
+from rimelabs_sdk import (
     RimeAuthenticationError,
     RimePermissionError,
     RimeResourceLimitError,

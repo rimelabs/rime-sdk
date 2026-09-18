@@ -11,7 +11,7 @@ from pathlib import Path
 import grpc
 import pytest
 
-from rime_sdk import (
+from rimelabs_sdk import (
     AudioFormat,
     Rime,
     RimeAudioFormatError,
@@ -24,9 +24,9 @@ from rime_sdk import (
     RimeUnavailableError,
     _auth,
 )
-from rime_sdk._audio import Converter
-from rime_sdk._sentences import SentenceBuffer
-from rime_sdk._transport import rpc_error
+from rimelabs_sdk._audio import Converter
+from rimelabs_sdk._sentences import SentenceBuffer
+from rimelabs_sdk._transport import rpc_error
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((ROOT / "conformance/contract.json").read_text())
@@ -104,7 +104,7 @@ def test_sentence_storage_does_not_grow_with_completed_text():
 
 
 def test_long_sentence_does_not_scan_once_per_source_chunk(monkeypatch):
-    from rime_sdk import _sentences
+    from rimelabs_sdk import _sentences
 
     detector = _sentences.sentence_ends
     calls = 0

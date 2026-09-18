@@ -6,7 +6,7 @@ The SDK handles sentence detection, API-key exchange, gRPC, conversion, and canc
 
 | Package | Location | Runtime | Local version |
 | --- | --- | --- | --- |
-| `rime-sdk` | [python](python/) | Python 3.11+ | 0.1.0a1 |
+| `rimelabs-sdk` | [python](python/) | Python 3.11+ | 0.1.0a1 |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM | 0.1.0-alpha.1 |
 
 ## Local setup

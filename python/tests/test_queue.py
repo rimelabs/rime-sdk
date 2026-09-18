@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from rime_sdk._queue import ByteQueue
+from rimelabs_sdk._queue import ByteQueue
 
 
 @pytest.mark.parametrize("limit,chunk_size", [(6, 2), (5, 3), (3, 8)])

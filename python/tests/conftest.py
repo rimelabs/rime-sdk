@@ -5,7 +5,7 @@ import grpc
 import pytest
 from fake_service import FakeService
 
-from rime_sdk import Rime, _auth, _policy, _transport
+from rimelabs_sdk import Rime, _auth, _policy, _transport
 
 
 @pytest.fixture

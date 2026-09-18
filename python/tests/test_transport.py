@@ -6,13 +6,13 @@ import grpc
 import pytest
 from fake_service import FakeService
 
-from rime_sdk import (
+from rimelabs_sdk import (
     RimeAudioFormatError,
     RimeAuthenticationError,
     RimePermissionError,
     RimeUnavailableError,
 )
-from rime_sdk._transport import SynthesisCall, discover
+from rimelabs_sdk._transport import SynthesisCall, discover
 
 
 @pytest.fixture
