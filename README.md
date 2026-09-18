@@ -9,11 +9,6 @@ The SDK handles sentence detection, API-key exchange, gRPC, conversion, and canc
 | `rime-sdk` | [python](python/) | Python 3.11+ | 0.1.0a1 |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM | 0.1.0-alpha.1 |
 
-These are local alpha implementations. See [validation](docs/validation.md) for
-completed tests and checks that require the deployed services.
-The private [Themis contract](docs/authentication.md) uses the requested assumption
-that the service is complete. Its wire format still needs deployment validation.
-
 ## Local setup
 
 ```sh
@@ -34,8 +29,3 @@ See the package READMEs for use and the [examples](examples/) for runnable scrip
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
 - Canonical schemas remain in their existing repository. These packages consume
   published `rime-api` and `@rimelabs/api` version 0.0.1.
-- LiveKit plugin code stays outside this repository. The local
-  `../rime-sdk-livekit-poc` uses `python/` as an editable dependency.
-
-Read the [specification and plan](docs/rime-sdk-api-spec.md),
-[internal design](docs/internal-design.md), and [release process](docs/releases.md).
