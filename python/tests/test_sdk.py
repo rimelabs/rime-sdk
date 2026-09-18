@@ -377,6 +377,38 @@ async def test_source_failure_cleanup(setup):
     assert closed.is_set()
 
 
+@pytest.mark.parametrize("submit_sentence", [False, True])
+async def test_source_cancellation_stops_stream(setup, submit_sentence):
+    service, client = setup
+    upstream = asyncio.get_running_loop().create_future()
+    upstream.cancel()
+    closed = asyncio.Event()
+
+    async def source():
+        try:
+            await service.headers_sent.wait()
+            if submit_sentence:
+                yield "First sentence. The next sentence "
+                await service.received.wait()
+            await upstream
+        finally:
+            closed.set()
+
+    async with client.tts.stream(source()) as audio:
+        with pytest.raises(RimeCancelledError):
+            await asyncio.wait_for(collect(audio), 1)
+        await asyncio.wait_for(asyncio.shield(audio._worker), 1)
+        assert closed.is_set()
+        assert audio._call.cancelled()
+        assert not client._streams
+        assert not any(
+            task.get_name() in {"rime:input", "rime:audio"} for task in asyncio.all_tasks()
+        )
+        async with asyncio.timeout(1):
+            while service.active:
+                await asyncio.sleep(0.01)
+
+
 @pytest.mark.parametrize("cleanup_stalls", [False, True])
 async def test_cancel_allows_source_cleanup_within_budget(setup, cleanup_stalls):
     _, client = setup

@@ -247,9 +247,12 @@ class AudioStream:
             ]
             # The worker owns child cancellation. Unlike gather(), wait() does
             # not cancel children when the worker is cancelled.
-            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
-            for task in done:
-                task.result()
+            # FIRST_EXCEPTION does not wake for a cancelled child task.
+            pending = set(tasks)
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    task.result()
             self._queue.finish()
         except grpc.aio.AioRpcError as error:
             for metadata in [error.initial_metadata(), error.trailing_metadata()]:
