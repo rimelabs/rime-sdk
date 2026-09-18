@@ -1,0 +1,29 @@
+name: Release Python
+on:
+  push:
+    tags: ['python-v*']
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --dev
+      - name: Verify package tag
+        run: uv run python -c 'import os,tomllib; assert os.environ["GITHUB_REF_NAME"] == "python-v" + tomllib.load(open("pyproject.toml", "rb"))["project"]["version"]'
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src
+      - run: uv run pytest
+      - run: uv build
+      - run: uv publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
