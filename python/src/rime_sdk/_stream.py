@@ -9,13 +9,9 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Self
 
-import grpc
-from rime_api import text_to_speech_pb2 as proto
-
 from . import _transport
 from ._audio import AudioFormat, Converter
 from ._errors import (
-    RimeAudioFormatError,
     RimeCancelledError,
     RimeError,
     RimeInputError,
@@ -39,7 +35,6 @@ class AudioStream:
         self._language = language
         self._format = profile
         self._timeout = timeout
-        self._request_id = None
         self._operation_id = uuid.uuid4().hex
         self._queue = ByteQueue(client._policy.output_bytes)
         self._worker = None
@@ -63,7 +58,7 @@ class AudioStream:
 
     @property
     def request_id(self) -> str | None:
-        return self._request_id
+        return self._call.request_id if self._call is not None else None
 
     def _start(self):
         self._client._check_loop()
@@ -80,7 +75,7 @@ class AudioStream:
     def _fail(self, error):
         if self._error or self._finished:
             return
-        error.request_id = self._request_id
+        error.request_id = self.request_id
         self._error = error
         self._queue.finish(error)
         if self._call:
@@ -118,31 +113,12 @@ class AudioStream:
         except asyncio.CancelledError:
             pass
 
-    async def _write(self, message):
-        assert self._call is not None
-        try:
-            await self._call.write(message)
-        except asyncio.InvalidStateError:
-            # grpc.aio.write() raises InvalidStateError if the RPC has already
-            # ended, even when the server supplied a more specific failure.
-            if not self._call.done():
-                raise
-            code = await self._call.code()
-            for metadata in [
-                await self._call.initial_metadata(),
-                await self._call.trailing_metadata(),
-            ]:
-                self._request_id = self._request_id or dict(metadata or ()).get("x-request-id")
-            if code != grpc.StatusCode.OK:
-                raise _transport.rpc_error(code, self._request_id) from None
-            raise RimeStreamError("The service completed before input finished") from None
-
     async def _write_sentence(self, sentence):
         assert self._call is not None
         if not self._submitted:
             self._progress_at = time.monotonic()
         self._submitted = True
-        await self._write(proto.StreamingSynthesisRequest(text_chunk=sentence))
+        await self._call.write(sentence)
 
     async def _produce(self):
         assert self._call is not None
@@ -183,7 +159,7 @@ class AudioStream:
                 raise RimeInputError("The text source contained no meaningful text")
             for sentence in buffer.feed("", final=True):
                 await self._write_sentence(sentence)
-            await self._call.done_writing()
+            await self._call.finish_input()
             self._input_done = True
         finally:
             if iterator is not None and hasattr(iterator, "aclose"):
@@ -207,30 +183,13 @@ class AudioStream:
 
     async def _read(self):
         assert self._call is not None
-        metadata = dict(await self._call.initial_metadata())
-        self._request_id = self._request_id or metadata.get("x-request-id")
-        content_type = metadata.get("x-rime-audio-content-type")
-        # A rejection can send headers before its failure status. Check the
-        # format only when audio arrives or the service completes successfully.
         converter = Converter(self._format)
-        while True:
-            message = await self._call.read()
-            if message is grpc.aio.EOF:
-                break
+        async for data in self._call.audio():
             self._progress_at = time.monotonic()
-            if message.audio:
-                if content_type != "audio/pcm":
-                    raise RimeAudioFormatError("Expected raw audio/pcm from the service")
+            if data:
                 self._received = True
-                self._bytes_received += len(message.audio)
-                await self._put(converter.process(message.audio))
-        code = await self._call.code()
-        trailers = dict(await self._call.trailing_metadata())
-        self._request_id = self._request_id or trailers.get("x-request-id")
-        if code != grpc.StatusCode.OK:
-            raise _transport.rpc_error(code, self._request_id)
-        if content_type != "audio/pcm":
-            raise RimeAudioFormatError("Expected raw audio/pcm from the service")
+                self._bytes_received += len(data)
+                await self._put(converter.process(data))
         if not self._input_done:
             raise RimeStreamError("The service completed before input finished")
         await self._put(converter.process(b"", final=True))
@@ -239,8 +198,8 @@ class AudioStream:
         tasks = []
         try:
             channel, metadata = await self._client._prepare()
-            self._call = _transport.bind(channel, "SynthesizeStreaming")(metadata=metadata)
-            await self._write(_transport.header(self._voice, self._language))
+            self._call = _transport.SynthesisCall(channel, metadata)
+            await self._call.start(self._voice, self._language)
             tasks = [
                 asyncio.create_task(self._produce(), name="rime:input"),
                 asyncio.create_task(self._read(), name="rime:audio"),
@@ -254,10 +213,6 @@ class AudioStream:
                 for task in done:
                     task.result()
             self._queue.finish()
-        except grpc.aio.AioRpcError as error:
-            for metadata in [error.initial_metadata(), error.trailing_metadata()]:
-                self._request_id = self._request_id or dict(metadata or ()).get("x-request-id")
-            self._fail(_transport.rpc_error(error.code(), self._request_id))
         except RimeError as error:
             self._fail(error)
         except asyncio.CancelledError:
@@ -285,7 +240,7 @@ class AudioStream:
                 "Synthesis stopped",
                 extra={
                     "operation_id": self._operation_id,
-                    "request_id": self._request_id,
+                    "request_id": self.request_id,
                     "bytes_received": self._bytes_received,
                     "bytes_delivered": self._bytes_delivered,
                 },

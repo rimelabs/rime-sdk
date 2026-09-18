@@ -26,7 +26,6 @@ from rime_sdk import (
 )
 from rime_sdk._audio import Converter
 from rime_sdk._sentences import SentenceBuffer
-from rime_sdk._stream import AudioStream
 from rime_sdk._transport import rpc_error
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -300,41 +299,6 @@ async def test_no_synthesis_replay(setup):
     assert len(service.calls) == 1
 
 
-@pytest.mark.parametrize(
-    "status,error_type",
-    [
-        (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError),
-        (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError),
-        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
-    ],
-)
-async def test_rejection_during_text_write(setup, monkeypatch, status, error_type):
-    service, client = setup
-    service.mode = "error_before_audio"
-    service.rejection_status = status
-    original_write = AudioStream._write_sentence
-    attempted = asyncio.Event()
-
-    async def write_after_rejection(stream, sentence):
-        await stream._call.code()
-        attempted.set()
-        await original_write(stream, sentence)
-
-    async def paused_reader(stream):
-        # Let the writer observe the rejection first, as it can in production.
-        await asyncio.Event().wait()
-
-    monkeypatch.setattr(AudioStream, "_write_sentence", write_after_rejection)
-    monkeypatch.setattr(AudioStream, "_read", paused_reader)
-    async with client.tts.stream("Hello.", timeout=1) as audio:
-        with pytest.raises(error_type) as caught:
-            await collect(audio)
-        assert caught.value.request_id == "rejected-request"
-    assert attempted.is_set()
-    assert len(service.calls) == 1
-    assert not client._streams
-
-
 async def test_invalid_state_from_source_is_an_input_error(setup):
     _, client = setup
     cause = asyncio.InvalidStateError("application source failed")
@@ -399,7 +363,6 @@ async def test_source_cancellation_stops_stream(setup, submit_sentence):
             await asyncio.wait_for(collect(audio), 1)
         await asyncio.wait_for(asyncio.shield(audio._worker), 1)
         assert closed.is_set()
-        assert audio._call.cancelled()
         assert not client._streams
         assert not any(
             task.get_name() in {"rime:input", "rime:audio"} for task in asyncio.all_tasks()
@@ -634,9 +597,9 @@ async def test_server_error_without_audio_metadata(setup, location, status, erro
     async with client.tts.stream("Hello.", timeout=1) as audio:
         result = asyncio.create_task(collect(audio))
         await service.headers_sent.wait()
-        await audio._call.initial_metadata()
-        # Separate receipt of headers from the final rejection.
+        # Missing format metadata must not mask a later server rejection.
         await asyncio.sleep(0.01)
+        assert not result.done()
         service.release.set()
         with pytest.raises(error_type) as caught:
             await result

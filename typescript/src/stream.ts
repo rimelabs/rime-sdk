@@ -5,38 +5,28 @@ import { AudioFormat, Converter } from "./audio.js";
 import { policy, abortable } from "./policy.js";
 import { ByteQueue } from "./queue.js";
 import { SentenceBuffer, ready } from "./sentences.js";
-import {
-  grpc,
-  openStream,
-  header,
-  textMessage,
-  rpcError,
-} from "./transport.js";
+import { SynthesisCall, type PreparedConnection } from "./transport.js";
 import {
   RimeError,
   RimeInputError,
   RimeCancelledError,
   RimeTimeoutError,
   RimeStreamError,
-  RimeAudioFormatError,
 } from "./errors.js";
 
 export interface StreamOwner {
-  prepare(
-    signal: AbortSignal,
-  ): Promise<{ client: grpc.Client; metadata: grpc.Metadata }>;
+  prepare(signal: AbortSignal): Promise<PreparedConnection>;
   checkOpen(): void;
   forget(stream: AudioStream): void;
 }
 export type TextSource = string | AsyncIterable<string>;
 export const constructionKey = Symbol("private stream constructor");
 export class AudioStream implements AsyncIterableIterator<Uint8Array> {
-  private requestIdValue: string | null = null;
   private readonly controller = new AbortController();
   private readonly queue = new ByteQueue(policy.outputBytes);
   private worker: Promise<void> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
-  private call: ReturnType<typeof openStream> | null = null;
+  private call: SynthesisCall | null = null;
   private failure: RimeError | null = null;
   private finished = false;
   private reading = false;
@@ -66,7 +56,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     return this.formatValue;
   }
   get requestId(): string | null {
-    return this.requestIdValue;
+    return this.call?.requestId ?? null;
   }
   private start() {
     if (this.failure) throw this.failure;
@@ -91,7 +81,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       }
       if (
         this.call &&
-        !this.call.destroyed &&
+        !this.call.done &&
         this.submitted &&
         !this.sourceWaiting &&
         !this.outputWaiting &&
@@ -112,10 +102,10 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   }
   private fail(error: RimeError) {
     if (this.finished || this.failure) return;
-    if (error.requestId === null && this.requestIdValue !== null)
+    if (error.requestId === null && this.requestId !== null)
       error = new (error.constructor as typeof RimeError)(
         error.message,
-        this.requestIdValue,
+        this.requestId,
         { cause: error.cause },
       );
     this.failure = error;
@@ -123,17 +113,6 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     this.queue.finish(error);
     this.controller.abort(error);
     this.call?.cancel();
-  }
-  private async write(message: unknown) {
-    const call = this.call!;
-    await abortable(
-      new Promise<void>((resolve, reject) =>
-        call.write(message, (error: Error | null | undefined) =>
-          error ? reject(error) : resolve(),
-        ),
-      ),
-      this.controller.signal,
-    );
   }
   private async produce() {
     const source = this.source!;
@@ -182,7 +161,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
           for (const sentence of buffer.feed(chunk.slice(offset, end))) {
             if (!this.submitted) this.progressAt = performance.now();
             this.submitted = true;
-            await this.write(textMessage(sentence));
+            await this.call!.write(sentence);
           }
           offset = end;
         }
@@ -194,16 +173,12 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       for (const sentence of buffer.feed("", true)) {
         if (!this.submitted) this.progressAt = performance.now();
         this.submitted = true;
-        await this.write(textMessage(sentence));
+        await this.call!.write(sentence);
       }
-      this.call!.end();
+      this.call!.finishInput();
       this.inputDone = true;
     } catch (error) {
-      if (
-        error instanceof RimeError ||
-        this.controller.signal.aborted ||
-        (error && typeof error === "object" && "code" in error)
-      )
+      if (error instanceof RimeError || this.controller.signal.aborted)
         throw error;
       throw new RimeInputError("The text source failed", this.requestId, {
         cause: error,
@@ -233,38 +208,16 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       }
     }
   }
-  private async read(
-    metadataPromise: Promise<grpc.Metadata>,
-    statusPromise: Promise<grpc.StatusObject>,
-  ) {
-    const metadata = await abortable(metadataPromise, this.controller.signal);
-    const contentType = metadata.get("x-rime-audio-content-type")[0];
-    // A rejection can send headers before its failure status. Check the
-    // format only when audio arrives or the service completes successfully.
+  private async read() {
     const converter = new Converter(this.format);
-    for await (const response of this.call!) {
+    for await (const data of this.call!.audio()) {
       this.progressAt = performance.now();
-      if (response.audio.length) {
-        if (contentType !== "audio/pcm")
-          throw new RimeAudioFormatError(
-            "Expected raw audio/pcm from the service",
-            this.requestId,
-          );
+      if (data.length) {
         this.received = true;
-        this.bytesReceived += response.audio.length;
-        await this.put(converter.process(response.audio));
+        this.bytesReceived += data.length;
+        await this.put(converter.process(data));
       }
     }
-    const status = await abortable(statusPromise, this.controller.signal);
-    this.requestIdValue ??=
-      status.metadata.get("x-request-id")[0]?.toString() ?? null;
-    if (status.code !== grpc.status.OK)
-      throw rpcError(status.code, this.requestId);
-    if (contentType !== "audio/pcm")
-      throw new RimeAudioFormatError(
-        "Expected raw audio/pcm from the service",
-        this.requestId,
-      );
     if (!this.inputDone)
       throw new RimeStreamError(
         "The service completed before input finished",
@@ -277,41 +230,14 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     try {
       await abortable(ready, this.controller.signal);
       const prepared = await this.owner.prepare(this.controller.signal);
-      this.call = openStream(prepared.client, prepared.metadata);
-      const metadataPromise = new Promise<grpc.Metadata>((resolve, reject) => {
-        this.call!.once("metadata", (metadata: grpc.Metadata) => {
-          this.requestIdValue =
-            metadata.get("x-request-id")[0]?.toString() ?? null;
-          resolve(metadata);
-        });
-        // A trailers-only response has no metadata event, including an empty
-        // successful response. Let the reader validate its final status.
-        this.call!.once("status", () => resolve(new grpc.Metadata()));
-        this.call!.once("error", reject);
-      });
-      metadataPromise.catch(() => {});
-      const statusPromise = new Promise<grpc.StatusObject>((resolve) =>
-        this.call!.once("status", resolve),
-      );
-      this.call.on("error", () => {});
-      await this.write(header(this.voice, this.language));
-      tasks = [this.produce(), this.read(metadataPromise, statusPromise)];
+      this.call = new SynthesisCall(prepared, this.controller.signal);
+      await this.call.start(this.voice, this.language);
+      tasks = [this.produce(), this.read()];
       await Promise.all(tasks);
       this.queue.finish();
     } catch (error) {
       if (error instanceof RimeError) this.fail(error);
-      else if (
-        error &&
-        typeof error === "object" &&
-        "code" in error &&
-        typeof error.code === "number"
-      ) {
-        const metadata = "metadata" in error ? error.metadata : null;
-        if (metadata instanceof grpc.Metadata)
-          this.requestIdValue ??=
-            metadata.get("x-request-id")[0]?.toString() ?? null;
-        this.fail(rpcError(error.code, this.requestId));
-      } else
+      else
         this.fail(
           new RimeStreamError("Synthesis failed", this.requestId, {
             cause: error,

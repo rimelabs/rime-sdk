@@ -42,14 +42,18 @@ class FakeService:
             metadata = dict(self.response_metadata)
             if self.mode == "wrong_format":
                 metadata["x-rime-audio-content-type"] = "audio/wav"
-            await context.send_initial_metadata(tuple(metadata.items()))
+            if self.mode != "headers_after_text":
+                await context.send_initial_metadata(tuple(metadata.items()))
+                self.headers_sent.set()
             context.set_trailing_metadata(self.trailing_metadata)
-            self.headers_sent.set()
             if self.mode == "no_audio_error":
                 await self.release.wait()
                 await context.abort(self.rejection_status, "test rejection after headers")
             async for message in requests:
                 messages.append(message)
+                if self.mode == "headers_after_text" and len(messages) == 2:
+                    await context.send_initial_metadata(tuple(metadata.items()))
+                    self.headers_sent.set()
                 self.received.set()
                 assert message.WhichOneof("payload") == "text_chunk"
                 if self.mode == "empty_audio":

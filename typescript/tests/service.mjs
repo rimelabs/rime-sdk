@@ -57,14 +57,10 @@ export class FakeService {
             return;
           }
           if (this.mode === "error_before_audio") {
-            call.emit(
-              "error",
-              Object.assign(new Error("service failure"), {
-                code: grpc.status.UNAVAILABLE,
-              }),
-            );
+            call.emit("error", this.rejection());
             return;
           }
+          if (this.mode === "headers_after_text") return;
           const metadata = this.makeMetadata(this.responseMetadata);
           if (this.mode === "wrong_format")
             metadata.set("x-rime-audio-content-type", "audio/wav");
@@ -73,6 +69,10 @@ export class FakeService {
           if (this.mode === "no_audio_error")
             this.release = () => call.emit("error", this.rejection());
           return;
+        }
+        if (this.mode === "headers_after_text" && messages.length === 2) {
+          call.sendMetadata(this.makeMetadata(this.responseMetadata));
+          this.markHeadersSent();
         }
         if (["no_audio_error", "empty_audio"].includes(this.mode)) return;
         const send = () => {

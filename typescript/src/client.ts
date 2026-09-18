@@ -3,15 +3,12 @@ import { AudioStream, constructionKey, type TextSource } from "./stream.js";
 import { Credentials } from "./auth.js";
 import { policy, timeout, nonempty, abortable } from "./policy.js";
 import {
-  grpc,
   transport,
   connect,
   metadata,
-  serializer,
-  deserializer,
-  create,
-  schema,
-  rpcError,
+  discover,
+  type Connection,
+  type DiscoveryKind,
 } from "./transport.js";
 import {
   RimeAuthenticationError,
@@ -19,6 +16,7 @@ import {
   RimeAudioFormatError,
   RimeCancelledError,
   RimeTimeoutError,
+  RimeUnavailableError,
 } from "./errors.js";
 export interface RimeOptions {
   apiKey?: string | null;
@@ -39,7 +37,7 @@ export interface VoiceListOptions extends DiscoveryOptions {
 }
 export class Rime {
   private credentials: Credentials;
-  private client: grpc.Client | null = null;
+  private client: Connection | null = null;
   private closed = false;
   private streams = new Set<AudioStream>();
   private discoveryControllers = new Set<AbortController>();
@@ -68,25 +66,12 @@ export class Rime {
       list: async (options = {}) => {
         if (options.language !== undefined && options.language !== null)
           nonempty(options.language, "language");
-        const response = await this.discover(
-          "GetSupportedSpeakers",
-          create(schema.GetSupportedSpeakersRequestSchema, {
-            language: options.language ?? undefined,
-          }),
-          options.timeout,
-        );
-        return response.speakers;
+        return this.discover("voices", options.language, options.timeout);
       },
     };
     this.languages = {
-      list: async (options = {}) =>
-        (
-          await this.discover(
-            "GetSupportedLanguages",
-            create(schema.GetSupportedLanguagesRequestSchema),
-            options.timeout,
-          )
-        ).languages,
+      list: (options = {}) =>
+        this.discover("languages", undefined, options.timeout),
     };
   }
   private checkOpen() {
@@ -134,10 +119,10 @@ export class Rime {
     return audio;
   }
   private async discover(
-    name: "GetSupportedSpeakers" | "GetSupportedLanguages",
-    request: unknown,
+    kind: DiscoveryKind,
+    language: string | null | undefined,
     override: number | null | undefined,
-  ): Promise<any> {
+  ): Promise<string[]> {
     this.checkOpen();
     const budget = Math.min(
       timeout(override, this.defaultTimeout) ?? Infinity,
@@ -153,39 +138,14 @@ export class Rime {
     );
     try {
       const prepared = await this.prepare(controller.signal);
-      const method =
-        name === "GetSupportedSpeakers"
-          ? schema.TextToSpeech.method.getSupportedSpeakers
-          : schema.TextToSpeech.method.getSupportedLanguages;
       for (let attempt = 0; ; attempt++) {
-        let call: grpc.ClientUnaryCall | undefined;
         requestId = null;
         try {
-          const operation = new Promise((resolve, reject) => {
-            call = prepared.client.makeUnaryRequest(
-              "/rime.TextToSpeech/" + name,
-              serializer(method.input),
-              deserializer(method.output),
-              request,
-              prepared.metadata,
-              (error, result) => (error ? reject(error) : resolve(result)),
-            );
-            call.once("metadata", (responseMetadata: grpc.Metadata) => {
-              requestId =
-                responseMetadata.get("x-request-id")[0]?.toString() ?? null;
-            });
-          });
-          return await abortable(operation, controller.signal);
+          return await discover(prepared, kind, language, controller.signal);
         } catch (error) {
-          call?.cancel();
-          if (controller.signal.aborted) throw controller.signal.reason;
-          const code = (error as grpc.ServiceError).code;
-          requestId ??=
-            (error as grpc.ServiceError).metadata
-              ?.get("x-request-id")[0]
-              ?.toString() ?? null;
-          if (code !== grpc.status.UNAVAILABLE || attempt === 2)
-            throw rpcError(code, requestId);
+          if (!(error instanceof RimeUnavailableError) || attempt === 2)
+            throw error;
+          requestId = error.requestId;
           await abortable(
             new Promise<void>((resolve) =>
               setTimeout(resolve, 50 * 2 ** attempt),

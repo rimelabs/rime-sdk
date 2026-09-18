@@ -8,7 +8,6 @@ from collections.abc import AsyncIterable
 from typing import Any, Self
 
 import grpc
-from rime_api import text_to_speech_pb2 as proto
 
 from . import _policy, _transport
 from ._audio import AudioFormat
@@ -19,6 +18,7 @@ from ._errors import (
     RimeCancelledError,
     RimeInputError,
     RimeTimeoutError,
+    RimeUnavailableError,
 )
 from ._stream import _CONSTRUCTION_KEY, AudioStream
 
@@ -70,7 +70,7 @@ class Rime:
             raise RimeTimeoutError("Connection establishment timed out") from None
         return self._channel, metadata
 
-    async def _discover(self, name, message, timeout):
+    async def _discover(self, kind, language, timeout):
         self._check_loop()
         self._check_open()
         budget = self._policy.discovery_timeout
@@ -89,20 +89,14 @@ class Rime:
                     if remaining <= 0:
                         raise TimeoutError
                     request_id = None
-                    # grpc.aio batches unary headers with completion. Let its
-                    # deadline end the call so it retains received metadata;
-                    # asyncio cancellation would discard those headers.
-                    call = _transport.bind(channel, name)(
-                        message, metadata=metadata, timeout=remaining
-                    )
                     try:
-                        return await call
-                    except grpc.aio.AioRpcError as error:
-                        request_id = dict(error.initial_metadata() or ()).get(
-                            "x-request-id"
-                        ) or dict(error.trailing_metadata() or ()).get("x-request-id")
-                        if error.code() != grpc.StatusCode.UNAVAILABLE or attempt == 2:
-                            raise _transport.rpc_error(error.code(), request_id) from None
+                        return await _transport.discover(
+                            channel, metadata, kind, language, remaining
+                        )
+                    except RimeUnavailableError as error:
+                        request_id = error.request_id
+                        if attempt == 2:
+                            raise
                         async with asyncio.timeout_at(deadline):
                             await asyncio.sleep(0.05 * 2**attempt)
             except TimeoutError:
@@ -188,13 +182,11 @@ class _Voices:
         self._client = client
 
     async def list(self, language: str | None = None, *, timeout=_policy.INHERIT) -> list[str]:
-        request = proto.GetSupportedSpeakersRequest()
         if language is not None:
-            request.language = _policy.nonempty(language, "language")
-        response = await self._client._discover(
-            "GetSupportedSpeakers", request, _policy.timeout(timeout, self._client._timeout)
+            _policy.nonempty(language, "language")
+        return await self._client._discover(
+            "voices", language, _policy.timeout(timeout, self._client._timeout)
         )
-        return list(response.speakers)
 
 
 class _Languages:
@@ -202,9 +194,6 @@ class _Languages:
         self._client = client
 
     async def list(self, *, timeout=_policy.INHERIT) -> list[str]:
-        response = await self._client._discover(
-            "GetSupportedLanguages",
-            proto.GetSupportedLanguagesRequest(),
-            _policy.timeout(timeout, self._client._timeout),
+        return await self._client._discover(
+            "languages", None, _policy.timeout(timeout, self._client._timeout)
         )
-        return list(response.languages)
