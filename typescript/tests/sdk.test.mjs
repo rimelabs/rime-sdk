@@ -591,20 +591,72 @@ test("sentence limit still rejects oversized spans", async () => {
   }
 });
 
-test("bounded output cancellation and client shutdown", async () => {
+test("client shutdown stops paused output", async () => {
   await setup(async (service, client) => {
     service.mode = "burst";
     const audio = client.tts.stream("Hello.");
     await audio.next();
     await sleep(30);
-    assert.ok(audio.queue.size <= policy.outputBytes);
-    assert.ok(audio.queue.size > 0);
     await client.close();
     assert.equal(client.streams.size, 0);
     await assert.rejects(audio.next(), RimeCancelledError);
     assert.throws(() => client.tts.stream("Later."), RimeInputError);
   });
 });
+
+for (const profile of [AudioFormat.PCM_24000, AudioFormat.MULAW_8000]) {
+  test(`large audio is delivered in bounded chunks / ${profile.encoding}`, () =>
+    setup(async (service, client) => {
+      const samples = policy.outputBytes + 1;
+      service.payload = Buffer.alloc(samples * 2);
+      const chunks = [];
+      for await (const part of client.tts.stream("Hello.", {
+        audioFormat: profile,
+      }))
+        chunks.push(part);
+      assert.ok(
+        chunks.every(
+          (part) => part.length > 0 && part.length <= policy.outputChunkBytes,
+        ),
+      );
+      const expected =
+        profile === AudioFormat.PCM_24000
+          ? service.payload
+          : Buffer.alloc(Math.ceil(samples / 3), 255);
+      assert.deepEqual(Buffer.concat(chunks), expected);
+    }));
+}
+
+for (const queued of [false, true]) {
+  test(`overall timeout after producer completion / queued=${queued}`, () =>
+    setup(async (service, client) => {
+      service.payload = Buffer.alloc(queued ? policy.outputChunkBytes * 2 : 2);
+      const audio = client.tts.stream("Hello.", { timeout: 0.1 });
+      await audio.next();
+      // Production has ended, but the consumer has not observed completion.
+      await audio.worker;
+      await sleep(150);
+      await assert.rejects(audio.next(), RimeTimeoutError);
+    }));
+}
+
+test("slow consumer does not trigger stall timeout", () =>
+  setup(async (service, client) => {
+    const original = policy.progressTimeout;
+    policy.progressTimeout = 0.02;
+    // Keep the RPC open while a large response waits for output capacity.
+    service.mode = "partial_error";
+    service.payload = Buffer.alloc(policy.outputBytes * 2);
+    const audio = client.tts.stream("Hello.");
+    try {
+      assert.ok((await audio.next()).value.length);
+      await sleep(80);
+      assert.ok((await audio.next()).value.length);
+    } finally {
+      policy.progressTimeout = original;
+      await audio.cancel();
+    }
+  }));
 
 test("incomplete final PCM sample fails", async () => {
   await setup(async (service, client) => {
@@ -623,7 +675,6 @@ for (const queued of [true, false]) {
       const audio = client.tts.stream("Hello.");
       await audio.next();
       await audio.worker;
-      assert.equal(audio.queue.size > 0, queued);
       const pending = audio.next();
       const cancelled = audio.cancel();
       await assert.rejects(pending, RimeCancelledError);

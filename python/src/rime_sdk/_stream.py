@@ -36,7 +36,7 @@ class AudioStream:
         self._format = profile
         self._timeout = timeout
         self._operation_id = uuid.uuid4().hex
-        self._queue = ByteQueue(client._policy.output_bytes)
+        self._queue = ByteQueue(client._policy.output_bytes, client._policy.output_chunk_bytes)
         self._worker = None
         self._watcher = None
         self._call = None
@@ -45,7 +45,6 @@ class AudioStream:
         self._reading = False
         self._input_done = False
         self._source_waiting = False
-        self._output_waiting = False
         self._submitted = False
         self._received = False
         self._progress_at = 0.0
@@ -77,7 +76,7 @@ class AudioStream:
             return
         error.request_id = self.request_id
         self._error = error
-        self._queue.finish(error)
+        self._queue.fail(error)
         if self._call:
             self._call.cancel()
         if self._worker and self._worker is not asyncio.current_task():
@@ -96,8 +95,7 @@ class AudioStream:
                     and not self._worker.done()
                     and self._submitted
                     and not self._source_waiting
-                    and not self._output_waiting
-                    and self._queue.size == 0
+                    and not self._queue.has_pending_output
                 ):
                     limit = (
                         self._client._policy.progress_timeout
@@ -172,15 +170,6 @@ class AudioStream:
                         extra={"operation_id": self._operation_id},
                     )
 
-    async def _put(self, data):
-        step = self._client._policy.output_chunk_bytes
-        for offset in range(0, len(data), step):
-            self._output_waiting = True
-            try:
-                await self._queue.put(data[offset : offset + step])
-            finally:
-                self._output_waiting = False
-
     async def _read(self):
         assert self._call is not None
         converter = Converter(self._format)
@@ -189,10 +178,10 @@ class AudioStream:
             if data:
                 self._received = True
                 self._bytes_received += len(data)
-                await self._put(converter.process(data))
+                await self._queue.put(converter.process(data))
         if not self._input_done:
             raise RimeStreamError("The service completed before input finished")
-        await self._put(converter.process(b"", final=True))
+        await self._queue.put(converter.process(b"", final=True))
 
     async def _run(self):
         tasks = []

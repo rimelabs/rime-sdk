@@ -269,7 +269,8 @@ async def test_overall_timeout_while_paused(setup):
         await asyncio.sleep(0.12)
         with pytest.raises(RimeTimeoutError):
             await anext(audio)
-        assert audio._queue.size == 0
+        with pytest.raises(RimeTimeoutError):
+            await anext(audio)
 
 
 async def test_lazy_cancel_and_close(setup):
@@ -553,20 +554,58 @@ async def test_failed_operation_releases_state(setup):
         assert not client._streams
 
 
-async def test_bounded_output_cancellation_and_shutdown(setup):
+async def test_client_shutdown_stops_paused_output(setup):
     service, _ = setup
     service.mode = "burst"
     client = Rime(api_key="test")
     audio = client.tts.stream("Hello.")
     await anext(audio)
     await asyncio.sleep(0.03)
-    assert 0 < audio._queue.size <= client._policy.output_bytes
     await client.close()
     assert not client._streams
     with pytest.raises(RimeCancelledError):
         await anext(audio)
     with pytest.raises(RimeInputError):
         client.tts.stream("Later.")
+
+
+@pytest.mark.parametrize("profile", list(AudioFormat))
+async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
+    service, client = setup
+    samples = client._policy.output_bytes + 1
+    service.payload = b"\x00\x00" * samples
+    async with client.tts.stream("Hello.", audio_format=profile) as audio:
+        chunks = [part async for part in audio]
+    assert all(0 < len(part) <= client._policy.output_chunk_bytes for part in chunks)
+    expected = (
+        service.payload if profile is AudioFormat.PCM_24000 else b"\xff" * ((samples + 2) // 3)
+    )
+    assert b"".join(chunks) == expected
+
+
+@pytest.mark.parametrize("queued", [False, True])
+async def test_overall_timeout_after_producer_completion(setup, queued):
+    service, client = setup
+    service.payload = b"\x00\x00" * (client._policy.output_chunk_bytes if queued else 1)
+    async with client.tts.stream("Hello.", timeout=0.1) as audio:
+        assert await anext(audio)
+        # Wait for production to finish without observing iterator completion.
+        await asyncio.wait_for(asyncio.shield(audio._worker), 1)
+        await asyncio.sleep(0.15)
+        with pytest.raises(RimeTimeoutError):
+            await anext(audio)
+
+
+async def test_slow_consumer_does_not_trigger_stall_timeout(setup):
+    service, client = setup
+    client._policy = replace(client._policy, progress_timeout=0.02)
+    # Keep the RPC open while a large response waits for output capacity.
+    service.mode = "partial_error"
+    service.payload = b"\x00\x00" * client._policy.output_bytes
+    async with client.tts.stream("Hello.") as audio:
+        assert await anext(audio)
+        await asyncio.sleep(0.08)
+        assert await anext(audio)
 
 
 async def test_incomplete_final_pcm_sample(setup):

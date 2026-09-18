@@ -23,7 +23,10 @@ export type TextSource = string | AsyncIterable<string>;
 export const constructionKey = Symbol("private stream constructor");
 export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private readonly controller = new AbortController();
-  private readonly queue = new ByteQueue(policy.outputBytes);
+  private readonly queue = new ByteQueue(
+    policy.outputBytes,
+    policy.outputChunkBytes,
+  );
   private worker: Promise<void> | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
   private call: SynthesisCall | null = null;
@@ -32,7 +35,6 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private reading = false;
   private inputDone = false;
   private sourceWaiting = false;
-  private outputWaiting = false;
   private submitted = false;
   private received = false;
   private startedAt = 0;
@@ -84,8 +86,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
         !this.call.done &&
         this.submitted &&
         !this.sourceWaiting &&
-        !this.outputWaiting &&
-        this.queue.size === 0
+        !this.queue.hasPendingOutput
       ) {
         const limit = this.received
           ? policy.progressTimeout
@@ -110,7 +111,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       );
     this.failure = error;
     if (this.timer) clearInterval(this.timer);
-    this.queue.finish(error);
+    this.queue.fail(error);
     this.controller.abort(error);
     this.call?.cancel();
   }
@@ -198,16 +199,6 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       }
     }
   }
-  private async put(data: Buffer) {
-    for (let i = 0; i < data.length; i += policy.outputChunkBytes) {
-      this.outputWaiting = true;
-      try {
-        await this.queue.put(data.subarray(i, i + policy.outputChunkBytes));
-      } finally {
-        this.outputWaiting = false;
-      }
-    }
-  }
   private async read() {
     const converter = new Converter(this.format);
     for await (const data of this.call!.audio()) {
@@ -215,7 +206,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
       if (data.length) {
         this.received = true;
         this.bytesReceived += data.length;
-        await this.put(converter.process(data));
+        await this.queue.put(converter.process(data));
       }
     }
     if (!this.inputDone)
@@ -223,7 +214,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
         "The service completed before input finished",
         this.requestId,
       );
-    await this.put(converter.process(new Uint8Array(), true));
+    await this.queue.put(converter.process(new Uint8Array(), true));
   }
   private async run() {
     let tasks: Promise<void>[] = [];
