@@ -5,7 +5,10 @@ on:
 permissions:
   contents: read
 jobs:
+  packages:
+    uses: ./.github/workflows/native-build.yml
   release:
+    needs: packages
     runs-on: ubuntu-latest
     environment: npm
     defaults:
@@ -17,16 +20,21 @@ jobs:
         with:
           node-version: '22'
           registry-url: https://registry.npmjs.org
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: collected
+      - name: Verify version and complete binary set
+        run: |
+          node -e 'if(process.env.GITHUB_REF_NAME !== "typescript-v" + require("./package.json").version) process.exit(1)'
+          mkdir -p native
+          find ../collected -path '*/native/*.node' -exec cp {} native/ \;
+          test "$(find native -name '*.node' | wc -l)" -eq 5
       - run: npm ci
-      - name: Verify package tag
-        run: node -e 'const p = require("./package.json"); if(process.env.GITHUB_REF_NAME !== "typescript-v" + p.version) process.exit(1)'
-      - run: npm run check
-      - run: npm run lint
-      - run: npm test
       - run: npm pack
-      - name: Publish package
+      - name: Publish the tested native bundle
         run: |
           tag=$(node -p 'require("./package.json").version.includes("-") ? "next" : "latest"')
-          npm publish --access public --tag "$tag"
+          npm publish rimelabs-sdk-*.tgz --access public --tag "$tag"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

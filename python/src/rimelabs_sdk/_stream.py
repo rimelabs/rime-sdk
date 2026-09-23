@@ -1,55 +1,91 @@
-"""One raw-text operation, one RPC, one audio consumer."""
+"""Python iterator scheduling; native code owns stream policy."""
 
 from __future__ import annotations
 
 import asyncio
-import logging
-import time
-import uuid
+import json
+import weakref
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from typing import Self
 
-from . import _transport
-from ._audio import AudioFormat, Converter
-from ._errors import (
-    RimeCancelledError,
-    RimeError,
-    RimeInputError,
-    RimeStreamError,
-    RimeTimeoutError,
-)
-from ._queue import ByteQueue
-from ._sentences import SentenceBuffer
+from ._audio import AudioFormat
+from ._bridge import call, translate
+from ._errors import RimeError, RimeInputError
 
-_LOG = logging.getLogger(__name__)
 _CONSTRUCTION_KEY = object()
 
 
+def _consume(task):
+    if not task.cancelled():
+        task.exception()
+
+
+def _source_failed(owner, error=None):
+    stream = owner()
+    if stream is not None:
+        if error is None:
+            stream._native.cancel()
+        else:
+            stream._cause = error
+            stream._native.fail_source()
+
+
+async def _read_source(source, requests, replies, closing, owner):
+    # This task owns the iterator throughout its lifetime, including aclose().
+    # Only a weak reference reaches the stream, so cancellation can detach it safely.
+    iterator = None
+    try:
+        if isinstance(source, str):
+
+            async def one():
+                yield source
+
+            iterator = one().__aiter__()
+        else:
+            iterator = source.__aiter__()
+        while True:
+            await requests.get()
+            try:
+                item = await anext(iterator)
+            except StopAsyncIteration:
+                replies.put_nowait(("end", None))
+                break
+            replies.put_nowait(("item", item))
+            del item
+    except asyncio.CancelledError:
+        _source_failed(owner)
+    except Exception as error:  # noqa: BLE001 - preserve arbitrary host source exceptions
+        _source_failed(owner, error)
+    finally:
+        closing.set()
+        if iterator is not None and hasattr(iterator, "aclose"):
+            # Cleanup must not replace the terminal result.
+            with suppress(Exception):
+                await iterator.aclose()
+
+
+async def _bounded_cleanup(awaitable, timeout):
+    task = asyncio.ensure_future(awaitable)
+    done, _ = await asyncio.wait([task], timeout=timeout)
+    if done:
+        _consume(task)
+    else:
+        task.cancel()
+        task.add_done_callback(_consume)
+        await asyncio.sleep(0)
+
+
 class AudioStream:
-    def __init__(self, key, client, source, voice, language, profile, timeout):
+    def __init__(self, key, client, native, source, profile):
         if key is not _CONSTRUCTION_KEY:
-            raise TypeError("AudioStream is returned by client.tts.stream()")
-        self._client = client
-        self._source = source
-        self._voice = voice
-        self._language = language
-        self._format = profile
-        self._timeout = timeout
-        self._operation_id = uuid.uuid4().hex
-        self._queue = ByteQueue(client._policy.output_bytes, client._policy.output_chunk_bytes)
-        self._worker = None
-        self._watcher = None
-        self._call = None
-        self._error = None
+            raise RimeInputError("AudioStream is returned by client.tts.stream()")
+        self._client, self._native, self._source, self._format = client, native, source, profile
+        self._pump_task = None
+        self._stop_task = None
+        self._cause = None
         self._finished = False
         self._reading = False
-        self._input_done = False
-        self._source_waiting = False
-        self._submitted = False
-        self._received = False
-        self._progress_at = 0.0
-        self._bytes_received = 0
-        self._bytes_delivered = 0
 
     @property
     def format(self) -> AudioFormat:
@@ -57,220 +93,120 @@ class AudioStream:
 
     @property
     def request_id(self) -> str | None:
-        return self._call.request_id if self._call is not None else None
+        return self._native.request_id
+
+    @property
+    def _input_done(self):
+        return self._native.input_done
 
     def _start(self):
         self._client._check_loop()
-        if self._error:
-            raise self._error
-        if self._finished:
-            return
-        if self._worker is None:
-            self._client._check_open()
-            self._started_at = time.monotonic()
-            self._worker = asyncio.create_task(self._run(), name="rime:operation")
-            self._watcher = asyncio.create_task(self._watch(), name="rime:deadline")
+        call(self._native.start)
+        if self._pump_task is None:
+            self._pump_task = asyncio.create_task(self._pump())
+            self._stop_task = asyncio.create_task(self._cleanup_when_stopped())
 
-    def _fail(self, error):
-        if self._error or self._finished:
-            return
-        error.request_id = self.request_id
-        self._error = error
-        self._queue.fail(error)
-        if self._call:
-            self._call.cancel()
-        if self._worker and self._worker is not asyncio.current_task():
-            self._worker.cancel()
+    async def _cleanup_when_stopped(self):
+        await self._native.wait_stopped()
+        await self._cleanup()
 
-    async def _watch(self):
+    async def _pump(self):
+        pending = None
+        requests: asyncio.Queue[None] = asyncio.Queue(maxsize=1)
+        replies: asyncio.Queue[tuple[str, object]] = asyncio.Queue(maxsize=1)
+        closing = asyncio.Event()
+        source_task = asyncio.create_task(
+            _read_source(self._source, requests, replies, closing, weakref.ref(self))
+        )
+        stopped = asyncio.ensure_future(self._native.wait_stopped())
         try:
-            while not self._finished and not self._error:
-                await asyncio.sleep(0.02)
-                now = time.monotonic()
-                if self._timeout is not None and now - self._started_at >= self._timeout:
-                    self._fail(RimeTimeoutError("Overall synthesis deadline expired"))
-                    return
-                if (
-                    self._worker
-                    and not self._worker.done()
-                    and self._submitted
-                    and not self._source_waiting
-                    and not self._queue.has_pending_output
-                ):
-                    limit = (
-                        self._client._policy.progress_timeout
-                        if self._received
-                        else self._client._policy.first_audio_timeout
+            item, offset = "", 0
+            while (request := await self._native.input_request()) is not None:
+                if request == 0:
+                    requests.put_nowait(None)
+                    pending = asyncio.create_task(replies.get())
+                    done, _ = await asyncio.wait(
+                        [pending, stopped], return_when=asyncio.FIRST_COMPLETED
                     )
-                    if now - self._progress_at >= limit:
-                        self._fail(RimeTimeoutError("Synthesis output stopped making progress"))
-                        return
+                    if stopped in done:
+                        break
+                    kind, value = pending.result()
+                    pending = None
+                    if kind == "end":
+                        call(self._native.input_reply, '{"kind":"end"}')
+                        break
+                    if not isinstance(value, str):
+                        raise RimeInputError("The text source must yield strings")
+                    item = value
+                    del value
+                    offset = 0
+                    reply: dict[str, object] = {"kind": "item"}
                 else:
-                    # Consumer/source pauses suspend internal stall accounting.
-                    self._progress_at = now
+                    part = item[offset : offset + self._native.source_chars]
+                    offset += len(part)
+                    reply = {"kind": "text", "text": part, "last": offset == len(item)}
+                    if reply["last"]:
+                        item = ""
+                call(self._native.input_reply, json.dumps(reply, ensure_ascii=False))
         except asyncio.CancelledError:
-            pass
-
-    async def _write_sentence(self, sentence):
-        assert self._call is not None
-        if not self._submitted:
-            self._progress_at = time.monotonic()
-        self._submitted = True
-        await self._call.write(sentence)
-
-    async def _produce(self):
-        assert self._call is not None
-        buffer = SentenceBuffer(self._client._policy.sentence_bytes)
-        iterator = None
-        meaningful = False
-        try:
-            if isinstance(self._source, str):
-
-                async def one():
-                    yield self._source
-
-                iterator = one().__aiter__()
-            else:
-                try:
-                    iterator = self._source.__aiter__()
-                except Exception as error:
-                    raise RimeInputError("The text source failed") from error
-            while True:
-                self._source_waiting = True
-                try:
-                    chunk = await anext(iterator)
-                except StopAsyncIteration:
-                    break
-                except Exception as error:
-                    raise RimeInputError("The text source failed") from error
-                finally:
-                    self._source_waiting = False
-                if not isinstance(chunk, str):
-                    raise RimeInputError("The text source must yield strings")
-                if chunk.strip():
-                    meaningful = True
-                step = self._client._policy.source_chars
-                for offset in range(0, len(chunk), step):
-                    for sentence in buffer.feed(chunk[offset : offset + step]):
-                        await self._write_sentence(sentence)
-            if not meaningful:
-                raise RimeInputError("The text source contained no meaningful text")
-            for sentence in buffer.feed("", final=True):
-                await self._write_sentence(sentence)
-            await self._call.finish_input()
-            self._input_done = True
+            self._native.cancel()
+            return
+        except Exception as error:  # noqa: BLE001 - preserve arbitrary host source exceptions
+            self._cause = error
+            self._native.fail_source()
         finally:
-            if iterator is not None and hasattr(iterator, "aclose"):
-                try:
-                    async with asyncio.timeout(self._client._policy.cleanup_timeout):
-                        await iterator.aclose()
-                except (TimeoutError, RuntimeError):
-                    _LOG.debug(
-                        "Source cleanup could not complete",
-                        extra={"operation_id": self._operation_id},
-                    )
-
-    async def _read(self):
-        assert self._call is not None
-        converter = Converter(self._format)
-        async for data in self._call.audio():
-            self._progress_at = time.monotonic()
-            if data:
-                self._received = True
-                self._bytes_received += len(data)
-                await self._queue.put(converter.process(data))
-        if not self._input_done:
-            raise RimeStreamError("The service completed before input finished")
-        await self._queue.put(converter.process(b"", final=True))
-
-    async def _run(self):
-        tasks = []
-        try:
-            channel, metadata = await self._client._prepare()
-            self._call = _transport.SynthesisCall(channel, metadata)
-            await self._call.start(self._voice, self._language)
-            tasks = [
-                asyncio.create_task(self._produce(), name="rime:input"),
-                asyncio.create_task(self._read(), name="rime:audio"),
-            ]
-            # The worker owns child cancellation. Unlike gather(), wait() does
-            # not cancel children when the worker is cancelled.
-            # FIRST_EXCEPTION does not wake for a cancelled child task.
-            pending = set(tasks)
-            while pending:
-                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-                for task in done:
-                    task.result()
-            self._queue.finish()
-        except RimeError as error:
-            self._fail(error)
-        except asyncio.CancelledError:
-            if not self._error:
-                self._fail(RimeCancelledError("Synthesis cancelled"))
-        except Exception as error:  # noqa: BLE001 - terminal boundary wakes all readers
-            failure = RimeStreamError("Synthesis failed")
-            failure.__cause__ = error
-            self._fail(failure)
-        finally:
-            for task in tasks:
-                if not task.done() and not task.cancelling():
-                    task.cancel()
-            if tasks:
-                _, pending = await asyncio.wait(tasks, timeout=self._client._policy.cleanup_timeout)
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-            if self._call and not self._call.done():
-                self._call.cancel()
+            stopped.cancel()
+            if pending is not None:
+                pending.cancel()
+                pending.add_done_callback(_consume)
+            if not closing.is_set():
+                source_task.cancel()
+            await _bounded_cleanup(source_task, self._native.cleanup_timeout)
             self._source = None
-            if self._error:
-                self._client._streams.discard(self)
-            _LOG.debug(
-                "Synthesis stopped",
-                extra={
-                    "operation_id": self._operation_id,
-                    "request_id": self.request_id,
-                    "bytes_received": self._bytes_received,
-                    "bytes_delivered": self._bytes_delivered,
-                },
-            )
 
     def __aiter__(self) -> AsyncIterator[bytes]:
         return self
 
     async def __anext__(self) -> bytes:
+        # Validation must not enter cleanup on a different event loop.
+        self._client._check_loop()
+        if self._finished:
+            raise StopAsyncIteration
         if self._reading:
             raise RimeInputError("AudioStream permits only one concurrent reader")
         self._reading = True
         try:
             self._start()
-            try:
-                data = await self._queue.get()
-            except StopAsyncIteration:
-                self._finished = True
+            data, ticket = await self._native.read()
+            if data is None:
                 await self._cleanup()
-                raise
-            self._bytes_delivered += len(data)
+            call(self._native.accept_read, ticket)
+            if data is None:
+                self._finished = True
+                raise StopAsyncIteration
             return data
         except asyncio.CancelledError:
             await self.cancel()
             raise
+        except (ValueError, RimeError) as error:
+            await self._cleanup()
+            raise translate(error) from self._cause
         finally:
             self._reading = False
 
     async def _cleanup(self):
-        if self._watcher:
-            self._watcher.cancel()
-            await asyncio.gather(self._watcher, return_exceptions=True)
-        if self._worker:
-            await asyncio.gather(self._worker, return_exceptions=True)
+        if self._pump_task:
+            try:
+                await asyncio.shield(self._pump_task)
+            except asyncio.CancelledError:
+                if not self._pump_task.done():
+                    raise
         self._client._streams.discard(self)
+        self._source = None
 
     async def cancel(self) -> None:
-        if not self._finished and not self._error:
-            self._fail(RimeCancelledError("Synthesis cancelled"))
+        self._native.cancel()
         await self._cleanup()
-        self._source = None
 
     async def __aenter__(self) -> Self:
         self._start()

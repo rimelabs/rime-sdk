@@ -1,26 +1,19 @@
-"""Reusable async Rime client and public operation namespaces."""
+"""Python public interface and event-loop ownership."""
 
 from __future__ import annotations
 
 import asyncio
 import os
 from collections.abc import AsyncIterable
-from typing import Any, Self
+from typing import Self
 
-import grpc
-
-from . import _policy, _transport
+from . import _native
 from ._audio import AudioFormat
-from ._auth import Credentials
-from ._errors import (
-    RimeAudioFormatError,
-    RimeAuthenticationError,
-    RimeCancelledError,
-    RimeInputError,
-    RimeTimeoutError,
-    RimeUnavailableError,
-)
+from ._bridge import INHERIT, call, encode_options, translate
+from ._errors import RimeAudioFormatError, RimeAuthenticationError, RimeInputError
 from ._stream import _CONSTRUCTION_KEY, AudioStream
+
+_native_factory = _native.NativeClient
 
 
 class Rime:
@@ -35,15 +28,18 @@ class Rime:
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():
             raise RimeAuthenticationError("Provide api_key or set RIME_API_KEY")
-        self._timeout = _policy.timeout(timeout)
-        self._policy = _policy.resolve(model, endpoint)
-        self._credentials = Credentials(key, self._policy)
-        self._channel: grpc.aio.Channel | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
+        if endpoint is not None and not isinstance(endpoint, str):
+            raise RimeInputError("endpoint must be a hostname")
+        self._native = call(
+            _native_factory,
+            encode_options(
+                {"api_key": key, "model": model, "endpoint": endpoint, "timeout": timeout}
+            ),
+        )
         self._pid = os.getpid()
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._closed = False
         self._streams: set[AudioStream] = set()
-        self._discovery_tasks: set[asyncio.Task[Any]] = set()
         self._close_task: asyncio.Task[None] | None = None
         self.tts = _TTS(self)
         self.voices = _Voices(self)
@@ -59,79 +55,34 @@ class Rime:
             raise RimeInputError("A Rime client belongs to one process and event loop")
         self._loop = loop
 
-    async def _prepare(self):
+    async def _discover(self, voices, language, timeout):
         self._check_loop()
         self._check_open()
-        metadata = await self._credentials.metadata()
-        self._check_open()
-        if self._channel is None:
-            self._channel = _transport.make_channel(self._policy)
+        if language is not None and (not isinstance(language, str) or not language.strip()):
+            raise RimeInputError("language must be a non-empty string")
+        if (
+            timeout is not INHERIT
+            and timeout is not None
+            and (isinstance(timeout, bool) or not isinstance(timeout, (int, float)))
+        ):
+            raise RimeInputError("timeout must be a number or None")
         try:
-            async with asyncio.timeout(self._policy.connection_timeout):
-                await self._channel.channel_ready()
-        except TimeoutError:
-            raise RimeTimeoutError("Connection establishment timed out") from None
-        return self._channel, metadata
-
-    async def _discover(self, kind, language, timeout):
-        self._check_loop()
-        self._check_open()
-        budget = self._policy.discovery_timeout
-        if timeout is not None:
-            budget = min(budget, timeout)
-
-        async def run():
-            request_id = None
-            loop = asyncio.get_running_loop()
-            deadline = loop.time() + budget
-            try:
-                async with asyncio.timeout_at(deadline):
-                    channel, metadata = await self._prepare()
-                for attempt in range(3):
-                    remaining = deadline - loop.time()
-                    if remaining <= 0:
-                        raise TimeoutError
-                    request_id = None
-                    try:
-                        return await _transport.discover(
-                            channel, metadata, kind, language, remaining
-                        )
-                    except RimeUnavailableError as error:
-                        request_id = error.request_id
-                        if attempt == 2:
-                            raise
-                        async with asyncio.timeout_at(deadline):
-                            await asyncio.sleep(0.05 * 2**attempt)
-            except TimeoutError:
-                raise RimeTimeoutError(
-                    "Discovery deadline expired", request_id=request_id
-                ) from None
-
-        task = asyncio.create_task(run(), name="rime:discovery")
-        self._discovery_tasks.add(task)
-        try:
-            return await task
-        except asyncio.CancelledError:
-            if self._closed:
-                raise RimeCancelledError("Client closed during discovery") from None
-            raise
-        finally:
-            self._discovery_tasks.discard(task)
+            return await self._native.discover(
+                voices, language, None if timeout is INHERIT else timeout, timeout is INHERIT
+            )
+        except ValueError as error:
+            raise translate(error) from None
 
     async def _shutdown(self):
+        self._native.cancel()
         await asyncio.gather(*(stream.cancel() for stream in list(self._streams)))
-        for task in self._discovery_tasks:
-            task.cancel()
-        await asyncio.gather(*self._discovery_tasks, return_exceptions=True)
-        await self._credentials.close()
-        if self._channel:
-            await self._channel.close()
+        await self._native.close()
 
     async def close(self) -> None:
         self._check_loop()
         if self._close_task is None:
             self._closed = True
-            self._close_task = asyncio.create_task(self._shutdown(), name="rime:close")
+            self._close_task = asyncio.create_task(self._shutdown())
         await asyncio.shield(self._close_task)
 
     async def __aenter__(self) -> Self:
@@ -154,7 +105,7 @@ class _TTS:
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
-        timeout: float | None | object = _policy.INHERIT,
+        timeout: float | None | object = INHERIT,
     ) -> AudioStream:
         self._client._check_open()
         if isinstance(text, str):
@@ -162,20 +113,18 @@ class _TTS:
                 raise RimeInputError("Text must contain non-whitespace characters")
         elif not hasattr(text, "__aiter__"):
             raise RimeInputError("text must be a string or an async iterable of strings")
-        voice = "clementine" if voice is None else _policy.nonempty(voice, "voice")
-        _policy.nonempty(language, "language")
         profile = AudioFormat.PCM_24000 if audio_format is None else audio_format
         if not isinstance(profile, AudioFormat):
             raise RimeAudioFormatError("Select a named AudioFormat profile")
-        stream = AudioStream(
-            _CONSTRUCTION_KEY,
-            self._client,
-            text,
-            voice,
-            language,
-            profile,
-            _policy.timeout(timeout, self._client._timeout),
-        )
+        options = {
+            "voice": "clementine" if voice is None else voice,
+            "language": language,
+            "profile": profile.name,
+            "timeout": None if timeout is INHERIT else timeout,
+            "inherit_timeout": timeout is INHERIT,
+        }
+        native = call(self._client._native.stream, encode_options(options))
+        stream = AudioStream(_CONSTRUCTION_KEY, self._client, native, text, profile)
         self._client._streams.add(stream)
         return stream
 
@@ -184,19 +133,13 @@ class _Voices:
     def __init__(self, client):
         self._client = client
 
-    async def list(self, language: str | None = None, *, timeout=_policy.INHERIT) -> list[str]:
-        if language is not None:
-            _policy.nonempty(language, "language")
-        return await self._client._discover(
-            "voices", language, _policy.timeout(timeout, self._client._timeout)
-        )
+    async def list(self, language: str | None = None, *, timeout=INHERIT) -> list[str]:
+        return await self._client._discover(True, language, timeout)
 
 
 class _Languages:
     def __init__(self, client):
         self._client = client
 
-    async def list(self, *, timeout=_policy.INHERIT) -> list[str]:
-        return await self._client._discover(
-            "languages", None, _policy.timeout(timeout, self._client._timeout)
-        )
+    async def list(self, *, timeout=INHERIT) -> list[str]:
+        return await self._client._discover(False, None, timeout)

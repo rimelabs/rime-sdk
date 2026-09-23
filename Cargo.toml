@@ -1,0 +1,26 @@
+[workspace]
+members = ["crates/sdk-core", "crates/sdk-protocol", "crates/blingfire-sys", "bindings/python", "bindings/node"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+
+[workspace.dependencies]
+sdk-core = { path = "crates/sdk-core" }
+sdk-protocol = { path = "crates/sdk-protocol" }
+blingfire-sys = { path = "crates/blingfire-sys" }
+tokio = { version = "1.53", features = ["rt-multi-thread", "sync", "time", "net", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-stream = "0.1"
+tonic = { version = "0.14", features = ["tls-native-roots", "tls-ring"] }
+prost = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bytes = "1"
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"
+

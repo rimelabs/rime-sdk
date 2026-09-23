@@ -2,7 +2,7 @@
 
 First-party Python and Node.js SDKs for Coda streaming speech.
 Both packages accept complete text or an async text source and return audio chunks.
-The SDK handles sentence detection, API-key exchange, gRPC, conversion, and cancellation.
+The SDK handles sentence detection, authentication, gRPC, conversion, and cancellation.
 
 | Package | Location | Runtime | Local version |
 | --- | --- | --- | --- |
@@ -12,12 +12,12 @@ The SDK handles sentence detection, API-key exchange, gRPC, conversion, and canc
 ## Local setup
 
 ```sh
-cd python
-uv sync --locked --dev
-uv run pytest
-cd ../typescript
-npm ci
-npm test
+uv sync --project python --locked --dev
+npm ci --prefix typescript
+uv run --no-project tools/build-native.py --test-support
+uv run --project python --no-sync pytest python/tests
+npm test --prefix typescript
+cargo test --locked -p sdk-core --features test-support
 ```
 
 Set `RIME_API_KEY` in your application environment. The SDK does not load `.env` files.
@@ -25,7 +25,7 @@ See the package READMEs for use and the [examples](examples/) for runnable scrip
 
 ## Repository boundaries
 
-- Each language owns its dependencies, tests, version, changelog, and release workflow.
+- The Rust core owns SDK behavior; Python and Node own their public adapters.
+- Each package keeps its version, changelog, types, and release workflow.
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
-- Canonical schemas remain in their existing repository. These packages consume
-  published `rime-api` and `@rimelabs/api` version 0.0.1.
+- Canonical schemas remain in `rime`. Native builds use the pinned protocol descriptor.

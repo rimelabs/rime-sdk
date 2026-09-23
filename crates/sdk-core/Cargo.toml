@@ -1,0 +1,38 @@
+[package]
+name = "sdk-core"
+version.workspace = true
+edition.workspace = true
+
+[features]
+test-support = []
+
+[dependencies]
+sdk-protocol.workspace = true
+blingfire-sys.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bytes.workspace = true
+prost.workspace = true
+tonic-prost = "0.14"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls-native-roots", "stream"] }
+futures-util = "0.3"
+hyper-util = { version = "0.1", features = ["tokio"] }
+hyper = { version = "1", features = ["client", "http2"] }
+h2 = "0.4"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls-native-certs = "0.8"
+tower = { version = "0.5", features = ["util"] }
+base64 = "0.22"
+percent-encoding = "2"
+ipnet = "2"
+http-body = "1"
+http-body-util = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+rcgen = "0.14"
+tokio-stream = { workspace = true, features = ["net"] }

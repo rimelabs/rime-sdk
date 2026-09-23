@@ -1,0 +1,18 @@
+[package]
+name = "rime-python"
+version.workspace = true
+edition.workspace = true
+[features]
+test-support = ["sdk-core/test-support"]
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+[dependencies]
+sdk-core.workspace = true
+pyo3 = { version = "0.29", features = ["extension-module", "abi3-py311"] }
+pyo3-async-runtimes = { version = "0.29", features = ["tokio-runtime"] }
+tokio.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+[build-dependencies]
+pyo3-build-config = "0.29"

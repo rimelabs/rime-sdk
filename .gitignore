@@ -10,3 +10,11 @@ coverage/
 *.egg-info/
 *.tgz
 *.pcm
+target/
+*.node
+*.so
+*.pyd
+*.whl
+
+/artifacts/
+/.artifact-venv/

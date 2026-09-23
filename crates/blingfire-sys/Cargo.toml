@@ -1,0 +1,9 @@
+[package]
+name = "blingfire-sys"
+version.workspace = true
+edition.workspace = true
+links = "rime_blingfire"
+license = "MIT"
+
+[build-dependencies]
+cc = { version = "1", features = ["parallel"] }

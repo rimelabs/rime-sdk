@@ -15,25 +15,35 @@
   },
   "files": [
     "dist",
-    "vendor",
+    "native/*.node",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "THIRD_PARTY_LICENSES.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "prepack": "npm run build",
-    "lint": "prettier --check src tests"
-  },
-  "dependencies": {
-    "@bufbuild/protobuf": "^2.11.0",
-    "@grpc/grpc-js": "^1.14.0",
-    "@rimelabs/api": "0.0.1"
+    "prepack": "npm run build && node scripts/check-package.mjs",
+    "lint": "prettier --check src tests",
+    "build:native": "uv run --no-project ../tools/build-native.py --release"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "prettier": "3.9.8",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "@bufbuild/protobuf": "^2.11.0",
+    "@grpc/grpc-js": "^1.14.0",
+    "@rimelabs/api": "0.0.1"
+  },
+  "napi": {
+    "binaryName": "rime-sdk",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc"
+    ]
   }
 }

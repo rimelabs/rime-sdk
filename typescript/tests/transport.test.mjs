@@ -1,130 +1,180 @@
-import test from "node:test";
+import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http2";
+import { once } from "node:events";
+import { createServer as createTcpServer } from "node:net";
 import { setTimeout as sleep } from "node:timers/promises";
-import * as grpc from "@grpc/grpc-js";
-import { SynthesisCall, discover } from "../dist/transport.js";
 import {
-  RimeAudioFormatError,
-  RimeAuthenticationError,
+  Rime,
   RimePermissionError,
   RimeTimeoutError,
   RimeUnavailableError,
-} from "../dist/errors.js";
+} from "../dist/index.js";
+import { factory, native } from "../dist/native.js";
 import { FakeService } from "./service.mjs";
 
-async function setup(fn) {
-  const server = await new FakeService().start();
-  const client = new grpc.Client(
-    server.target,
-    grpc.credentials.createInsecure(),
-    {
-      "grpc.enable_retries": 0,
-    },
-  );
-  const metadata = new grpc.Metadata();
-  metadata.set("authorization", "Bearer test-token");
-  const controller = new AbortController();
-  const timer = setTimeout(
-    () => controller.abort(new RimeTimeoutError("Test timed out")),
-    2000,
-  );
-  try {
-    await fn(server, { client, metadata }, controller.signal);
-  } finally {
-    clearTimeout(timer);
-    client.close();
-    server.close();
-  }
-}
-
-for (const [status, errorType] of [
-  [grpc.status.UNAVAILABLE, RimeUnavailableError],
-  [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
-  [grpc.status.PERMISSION_DENIED, RimePermissionError],
-]) {
-  test(`write after rejection without reader / ${status}`, () =>
-    setup(async (server, prepared, signal) => {
-      server.mode = "error_before_audio";
-      server.rejectionStatus = status;
-      server.trailingMetadata = { "x-request-id": "rejected-request" };
-      const call = new SynthesisCall(prepared, signal);
-      try {
-        await call.start("clementine", "en");
-        while (!call.done) await sleep(1, undefined, { signal });
-        await assert.rejects(
-          call.write("Hello."),
-          (error) =>
-            error instanceof errorType &&
-            error.requestId === "rejected-request",
+for (const phase of ["before", "after"])
+  for (const operation of ["stream", "voices", "languages"])
+    test(`connection drop ${phase} response headers / ${operation}`, async () => {
+      const server = createServer();
+      let attempts = 0;
+      server.on("stream", (stream) => {
+        attempts++;
+        const session = stream.session;
+        if (phase === "after") {
+          stream.respond({
+            ":status": 200,
+            "content-type": "application/grpc",
+          });
+          // A ping reply confirms that the client received the response headers.
+          session.ping(() => session.destroy());
+        } else {
+          session.destroy();
+        }
+      });
+      server.listen(0, "127.0.0.1");
+      await once(server, "listening");
+      const previous = factory.create;
+      factory.create = (config) =>
+        native.NativeClient.testing(
+          config,
+          `127.0.0.1:${server.address().port}`,
+          "{}",
         );
-        assert.equal(call.requestId, "rejected-request");
-        assert.equal(server.calls.length, 1);
-      } finally {
-        call.cancel();
-      }
-    }));
-}
-
-for (const mode of ["odd_chunks", "headers_after_text"]) {
-  test(`audio and wire order / ${mode}`, () =>
-    setup(async (server, prepared, signal) => {
-      server.mode = mode;
-      server.trailingMetadata = { "x-request-id": "trailer-id" };
-      const call = new SynthesisCall(prepared, signal);
+      const client = new Rime({ apiKey: "test-key", timeout: 2 });
       try {
-        await call.start("voice", "de");
-        await call.write("Hello.");
-        call.finishInput();
-        const chunks = [];
-        for await (const part of call.audio()) chunks.push(part);
-        assert.deepEqual(Buffer.concat(chunks), server.payload);
-        if (mode === "odd_chunks")
-          assert.deepEqual(chunks, [
-            server.payload.subarray(0, 1),
-            server.payload.subarray(1),
-          ]);
-        assert.equal(call.requestId, "test-request");
-        assert.equal(server.calls.length, 1);
-        assert.deepEqual(
-          server.calls[0].map((m) => m.payload.case),
-          ["header", "textChunk"],
-        );
-        const header = server.calls[0][0].payload.value;
-        assert.equal(header.speaker, "voice");
-        assert.equal(header.language, "de");
-        assert.equal(header.audioParameters.audioFormat, "audio/pcm");
-        assert.equal(
-          server.metadata[0].get("authorization")[0],
-          "Bearer test-token",
-        );
+        await assert.rejects(async () => {
+          if (operation === "stream") {
+            for await (const _chunk of client.tts.stream("Hello.")) {
+              assert.fail("The server must not send audio");
+            }
+          } else {
+            await client[operation].list();
+          }
+        }, RimeUnavailableError);
+        assert.equal(attempts, operation === "stream" ? 1 : 3);
       } finally {
-        call.cancel();
+        await client.close();
+        await new Promise((resolve) => server.close(resolve));
+        factory.create = previous;
       }
-    }));
-}
+    });
 
-for (const mode of ["empty_no_headers", "empty_audio"]) {
-  test(`empty success requires audio metadata / ${mode}`, () =>
-    setup(async (server, prepared, signal) => {
-      server.mode = mode;
-      server.responseMetadata = {};
-      const call = new SynthesisCall(prepared, signal);
-      try {
-        await call.start("voice", "en");
-        call.finishInput();
-        await assert.rejects(call.audio().next(), RimeAudioFormatError);
-      } finally {
-        call.cancel();
-      }
-    }));
-}
-
-test("discovery transport does not retry", () =>
-  setup(async (server, prepared, signal) => {
-    server.discoveryFailures = 1;
-    await assert.rejects(
-      discover(prepared, "languages", undefined, signal),
-      RimeUnavailableError,
+test("connection deadline includes waiting for peer HTTP/2 settings", async () => {
+  const sockets = new Set();
+  const server = createTcpServer((socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+    socket.resume();
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const previous = factory.create;
+  factory.create = (config) =>
+    native.NativeClient.testing(
+      config,
+      `127.0.0.1:${server.address().port}`,
+      JSON.stringify({ connection_timeout: 0.1, first_audio_timeout: 0.6 }),
     );
-    assert.equal(server.discoveryCalls, 1);
-  }));
+  const client = new Rime({ apiKey: "test-key" });
+  let reads = 0;
+  async function* source() {
+    reads++;
+    yield "Hello.";
+  }
+  try {
+    const start = performance.now();
+    await assert.rejects(client.tts.stream(source()).next(), (error) => {
+      assert.ok(error instanceof RimeTimeoutError);
+      assert.match(error.message, /Connection establishment timed out/);
+      return true;
+    });
+    assert.ok(performance.now() - start < 500);
+    assert.equal(reads, 0);
+  } finally {
+    await client.close();
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => server.close(resolve));
+    factory.create = previous;
+  }
+});
+
+test("connection waits until peer settings allow requests", async () => {
+  const server = createServer({ settings: { maxConcurrentStreams: 0 } });
+  const sessions = new Set();
+  server.on("session", (session) => {
+    sessions.add(session);
+    session.on("close", () => sessions.delete(session));
+  });
+  server.on("stream", (stream) => {
+    stream.respond(
+      {
+        ":status": 200,
+        "content-type": "application/grpc",
+        "grpc-status": "7",
+      },
+      { endStream: true },
+    );
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const previous = factory.create;
+  factory.create = (config) =>
+    native.NativeClient.testing(
+      config,
+      `127.0.0.1:${server.address().port}`,
+      JSON.stringify({ connection_timeout: 1 }),
+    );
+  const client = new Rime({ apiKey: "test-key" });
+  let reads = 0;
+  async function* source() {
+    reads++;
+    yield "Hello.";
+  }
+  try {
+    const sessionReady = once(server, "session");
+    const result = assert.rejects(
+      client.tts.stream(source()).next(),
+      RimePermissionError,
+    );
+    const [session] = await sessionReady;
+    await once(session, "localSettings");
+    await sleep(30);
+    assert.equal(reads, 0);
+    session.settings({ maxConcurrentStreams: 1 });
+    await result;
+  } finally {
+    await client.close();
+    for (const session of sessions) session.destroy();
+    await new Promise((resolve) => server.close(resolve));
+    factory.create = previous;
+  }
+});
+
+for (const mode of ["odd_chunks", "headers_after_text"])
+  test(`audio and wire order / ${mode}`, async () => {
+    const service = await new FakeService().start();
+    const previous = factory.create;
+    factory.create = (config) =>
+      native.NativeClient.testing(config, service.target, "{}");
+    const client = new Rime({ apiKey: "test-key" });
+    try {
+      service.mode = mode;
+      const chunks = [];
+      for await (const chunk of client.tts.stream("Hello.", {
+        voice: "voice",
+        language: "de",
+      }))
+        chunks.push(chunk);
+      assert.deepEqual(Buffer.concat(chunks), service.payload);
+      assert.equal(service.calls.length, 1);
+      assert.deepEqual(
+        service.calls[0].map((m) => m.payload.case),
+        ["header", "textChunk"],
+      );
+    } finally {
+      await client.close();
+      service.close();
+      factory.create = previous;
+    }
+  });

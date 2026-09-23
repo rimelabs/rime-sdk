@@ -22,6 +22,7 @@ class FakeService:
         self.release = asyncio.Event()
         self.received = asyncio.Event()
         self.discovery_calls = 0
+        self.language_calls = 0
         self.discovery_failures = 0
         self.payload = b"\x01\x00" * 2400
 
@@ -81,15 +82,17 @@ class FakeService:
 
     async def languages(self, message, context):
         self.discovery_calls += 1
+        self.language_calls += 1
         if self.mode == "discovery_timeout":
             await self.discovery_timeout(context)
         if self.mode == "discovery_error":
             await self.discovery_error(context)
-        if self.discovery_calls <= self.discovery_failures:
+        if self.language_calls <= self.discovery_failures:
             await context.abort(grpc.StatusCode.UNAVAILABLE, "test retryable discovery")
         return proto.GetSupportedLanguagesResponse(languages=["en", "de"])
 
     async def voices(self, message, context):
+        self.discovery_calls += 1
         if self.mode == "discovery_timeout":
             await self.discovery_timeout(context)
         if self.mode == "discovery_error":

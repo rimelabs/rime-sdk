@@ -1,6 +1,7 @@
 # Rime SDK for Python
 
-Requires Python 3.11 or later. Use `uv` to install the local package:
+Requires CPython 3.11 or later. Published wheels contain the Rust extension.
+Source builds require Rust 1.96 and a C++ compiler. Use `uv` to install the local package:
 
 ```sh
 uv add /path/to/rime-sdk/python
@@ -68,11 +69,10 @@ Catch `RimeError` or one of `RimeAuthenticationError`, `RimePermissionError`,
 Cancellation of the caller's Python task keeps `asyncio.CancelledError`.
 
 Authentication temporarily sends the API key directly as a bearer token.
-Restore the commented call in `_auth.py` when Themis is ready.
+The inactive Themis exchange is now in the shared Rust core.
 
-The retained API-key exchange follows the assumed private contract in
-[authentication](../docs/authentication.md). It has local tests, but no live
-service validation.
+The retained API-key exchange follows an assumed private contract. It has local
+tests, but no live service validation.
 
 ## Development
 
@@ -81,6 +81,7 @@ uv sync --locked --dev
 uv run ruff check src tests
 uv run ruff format --check src tests
 uv run mypy src
-uv run pytest
+uv run --no-project ../tools/build-native.py --test-support
+uv run --no-sync pytest
 uv build
 ```

@@ -1,0 +1,17 @@
+[package]
+name = "rime-node"
+version.workspace = true
+edition.workspace = true
+[features]
+test-support = ["sdk-core/test-support"]
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+sdk-core.workspace = true
+napi = { version = "3", features = ["napi8", "tokio_rt"] }
+napi-derive = "3"
+tokio.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+[build-dependencies]
+napi-build = "2"

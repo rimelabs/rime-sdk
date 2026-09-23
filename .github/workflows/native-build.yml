@@ -1,0 +1,106 @@
+name: Build native packages
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            node: linux-x64-gnu
+            container: quay.io/pypa/manylinux_2_28_x86_64:latest
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            node: linux-arm64-gnu
+            container: quay.io/pypa/manylinux_2_28_aarch64:latest
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            node: darwin-x64
+          - os: macos-15
+            target: aarch64-apple-darwin
+            node: darwin-arm64
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            node: win32-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.96.0'
+      - name: Use a static runtime for Windows Rust and C++ code
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # An explicit target keeps these flags out of host proc-macro builds.
+          "CARGO_BUILD_TARGET=${{ matrix.target }}" >> $env:GITHUB_ENV
+          "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS=-C target-feature=+crt-static" >> $env:GITHUB_ENV
+      - run: uv sync --project python --locked --dev
+      - run: npm ci --prefix typescript
+      - name: Build private test extensions
+        run: uv run --no-project tools/build-native.py --test-support
+      - run: cargo test --locked -p sdk-core --features test-support
+      - run: uv run --project python --no-sync pytest python/tests
+      - run: npm test --prefix typescript
+      - name: Create Linux artifact directories as the runner user
+        if: runner.os == 'Linux'
+        run: mkdir -p artifacts/native artifacts/wheels
+      - name: Build portable Linux wheels and Node libraries
+        if: runner.os == 'Linux'
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: '2_28'
+          container: ${{ matrix.container }}
+          rust-toolchain: '1.96.0'
+          working-directory: python
+          args: --release --locked --out ../artifacts/wheels
+          before-script-linux: |
+            cd ..
+            cargo build --locked --release -p rime-node
+            mkdir -p artifacts/native
+            cp target/release/librime_node.so artifacts/native/rime-sdk.${{ matrix.node }}.node
+            cd python
+      - name: Build macOS and Windows packages
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          uv run --no-project tools/build-native.py --release
+          mkdir -p artifacts/native artifacts/wheels
+          cp typescript/native/*.node artifacts/native/
+          (cd python && uv run --no-sync maturin build --release --locked --out ../artifacts/wheels)
+      - name: Install and test production wheel
+        shell: bash
+        run: |
+          uv venv .artifact-venv
+          if [[ "$RUNNER_OS" == Windows ]]; then interpreter=.artifact-venv/Scripts/python.exe; else interpreter=.artifact-venv/bin/python; fi
+          uv pip install --python "$interpreter" --no-deps artifacts/wheels/*.whl
+          "$interpreter" tools/smoke-python.py
+      - name: Install and test production npm package
+        shell: bash
+        run: |
+          cp artifacts/native/*.node typescript/native/
+          (cd typescript && npm pack --pack-destination ../artifacts)
+          mkdir -p artifacts/node-install
+          cd artifacts/node-install
+          npm install --ignore-scripts --omit=dev ../rimelabs-sdk-*.tgz
+          cp ../../tools/smoke-node.mjs smoke.mjs
+          node smoke.mjs
+      - name: Check Windows runtime dependencies and clean installation
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: tools/check-windows-package.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.target }}
+          path: artifacts/

@@ -1,5 +1,20 @@
 [
   {
+    "id": "word_joiner_at_boundary",
+    "text": "Hello. \u2060Next.",
+    "sentences": ["Hello.", " \u2060Next."]
+  },
+  {
+    "id": "word_joiner_inside_sentence",
+    "text": "Hello\u2060 world. The next sentence has enough context.\u2060",
+    "sentences": ["Hello\u2060 world.", " The next sentence has enough context.\u2060"]
+  },
+  {
+    "id": "nul_inside_sentence",
+    "text": "Hello\u0000 world. Next.",
+    "sentences": ["Hello\u0000 world.", " Next."]
+  },
+  {
     "id": "title_after_exclamation",
     "text": "Hi! Dr. Smith agrees. Hello.",
     "sentences": ["Hi!", " Dr.", " Smith agrees.", " Hello."]

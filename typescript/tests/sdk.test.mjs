@@ -1,3 +1,4 @@
+import { factory, native } from "../dist/native.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -13,12 +14,15 @@ import {
   RimeAuthenticationError,
   RimePermissionError,
   RimeResourceLimitError,
+  RimeStreamError,
 } from "../dist/index.js";
 import { SentenceBuffer, ready } from "../dist/sentences.js";
 import { Converter } from "../dist/audio.js";
-import { authentication, Credentials } from "../dist/auth.js";
-import { transport, rpcError } from "../dist/transport.js";
-import { policy } from "../dist/policy.js";
+const policy = {
+  outputBytes: 96000,
+  outputChunkBytes: 9600,
+  progressTimeout: 0.2,
+};
 import { FakeService } from "./service.mjs";
 const fixtures = JSON.parse(
   fs.readFileSync(new URL("../../conformance/sentences.json", import.meta.url)),
@@ -33,39 +37,23 @@ async function collect(stream) {
   return Buffer.concat(chunks);
 }
 async function setup(fn) {
-  // Keep exercising the retained Themis path while direct auth is temporary.
-  const oldMetadata = Credentials.prototype.metadata;
-  Credentials.prototype.metadata = Credentials.prototype.themisMetadata;
   const service = await new FakeService().start();
-  const oldFactory = transport.makeClient,
-    oldExchange = authentication.exchangeKey;
-  transport.makeClient = () =>
-    new grpc.Client(service.target, grpc.credentials.createInsecure(), {
-      "grpc.enable_retries": 0,
-    });
-  authentication.exchangeKey = async () => ({
-    value: "test-token",
-    expiresAt: Date.now() / 1000 + 3600,
-    audience: policy.audience,
-  });
+  const previous = factory.create;
+  factory.create = (config) =>
+    native.NativeClient.testing(
+      config,
+      service.target,
+      JSON.stringify({ first_audio_timeout: 0.2, progress_timeout: 0.2 }),
+    );
   const client = new Rime({ apiKey: "test-key" });
   try {
     await fn(service, client);
   } finally {
     await client.close();
     service.close();
-    transport.makeClient = oldFactory;
-    authentication.exchangeKey = oldExchange;
-    Credentials.prototype.metadata = oldMetadata;
+    factory.create = previous;
   }
 }
-test("temporary bearer auth", async () => {
-  const credentials = new Credentials("test-key");
-  const signal = new AbortController().signal;
-  assert.equal(await credentials.metadata(signal), "Bearer test-key");
-  await credentials.close();
-  await assert.rejects(credentials.metadata(signal), /closed/);
-});
 for (const fixture of fixtures)
   for (const size of contract.chunk_sizes)
     test(`sentences ${fixture.id} / ${size}`, async () => {
@@ -132,11 +120,11 @@ test("sentence storage does not grow with completed text", async () => {
   const output = [];
   for (const sentence of buffer.feed(text)) {
     output.push(sentence);
-    assert.ok(Buffer.byteLength(buffer.pending) < 2048);
+    assert.ok(buffer.retainedBytes < 2048);
   }
   output.push(...buffer.feed("", true));
   assert.equal(output.join(""), text);
-  assert.equal(buffer.pending, "");
+  assert.equal(buffer.retainedBytes, 0);
 });
 test("sentence messages ignore source chunk size", () =>
   setup(async (service, client) => {
@@ -171,14 +159,6 @@ test("public validation", () => {
     () => client.tts.stream("Hi", { audioFormat: "wav" }),
     RimeAudioFormatError,
   );
-});
-test("error conformance", () => {
-  for (const [status, name] of Object.entries(contract.grpc_errors)) {
-    const error = rpcError(grpc.status[status], "id");
-    assert.equal(error.name, name);
-    assert.equal(error.requestId, "id");
-    assert.equal(error.grpcStatus, undefined);
-  }
 });
 for (const [name, expected] of Object.entries(contract.profiles))
   test(`audio ${name}`, () => {
@@ -223,7 +203,7 @@ test("complete input uses streaming RPC", () =>
     assert.equal(service.calls[0][0].payload.value.speaker, "clementine");
     assert.equal(
       service.metadata[0].get("authorization")[0],
-      "Bearer test-token",
+      "Bearer test-key",
     );
   }));
 test("incremental_audio_before_input_end", () =>
@@ -272,6 +252,20 @@ test("overall_timeout_while_paused", () =>
     await assert.rejects(() => audio.next(), RimeTimeoutError);
     await audio.cancel();
   }));
+test("client close preserves cancellation before stream start", () =>
+  setup(async (service, client) => {
+    let sourceTouched = false;
+    async function* source() {
+      sourceTouched = true;
+      yield "Hello.";
+    }
+    const audio = client.tts.stream(source());
+    await client.close();
+    await assert.rejects(() => audio.next(), RimeCancelledError);
+    assert.equal(sourceTouched, false);
+    assert.equal(service.calls.length, 0);
+    assert.throws(() => client.tts.stream("New work."), RimeInputError);
+  }));
 test("lazy startup and cancellation before start", () =>
   setup(async (service, client) => {
     const audio = client.tts.stream("Hi.", { timeout: 0.01 });
@@ -281,6 +275,41 @@ test("lazy startup and cancellation before start", () =>
     await audio.cancel();
     await assert.rejects(() => audio.next(), RimeCancelledError);
   }));
+
+for (const completion of ["resolve", "reject"]) {
+  test(`cancellation stops a pending source read / late ${completion}`, () =>
+    setup(async (_, client) => {
+      const started = Promise.withResolvers();
+      const pending = Promise.withResolvers();
+      let returned = 0;
+      const source = {
+        [Symbol.asyncIterator]() {
+          return {
+            next() {
+              started.resolve();
+              return pending.promise;
+            },
+            async return() {
+              returned++;
+              return { done: true };
+            },
+          };
+        },
+      };
+      const stream = client.tts.stream(source);
+      const checked = assert.rejects(stream.next(), RimeCancelledError);
+      await started.promise;
+      await stream.cancel();
+      await checked;
+      assert.equal(returned, 1);
+      assert.equal(client.streams.size, 0);
+      if (completion === "resolve")
+        pending.resolve({ done: false, value: "Too late." });
+      else pending.reject(new Error("late source failure"));
+      // Give a late rejection time to surface as an unhandled rejection.
+      await sleep(0);
+    }));
+}
 test("no_synthesis_replay", () =>
   setup(async (service, client) => {
     service.mode = "error_before_audio";
@@ -301,18 +330,8 @@ test("format validation and odd chunk alignment", () =>
     await assert.rejects(() => collect(audio), RimeAudioFormatError);
     await audio.cancel();
   }));
-test("shared refresh and discovery retries", () =>
+test("discovery retries with a shared connection", () =>
   setup(async (service, client) => {
-    let calls = 0;
-    authentication.exchangeKey = async () => {
-      calls++;
-      await sleep(20);
-      return {
-        value: "token",
-        expiresAt: Date.now() / 1000 + 3600,
-        audience: policy.audience,
-      };
-    };
     service.discoveryFailures = 1;
     assert.deepEqual(
       await Promise.all([
@@ -321,114 +340,8 @@ test("shared refresh and discovery retries", () =>
       ]),
       [["test-speaker"], ["en", "de"]],
     );
-    assert.equal(calls, 1);
+    assert.equal(service.discoveryCalls, 2);
   }));
-
-test("private Themis HTTP exchange", async () => {
-  const { createServer } = await import("node:http");
-  const { exchangeKey } = await import("../dist/auth.js");
-  let status = 200;
-  let body = {
-    access_token: "token",
-    expires_in: 60,
-    audience: policy.audience,
-  };
-  const server = createServer(async (request, response) => {
-    assert.equal(request.headers.authorization, "Api-Key local-test-secret");
-    const chunks = [];
-    for await (const chunk of request) chunks.push(chunk);
-    assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), {
-      audience: policy.audience,
-    });
-    response.writeHead(status, { "content-type": "application/json" });
-    response.end(JSON.stringify(body));
-  });
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const original = policy.exchangeUrl;
-  policy.exchangeUrl = `http://127.0.0.1:${server.address().port}/v1/token`;
-  try {
-    assert.equal(
-      (await exchangeKey("local-test-secret", new AbortController().signal))
-        .value,
-      "token",
-    );
-    for (const [code, errorType] of [
-      [401, RimeAuthenticationError],
-      [403, RimePermissionError],
-      [429, RimeResourceLimitError],
-      [500, RimeUnavailableError],
-      [502, RimeUnavailableError],
-      [503, RimeUnavailableError],
-      [504, RimeUnavailableError],
-    ]) {
-      status = code;
-      await assert.rejects(
-        () => exchangeKey("local-test-secret", new AbortController().signal),
-        (error) =>
-          error instanceof errorType &&
-          !error.message.includes("local-test-secret"),
-      );
-    }
-    status = 200;
-    body = { ...body, audience: "wrong" };
-    await assert.rejects(
-      () => exchangeKey("local-test-secret", new AbortController().signal),
-      RimeAuthenticationError,
-    );
-  } finally {
-    policy.exchangeUrl = original;
-    await new Promise((resolve) => server.close(resolve));
-  }
-});
-
-for (const [status, errorType] of [
-  [401, RimeAuthenticationError],
-  [403, RimePermissionError],
-  [429, RimeResourceLimitError],
-  [503, RimeUnavailableError],
-]) {
-  test(`HTTP ${status} closes an unfinished authentication response`, async () => {
-    const { createServer } = await import("node:http");
-    const { Credentials } = await import("../dist/auth.js");
-    let markClosed;
-    const closed = new Promise((resolve) => {
-      markClosed = resolve;
-    });
-    const server = createServer((request, response) => {
-      request.resume();
-      response.on("close", markClosed);
-      response.writeHead(status, { "content-type": "text/plain" });
-      response.write("local-test-secret");
-      // Keep the body open. The SDK must cancel it when rejecting the status.
-    });
-    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const original = policy.exchangeUrl;
-    policy.exchangeUrl = `http://127.0.0.1:${server.address().port}/v1/token`;
-    const credentials = new Credentials("local-test-secret");
-    let timer;
-    try {
-      await assert.rejects(
-        credentials.themisMetadata(new AbortController().signal),
-        errorType,
-      );
-      await Promise.race([
-        closed,
-        new Promise((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error("Authentication response stayed open")),
-            1000,
-          );
-        }),
-      ]);
-    } finally {
-      clearTimeout(timer);
-      await credentials.close();
-      policy.exchangeUrl = original;
-      server.closeAllConnections();
-      await new Promise((resolve) => server.close(resolve));
-    }
-  });
-}
 
 test("UTF-16 chunk boundaries preserve surrogate pairs", async () => {
   await ready;
@@ -469,30 +382,6 @@ test("early loop exit cancels and readonly format", () =>
     for await (const _ of audio) break;
     await assert.rejects(() => audio.next(), RimeCancelledError);
   }));
-test("cancel during shared refresh", () =>
-  setup(async (service, client) => {
-    let release;
-    const wait = new Promise((resolve) => (release = resolve));
-    authentication.exchangeKey = async () => {
-      await wait;
-      return {
-        value: "token",
-        expiresAt: Date.now() / 1000 + 3600,
-        audience: policy.audience,
-      };
-    };
-    const a = client.tts.stream("A."),
-      b = client.tts.stream("B.");
-    const first = a.next();
-    const check = assert.rejects(() => first, RimeCancelledError);
-    const second = collect(b);
-    await sleep(5);
-    await a.cancel();
-    release();
-    await check;
-    assert.ok((await second).length);
-  }));
-
 test("shared audio bytes", async () => {
   const { readFile } = await import("node:fs/promises");
   const fixture = JSON.parse(
@@ -566,7 +455,6 @@ for (const operation of ["voices", "languages"])
               error instanceof RimeTimeoutError &&
               error.requestId === requestId,
           );
-          assert.equal(client.discoveryControllers.size, 0);
         }));
 
 for (const size of [1024, 100000])
@@ -645,9 +533,73 @@ for (const queued of [false, true]) {
       const audio = client.tts.stream("Hello.", { timeout: 0.1 });
       await audio.next();
       // Production has ended, but the consumer has not observed completion.
-      await audio.worker;
+      await audio.native.waitProduced();
       await sleep(150);
       await assert.rejects(audio.next(), RimeTimeoutError);
+    }));
+}
+
+for (const stop of ["complete", "timeout", "cancel"]) {
+  test(`EOF waits for source cleanup / ${stop}`, () =>
+    setup(async (_service, client) => {
+      let release, observedEof;
+      let closed = false;
+      const cleanup = new Promise((resolve) => {
+        release = resolve;
+      });
+      const eof = new Promise((resolve) => {
+        observedEof = resolve;
+      });
+      const source = {
+        sent: false,
+        [Symbol.asyncIterator]() {
+          return this;
+        },
+        async next() {
+          if (this.sent) return { done: true };
+          this.sent = true;
+          return { done: false, value: "Hello." };
+        },
+        async return() {
+          await cleanup;
+          closed = true;
+          return { done: true };
+        },
+      };
+      const audio = client.tts.stream(source, {
+        timeout: stop === "timeout" ? 0.1 : null,
+      });
+      const read = audio.native.read.bind(audio.native);
+      audio.native.read = async () => {
+        const result = await read();
+        if (result.data == null) observedEof();
+        return result;
+      };
+      const pending = collect(audio);
+      let cancellation;
+      try {
+        await eof;
+        // Let next() reach the cleanup wait before stopping the stream.
+        await sleep(0);
+        assert.equal(closed, false);
+        if (stop === "timeout") await sleep(150);
+        else if (stop === "cancel") cancellation = audio.cancel();
+        release();
+        if (stop === "complete") {
+          assert.ok((await pending).length);
+          assert.equal((await audio.next()).done, true);
+        } else {
+          const error =
+            stop === "timeout" ? RimeTimeoutError : RimeCancelledError;
+          await assert.rejects(pending, error);
+          await assert.rejects(audio.next(), error);
+        }
+        assert.equal(closed, true);
+        assert.equal(client.streams.size, 0);
+      } finally {
+        release();
+        await Promise.allSettled([pending, cancellation]);
+      }
     }));
 }
 
@@ -685,7 +637,7 @@ for (const queued of [true, false]) {
       service.payload = Buffer.alloc(queued ? policy.outputChunkBytes * 2 : 2);
       const audio = client.tts.stream("Hello.");
       await audio.next();
-      await audio.worker;
+      await audio.native.waitProduced();
       const pending = audio.next();
       const cancelled = audio.cancel();
       await assert.rejects(pending, RimeCancelledError);
@@ -699,6 +651,8 @@ for (const location of ["headers", "trailers", "both"]) {
     [grpc.status.PERMISSION_DENIED, RimePermissionError],
     [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
     [grpc.status.UNAVAILABLE, RimeUnavailableError],
+    [grpc.status.OUT_OF_RANGE, RimeStreamError],
+    [grpc.status.UNKNOWN, RimeStreamError],
   ]) {
     test(`server error without audio metadata: ${status}, ${location}`, () =>
       setup(async (service, client) => {
@@ -747,6 +701,43 @@ for (const location of ["headers", "trailers", "both"]) {
   }
 }
 
+test("oversized audio response preserves the resource-limit error", () =>
+  setup(async (service, client) => {
+    service.payload = Buffer.alloc(4 * 1024 * 1024);
+    const stream = client.tts.stream("Hello.");
+    await assert.rejects(
+      stream.next(),
+      (error) =>
+        error instanceof RimeResourceLimitError &&
+        error.requestId === "test-request",
+    );
+  }));
+
+for (const namespace of ["voices", "languages"]) {
+  test(`oversized discovery response preserves the resource-limit error / ${namespace}`, () =>
+    setup(async (service, client) => {
+      service[namespace === "voices" ? "speakers" : "languages"] = [
+        "x".repeat(4 * 1024 * 1024),
+      ];
+      await assert.rejects(client[namespace].list(), RimeResourceLimitError);
+    }));
+
+  test(`server OUT_OF_RANGE remains a stream error / ${namespace}`, () =>
+    setup(async (service, client) => {
+      service.mode = "discovery_error";
+      service.rejectionStatus = grpc.status.OUT_OF_RANGE;
+      // A server is allowed to use the same message as tonic's local size error.
+      service.rejection = () =>
+        Object.assign(
+          new Error(
+            "Error, decoded message length too large: found 4194305 bytes, the limit is: 4194304 bytes",
+          ),
+          { code: grpc.status.OUT_OF_RANGE },
+        );
+      await assert.rejects(client[namespace].list(), RimeStreamError);
+    }));
+}
+
 for (const mode of ["normal", "empty_audio", "empty_no_headers"]) {
   test(`missing audio metadata cannot succeed: ${mode}`, () =>
     setup(async (service, client) => {
@@ -756,3 +747,30 @@ for (const mode of ["normal", "empty_audio", "empty_no_headers"]) {
       await assert.rejects(audio.next(), RimeAudioFormatError);
     }));
 }
+
+test("concurrent reads do not cancel the first read", () =>
+  setup(async (service, client) => {
+    service.mode = "silence";
+    const stream = client.tts.stream("Hello.");
+    const first = stream.next();
+    await service.received;
+    await assert.rejects(stream.next(), RimeInputError);
+    service.release();
+    assert.equal((await first).done, false);
+    await stream.cancel();
+  }));
+
+test("Node worker environment can load and release the extension", async () => {
+  const { Worker } = await import("node:worker_threads");
+  const moduleUrl = new URL("../dist/index.js", import.meta.url).href;
+  const worker = new Worker(
+    `(async()=>{const {Rime}=await import(${JSON.stringify(moduleUrl)}); const client=new Rime({apiKey:'worker'}); const stream=client.tts.stream('Hello.');await stream.cancel();await client.close();})().catch(error=>{throw error;});`,
+    { eval: true },
+  );
+  await new Promise((resolve, reject) => {
+    worker.once("error", reject);
+    worker.once("exit", (code) =>
+      code ? reject(new Error(`worker exit ${code}`)) : resolve(),
+    );
+  });
+});

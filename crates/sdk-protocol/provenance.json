@@ -1,0 +1,6 @@
+{
+  "source": "rime-api",
+  "version": "0.0.1",
+  "descriptor_file": "rime_api/text_to_speech.proto",
+  "sha256": "6679640065c8716de83dc196d7552a0af0ed909c44b748bdc49879604dd88742"
+}

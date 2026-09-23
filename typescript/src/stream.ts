@@ -1,258 +1,131 @@
-import { randomUUID } from "node:crypto";
-import { debuglog } from "node:util";
-const log = debuglog("rime-sdk");
-import { AudioFormat, Converter } from "./audio.js";
-import { policy, abortable } from "./policy.js";
-import { ByteQueue } from "./queue.js";
-import { SentenceBuffer, ready } from "./sentences.js";
-import { SynthesisCall, type PreparedConnection } from "./transport.js";
-import {
-  RimeError,
-  RimeInputError,
-  RimeCancelledError,
-  RimeTimeoutError,
-  RimeStreamError,
-} from "./errors.js";
-
-export interface StreamOwner {
-  prepare(signal: AbortSignal): Promise<PreparedConnection>;
-  checkOpen(): void;
-  forget(stream: AudioStream): void;
-}
+import { AudioFormat } from "./audio.js";
+import { call, translate, type NativeStream } from "./native.js";
+import { RimeInputError } from "./errors.js";
 export type TextSource = string | AsyncIterable<string>;
 export const constructionKey = Symbol("private stream constructor");
+interface StreamOwner {
+  forget(stream: AudioStream): void;
+}
+async function nextOrStopped(
+  iterator: AsyncIterator<string>,
+  signal: AbortSignal,
+): Promise<IteratorResult<string> | null> {
+  if (signal.aborted) return null;
+  let onStop!: () => void;
+  const stopped = new Promise<null>((resolve) => {
+    onStop = () => resolve(null);
+    signal.addEventListener("abort", onStop, { once: true });
+  });
+  try {
+    return await Promise.race([iterator.next(), stopped]);
+  } finally {
+    signal.removeEventListener("abort", onStop);
+  }
+}
+async function cleanup(task: Promise<unknown>, timeout: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      task,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, timeout * 1000);
+      }),
+    ]);
+  } catch {
+    /* Source cleanup must not replace the terminal result. */
+  } finally {
+    clearTimeout(timer);
+  }
+}
 export class AudioStream implements AsyncIterableIterator<Uint8Array> {
-  private readonly controller = new AbortController();
-  private readonly queue = new ByteQueue(
-    policy.outputBytes,
-    policy.outputChunkBytes,
-  );
-  private worker: Promise<void> | null = null;
-  private timer: ReturnType<typeof setInterval> | null = null;
-  private call: SynthesisCall | null = null;
-  private failure: RimeError | null = null;
+  private pump: Promise<void> | null = null;
   private finished = false;
   private reading = false;
-  private inputDone = false;
-  private sourceWaiting = false;
-  private submitted = false;
-  private received = false;
-  private startedAt = 0;
-  private progressAt = 0;
-  private readonly operationId = randomUUID();
-  private bytesReceived = 0;
-  private bytesDelivered = 0;
+  private cause: unknown;
   constructor(
     key: symbol,
     private owner: StreamOwner,
+    private native: NativeStream,
     private source: TextSource | null,
-    private voice: string,
-    private language: string,
     private formatValue: AudioFormat,
-    private timeout: number | null,
   ) {
     if (key !== constructionKey)
       throw new TypeError("AudioStream is returned by client.tts.stream()");
   }
-  get format(): AudioFormat {
+  get format() {
     return this.formatValue;
   }
   get requestId(): string | null {
-    return this.call?.requestId ?? null;
+    return this.native.requestId ?? null;
   }
   private start() {
-    if (this.failure) throw this.failure;
-    if (this.finished || this.worker) return;
-    this.owner.checkOpen();
-    this.startedAt = performance.now();
-    this.worker = this.run();
-    this.timer = setInterval(() => {
-      if (this.finished || this.failure) return;
-      const now = performance.now();
-      if (
-        this.timeout !== null &&
-        now - this.startedAt >= this.timeout * 1000
-      ) {
-        this.fail(
-          new RimeTimeoutError(
-            "Overall synthesis deadline expired",
-            this.requestId,
-          ),
-        );
-        return;
-      }
-      if (
-        this.call &&
-        !this.call.done &&
-        this.submitted &&
-        !this.sourceWaiting &&
-        !this.queue.hasPendingOutput
-      ) {
-        const limit = this.received
-          ? policy.progressTimeout
-          : policy.firstAudioTimeout;
-        if (now - this.progressAt >= limit * 1000)
-          this.fail(
-            new RimeTimeoutError(
-              "Synthesis output stopped making progress",
-              this.requestId,
-            ),
-          );
-      } else this.progressAt = now;
-    }, 20);
+    if (!this.pump) {
+      call(() => this.native.start());
+      this.pump = this.produce();
+      void this.native.waitStopped().then(() => this.cleanup());
+    }
   }
-  private fail(error: RimeError) {
-    if (this.finished || this.failure) return;
-    if (error.requestId === null && this.requestId !== null)
-      error = new (error.constructor as typeof RimeError)(
-        error.message,
-        this.requestId,
-        { cause: error.cause },
-      );
-    this.failure = error;
-    if (this.timer) clearInterval(this.timer);
-    this.queue.fail(error);
-    this.controller.abort(error);
-    this.call?.cancel();
-  }
-  private async produce() {
-    const source = this.source!;
+  private async produce(): Promise<void> {
     let iterator: AsyncIterator<string> | undefined;
-    const buffer = new SentenceBuffer(policy.sentenceBytes);
-    let meaningful = false;
+    const stop = new AbortController();
+    void this.native.waitStopped().then(() => stop.abort());
     try {
-      try {
-        iterator = (
-          typeof source === "string"
-            ? (async function* () {
-                yield source;
-              })()
-            : source
-        )[Symbol.asyncIterator]();
-      } catch (error) {
-        if (this.controller.signal.aborted) throw this.controller.signal.reason;
-        throw new RimeInputError("The text source failed", this.requestId, {
-          cause: error,
-        });
-      }
+      const source = this.source!;
+      iterator = (
+        typeof source === "string"
+          ? (async function* () {
+              yield source;
+            })()
+          : source
+      )[Symbol.asyncIterator]();
+      let item = "",
+        offset = 0;
       for (;;) {
-        this.sourceWaiting = true;
-        let result: IteratorResult<string>;
-        try {
-          result = await abortable(iterator.next(), this.controller.signal);
-        } catch (error) {
-          if (this.controller.signal.aborted)
-            throw this.controller.signal.reason;
-          throw new RimeInputError("The text source failed", this.requestId, {
-            cause: error,
-          });
-        } finally {
-          this.sourceWaiting = false;
-        }
-        if (result.done) break;
-        const chunk = result.value;
-        if (typeof chunk !== "string")
-          throw new RimeInputError("The text source must yield strings");
-        if (chunk.trim()) meaningful = true;
-        // Never split a surrogate pair when limiting native detector input size.
-        for (let offset = 0; offset < chunk.length;) {
-          let end = Math.min(chunk.length, offset + policy.sourceChars);
-          if (end < chunk.length && /[\uD800-\uDBFF]/.test(chunk[end - 1]!))
-            end++;
-          for (const sentence of buffer.feed(chunk.slice(offset, end))) {
-            if (!this.submitted) this.progressAt = performance.now();
-            this.submitted = true;
-            await this.call!.write(sentence);
+        const request = await this.native.inputRequest();
+        if (request == null) break;
+        if (request === 0) {
+          const result = await nextOrStopped(iterator, stop.signal);
+          if (result === null) break;
+          if (result.done) {
+            this.native.inputReply('{"kind":"end"}');
+            break;
           }
-          offset = end;
+          if (typeof result.value !== "string")
+            throw new RimeInputError("The text source must yield strings");
+          item = result.value;
+          offset = 0;
+          this.native.inputReply('{"kind":"item"}');
+        } else {
+          const end = Math.min(item.length, offset + this.native.sourceChars);
+          const units: number[] = [];
+          for (; offset < end; offset++) units.push(item.charCodeAt(offset));
+          this.native.inputReply(
+            JSON.stringify({
+              kind: "utf16",
+              units,
+              last: offset === item.length,
+            }),
+          );
+          if (offset === item.length) item = "";
         }
       }
-      if (!meaningful)
-        throw new RimeInputError(
-          "The text source contained no meaningful text",
-        );
-      for (const sentence of buffer.feed("", true)) {
-        if (!this.submitted) this.progressAt = performance.now();
-        this.submitted = true;
-        await this.call!.write(sentence);
-      }
-      this.call!.finishInput();
-      this.inputDone = true;
     } catch (error) {
-      if (error instanceof RimeError || this.controller.signal.aborted)
-        throw error;
-      throw new RimeInputError("The text source failed", this.requestId, {
-        cause: error,
-      });
+      this.cause = error;
+      this.native.failSource();
     } finally {
-      if (iterator?.return) {
-        const cleanup = Promise.resolve(iterator.return());
-        cleanup.catch(() => {});
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        await Promise.race([
-          cleanup,
-          new Promise<void>((resolve) => {
-            timer = setTimeout(resolve, policy.cleanupTimeout * 1000);
-          }),
-        ]).catch(() => {});
-        clearTimeout(timer);
-      }
-    }
-  }
-  private async read() {
-    const converter = new Converter(this.format);
-    for await (const data of this.call!.audio()) {
-      this.progressAt = performance.now();
-      if (data.length) {
-        this.received = true;
-        this.bytesReceived += data.length;
-        await this.queue.put(converter.process(data));
-      }
-    }
-    if (!this.inputDone)
-      throw new RimeStreamError(
-        "The service completed before input finished",
-        this.requestId,
-      );
-    await this.queue.put(converter.process(new Uint8Array(), true));
-  }
-  private async run() {
-    let tasks: Promise<void>[] = [];
-    try {
-      await abortable(ready, this.controller.signal);
-      const prepared = await this.owner.prepare(this.controller.signal);
-      this.call = new SynthesisCall(prepared, this.controller.signal);
-      await this.call.start(this.voice, this.language);
-      tasks = [this.produce(), this.read()];
-      await Promise.all(tasks);
-      this.queue.finish();
-    } catch (error) {
-      if (error instanceof RimeError) this.fail(error);
-      else
-        this.fail(
-          new RimeStreamError("Synthesis failed", this.requestId, {
-            cause: error,
-          }),
+      if (iterator?.return)
+        await cleanup(
+          Promise.resolve().then(() => iterator!.return!()),
+          this.native.cleanupTimeout,
         );
-    } finally {
-      if (this.failure) this.controller.abort(this.failure);
-      await Promise.allSettled(tasks);
       this.source = null;
-      if (this.failure) this.owner.forget(this);
-      log(
-        "operation=%s request=%s received=%d delivered=%d duration_ms=%d",
-        this.operationId,
-        this.requestId,
-        this.bytesReceived,
-        this.bytesDelivered,
-        Math.round(performance.now() - this.startedAt),
-      );
     }
   }
   [Symbol.asyncIterator]() {
     return this;
   }
   async next(): Promise<IteratorResult<Uint8Array>> {
+    if (this.finished) return { done: true, value: undefined };
     if (this.reading)
       throw new RimeInputError(
         "AudioStream permits only one concurrent reader",
@@ -260,29 +133,29 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     this.reading = true;
     try {
       this.start();
-      const result = await this.queue.get();
-      if (this.failure) throw this.failure;
-      if (result.done) {
-        await this.cleanup();
-        if (this.failure) throw this.failure;
+      const result = await this.native.read();
+      if (result.data == null) await this.cleanup();
+      this.native.acceptRead(result.ticket);
+      if (result.data == null) {
         this.finished = true;
+        return { done: true, value: undefined };
       }
-      if (!result.done) this.bytesDelivered += result.value.byteLength;
-      return result;
+      return { done: false, value: result.data };
+    } catch (error) {
+      await this.cleanup();
+      throw translate(error, this.cause);
     } finally {
       this.reading = false;
     }
   }
   private async cleanup() {
-    if (this.timer) clearInterval(this.timer);
-    await this.worker;
+    if (this.pump) await cleanup(this.pump, this.native.cleanupTimeout);
     this.owner.forget(this);
+    this.source = null;
   }
   async cancel(): Promise<void> {
-    if (!this.finished && !this.failure)
-      this.fail(new RimeCancelledError("Synthesis cancelled", this.requestId));
+    this.native.cancel();
     await this.cleanup();
-    this.source = null;
   }
   async return(): Promise<IteratorResult<Uint8Array>> {
     await this.cancel();

@@ -1,10 +1,12 @@
 # Rime SDK for Node.js
 
 Requires Node.js 22 or later. The package uses ESM and includes TypeScript types.
-Build and install the local package:
+Published packages contain the Rust extension. For a local source build, install
+Rust 1.96, a C++ compiler, and uv, then build and install the package:
 
 ```sh
 npm ci
+npm run build:native
 npm run build
 # In your application:
 npm install /path/to/rime-sdk/typescript
@@ -72,11 +74,10 @@ Cancellation cannot stop application code that waits on an unrelated promise.
 The SDK stops its RPC and limits how long it waits for source cleanup.
 
 Authentication temporarily sends the API key directly as a bearer token.
-Restore the commented call in `auth.ts` when Themis is ready.
+The inactive Themis exchange is now in the shared Rust core.
 
-The retained API-key exchange follows the assumed private contract in
-[authentication](../docs/authentication.md). It has local tests, but no live
-service validation. Browser use is not supported.
+The retained API-key exchange follows an assumed private contract. It has local
+tests, but no live service validation. Browser use is not supported.
 
 ## Development
 
@@ -84,9 +85,12 @@ service validation. Browser use is not supported.
 npm ci
 npm run check
 npm run lint
+uv run --no-project ../tools/build-native.py --test-support
 npm test
+npm run build:native
 npm pack
 ```
 
-The package includes a pinned Microsoft BlingFire WASM binary and its license.
-It does not download code at runtime. See [vendor provenance](vendor/README.md).
+The package includes a native Rust extension built with pinned Microsoft BlingFire
+sources and includes the BlingFire license. It does not download code at runtime.
+See [BlingFire source details](../crates/blingfire-sys/README.md).

@@ -1,10 +1,8 @@
+import { factory, native } from "../dist/native.js";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as grpc from "@grpc/grpc-js";
 import { Rime, RimeInputError } from "../dist/index.js";
-import { authentication, Credentials } from "../dist/auth.js";
-import { transport } from "../dist/transport.js";
-import { policy } from "../dist/policy.js";
 import { FakeService } from "./service.mjs";
 
 for (const endpoint of [
@@ -47,55 +45,21 @@ test("custom endpoint does not enable an unknown model", () => {
   );
 });
 
-for (const themis of [false, true])
-  for (const endpoint of ["Customer.Example", "Customer.Example:8443"])
-    test(`independent speech and discovery endpoints: ${endpoint}, Themis=${themis}`, async (t) => {
-      const original = { ...policy };
-      const standard = await new FakeService().start();
-      const custom = await new FakeService().start();
-      t.after(() => {
-        standard.close();
-        custom.close();
-      });
-      custom.payload = Buffer.from(Array(2400).fill([2, 0]).flat());
-      const routes = {
-        "coda.api.rime.ai:443": standard.target,
-        [`customer.example:${endpoint.includes(":") ? 8443 : 443}`]:
-          custom.target,
-      };
-      const targets = [],
-        audiences = [];
-      t.mock.method(transport, "makeClient", (target) => {
-        targets.push(target);
-        return new grpc.Client(
-          routes[target],
-          grpc.credentials.createInsecure(),
-        );
-      });
-      t.mock.method(
-        authentication,
-        "exchangeKey",
-        async (key, signal, configuration) => {
-          assert.equal(configuration.exchangeUrl, original.exchangeUrl);
-          audiences.push(configuration.audience);
-          return {
-            value: key,
-            expiresAt: Date.now() / 1000 + 3600,
-            audience: configuration.audience,
-          };
-        },
+for (const endpoint of ["Customer.Example", "Customer.Example:8443"]) {
+  test(`independent speech and discovery endpoints: ${endpoint}`, async () => {
+    const standard = await new FakeService().start(),
+      custom = await new FakeService().start();
+    custom.payload = Buffer.from([2, 0]);
+    const previous = factory.create;
+    factory.create = (config) =>
+      native.NativeClient.testing(
+        config,
+        JSON.parse(config).endpoint ? custom.target : standard.target,
+        "{}",
       );
-      if (themis)
-        t.mock.method(
-          Credentials.prototype,
-          "metadata",
-          Credentials.prototype.themisMetadata,
-        );
-      const first = new Rime({ apiKey: "standard-key" });
-      const second = new Rime({ apiKey: "custom-key", endpoint });
-      t.after(async () => {
-        await Promise.all([first.close(), second.close()]);
-      });
+    const first = new Rime({ apiKey: "standard-key" }),
+      second = new Rime({ apiKey: "custom-key", endpoint });
+    try {
       async function use(client) {
         const chunks = [];
         for await (const chunk of client.tts.stream("Hello."))
@@ -108,18 +72,20 @@ for (const themis of [false, true])
         standard.payload,
         custom.payload,
       ]);
-      assert.deepEqual(targets.sort(), Object.keys(routes).sort());
-      assert.deepEqual(standard.metadata[0].get("authorization"), [
+      assert.equal(
+        standard.metadata[0].get("authorization")[0],
         "Bearer standard-key",
-      ]);
-      assert.deepEqual(custom.metadata[0].get("authorization"), [
-        "Bearer custom-key",
-      ]);
-      assert.equal(standard.discoveryCalls, 1);
-      assert.equal(custom.discoveryCalls, 1);
-      assert.deepEqual(
-        audiences.sort(),
-        themis ? ["coda.api.rime.ai", "customer.example"] : [],
       );
-      assert.deepEqual(policy, original);
-    });
+      assert.equal(
+        custom.metadata[0].get("authorization")[0],
+        "Bearer custom-key",
+      );
+    } finally {
+      await first.close();
+      await second.close();
+      standard.close();
+      custom.close();
+      factory.create = previous;
+    }
+  });
+}

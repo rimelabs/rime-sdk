@@ -13,10 +13,15 @@ export class FakeService {
   metadata = [];
   discoveryCalls = 0;
   discoveryFailures = 0;
+  languages = ["en", "de"];
+  speakers = ["test-speaker"];
   payload = Buffer.from(Array(2400).fill([1, 0]).flat());
   release = () => {};
   constructor() {
     this.server = new grpc.Server();
+    this.received = new Promise((resolve) => {
+      this.markReceived = resolve;
+    });
     this.headersSent = new Promise((resolve) => {
       this.markHeadersSent = resolve;
     });
@@ -95,6 +100,7 @@ export class FakeService {
                 }),
               );
         };
+        this.markReceived();
         if (this.mode === "silence") {
           this.release = send;
           return;
@@ -135,7 +141,7 @@ export class FakeService {
         callback(
           null,
           create(schema.GetSupportedLanguagesResponseSchema, {
-            languages: ["en", "de"],
+            languages: this.languages,
           }),
         );
     };
@@ -153,7 +159,7 @@ export class FakeService {
       callback(
         null,
         create(schema.GetSupportedSpeakersResponseSchema, {
-          speakers: ["test-speaker"],
+          speakers: this.speakers,
         }),
       );
     };

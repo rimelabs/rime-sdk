@@ -1,11 +1,7 @@
 import asyncio
-import gc
 import json
 import math
 import struct
-import time
-import weakref
-from dataclasses import replace
 from pathlib import Path
 
 import grpc
@@ -20,13 +16,12 @@ from rimelabs_sdk import (
     RimeInputError,
     RimePermissionError,
     RimeResourceLimitError,
+    RimeStreamError,
     RimeTimeoutError,
     RimeUnavailableError,
-    _auth,
 )
 from rimelabs_sdk._audio import Converter
 from rimelabs_sdk._sentences import SentenceBuffer
-from rimelabs_sdk._transport import rpc_error
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((ROOT / "conformance/contract.json").read_text())
@@ -34,6 +29,60 @@ CONTRACT = json.loads((ROOT / "conformance/contract.json").read_text())
 
 async def collect(stream):
     return b"".join([chunk async for chunk in stream])
+
+
+async def test_active_stream_rejects_another_loop_without_cleanup(setup):
+    _, client = setup
+    pending = asyncio.Event()
+    release = asyncio.Event()
+
+    async def source():
+        yield "First sentence. The next sentence "
+        pending.set()
+        await release.wait()
+        yield "is here."
+
+    async with client.tts.stream(source()) as stream:
+        assert await anext(stream)
+        await asyncio.wait_for(pending.wait(), 1)
+
+        async def read_from_another_loop():
+            with pytest.raises(RimeInputError, match="one process and event loop"):
+                await anext(stream)
+
+        await asyncio.to_thread(lambda: asyncio.run(read_from_another_loop()))
+        assert stream in client._streams
+        assert not stream._pump_task.done()
+        release.set()
+        assert await collect(stream)
+
+
+@pytest.mark.parametrize("namespace", ["voices", "languages"])
+async def test_discovery_started_before_close_is_cancelled(setup, namespace):
+    service, client = setup
+    service.mode = "discovery_timeout"
+    pending = asyncio.create_task(getattr(client, namespace).list())
+    await asyncio.sleep(0)
+    await client.close()
+    with pytest.raises(RimeCancelledError):
+        await pending
+    with pytest.raises(RimeInputError, match="closed"):
+        await getattr(client, namespace).list()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "server error"])
+async def test_failed_stream_released_without_another_read(setup, failure):
+    service, client = setup
+    service.mode = "partial_error"
+    stream = client.tts.stream("Hello.", timeout=0.15 if failure == "timeout" else None)
+    await anext(stream)
+    if failure == "server error":
+        service.release.set()
+    await stream._native.wait_stopped()
+    await asyncio.sleep(0.1)
+    assert not client._streams
+    with pytest.raises(RimeTimeoutError if failure == "timeout" else RimeUnavailableError):
+        await anext(stream)
 
 
 @pytest.mark.parametrize(
@@ -97,24 +146,13 @@ def test_sentence_storage_does_not_grow_with_completed_text():
     output = []
     for sentence in buffer.feed(text):
         output.append(sentence)
-        assert len(buffer.pending.encode()) < 2048
+        assert buffer.retained_bytes < 2048
     output.extend(buffer.feed("", final=True))
     assert "".join(output) == text
-    assert buffer.pending == ""
+    assert buffer.retained_bytes == 0
 
 
-def test_long_sentence_does_not_scan_once_per_source_chunk(monkeypatch):
-    from rimelabs_sdk import _sentences
-
-    detector = _sentences.sentence_ends
-    calls = 0
-
-    def count_calls(text):
-        nonlocal calls
-        calls += 1
-        return detector(text)
-
-    monkeypatch.setattr(_sentences, "sentence_ends", count_calls)
+def test_long_sentence_does_not_scan_once_per_source_chunk():
     buffer = SentenceBuffer(65536)
     text = "a" * 65535 + "."
     output = []
@@ -122,7 +160,7 @@ def test_long_sentence_does_not_scan_once_per_source_chunk(monkeypatch):
         output.extend(buffer.feed(char))
     output.extend(buffer.feed("", final=True))
     assert output == [text]
-    assert calls < 128
+    assert buffer.scans < 128
 
 
 async def test_sentence_messages_ignore_source_chunk_size(setup):
@@ -145,10 +183,33 @@ def test_invalid_timeout(value):
         Rime(api_key="test", timeout=value)
 
 
+def unserializable_options():
+    circular = []
+    circular.append(circular)
+    return [b"clementine", object(), {"en"}, circular]
+
+
+@pytest.mark.parametrize("option", ["model", "timeout"])
+@pytest.mark.parametrize("value", unserializable_options())
+def test_unserializable_client_option_is_input_error(option, value):
+    with pytest.raises(RimeInputError):
+        Rime(api_key="test", **{option: value})
+
+
+@pytest.mark.parametrize("option", ["voice", "language", "timeout"])
+@pytest.mark.parametrize("value", unserializable_options())
+async def test_unserializable_stream_option_is_input_error(setup, option, value):
+    service, client = setup
+    with pytest.raises(RimeInputError):
+        client.tts.stream("Hello.", **{option: value})
+    assert not client._streams
+    assert not service.calls
+
+
 def test_public_boundary_and_credentials(monkeypatch):
     monkeypatch.setenv("RIME_API_KEY", "environment-key")
-    assert Rime()._credentials._key == "environment-key"
-    assert Rime(api_key="explicit")._credentials._key == "explicit"
+    assert isinstance(Rime(), Rime)
+    assert isinstance(Rime(api_key="explicit"), Rime)
     with pytest.raises(RimeAuthenticationError):
         Rime(api_key="")
     client = Rime()
@@ -165,14 +226,6 @@ def test_public_boundary_and_credentials(monkeypatch):
         client.tts.stream("  ")
     with pytest.raises(RimeAudioFormatError):
         client.tts.stream("Hi", audio_format="wav")
-
-
-def test_error_conformance():
-    for status, expected in CONTRACT["grpc_errors"].items():
-        error = rpc_error(getattr(grpc.StatusCode, status), "id")
-        assert type(error).__name__ == expected
-        assert error.request_id == "id"
-        assert not hasattr(error, "grpc_status")
 
 
 @pytest.mark.parametrize("profile", list(AudioFormat))
@@ -215,7 +268,7 @@ async def test_complete_and_incremental_shared_rpc(setup):
     assert len(service.calls) == 1
     assert service.calls[0][0].header.speaker == "clementine"
     assert service.calls[0][0].header.language == "en"
-    assert service.metadata[0]["authorization"] == "Bearer test-token"
+    assert service.metadata[0]["authorization"] == "Bearer test-key"
     assert not client._streams
 
 
@@ -314,6 +367,37 @@ async def test_invalid_state_from_source_is_an_input_error(setup):
         assert caught.value.__cause__ is cause
 
 
+async def test_source_failure_after_read_preserves_cause(setup):
+    _, client = setup
+    release = asyncio.Event()
+    cause = RuntimeError("source failed before read acceptance")
+
+    async def source():
+        yield "First sentence. The next sentence "
+        await release.wait()
+        raise cause
+
+    audio = client.tts.stream(source())
+    native = audio._native
+
+    class DelayedRead:
+        def __getattr__(self, name):
+            return getattr(native, name)
+
+        async def read(self):
+            candidate = await native.read()
+            assert candidate[0]
+            release.set()
+            await audio._pump_task
+            return candidate
+
+    audio._native = DelayedRead()
+    with pytest.raises(RimeInputError) as caught:
+        await asyncio.wait_for(anext(audio), 2)
+    assert caught.value.__cause__ is cause
+    assert not client._streams
+
+
 async def test_format_and_sample_alignment(setup):
     service, client = setup
     service.mode = "odd_chunks"
@@ -362,7 +446,7 @@ async def test_source_cancellation_stops_stream(setup, submit_sentence):
     async with client.tts.stream(source()) as audio:
         with pytest.raises(RimeCancelledError):
             await asyncio.wait_for(collect(audio), 1)
-        await asyncio.wait_for(asyncio.shield(audio._worker), 1)
+        await asyncio.wait_for(asyncio.shield(audio._pump_task), 1)
         assert closed.is_set()
         assert not client._streams
         assert not any(
@@ -376,7 +460,6 @@ async def test_source_cancellation_stops_stream(setup, submit_sentence):
 @pytest.mark.parametrize("cleanup_stalls", [False, True])
 async def test_cancel_allows_source_cleanup_within_budget(setup, cleanup_stalls):
     _, client = setup
-    client._policy = replace(client._policy, cleanup_timeout=0.1)
     waiting = asyncio.Event()
     cleanup_started = asyncio.Event()
     closed = asyncio.Event()
@@ -400,7 +483,7 @@ async def test_cancel_allows_source_cleanup_within_budget(setup, cleanup_stalls)
     await asyncio.wait_for(audio.cancel(), 1)
     assert cleanup_started.is_set()
     assert closed.is_set() is not cleanup_stalls
-    assert audio._worker.done()
+    assert audio._pump_task.done()
     assert not client._streams
 
 
@@ -415,44 +498,39 @@ async def test_discovery_deadline_preserves_headers(setup, operation, request_id
     with pytest.raises(RimeTimeoutError) as caught:
         await getattr(client, operation).list(timeout=0.04)
     assert caught.value.request_id == request_id
-    assert not client._discovery_tasks
 
 
-async def test_discovery_retry_and_auth_singleflight(setup, monkeypatch):
+async def test_discovery_retry_and_shared_connection(setup):
     service, client = setup
-    calls = 0
-
-    async def exchange(key, policy):
-        nonlocal calls
-        calls += 1
-        await asyncio.sleep(0.02)
-        return _auth.Token("new-token", time.time() + 3600, policy.audience)
-
-    monkeypatch.setattr(_auth, "exchange_key", exchange)
     service.discovery_failures = 1
     voices, languages = await asyncio.gather(client.voices.list("en"), client.languages.list())
     assert voices == ["test-speaker"] and languages == ["en", "de"]
-    assert calls == 1
+    assert service.discovery_calls == 3
+    assert service.language_calls == 2
 
 
-async def test_cancel_during_shared_refresh(setup, monkeypatch):
-    _, client = setup
-    release = asyncio.Event()
-    started = asyncio.Event()
+@pytest.mark.parametrize("first", ["voices", "languages"])
+async def test_discovery_failure_injection_is_independent_of_request_order(first):
+    from unittest.mock import AsyncMock
 
-    async def exchange(key, policy):
-        started.set()
-        await release.wait()
-        return _auth.Token("token", time.time() + 3600, policy.audience)
+    from fake_service import FakeService
 
-    monkeypatch.setattr(_auth, "exchange_key", exchange)
-    a = client.tts.stream("A.")
-    b = client.tts.stream("B.")
-    async with a, b:
-        await started.wait()
-        await a.cancel()
-        release.set()
-        assert await collect(b)
+    service = FakeService()
+    service.discovery_failures = 1
+    context = AsyncMock()
+    context.abort.side_effect = RuntimeError("injected failure")
+    operations = [first, "languages" if first == "voices" else "voices", "languages"]
+    language_calls = 0
+    for operation in operations:
+        if operation == "languages":
+            language_calls += 1
+        if operation == "languages" and language_calls == 1:
+            with pytest.raises(RuntimeError, match="injected failure"):
+                await service.languages(None, context)
+        else:
+            await getattr(service, operation)(None, context)
+    context.abort.assert_awaited_once_with(grpc.StatusCode.UNAVAILABLE, "test retryable discovery")
+    assert service.discovery_calls == 3
 
 
 async def test_python_task_cancellation(setup):
@@ -572,11 +650,11 @@ async def test_client_shutdown_stops_paused_output(setup):
 @pytest.mark.parametrize("profile", list(AudioFormat))
 async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     service, client = setup
-    samples = client._policy.output_bytes + 1
+    samples = 96000 + 1
     service.payload = b"\x00\x00" * samples
     async with client.tts.stream("Hello.", audio_format=profile) as audio:
         chunks = [part async for part in audio]
-    assert all(0 < len(part) <= client._policy.output_chunk_bytes for part in chunks)
+    assert all(0 < len(part) <= 9600 for part in chunks)
     expected = (
         service.payload if profile is AudioFormat.PCM_24000 else b"\xff" * ((samples + 2) // 3)
     )
@@ -586,25 +664,93 @@ async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
 @pytest.mark.parametrize("queued", [False, True])
 async def test_overall_timeout_after_producer_completion(setup, queued):
     service, client = setup
-    service.payload = b"\x00\x00" * (client._policy.output_chunk_bytes if queued else 1)
+    service.payload = b"\x00\x00" * (9600 if queued else 1)
     async with client.tts.stream("Hello.", timeout=0.1) as audio:
         assert await anext(audio)
         # Wait for production to finish without observing iterator completion.
-        await asyncio.wait_for(asyncio.shield(audio._worker), 1)
+        await asyncio.wait_for(audio._native.wait_produced(), 1)
         await asyncio.sleep(0.15)
         with pytest.raises(RimeTimeoutError):
             await anext(audio)
 
 
+@pytest.mark.parametrize("stop", ["complete", "timeout", "cancel"])
+async def test_eof_waits_for_source_cleanup(setup, stop):
+    _, client = setup
+    release = asyncio.Event()
+    eof = asyncio.Event()
+    closed = asyncio.Event()
+
+    class Source:
+        def __aiter__(self):
+            self.sent = False
+            return self
+
+        async def __anext__(self):
+            if self.sent:
+                raise StopAsyncIteration
+            self.sent = True
+            return "Hello."
+
+        async def aclose(self):
+            await release.wait()
+            closed.set()
+
+    stream = client.tts.stream(Source(), timeout=0.1 if stop == "timeout" else None)
+    native = stream._native
+
+    class ObservedNative:
+        cleanup_timeout = 1
+
+        def __getattr__(self, name):
+            return getattr(native, name)
+
+        async def read(self):
+            result = await native.read()
+            if result[0] is None:
+                eof.set()
+            return result
+
+    stream._native = ObservedNative()
+    pending = asyncio.create_task(collect(stream))
+    cancellation = None
+    try:
+        await asyncio.wait_for(eof.wait(), 1)
+        assert not pending.done()
+        assert not closed.is_set()
+        if stop == "timeout":
+            await asyncio.sleep(0.15)
+        elif stop == "cancel":
+            cancellation = asyncio.create_task(stream.cancel())
+            await asyncio.sleep(0)
+        release.set()
+        if stop == "complete":
+            assert await pending
+            with pytest.raises(StopAsyncIteration):
+                await anext(stream)
+        else:
+            error = RimeTimeoutError if stop == "timeout" else RimeCancelledError
+            with pytest.raises(error):
+                await pending
+            with pytest.raises(error):
+                await anext(stream)
+        assert closed.is_set()
+        assert not client._streams
+    finally:
+        release.set()
+        await asyncio.gather(pending, return_exceptions=True)
+        if cancellation is not None:
+            await cancellation
+
+
 async def test_slow_consumer_does_not_trigger_stall_timeout(setup):
     service, client = setup
-    client._policy = replace(client._policy, progress_timeout=0.02)
     # Keep the RPC open while a large response waits for output capacity.
     service.mode = "partial_error"
-    service.payload = b"\x00\x00" * client._policy.output_bytes
+    service.payload = b"\x00\x00" * 96000
     async with client.tts.stream("Hello.") as audio:
         assert await anext(audio)
-        await asyncio.sleep(0.08)
+        await asyncio.sleep(0.3)
         assert await anext(audio)
 
 
@@ -617,6 +763,15 @@ async def test_incomplete_final_pcm_sample(setup):
                 await collect(audio)
 
 
+async def test_oversized_audio_response_preserves_resource_limit_error(setup):
+    service, client = setup
+    service.payload = bytes(4 * 1024 * 1024)
+    async with client.tts.stream("Hello.") as audio:
+        with pytest.raises(RimeResourceLimitError) as caught:
+            await anext(audio)
+        assert caught.value.request_id == "test-request"
+
+
 @pytest.mark.parametrize("location", ["headers", "trailers", "both"])
 @pytest.mark.parametrize(
     "status,error_type",
@@ -624,6 +779,8 @@ async def test_incomplete_final_pcm_sample(setup):
         (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
         (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError),
         (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError),
+        (grpc.StatusCode.OUT_OF_RANGE, RimeStreamError),
+        (grpc.StatusCode.UNKNOWN, RimeStreamError),
     ],
 )
 async def test_server_error_without_audio_metadata(setup, location, status, error_type):
@@ -674,25 +831,284 @@ async def test_trailers_only_synthesis_error_keeps_request_id(setup):
 
 @pytest.mark.parametrize("namespace", ["voices", "languages"])
 @pytest.mark.parametrize("location", ["headers", "trailers", "both"])
-async def test_discovery_error_keeps_request_id(setup, namespace, location):
+@pytest.mark.parametrize(
+    "status,error_type",
+    [
+        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
+        (grpc.StatusCode.OUT_OF_RANGE, RimeStreamError),
+        (grpc.StatusCode.UNKNOWN, RimeStreamError),
+    ],
+)
+async def test_discovery_error_keeps_request_id(setup, namespace, location, status, error_type):
     service, client = setup
     service.mode = "discovery_error"
-    service.rejection_status = grpc.StatusCode.PERMISSION_DENIED
+    service.rejection_status = status
     service.response_metadata = (("x-request-id", "header-id"),) if location != "trailers" else ()
     service.trailing_metadata = (("x-request-id", "trailer-id"),) if location != "headers" else ()
-    with pytest.raises(RimePermissionError) as caught:
+    with pytest.raises(error_type) as caught:
         await getattr(client, namespace).list()
     assert caught.value.request_id == ("trailer-id" if location == "trailers" else "header-id")
+    assert service.discovery_calls == 1
 
 
-async def test_client_close_releases_completed_token(setup):
+async def test_client_close_is_idempotent_and_rejects_new_work(setup):
     _, client = setup
     await client.languages.list()
-    token = weakref.ref(client._credentials._token)
     await client.close()
+    await client.close()
+    with pytest.raises(RimeInputError):
+        await client.languages.list()
+
+
+async def test_source_runs_with_host_context(setup):
+    from contextvars import ContextVar
+
+    _, client = setup
+    value = ContextVar("request-context", default="missing")
+    value.set("present")
+
+    async def source():
+        assert value.get() == "present"
+        yield "Hello."
+
+    assert await collect(client.tts.stream(source()))
+
+
+async def test_source_timeout_survives_a_yield(setup):
+    _, client = setup
+    closed = asyncio.Event()
+
+    async def source():
+        try:
+            async with asyncio.timeout(None) as timeout:
+                yield "First sentence. The next sentence "
+                timeout.reschedule(asyncio.get_running_loop().time())
+                await asyncio.Event().wait()
+        finally:
+            closed.set()
+
+    async with client.tts.stream(source()) as stream:
+        with pytest.raises(RimeInputError) as caught:
+            await asyncio.wait_for(collect(stream), 1)
+        assert isinstance(caught.value.__cause__, TimeoutError)
+    assert closed.is_set()
+    assert not client._streams
+
+
+async def test_source_failure_before_native_input_request(setup):
+    _, client = setup
+    cause = RuntimeError("source creation failed")
+
+    class Source:
+        def __aiter__(self):
+            raise cause
+
+    stream = client.tts.stream(Source())
+    native = stream._native
+
+    class DelayedInput:
+        def __getattr__(self, name):
+            return getattr(native, name)
+
+        async def input_request(self):
+            await native.wait_stopped()
+
+    stream._native = DelayedInput()
+    async with stream:
+        with pytest.raises(RimeInputError) as caught:
+            await asyncio.wait_for(collect(stream), 1)
+        assert caught.value.__cause__ is cause
+    assert not client._streams
+
+
+@pytest.mark.parametrize("stop", ["complete", "cancel", "invalid_item"])
+async def test_source_reads_and_cleanup_use_one_task(setup, stop):
+    _, client = setup
+    tasks = []
+    waiting = asyncio.Event()
+
+    class Source:
+        def __aiter__(self):
+            tasks.append(asyncio.current_task())
+            self.reads = 0
+            return self
+
+        async def __anext__(self):
+            tasks.append(asyncio.current_task())
+            self.reads += 1
+            if self.reads == 1:
+                return "First sentence. The next sentence "
+            if stop == "cancel":
+                waiting.set()
+                await asyncio.Event().wait()
+            if stop == "invalid_item":
+                return None
+            raise StopAsyncIteration
+
+        async def aclose(self):
+            await asyncio.sleep(0)
+            tasks.append(asyncio.current_task())
+
+    async with client.tts.stream(Source()) as stream:
+        if stop == "cancel":
+            read = asyncio.create_task(collect(stream))
+            await asyncio.wait_for(waiting.wait(), 1)
+            await asyncio.wait_for(stream.cancel(), 1)
+            with pytest.raises(RimeCancelledError):
+                await read
+        elif stop == "invalid_item":
+            with pytest.raises(RimeInputError):
+                await asyncio.wait_for(collect(stream), 1)
+        else:
+            assert await asyncio.wait_for(collect(stream), 1)
+    assert len(tasks) == 4
+    assert all(task is tasks[0] for task in tasks)
+
+
+async def test_source_context_survives_yields(setup):
+    from contextvars import ContextVar
+
+    _, client = setup
+    value = ContextVar("source-context", default="host")
+    restored = []
+
+    async def source(label):
+        token = value.set(label)
+        try:
+            yield "First sentence. "
+            await asyncio.sleep(0)
+            assert value.get() == label
+            yield "Second sentence."
+            assert value.get() == label
+        finally:
+            value.reset(token)
+            restored.append(value.get())
+
+    results = await asyncio.gather(
+        collect(client.tts.stream(source("first"))),
+        collect(client.tts.stream(source("second"))),
+    )
+    assert all(results)
+    assert restored == ["host", "host"]
+    assert value.get() == "host"
+
+
+@pytest.mark.parametrize("stop", ["cancel", "invalid_item"])
+async def test_source_cleanup_preserves_context(setup, stop):
+    from contextvars import ContextVar
+
+    _, client = setup
+    value = ContextVar("source-context", default="host")
+    waiting = asyncio.Event()
+    restored = []
+
+    async def source():
+        token = value.set("source")
+        try:
+            if stop == "invalid_item":
+                yield None
+            else:
+                yield "First sentence. The next sentence "
+                waiting.set()
+                await asyncio.Event().wait()
+        finally:
+            await asyncio.sleep(0)
+            assert value.get() == "source"
+            value.reset(token)
+            restored.append(value.get())
+
+    stream = client.tts.stream(source())
+    if stop == "invalid_item":
+        with pytest.raises(RimeInputError, match="text source"):
+            await collect(stream)
+    else:
+        assert await anext(stream)
+        await asyncio.wait_for(waiting.wait(), 1)
+        await asyncio.wait_for(stream.cancel(), 1)
+    assert restored == ["host"]
+    assert value.get() == "host"
+
+
+async def test_concurrent_reads_do_not_cancel_the_first_read(setup):
+    service, client = setup
+    service.mode = "silence"
+    stream = client.tts.stream("Hello.")
+    first = asyncio.create_task(anext(stream))
+    await service.received.wait()
+    with pytest.raises(RimeInputError):
+        await anext(stream)
+    service.release.set()
+    assert await first
+    await stream.cancel()
+
+
+def test_new_client_after_fork_has_a_new_runtime():
+    import os
+    import subprocess
+    import sys
+
+    if not hasattr(os, "fork"):
+        pytest.skip("fork is unavailable")
+    script = """
+import asyncio, os
+from rimelabs_sdk import Rime, RimeInputError
+parent = Rime(api_key='test')
+async def input_request(client):
+    stream = client.tts.stream('Hello.')
+    await stream.cancel()
+    assert await asyncio.wait_for(stream._native.input_request(), 2) is None
+    await client.close()
+asyncio.run(input_request(parent))
+pid = os.fork()
+if pid == 0:
+    async def child():
+        try:
+            await parent.close()
+        except RimeInputError:
+            pass
+        else:
+            raise AssertionError('inherited client accepted')
+        await input_request(Rime(api_key='child'))
+    asyncio.run(child())
+    os._exit(0)
+_, status = os.waitpid(pid, 0)
+assert status == 0
+"""
+    subprocess.run([sys.executable, "-c", script], check=True, timeout=10)
+
+
+async def test_uncooperative_source_does_not_retain_stream(setup):
+    import gc
+    import weakref
+
+    _, client = setup
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class Source:
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            entered.set()
+            while not release.is_set():
+                try:
+                    await release.wait()
+                except asyncio.CancelledError:
+                    continue
+            raise StopAsyncIteration
+
+    stream = client.tts.stream(Source())
+    read = asyncio.create_task(anext(stream))
+    await entered.wait()
+    await asyncio.wait_for(stream.cancel(), 1)
+    with pytest.raises(RimeCancelledError):
+        await read
+    reference = weakref.ref(stream)
+    del read, stream
     await asyncio.sleep(0)
     gc.collect()
-    assert token() is None
-    assert client._credentials._refresh is None
-    assert client._credentials._key == ""
-    await client.close()
+    try:
+        assert reference() is None
+    finally:
+        release.set()
