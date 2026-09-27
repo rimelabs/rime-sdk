@@ -84,3 +84,7 @@ uv run mypy src
 uv run pytest
 uv build
 ```
+
+## License
+
+The SDK is licensed under the [MIT License](LICENSE).

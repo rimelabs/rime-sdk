@@ -3,6 +3,8 @@ name = "rimelabs-sdk"
 version = "0.1.0a1"
 description = "Async Rime text-to-speech SDK"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = ["grpcio>=1.74,<2", "rime-api==0.0.1", "livekit-blingfire==1.1.0", "httpx>=0.28,<1"]
 [build-system]
