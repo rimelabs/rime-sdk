@@ -1,9 +1,10 @@
 # Rime SDK for Python
 
-Requires Python 3.11 or later. Use `uv` to install the local package:
+Requires Python 3.11 or later. This is an alpha release.
+Install it from PyPI with `uv`:
 
 ```sh
-uv add /path/to/rime-sdk/python
+uv add "rimelabs-sdk==0.1.0a1"
 ```
 
 ```python
@@ -67,14 +68,12 @@ Catch `RimeError` or one of `RimeAuthenticationError`, `RimePermissionError`,
 `RimeStreamError`. Errors expose a message and optional `request_id`.
 Cancellation of the caller's Python task keeps `asyncio.CancelledError`.
 
-Authentication temporarily sends the API key directly as a bearer token.
-Restore the commented call in `_auth.py` when Themis is ready.
+The SDK sends the API key as a bearer token over TLS.
 
-The retained API-key exchange follows the assumed private contract in
-[authentication](../docs/authentication.md). It has local tests, but no live
-service validation.
+## Development for contributors
 
-## Development
+These instructions require access to the source repository.
+Run the commands from its `python/` directory:
 
 ```sh
 uv sync --locked --dev
