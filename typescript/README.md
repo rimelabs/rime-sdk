@@ -1,13 +1,11 @@
 # Rime SDK for Node.js
 
 Requires Node.js 22 or later. The package uses ESM and includes TypeScript types.
-Build and install the local package:
+Browser use is not supported. This is an alpha release.
+Install it from npm using the `next` tag:
 
 ```sh
-npm ci
-npm run build
-# In your application:
-npm install /path/to/rime-sdk/typescript
+npm install @rimelabs/sdk@next
 ```
 
 ```javascript
@@ -71,14 +69,12 @@ Catch `RimeError` or one of `RimeAuthenticationError`, `RimePermissionError`,
 Cancellation cannot stop application code that waits on an unrelated promise.
 The SDK stops its RPC and limits how long it waits for source cleanup.
 
-Authentication temporarily sends the API key directly as a bearer token.
-Restore the commented call in `auth.ts` when Themis is ready.
+The SDK sends the API key as a bearer token over TLS.
 
-The retained API-key exchange follows the assumed private contract in
-[authentication](../docs/authentication.md). It has local tests, but no live
-service validation. Browser use is not supported.
+## Development for contributors
 
-## Development
+These instructions require access to the source repository.
+Run the commands from its `typescript/` directory:
 
 ```sh
 npm ci
