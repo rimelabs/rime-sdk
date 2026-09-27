@@ -29,3 +29,8 @@ See the package READMEs for use and the [examples](examples/) for runnable scrip
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
 - Canonical schemas remain in their existing repository. These packages consume
   published `rime-api` and `@rimelabs/api` version 0.0.1.
+
+## License
+
+The SDK is licensed under the [MIT License](LICENSE).
+Third-party components retain their own licenses.

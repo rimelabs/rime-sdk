@@ -90,3 +90,8 @@ npm pack
 
 The package includes a pinned Microsoft BlingFire WASM binary and its license.
 It does not download code at runtime. See [vendor provenance](vendor/README.md).
+
+## License
+
+The SDK is licensed under the [MIT License](LICENSE).
+BlingFire retains its [upstream license](vendor/LICENSE.blingfire).

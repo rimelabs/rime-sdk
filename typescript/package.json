@@ -2,6 +2,7 @@
   "name": "@rimelabs/sdk",
   "version": "0.1.0-alpha.1",
   "description": "Rime streaming text-to-speech SDK for Node.js",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -16,6 +17,7 @@
   "files": [
     "dist",
     "vendor",
+    "LICENSE",
     "README.md",
     "CHANGELOG.md"
   ],
