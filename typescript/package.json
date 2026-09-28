@@ -1,6 +1,6 @@
 {
   "name": "@rimelabs/sdk",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Rime streaming text-to-speech SDK for Node.js",
   "license": "MIT",
   "repository": {
