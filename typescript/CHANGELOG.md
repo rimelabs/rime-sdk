@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.0-alpha.2](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.1...typescript-v0.1.0-alpha.2) (2026-09-28)
 
 - Add `model: "mistv3"` for Mist v3 speech, voice discovery, and language discovery.
   The model selects its standard endpoint and default voice. Custom endpoints
