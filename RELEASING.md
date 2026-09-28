@@ -78,6 +78,26 @@ an appropriate change inside each affected package with a `fix:` or `feat:` comm
 Maintenance commits alone generally do not start a release. Use `fix:` or `feat:`
 for user-visible package changes, and describe breaking changes in the PR body.
 
+## API dependency updates
+
+The SDK uses published `rime-api` and `@rimelabs/api` packages.
+[Dependabot](.github/dependabot.yml) checks for new versions each weekday after
+its config reaches `main`. It opens separate Python and Node.js update PRs and
+updates each package's exact dependency version and lockfile. The config limits
+version updates to these two dependencies. Both API packages are excluded from
+the cooldown, so a new release is eligible at the next check.
+
+To check immediately, open **Insights > Dependency graph > Dependabot** in GitHub.
+For each package manager, open **Recent update jobs** and select **Check for updates**.
+
+Review each update and wait for **Package checks** to pass. Keep the generated
+`fix(deps):` title when you squash and merge. Release Please then includes the
+affected SDK package in a release PR. Review and merge that release PR to publish.
+An API release does not publish an SDK release on its own.
+
+Copybara does not manage these dependency versions. Dependabot reads the package
+registries, so no change to the API release workflow is needed.
+
 ## Alpha versions
 
 Both packages remain in alpha. The config uses the `prerelease` versioning strategy

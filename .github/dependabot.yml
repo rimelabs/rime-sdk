@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /python
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: rime-api
+    cooldown:
+      default-days: 3
+      exclude:
+        - rime-api
+    commit-message:
+      prefix: fix
+      include: scope
+  - package-ecosystem: npm
+    directory: /typescript
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: '@rimelabs/api'
+    cooldown:
+      default-days: 3
+      exclude:
+        - '@rimelabs/api'
+    commit-message:
+      prefix: fix
+      include: scope
