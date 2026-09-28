@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.3](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.2...python-v0.1.0-alpha.3) (2026-09-28)
+
+
+### Bug Fixes
+
+* match ITU mu-law quantization for negative PCM ([#10](https://github.com/rimelabs/rime-sdk/issues/10)) ([e03dcb3](https://github.com/rimelabs/rime-sdk/commit/e03dcb3424cab5a9b7d6bc9b1c37b3b72540e3a6))
+
 ## [0.1.0a2](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0a1...python-v0.1.0-alpha.2) (2026-09-28)
 
 - Add `model="mistv3"` for Mist v3 speech, voice discovery, and language discovery.
