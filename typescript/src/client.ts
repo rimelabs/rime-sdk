@@ -20,6 +20,7 @@ import {
 } from "./errors.js";
 export interface RimeOptions {
   apiKey?: string | null;
+  /** Select "coda" (default) or "mistv3" for speech and discovery. */
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
@@ -97,7 +98,7 @@ export class Rime {
       );
     const voice =
       options.voice === undefined || options.voice === null
-        ? "clementine"
+        ? this.deployment.defaultVoice
         : nonempty(options.voice, "voice");
     const language = nonempty(options.language ?? "en", "language");
     const format = options.audioFormat ?? AudioFormat.PCM_24000;

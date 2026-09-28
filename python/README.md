@@ -27,8 +27,18 @@ asyncio.run(main())
 ```
 
 Omit `api_key` to read `RIME_API_KEY`. The default model is `coda`.
-The SDK selects its standard endpoint. Only `coda` is currently supported.
-For a custom deployment of that model, set `endpoint`:
+The SDK selects the endpoint and default voice for the model:
+
+| Model | Standard endpoint | Default voice |
+| --- | --- | --- |
+| `coda` | `coda.api.rime.ai:443` | `clementine` |
+| `mistv3` | `mist.api.rime.ai:443` | `astra` |
+
+Use `Rime(model="mistv3")` for Mist v3. Both models accept complete text or an
+async text source and support voice and language discovery. The SDK rejects
+`mist` and `mistv2`, which name older models in the existing Rime API.
+
+For a custom deployment, select its model and set `endpoint`:
 
 ```python
 client = Rime(model="coda", endpoint="coda.api.customer-name.rime.ai")
@@ -38,7 +48,8 @@ Use a hostname with an optional port, such as `host:8443`. Omit the scheme and p
 Connections always use TLS; the default port is `443`.
 The endpoint applies to speech, voices, and languages for this client.
 
-The default voice is `clementine`; the default language is `en`.
+The default language is `en`. Set `voice` to replace the model's default voice.
+Use `client.voices.list()` to find voices for the selected deployment.
 `tts.stream()` also accepts `AsyncIterable[str]`. Do not await the factory.
 It starts work when you enter its async context or request the first chunk.
 Use the stream context to release resources when you exit a loop early.

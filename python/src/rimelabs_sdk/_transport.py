@@ -1,4 +1,4 @@
-"""Coda wire messages, metadata, and native gRPC completion."""
+"""TTS wire messages, metadata, and native gRPC completion."""
 
 import asyncio
 
@@ -91,7 +91,7 @@ async def discover(channel, metadata, kind, language, timeout):
 
 
 class SynthesisCall:
-    """One Coda RPC. Audio exhaustion means successful wire completion only."""
+    """One TTS RPC. Audio exhaustion means successful wire completion only."""
 
     def __init__(self, channel, metadata):
         self._call = bind(channel, "SynthesizeStreaming")(metadata=metadata)

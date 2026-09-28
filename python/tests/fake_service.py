@@ -23,6 +23,7 @@ class FakeService:
         self.received = asyncio.Event()
         self.discovery_calls = 0
         self.discovery_failures = 0
+        self.supported_speakers = ["test-speaker"]
         self.payload = b"\x01\x00" * 2400
 
     async def streaming(self, requests, context):
@@ -94,7 +95,7 @@ class FakeService:
             await self.discovery_timeout(context)
         if self.mode == "discovery_error":
             await self.discovery_error(context)
-        return proto.GetSupportedSpeakersResponse(speakers=["test-speaker"])
+        return proto.GetSupportedSpeakersResponse(speakers=self.supported_speakers)
 
     async def discovery_timeout(self, context):
         await context.send_initial_metadata(self.response_metadata)

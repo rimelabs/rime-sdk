@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+Add `model: "mistv3"` for Mist v3 streaming speech and discovery. Model selection
+sets the standard endpoint and default voice. Custom endpoints retain the selected
+model's voice default. Coda remains the default model.
+
 ## 0.1.0-alpha.1
 
 Initial local alpha for Node.js 22+ and ESM. Adds Coda synthesis, discovery,

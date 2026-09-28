@@ -24,6 +24,8 @@ from ._stream import _CONSTRUCTION_KEY, AudioStream
 
 
 class Rime:
+    """Speech and discovery for model='coda' or model='mistv3'."""
+
     def __init__(
         self,
         *,
@@ -162,7 +164,11 @@ class _TTS:
                 raise RimeInputError("Text must contain non-whitespace characters")
         elif not hasattr(text, "__aiter__"):
             raise RimeInputError("text must be a string or an async iterable of strings")
-        voice = "clementine" if voice is None else _policy.nonempty(voice, "voice")
+        voice = (
+            self._client._policy.default_voice
+            if voice is None
+            else _policy.nonempty(voice, "voice")
+        )
         _policy.nonempty(language, "language")
         profile = AudioFormat.PCM_24000 if audio_format is None else audio_format
         if not isinstance(profile, AudioFormat):
