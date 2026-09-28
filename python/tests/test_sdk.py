@@ -572,7 +572,10 @@ async def test_client_shutdown_stops_paused_output(setup):
 @pytest.mark.parametrize("profile", list(AudioFormat))
 async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     service, client = setup
-    samples = client._policy.output_bytes + 1
+    # Test queue limits without making FIR conversion race the short stall timeout.
+    client._policy = replace(client._policy, output_bytes=96, output_chunk_bytes=16)
+    # Mu-law emits one byte per three PCM samples. Exceed the queue in both formats.
+    samples = 3 * (client._policy.output_bytes + 1)
     service.payload = b"\x00\x00" * samples
     async with client.tts.stream("Hello.", audio_format=profile) as audio:
         chunks = [part async for part in audio]
@@ -580,6 +583,7 @@ async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     expected = (
         service.payload if profile is AudioFormat.PCM_24000 else b"\xff" * ((samples + 2) // 3)
     )
+    assert len(expected) > client._policy.output_bytes
     assert b"".join(chunks) == expected
 
 

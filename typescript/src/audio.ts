@@ -23,8 +23,9 @@ const total = raw.reduce((a, b) => a + b, 0);
 const coefficients = raw.map((x) => x / total);
 function mulaw(sample: number): number {
   sample = Math.max(-32768, Math.min(32767, sample));
+  // G.711 uses one's complement for negative PCM before quantization.
   const sign = sample < 0 ? 128 : 0,
-    magnitude = Math.min(Math.abs(sample), 32635) + 132;
+    magnitude = Math.min(sample < 0 ? ~sample : sample, 32635) + 132;
   const exponent = Math.max(0, Math.floor(Math.log2(magnitude)) - 7);
   return ~(sign | (exponent << 4) | ((magnitude >> (exponent + 3)) & 15)) & 255;
 }
