@@ -573,14 +573,14 @@ wheels = [
 
 [[package]]
 name = "rime-api"
-version = "0.0.1"
+version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6b/65/b56e9f8f2215cc5f53a5240debc76c6bc4b2a919a5950dd3699c4ef78814/rime_api-0.0.1.tar.gz", hash = "sha256:399985b3cfd0346f2c710a12a5ff609a7584a0e42443a690d75449958e5b6065", size = 17110, upload-time = "2026-09-07T23:08:31.894Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/50/d197d4d390b005db01ab1eb90008a3424fb4eecae7d63f7c4083cdd299ed/rime_api-0.0.2.tar.gz", hash = "sha256:28ab7af0a6b9020e39aad02a83b9ba74913393ef4ef6d7582b5707557098ffa1", size = 17093, upload-time = "2026-09-28T19:39:02.362Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/91/a90aaab25be635286ac79d2fa6b83940ea284485d83b30bb88fd66d84497/rime_api-0.0.1-py3-none-any.whl", hash = "sha256:75d4244a8fa3a5a828774fea853968376baa514756d779e47fb2c0a84b9d5ffe", size = 21307, upload-time = "2026-09-07T23:08:30.83Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/00/91ed386c84d47d0e61821603a047d583196a055dfc5953cdf25817c32ecb/rime_api-0.0.2-py3-none-any.whl", hash = "sha256:04859b204e8a8cec64e6aa84e6399e0744849f37d6ac975b25a6963db38adfe3", size = 21291, upload-time = "2026-09-28T19:39:01.535Z" },
 ]
 
 [[package]]
@@ -608,7 +608,7 @@ requires-dist = [
     { name = "grpcio", specifier = ">=1.74,<2" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "livekit-blingfire", specifier = "==1.1.0" },
-    { name = "rime-api", specifier = "==0.0.1" },
+    { name = "rime-api", specifier = "==0.0.2" },
 ]
 
 [package.metadata.requires-dev]
