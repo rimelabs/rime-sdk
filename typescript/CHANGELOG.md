@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.4](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.3...typescript-v0.1.0-alpha.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* **deps:** bump @rimelabs/api from 0.0.1 to 0.0.2 in /typescript ([8a57747](https://github.com/rimelabs/rime-sdk/commit/8a57747e6e07edfa7ec4f44238fb7074b7e010ab))
+
 ## [0.1.0-alpha.3](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.2...typescript-v0.1.0-alpha.3) (2026-09-28)
 
 

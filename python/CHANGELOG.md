@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.4](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.3...python-v0.1.0-alpha.4) (2026-09-28)
+
+
+### Bug Fixes
+
+* **deps:** bump rime-api from 0.0.1 to 0.0.2 in /python ([dbc93aa](https://github.com/rimelabs/rime-sdk/commit/dbc93aa861bc929064f397a443ee7741e6ba7a33))
+
 ## [0.1.0-alpha.3](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.2...python-v0.1.0-alpha.3) (2026-09-28)
 
 
