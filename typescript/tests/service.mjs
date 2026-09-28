@@ -13,6 +13,7 @@ export class FakeService {
   metadata = [];
   discoveryCalls = 0;
   discoveryFailures = 0;
+  supportedSpeakers = ["test-speaker"];
   payload = Buffer.from(Array(2400).fill([1, 0]).flat());
   release = () => {};
   constructor() {
@@ -153,7 +154,7 @@ export class FakeService {
       callback(
         null,
         create(schema.GetSupportedSpeakersResponseSchema, {
-          speakers: ["test-speaker"],
+          speakers: this.supportedSpeakers,
         }),
       );
     };

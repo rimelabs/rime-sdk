@@ -115,7 +115,7 @@ function nativeError(error: unknown, id: string | null): errors.RimeError {
       id ?? (metadata instanceof grpc.Metadata ? requestId(metadata) : null),
     );
   }
-  return new errors.RimeStreamError("Coda transport failed", id, {
+  return new errors.RimeStreamError("Rime transport failed", id, {
     cause: error,
   });
 }

@@ -1,15 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Add `model="mistv3"` for Mist v3 speech, voice discovery, and language discovery.
+  The model selects its standard endpoint and default voice. Custom endpoints
+  retain the model's default voice. Coda remains the default model.
+- Reorganize the usage guide around examples and option tables. Clarify audio
+  output, timeout defaults, error handling, and cancellation.
+
 ## 0.1.0a1
 
-Initial local alpha. Adds async Coda synthesis, discovery, API-key authentication,
-sentence buffering, PCM and mu-law profiles, typed errors, deadlines, and cancellation.
-The Themis wire contract is assumed and needs deployment validation.
+Initial public alpha for Python 3.11 and later:
 
-Review fixes preserve server errors when writes reach a closed RPC, use native
-sentence offsets for Unicode text, and distinguish token-exchange rate limits
-and service failures from rejected credentials.
-
-Further review fixes preserve errors from responses without audio metadata,
-collect request IDs from headers and trailers, and release completed credential
-refresh tasks at shutdown.
+- Stream Coda speech from a string or an async text source with API-key authentication.
+- Discover voices and languages, and select a custom deployment endpoint.
+- Receive raw 24 kHz PCM or 8 kHz mu-law audio with sentence buffering.
+- Set operation deadlines, cancel streams, and handle typed errors with request IDs.
+- Preserve original Unicode text during sentence detection.
+- Report server errors even when no audio metadata arrives or input writes fail.

@@ -7,12 +7,14 @@ from dataclasses import dataclass, replace
 from ._errors import RimeInputError
 
 INHERIT = object()
+_CODA_HOSTNAME = "coda.api.rime.ai"
 
 
 @dataclass(frozen=True)
 class Policy:
-    target: str = "coda.api.rime.ai:443"
-    audience: str = "coda.api.rime.ai"
+    target: str = f"{_CODA_HOSTNAME}:443"
+    audience: str = _CODA_HOSTNAME
+    default_voice: str = "clementine"
     exchange_url: str = "https://themis.api.rime.ai/v1/token"
     sentence_bytes: int = 65536
     source_chars: int = 1024
@@ -31,11 +33,17 @@ POLICY = Policy()
 
 
 def resolve(model: str, endpoint: str | None) -> Policy:
-    # Add model defaults here only when its transport contract is supported.
-    if model != "coda":
-        raise RimeInputError("This SDK supports model='coda'")
+    if model == "coda":
+        deployment = replace(POLICY)
+    elif model == "mistv3":
+        hostname = "mist.api.rime.ai"
+        deployment = replace(
+            POLICY, target=f"{hostname}:443", audience=hostname, default_voice="astra"
+        )
+    else:
+        raise RimeInputError("model must be 'coda' or 'mistv3'")
     if endpoint is None:
-        return replace(POLICY)
+        return deployment
     error = "endpoint must be a hostname with an optional port (1-65535), without a scheme or path"
     if not isinstance(endpoint, str):
         raise RimeInputError(error)
@@ -52,7 +60,7 @@ def resolve(model: str, endpoint: str | None) -> Policy:
     if separator and (not re.fullmatch(r"[0-9]{1,5}", port) or not 1 <= int(port) <= 65535):
         raise RimeInputError(error)
     host = host.lower()
-    return replace(POLICY, target=f"{host}:{int(port) if separator else 443}", audience=host)
+    return replace(deployment, target=f"{host}:{int(port) if separator else 443}", audience=host)
 
 
 def timeout(value, inherited=None):

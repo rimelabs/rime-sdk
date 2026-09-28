@@ -1,7 +1,9 @@
 import { RimeInputError } from "./errors.js";
+const codaHostname = "coda.api.rime.ai";
 export const policy = {
-  target: "coda.api.rime.ai:443",
-  audience: "coda.api.rime.ai",
+  target: `${codaHostname}:443`,
+  audience: codaHostname,
+  defaultVoice: "clementine",
   exchangeUrl: "https://themis.api.rime.ai/v1/token",
   sentenceBytes: 65536,
   sourceChars: 1024,
@@ -19,10 +21,16 @@ export function resolve(
   model: string,
   endpoint?: string | null,
 ): Readonly<typeof policy> {
-  // Add model defaults here only when its transport contract is supported.
-  if (model !== "coda")
-    throw new RimeInputError("This SDK supports model='coda'");
-  if (endpoint === undefined || endpoint === null) return { ...policy };
+  const deployment = { ...policy };
+  if (model === "mistv3") {
+    const hostname = "mist.api.rime.ai";
+    deployment.target = `${hostname}:443`;
+    deployment.audience = hostname;
+    deployment.defaultVoice = "astra";
+  } else if (model !== "coda") {
+    throw new RimeInputError("model must be 'coda' or 'mistv3'");
+  }
+  if (endpoint === undefined || endpoint === null) return deployment;
   const error =
     "endpoint must be a hostname with an optional port (1-65535), without a scheme or path";
   if (typeof endpoint !== "string" || /\s/.test(endpoint))
@@ -42,7 +50,7 @@ export function resolve(
   )
     throw new RimeInputError(error);
   return {
-    ...policy,
+    ...deployment,
     target: `${host.toLowerCase()}:${port === undefined ? 443 : Number(port)}`,
     audience: host.toLowerCase(),
   };
