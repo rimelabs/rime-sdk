@@ -1,7 +1,7 @@
 # Development
 
 These instructions require access to the private source repository.
-Run each set of commands from its package directory.
+Start each command block from the repository root.
 
 ## Python
 
