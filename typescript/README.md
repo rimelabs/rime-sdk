@@ -1,23 +1,28 @@
 # Rime SDK for Node.js
 
-Requires Node.js 22 or later. The package uses ESM and includes TypeScript types.
-Browser use is not supported. This is an alpha release.
-Install it from npm using the `next` tag:
+Stream speech from a string or async text source with Rime.
+
+## Install
+
+Requires Node.js 22 or later. This alpha package uses ESM and includes TypeScript
+types. Browser use is not supported.
 
 ```sh
 npm install @rimelabs/sdk@next
+export RIME_API_KEY="your-api-key"
 ```
+
+## Quick start
+
+Save this as `speech.mjs` and run `node speech.mjs`:
 
 ```javascript
 import { writeFile } from "node:fs/promises";
-import { Rime, AudioFormat } from "@rimelabs/sdk";
+import { Rime } from "@rimelabs/sdk";
 
-const client = new Rime({ apiKey: "your-api-key" });
+const client = new Rime();
 try {
-  const audio = client.tts.stream("Hello. This is Rime.", {
-    voice: "clementine",
-    audioFormat: AudioFormat.PCM_24000,
-  });
+  const audio = client.tts.stream("Hello. This is Rime.");
   await writeFile("speech.pcm", audio);
   console.log(audio.requestId);
 } finally {
@@ -25,80 +30,137 @@ try {
 }
 ```
 
-Omit `apiKey` to read `RIME_API_KEY`. The default model is `coda`.
-The SDK selects the endpoint and default voice for the model:
+Output is raw mono 24 kHz signed 16-bit little-endian PCM. Configure your player
+for this format; there is no WAV header.
+
+## Stream incoming text
+
+Add this async text source before the client declaration in the quick start:
+
+```javascript
+async function* text() {
+  yield "Hello. ";
+  yield "This text arrives in separate chunks.";
+}
+```
+
+Use `client.tts.stream(text())` with the same file write and cleanup.
+The SDK handles sentence boundaries. Do not await `tts.stream()`; the first
+iterator read starts work. `writeFile` consumes the stream for you.
+
+## Configuration
+
+Select Mist v3 with `new Rime({ model: "mistv3" })`. Mist v1 and v2 are not supported.
 
 | Model | Standard endpoint | Default voice |
 | --- | --- | --- |
 | `coda` | `coda.api.rime.ai:443` | `clementine` |
 | `mistv3` | `mist.api.rime.ai:443` | `astra` |
 
-Use `new Rime({ model: "mistv3" })` for Mist v3. Both models accept complete text
-or an async text source and support voice and language discovery. The SDK rejects
-`mist` and `mistv2`, which name older models in the existing Rime API.
+### Client options
 
-For a custom deployment, select its model and set `endpoint`:
+| `new Rime({ ... })` option | Default | Meaning |
+| --- | --- | --- |
+| `apiKey` | `RIME_API_KEY` | API key; an explicit value overrides the environment |
+| `model` | `"coda"` | Model for speech and discovery |
+| `endpoint` | Model's standard endpoint | Custom hostname and optional port for speech and discovery |
+| `timeout` | No overall deadline | Positive seconds; `null` disables the overall deadline |
+
+Authentication uses bearer tokens over TLS. The SDK does not load `.env` files.
+
+Custom deployments use `new Rime({ model: "coda", endpoint: "host:8443" })`.
+Omit the scheme and path. TLS is required; the default port is `443`.
+Model defaults still apply.
+
+### Synthesis options
+
+Pass these options to `client.tts.stream(text, { ... })`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `voice` | Model's default voice | Voice name from `client.voices.list()` |
+| `language` | `"en"` | Language code |
+| `audioFormat` | `AudioFormat.PCM_24000` | Output profile, imported from `@rimelabs/sdk` |
+| `timeout` | Client setting | Seconds; pass `null` to disable the overall deadline |
+
+### Audio formats
+
+Both profiles return raw audio without a file header.
+
+| `AudioFormat` profile | Encoding | Sample rate | Channels |
+| --- | --- | --- | --- |
+| `PCM_24000` | Signed 16-bit little-endian PCM | 24 kHz | Mono |
+| `MULAW_8000` | G.711 mu-law | 8 kHz | Mono |
+
+Chunks are `Uint8Array` values with complete sample frames; sizes vary. Inspect the
+read-only `audio.format.encoding`, `audio.format.sampleRate`, and `audio.format.channels`.
+
+### Timeouts
+
+An overall deadline includes pauses between reads. Disabling it leaves internal
+connection and progress limits active. Discovery allows at most 10 seconds;
+a shorter supplied timeout takes precedence. Omit an operation's `timeout` or
+pass `undefined` to inherit the client setting.
+
+## Discover voices and languages
+
+List voices and languages inside the quick start's `try` block:
 
 ```javascript
-const client = new Rime({ model: "coda", endpoint: "coda.api.customer-name.rime.ai" });
+const voices = await client.voices.list({ language: "en" });
+const languages = await client.languages.list();
+console.log(voices, languages);
 ```
 
-Use a hostname with an optional port, such as `host:8443`. Omit the scheme and path.
-Connections always use TLS; the default port is `443`.
-The endpoint applies to speech, voices, and languages for this client.
+Both return string arrays and accept `timeout`. Omit `language` to disable filtering.
 
-The default language is `en`. Set `voice` to replace the model's default voice.
-Use `client.voices.list()` to find voices for the selected deployment.
-`tts.stream()` also accepts `AsyncIterable<string>`. Do not await the factory.
-The first iterator read starts work. A `for await` loop exit cancels the stream.
-Use `await audio.cancel()` in a `finally` block if you read the iterator manually.
+## Errors and cancellation
 
-`await client.voices.list({ language: "en" })` returns voice names.
-`await client.languages.list()` returns language codes.
-Both accept an options object with `timeout` in seconds.
+Report SDK errors and request IDs while closing the client on failure:
 
-`new Rime({ timeout: 30 })` sets an overall timeout. An operation can replace
-it with `{ timeout: 10 }` or disable it with `{ timeout: null }`.
-An omitted or `undefined` option inherits the client setting. Internal connection
-and progress limits still apply. An overall timeout continues during caller pauses.
+```javascript
+import { writeFile } from "node:fs/promises";
+import { Rime, RimeError } from "@rimelabs/sdk";
 
-`audio.format` is a read-only `AudioFormat` with `encoding`, `sampleRate`, and
-`channels`. `PCM_24000` is raw signed 16-bit little-endian mono PCM at 24 kHz.
-`MULAW_8000` is raw mono G.711 mu-law at 8 kHz. Neither includes a file header.
-The iterator yields `Uint8Array` chunks with complete sample frames.
-Chunk sizes are not fixed.
-
-`await audio.cancel()` cancels one operation. `await client.close()` cancels all
-client work. Both are idempotent. Both objects support `Symbol.asyncDispose`.
-Normal iterator completion means that the final service status was successful.
-Partial audio can precede a typed error. Synthesis is never replayed.
-
-Catch `RimeError` or one of `RimeAuthenticationError`, `RimePermissionError`,
-`RimeInputError`, `RimeResourceLimitError`, `RimeUnavailableError`,
-`RimeTimeoutError`, `RimeAudioFormatError`, `RimeCancelledError`, or
-`RimeStreamError`. Errors expose a message and optional `requestId`.
-Cancellation cannot stop application code that waits on an unrelated promise.
-The SDK stops its RPC and limits how long it waits for source cleanup.
-
-The SDK sends the API key as a bearer token over TLS.
-
-## Development for contributors
-
-These instructions require access to the source repository.
-Run the commands from its `typescript/` directory:
-
-```sh
-npm ci
-npm run check
-npm run lint
-npm test
-npm pack
+let client;
+try {
+  client = new Rime();
+  await writeFile("speech.pcm", client.tts.stream("Hello. This is Rime."));
+} catch (error) {
+  if (error instanceof RimeError) {
+    console.error(`Speech failed: ${error.message}; requestId=${error.requestId}`);
+  }
+  throw error;
+} finally {
+  await client?.close();
+}
 ```
 
-The package includes a pinned Microsoft BlingFire WASM binary and its license.
-It does not download code at runtime. See [vendor provenance](vendor/README.md).
+Each SDK error inherits from `RimeError`:
+
+| Error | Meaning |
+| --- | --- |
+| `RimeAuthenticationError` | Missing or rejected credentials |
+| `RimePermissionError` | Access denied |
+| `RimeInputError` | Invalid input or client use |
+| `RimeResourceLimitError` | Service resource limit reached |
+| `RimeUnavailableError` | Service unavailable |
+| `RimeTimeoutError` | Overall or internal deadline reached |
+| `RimeAudioFormatError` | Unsupported or unexpected audio format |
+| `RimeCancelledError` | Operation cancelled |
+| `RimeStreamError` | Other stream or transport failure |
+
+Partial audio can arrive before an error. Output is complete only after successful
+iteration. Synthesis is not retried automatically.
+
+Keep cleanup when stopping early. A `for await` loop exit cancels the stream.
+For manual reads, call `await audio.cancel()` in `finally`. `await client.close()`
+stops all client work. Both calls are safe to repeat; both objects support
+`Symbol.asyncDispose`. Cancellation stops the RPC and limits cleanup time, but
+cannot force your text source to finish an unrelated promise.
 
 ## License
 
-The SDK is licensed under the [MIT License](LICENSE).
-BlingFire retains its [upstream license](vendor/LICENSE.blingfire).
+The SDK uses the [MIT License](LICENSE). BlingFire retains its
+[upstream license](vendor/LICENSE.blingfire). The package includes its WASM runtime
+and downloads no code or models at runtime. See [vendor provenance](vendor/README.md).

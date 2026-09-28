@@ -2,7 +2,7 @@
 
 First-party Python and Node.js SDKs for Coda and Mist v3 streaming speech.
 Both packages accept complete text or an async text source and return audio chunks.
-The SDK handles sentence detection, API-key exchange, gRPC, conversion, and cancellation.
+The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
 The default model is `coda`. Select `mistv3` to use Mist v3:
 `Rime(model="mistv3")` in Python or `new Rime({ model: "mistv3" })` in Node.js.
@@ -27,6 +27,7 @@ npm test
 
 Set `RIME_API_KEY` in your application environment. The SDK does not load `.env` files.
 See the package READMEs for use and the [examples](examples/) for runnable scripts.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package checks and build commands.
 
 ## Repository boundaries
 
