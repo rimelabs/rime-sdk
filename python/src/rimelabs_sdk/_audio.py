@@ -42,7 +42,8 @@ COEFFICIENTS = tuple(x / sum(_raw) for x in _raw)
 def _mulaw(sample):
     sample = max(-32768, min(32767, sample))
     sign = 0x80 if sample < 0 else 0
-    magnitude = min(abs(sample), 32635) + 132
+    # G.711 uses one's complement for negative PCM before quantization.
+    magnitude = min(~sample if sample < 0 else sample, 32635) + 132
     exponent = max(0, magnitude.bit_length() - 8)
     mantissa = (magnitude >> (exponent + 3)) & 15
     return ~(sign | (exponent << 4) | mantissa) & 255
