@@ -1,0 +1,16 @@
+.github/dependabot.yml
+  h_018052b8652914 1-28
+RELEASING.md
+  h_018052b8652914 81-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c55c3a6b1107260bc8f227c6537d8279f5162bd",
+  "prompts": {},
+  "humans": {
+    "h_018052b8652914": {
+      "author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
