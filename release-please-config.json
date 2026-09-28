@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "8e5f69cbd742ae0beed1b516d1ba1dac1b71c362",
+  "include-component-in-tag": true,
+  "include-v-in-tag": true,
+  "separate-pull-requests": false,
+  "versioning": "prerelease",
+  "prerelease": true,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "packages": {
+    "python": {
+      "release-type": "python",
+      "prerelease-type": "alpha.1",
+      "component": "python",
+      "package-name": "rimelabs-sdk"
+    },
+    "typescript": {
+      "release-type": "node",
+      "prerelease-type": "alpha.1",
+      "component": "typescript"
+    }
+  }
+}

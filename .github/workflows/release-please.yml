@@ -1,0 +1,181 @@
+name: Release
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      python_tag:
+        description: 'Recovery only: existing Python release tag to publish'
+        type: string
+        default: ''
+      typescript_tag:
+        description: 'Recovery only: existing Node.js release tag to publish'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
+    outputs:
+      python_tag: ${{ steps.release.outputs['python--tag_name'] }}
+      typescript_tag: ${{ steps.release.outputs['typescript--tag_name'] }}
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        id: release
+        with:
+          target-branch: main
+      # GITHUB_TOKEN does not trigger pull_request CI. Find the open release PR
+      # even on a retry where Release Please did not change it.
+      - uses: actions/github-script@v7
+        id: pr
+        with:
+          script: |
+            const prs = await github.paginate(github.rest.pulls.list, {
+              ...context.repo, state: 'open', base: 'main',
+            });
+            const pr = prs.find(pr =>
+              pr.user.login === 'github-actions[bot]' &&
+              pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}` &&
+              pr.head.ref.startsWith('release-please--') &&
+              pr.labels.some(label => label.name === 'autorelease: pending')
+            );
+            if (pr) core.setOutput('branch', pr.head.ref);
+      - uses: actions/checkout@v4
+        if: steps.pr.outputs.branch != ''
+        with:
+          ref: ${{ steps.pr.outputs.branch }}
+      - uses: astral-sh/setup-uv@v6
+        if: steps.pr.outputs.branch != ''
+        with:
+          python-version: '3.12'
+      - name: Normalize Python version and update its lockfile
+        if: steps.pr.outputs.branch != ''
+        run: |
+          version=$(uv version --project python --short)
+          uv version --project python --no-sync "$version"
+          git add python/pyproject.toml python/uv.lock
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'chore: update Python release metadata'
+            git push
+          fi
+      - name: Run checks on the release PR branch
+        if: steps.pr.outputs.branch != ''
+        uses: actions/github-script@v7
+        env:
+          RELEASE_BRANCH: ${{ steps.pr.outputs.branch }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'checks.yml',
+              ref: process.env.RELEASE_BRANCH,
+            });
+
+  python:
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.python_tag != '' || inputs.python_tag != '')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.python_tag || inputs.python_tag }}
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --locked --dev
+      - name: Verify release version and alpha policy
+        run: |
+          uv run python - <<'PY'
+          import json, os, tomllib
+          from pathlib import Path
+          from packaging.version import Version
+
+          manifest = json.loads(Path('../.release-please-manifest.json').read_text())
+          config = json.loads(Path('../release-please-config.json').read_text())
+          version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          assert os.environ['RELEASE_TAG'] == 'python-v' + manifest['python']
+          assert Version(version) == Version(manifest['python'])
+          if config['prerelease']:
+              assert Version(version).pre and Version(version).pre[0] == 'a'
+          PY
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src
+      - run: uv run pytest
+      - run: uv build
+      - run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/
+
+  typescript:
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.typescript_tag != '' || inputs.typescript_tag != '')
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.typescript_tag || inputs.typescript_tag }}
+      # npm cannot create provenance for a package built from a private repo.
+      NPM_CONFIG_PROVENANCE: 'false'
+    defaults:
+      run:
+        working-directory: typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11.18.0
+      - run: npm ci
+      - name: Verify release version and alpha policy
+        run: |
+          node --input-type=commonjs <<'JS'
+          const assert = require('node:assert/strict');
+          const { version } = require('./package.json');
+          const manifest = require('../.release-please-manifest.json');
+          const config = require('../release-please-config.json');
+          assert.equal(process.env.RELEASE_TAG, 'typescript-v' + version);
+          assert.equal(version, manifest.typescript);
+          if (config.prerelease) assert.match(version, /^\d+\.\d+\.\d+-alpha\.\d+$/);
+          JS
+      - run: npm run check
+      - run: npm run lint
+      - run: npm test
+      - run: npm pack
+      - name: Publish package
+        run: |
+          tag=$(node -p 'require("./package.json").version.includes("-") ? "next" : "latest"')
+          npm publish --access public --tag "$tag"

@@ -4,7 +4,7 @@ Requires Python 3.11 or later. This is an alpha release.
 Install it from PyPI with `uv`:
 
 ```sh
-uv add "rimelabs-sdk==0.1.0a1"
+uv add --prerelease=allow rimelabs-sdk
 ```
 
 ```python
