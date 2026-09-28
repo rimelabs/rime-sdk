@@ -8,6 +8,13 @@
 - Reorganize the usage guide around examples and option tables. Clarify audio
   output, timeout defaults, error handling, and cancellation.
 
+## [0.1.0-alpha.2](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.1...python-v0.1.0-alpha.2) (2026-09-28)
+
+
+### Features
+
+* add Mist v3 support to Python and Node.js SDKs ([#8](https://github.com/rimelabs/rime-sdk/issues/8)) ([5dcf59c](https://github.com/rimelabs/rime-sdk/commit/5dcf59c117d98bd99a27f2e3ef490ccbb59cadb9))
+
 ## 0.1.0a1
 
 Initial public alpha for Python 3.11 and later:
