@@ -1,0 +1,19 @@
+typescript/tests/transport.test.mjs
+  s_602cd8bca5d2b1::t_9762f2f56f5e74 157-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cc99807a6f3681d5e1e23a26c5b7578061967415",
+  "prompts": {},
+  "sessions": {
+    "s_602cd8bca5d2b1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0eb40-cb58-72e2-ab0f-6c06ee8d327e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
