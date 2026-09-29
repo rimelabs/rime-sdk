@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.5](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.4...typescript-v0.1.0-alpha.5) (2026-09-29)
+
+
+### Bug Fixes
+
+* support API 0.1.0 in Python and TypeScript SDKs ([#16](https://github.com/rimelabs/rime-sdk/issues/16)) ([af0f646](https://github.com/rimelabs/rime-sdk/commit/af0f6467ffe662673e13a4f943351d4c8b88e0fa))
+
 ## [0.1.0-alpha.4](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.3...typescript-v0.1.0-alpha.4) (2026-09-28)
 
 
