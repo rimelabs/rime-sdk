@@ -156,6 +156,8 @@ class SynthesisCall:
                 message = await self._call.read()
                 if message is grpc.aio.EOF:
                     break
+                if message.WhichOneof("payload") != "audio":
+                    continue
                 if message.audio:
                     self._check_format(content_type)
                 yield message.audio

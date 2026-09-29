@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as grpc from "@grpc/grpc-js";
+import { create } from "@bufbuild/protobuf";
+import * as schema from "@rimelabs/api";
 import { SynthesisCall, discover } from "../dist/transport.js";
 import {
   RimeAudioFormatError,
@@ -128,3 +130,37 @@ test("discovery transport does not retry", () =>
     );
     assert.equal(server.discoveryCalls, 1);
   }));
+
+for (const [name, payload] of [
+  ["empty payload", { case: undefined }],
+  [
+    "trailer",
+    { case: "trailer", value: { timestamps: { status: { code: 0 } } } },
+  ],
+  [
+    "failed timestamps",
+    { case: "trailer", value: { timestamps: { status: { code: 14 } } } },
+  ],
+]) {
+  test(`non-audio responses do not enter audio stream / ${name}`, () =>
+    setup(async (server, prepared, signal) => {
+      server.finalResponses = [
+        create(schema.SynthesisResponseStreamSchema, { payload }),
+      ];
+      const call = new SynthesisCall(prepared, signal);
+      try {
+        await call.start("voice", "en");
+        await call.write("Hello.");
+        call.finishInput();
+        const chunks = [];
+        for await (const part of call.audio()) chunks.push(part);
+        assert.deepEqual(
+          chunks.map((chunk) => Buffer.from(chunk)),
+          [server.payload],
+        );
+        assert.equal(server.calls[0][0].payload.value.timestamps, undefined);
+      } finally {
+        call.cancel();
+      }
+    }));
+}

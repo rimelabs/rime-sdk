@@ -15,6 +15,7 @@ class FakeService:
             ("x-request-id", "test-request"),
         )
         self.trailing_metadata = ()
+        self.final_responses = []
         self.headers_sent = asyncio.Event()
         self.calls = []
         self.metadata = []
@@ -70,6 +71,8 @@ class FakeService:
                 if self.mode == "partial_error":
                     await self.release.wait()
                     await context.abort(grpc.StatusCode.UNAVAILABLE, "test disconnect")
+            for response in self.final_responses:
+                yield response
             if self.mode == "hang_after_input":
                 await self.release.wait()
         finally:

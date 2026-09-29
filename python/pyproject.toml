@@ -6,7 +6,12 @@ readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = ["grpcio>=1.74,<2", "rime-api==0.0.2", "livekit-blingfire==1.1.0", "httpx>=0.28,<1"]
+dependencies = [
+    "grpcio>=1.74,<2",
+    "rime-api==0.1.0",
+    "livekit-blingfire==1.1.0",
+    "httpx>=0.28,<1",
+]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

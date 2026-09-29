@@ -9,6 +9,7 @@ export class FakeService {
     "x-request-id": "test-request",
   };
   trailingMetadata = {};
+  finalResponses = [];
   calls = [];
   metadata = [];
   discoveryCalls = 0;
@@ -80,19 +81,19 @@ export class FakeService {
           if (this.mode === "odd_chunks") {
             call.write(
               create(schema.SynthesisResponseStreamSchema, {
-                audio: this.payload.subarray(0, 1),
+                payload: { case: "audio", value: this.payload.subarray(0, 1) },
               }),
             );
             call.write(
               create(schema.SynthesisResponseStreamSchema, {
-                audio: this.payload.subarray(1),
+                payload: { case: "audio", value: this.payload.subarray(1) },
               }),
             );
           } else
             for (let i = 0; i < (this.mode === "burst" ? 100 : 1); i++)
               call.write(
                 create(schema.SynthesisResponseStreamSchema, {
-                  audio: this.payload,
+                  payload: { case: "audio", value: this.payload },
                 }),
               );
         };
@@ -111,6 +112,7 @@ export class FakeService {
             );
       });
       call.on("end", () => {
+        for (const response of this.finalResponses) call.write(response);
         if (!["partial_error", "silence", "no_audio_error"].includes(this.mode))
           call.end(this.makeMetadata(this.trailingMetadata));
       });
