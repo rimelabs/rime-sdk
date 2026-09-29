@@ -154,7 +154,10 @@ for (const [name, payload] of [
         call.finishInput();
         const chunks = [];
         for await (const part of call.audio()) chunks.push(part);
-        assert.deepEqual(chunks, [server.payload]);
+        assert.deepEqual(
+          chunks.map((chunk) => Buffer.from(chunk)),
+          [server.payload],
+        );
         assert.equal(server.calls[0][0].payload.value.timestamps, undefined);
       } finally {
         call.cancel();
