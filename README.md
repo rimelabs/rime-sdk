@@ -34,7 +34,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package checks and build com
 - Each language owns its dependencies, tests, version, changelog, and release job.
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
 - Canonical schemas remain in their existing repository. These packages consume
-  published `rime-api` and `@rimelabs/api` version 0.0.1.
+  published `rime-api` and `@rimelabs/api` version 0.1.0.
 
 ## Releases
 

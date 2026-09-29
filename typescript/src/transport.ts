@@ -72,7 +72,10 @@ export function metadata(value: string) {
   return result;
 }
 function openStream(client: grpc.Client, auth: grpc.Metadata) {
-  return client.makeBidiStreamRequest(
+  return client.makeBidiStreamRequest<
+    schema.StreamingSynthesisRequest,
+    schema.SynthesisResponseStream
+  >(
     "/rime.TextToSpeech/SynthesizeStreaming",
     serializer(schema.StreamingSynthesisRequestSchema),
     deserializer(schema.SynthesisResponseStreamSchema),
@@ -296,9 +299,13 @@ export class SynthesisCall {
     try {
       const metadata = await abortable(this.metadataPromise, this.signal);
       const contentType = metadata.get("x-rime-audio-content-type")[0];
-      for await (const response of this.call) {
-        if (response.audio.length) this.checkFormat(contentType);
-        yield response.audio;
+      const responses: AsyncIterable<schema.SynthesisResponseStream> =
+        this.call;
+      for await (const response of responses) {
+        if (response.payload.case !== "audio") continue;
+        const audio = response.payload.value;
+        if (audio.length) this.checkFormat(contentType);
+        yield audio;
       }
       const status = await abortable(this.statusPromise, this.signal);
       if (status.code !== grpc.status.OK) throw rpcError(status.code, this.id);

@@ -5,6 +5,7 @@ import asyncio
 import grpc
 import pytest
 from fake_service import FakeService
+from rime_api import text_to_speech_pb2 as proto
 
 from rimelabs_sdk import (
     RimeAudioFormatError,
@@ -95,3 +96,27 @@ async def test_discovery_transport_does_not_retry(connection):
     with pytest.raises(RimeUnavailableError):
         await discover(channel, (), "languages", None, 1)
     assert server.discovery_calls == 1
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        proto.SynthesisResponseStream(),
+        proto.SynthesisResponseStream(trailer={"timestamps": {"status": {"code": 0}}}),
+        proto.SynthesisResponseStream(trailer={"timestamps": {"status": {"code": 14}}}),
+    ],
+    ids=["empty_payload", "trailer", "failed_timestamps"],
+)
+async def test_non_audio_responses_do_not_enter_audio_stream(connection, response):
+    server, channel = connection
+    server.final_responses = [response]
+    call = SynthesisCall(channel, ())
+    try:
+        await call.start("voice", "en")
+        await call.write("Hello.")
+        await call.finish_input()
+        chunks = [part async for part in call.audio()]
+        assert chunks == [server.payload]
+        assert not server.calls[0][0].header.HasField("timestamps")
+    finally:
+        call.cancel()
