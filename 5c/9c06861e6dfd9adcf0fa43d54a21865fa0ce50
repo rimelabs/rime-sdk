@@ -1,0 +1,39 @@
+README.md
+  s_602cd8bca5d2b1::t_05f562df2ee18c 37
+python/pyproject.toml
+  s_602cd8bca5d2b1::t_8a32f496c0fe42 9-14
+python/src/rimelabs_sdk/_transport.py
+  s_602cd8bca5d2b1::t_786c061e170755 159-160
+python/tests/fake_service.py
+  s_602cd8bca5d2b1::t_a976bb671f6ba4 18,74-75
+python/tests/test_transport.py
+  s_602cd8bca5d2b1::t_6f251761253a92 8,99-122
+python/uv.lock
+  s_602cd8bca5d2b1::t_561685d08ec7f1 161-172,588,591,594,596,624
+typescript/package-lock.json
+  s_602cd8bca5d2b1::t_7b68f9885b3946 14,130-132
+typescript/package.json
+  s_602cd8bca5d2b1::t_5614cf12f0220a 39
+typescript/src/transport.ts
+  s_602cd8bca5d2b1::t_e3ccb0e98f1027 75-78,302-308
+typescript/tests/service.mjs
+  s_602cd8bca5d2b1::t_f7b74abab61ec7 12,84,89,96,115
+typescript/tests/transport.test.mjs
+  s_602cd8bca5d2b1::t_ffca643e35a704 5-6,133-163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c9c06861e6dfd9adcf0fa43d54a21865fa0ce50",
+  "prompts": {},
+  "sessions": {
+    "s_602cd8bca5d2b1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0eb40-cb58-72e2-ab0f-6c06ee8d327e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
