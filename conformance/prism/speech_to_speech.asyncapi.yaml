@@ -1,0 +1,2102 @@
+# AsyncAPI description of the Prism realtime speech-to-speech WebSocket
+# interface. This is the public Preview subset: parser-only compatibility
+# fields and internal experiment controls are intentionally omitted.
+asyncapi: 3.0.0
+
+info:
+  title: Rime Prism Realtime Speech-to-Speech WebSocket API
+  version: '0.4.0'
+  description: |
+    Draft public contract. Provider-independent EOT error naming requires a
+    deployment adapter before use with the current direct server. This
+    document version is not negotiated on the wire. Turn detection and
+    generation sampling and output limits are service-managed. Tool-call filler
+    is enabled by default and is not customer-configurable; it need not occur
+    in every tool response. Customers choose interruption behavior, voice,
+    instructions, and tools during one-time session initialization. Enforcement of this narrower
+    public configuration requires Rust API and serving integration and must
+    not be inferred from the current core server's broader internal settings.
+    First-release scope is Direct WebSocket voice sessions, typed user input
+    with spoken replies, and tools. Customer connection settings and recovery
+    experience remain delivery-team decisions. Typed gateway enablement and
+    external tool-timeout profile acceptance are still release prerequisites.
+
+    One WebSocket connection is one realtime conversation session. The client
+    sends microphone audio, atomic typed user turns, and control events; Prism
+    sends turn signals, user transcription, generated text/audio, tool calls,
+    and operation-scoped errors. Typed input is an alternate way to supply one
+    user turn inside the same voice session; it is not a text-only chat mode.
+
+    Prism owns turn detection and response timing. Detector selection is
+    internal; turn-detection stages do not add independent WebSocket events.
+    Eager preparation and its enablement are internal. Starting, discarding,
+    or timing out private preparation produces no response events or client
+    errors. Once response.created is sent, normal response completion and
+    failure rules apply, regardless of how the reply was prepared.
+
+    This Preview overlaps with part of the OpenAI Realtime event vocabulary,
+    but it is not a drop-in OpenAI-compatible endpoint. Only the events and
+    fields declared here are part of this interface. Unknown server fields
+    must be ignored for forward compatibility, so server-event schemas remain
+    open to additional properties, and an unknown value of a documented enum
+    (a prsm_cause, an error scope or owner kind, a response status) must be
+    treated as unknown rather than as an error. Client requests fail closed. Every client
+    event accepts only its declared fields, and so do the session settings,
+    tool declarations and conversation items inside it; only a tool's
+    `parameters`, the customer's own JSON Schema, and customer keys in the
+    `response.metadata` of a typed turn or a nudge stay open. A misspelled,
+    read-only, internal or unknown field rejects the whole request with no
+    effect: `session.update` with invalid_session_configuration, and other
+    events with invalid_client_event unless a more specific code is
+    documented for them.
+
+    Existing wire identifiers retain their `prsm.` and `prsm_` prefixes.
+
+    ### Framing and audio
+
+    Every WebSocket message is one JSON object in a text frame. Binary frames,
+    JSON arrays, and protobuf subprotocols are not supported. Audio is carried
+    as base64 (standard alphabet, padded, no line breaks) of raw little-endian
+    mono PCM16, whole 16-bit samples only:
+
+    - client microphone input: 16 kHz
+    - Prism generated output: 24 kHz
+
+    The client keeps microphone audio flowing, including silence and while the
+    assistant speaks or tools run. The client owns echo cancellation, output
+    playback, and tool execution.
+
+    ### Session and response lifecycle
+
+    Prism first sends `session.created`, meaning connected but not ready for
+    conversation input. The client sends one complete initialization in
+    `session.update` and waits for `session.updated` before sending audio or
+    a response request. Omitted settings use deployment defaults, which must
+    form a valid voice-session configuration. Initialization applies and locks
+    the configuration before the acknowledgment is sent. Invalid initialization
+    applies nothing and may be corrected and retried. After success, every
+    subsequent `session.update` is rejected, including empty or identical
+    requests, even before user input or after returning to idle. A new
+    configuration requires a new session. Before initialization, audio append
+    and response requests are rejected without buffering input, creating
+    conversation items, or starting generation; they are never replayed after
+    initialization. The proposed state errors are `session_not_initialized`
+    and `session_already_initialized`, both event-scoped and non-terminal.
+    Their owner identifies the request event_id when supplied. These admission
+    rules require Rust API implementation; JSON Schema alone is stateless.
+    Turn detection commits user speech automatically; there is no public
+    client `input_audio_buffer.commit` event. Alternatively, while the voice
+    session is idle, or while a tool round waits once the response that made its
+    calls has ended, the client can send one complete typed user turn in
+    `response.create`; during a tool round it supersedes the batch, as speech
+    does. Prism acknowledges its server-created user item before
+    announcing the bound response; it emits no speech/VAD/transcription events
+    for that typed input. Under the same conditions the client can nudge the
+    assistant to speak without new user input: a `response.create` with
+    `prsm_cause: proactive` and an optional `prsm_instruction` for that one
+    reply, added at the end of the conversation and kept in history as an
+    instruction, never as the user's words. The session instructions are not
+    replaced.
+
+    A response starts with `response.created`, may contain item, text, audio,
+    and tool events, and ends with exactly one matching `response.done` while
+    the connection remains healthy. `response.done` ends generation, not
+    playback. A response that emitted audio includes
+    `response.metadata.prsm_drain_token` in its terminal event, including on
+    cancellation or failure. Playback receipts are optional: the client may
+    ignore this token and omit `prsm.playback.drained`, leaving Prism to estimate
+    completion. A receipt reports the player's boundary, not proof that a
+    person heard the audio. It does not gate a new turn already started after
+    an interruption.
+
+    `response.cancel` stops generation of the current response, or only of
+    the response its `response_id` names. It is not an interruption: no new
+    user turn starts, and the next reply does not acknowledge an interruption.
+    The cancelled response ends with `response.done` (`status: cancelled`,
+    `status_details.reason: client_cancelled`). When nothing is cancelled (no
+    response is generating, the named response is not current, or generation
+    already finished while audio is still playing), Prism sends the
+    event-scoped error `response_cancel_not_active` and the session is
+    unaffected. Tool calls already dispatched are not undone; their results
+    can still be delivered and continued. A manual stop needs no
+    `conversation.item.truncate`: truncate reports where the caller's speech
+    interrupted playback.
+
+    An `error` event does not terminate a response by itself. Use its `scope`
+    and `owner` to isolate the affected operation. For an announced response,
+    wait for its terminal event or the deployment's application deadline.
+    A request rejected before response creation has no response terminal to
+    wait for. Transport loss can prevent either error or terminal delivery;
+    end old-session waits and stop queued playback when the connection closes.
+
+    A known client event with an invalid shape is rejected with an
+    event-scoped error and has no effect. Text that is not a JSON object, or
+    an unknown client event type, may close the connection instead of
+    producing a recoverable `error`. A new
+    connection starts a new session; there is no replay or resume operation.
+
+    ### Tools
+
+    The application authorizes and executes each complete tool call at most
+    once. It saves the exact result before delivery, sends it with the original
+    `call_id`, waits for `conversation.item.created`, and requests one
+    continuation bound to the parent only after the parent `response.done` and
+    every result acknowledgment. An identical result may be resent only on the
+    same live session. Never rerun tools or replay results after reconnect.
+
+    Each `response.function_call_arguments.done` carries exactly one tool call.
+    One response may deliver several calls with distinct `call_id` values, and
+    clients must not rely on those events arriving adjacent to each other.
+    Results may be delivered before the parent `response.done`; each is
+    acknowledged on its own and never starts generation by itself.
+
+    Prism judges a continuation request by its own state when it handles the
+    request, not by what the client has observed. If it refuses the request it
+    sends an `error` with `scope: event` and no `response.created`; the
+    connection stays open. `owner.event_id` echoes the request's `event_id`,
+    and an accepted continuation's `response.created` echoes it as
+    `prsm_request_event_id`. `invalid_tool_continuation` means the request is malformed
+    and must be fixed. `tool_continuation_not_ready` means that, when Prism
+    handled the request, the parent response had not finished or not all tool
+    results had been accepted; request again only after observing the parent
+    `response.done` and every result acknowledgment.
+    `tool_continuation_unavailable` means the batch is unknown, already
+    continued, timed out, or superseded by a new user turn; do not retry it. A
+    refusal that arrives after the request was superseded, or after its
+    continuation response started, concerns that old request only. A missing
+    reply, a lost connection, or an otherwise unknown outcome still does not
+    authorize a retry, and `event_id` is not an idempotency key. These refusals
+    hold on every session and are not configurable.
+
+    Not requesting a continuation is how a tool round that needs no answer
+    ends: there is no finish operation, and a tool round does not hold the
+    session. Once the parent response has ended, new microphone speech, a
+    typed user turn, or a nudge is taken and supersedes the batch, which can
+    then no longer be continued. A result that arrives after that is recorded
+    under its call and starts nothing; the model can draw on it from its next
+    turn. To have it reported, send a nudge that names the call with `prsm_call_id`;
+    Prism writes the call and its recorded result into that reply's
+    instruction and never reports a result on its own.
+
+    Deployment profiles for external clients bound both tool waits. Read their
+    durations from `session.prsm_tool_waits` in `session.created` and
+    `session.updated` instead of assuming a specific number. They are total
+    durations, not remaining time, and an acknowledgment does not restart
+    either wait. The result wait starts when the parent `response.done` is
+    sent. The continuation wait starts once the parent has finished and every
+    result has been accepted.
+    Prism sends an error only when the current batch's result wait expires: a
+    missing result produces `tool_result_timeout` with `scope: tool_roundtrip`
+    and the unreturned tools are recorded as outcome unknown. When every result
+    was accepted and no continuation was requested, the continuation wait closes
+    the batch without an error: not requesting one is not a fault. A batch that
+    a new user turn has already superseded expires without sending an error and
+    does not affect the new turn. Expiry only ends waiting for that batch: it does not
+    rerun a tool, does not generate a reply, and does not mean the external
+    operation failed or was cancelled. Continue with the next user input. A
+    continuation for an expired batch is refused with
+    `tool_continuation_unavailable`. These bounds are
+    not a statement about authentication or other public-deployment
+    requirements.
+
+    A client whose own result-delivery and retry budget does not fit the
+    published waits should not enable tools for that session. A check at
+    session start is only a necessary condition: it does not cover tool
+    execution time or the number of calls in a batch, and server expiry
+    remains the backstop. An identical tool result may be resent, but a
+    continuation `response.create` whose send outcome is unknown must not be
+    blindly resent. A correlated `tool_continuation_not_ready` refusal may be
+    retried once its precondition holds.
+
+    ### Identity and acknowledgments
+
+    `session.id`, `response_id`, `item_id`, `call_id`, and `drain_token` are
+    distinct identity domains. A client `event_id` names one request.
+    `session.update`, `conversation.item.create`, and `response.create` must
+    carry one; a request without it is rejected with the proposed
+    event-scoped `event_id_required` and has no effect. Their success events
+    echo it unchanged as `prsm_request_event_id`: `session.updated`,
+    `conversation.item.created` (for a history message, a tool result, and the
+    user item of a typed turn), and the `response.created` of a typed turn,
+    tool continuation or nudge. Their rejections name it in `error.owner.event_id`.
+    Match each acknowledgment or rejection to the pending request by that
+    value, so a late acknowledgment of a request that already timed out is
+    never taken for the next request's. A `response.created` without
+    `prsm_request_event_id` answers no client request; it is a reply to user
+    speech.
+
+    Keep `event_id` values unique within the session. Prism does not check
+    this, and `event_id` is not an idempotency key: resending a request under
+    the same value performs it again. Other client events carry an `event_id`
+    optionally; `input_audio_buffer.append` and `prsm.playback.drained` are not
+    acknowledged, and `response.cancel` is answered by the cancelled
+    response's `response.done` or by `response_cancel_not_active`. After an
+    application deadline expires, treat the outcome as unknown instead of
+    retrying a response request or repeating a side effect.
+
+    ### Authentication and deployment limits
+
+    The realtime handler does not define a universal authentication scheme and
+    must not be exposed directly. A deployment gateway supplies authentication,
+    origin/client policy, supported voices and interruption behavior, message/chunk
+    limits, idle/max-call limits, reconnect policy, and quotas. How long to
+    wait for an acknowledgment and how often to resend a tool result are client
+    policy. Tool wait durations are published by the server in
+    `session.prsm_tool_waits`; a gateway in front of the realtime handler must
+    pass that field through to the client that actually handles tools.
+
+    ### Excluded from this Preview contract
+
+    This customer interface is a voice-session API. Text-only customer
+    sessions, application-initiated responses other than a nudge,
+    internal brain/ASR selection, corpus collection, client research metrics,
+    typed HTTP conversations, LiveKit/WebRTC adapters, SIP, durable resume, and
+    word-level playback timestamps are excluded.
+
+defaultContentType: application/json
+
+servers:
+  deployment:
+    host: '{host}'
+    pathname: /v1/realtime
+    protocol: wss
+    description: >-
+      Deployment gateway for the Prism realtime handler. Authentication and
+      limits are deployment-specific and must be supplied out of band.
+    variables:
+      host:
+        description: Deployment WebSocket host.
+        default: api.example.com
+
+channels:
+  realtime:
+    address: /v1/realtime
+    description: >-
+      One bidirectional realtime session. Client and server events are JSON
+      text frames selected by the top-level `type` field.
+    bindings:
+      ws:
+        method: GET
+    messages:
+      sessionUpdate:
+        $ref: '#/components/messages/sessionUpdate'
+      inputAudioBufferAppend:
+        $ref: '#/components/messages/inputAudioBufferAppend'
+      inputAudioBufferClear:
+        $ref: '#/components/messages/inputAudioBufferClear'
+      conversationItemCreate:
+        $ref: '#/components/messages/conversationItemCreate'
+      responseCreate:
+        $ref: '#/components/messages/responseCreate'
+      responseCancel:
+        $ref: '#/components/messages/responseCancel'
+      conversationItemTruncate:
+        $ref: '#/components/messages/conversationItemTruncate'
+      playbackDrained:
+        $ref: '#/components/messages/playbackDrained'
+      sessionCreated:
+        $ref: '#/components/messages/sessionCreated'
+      sessionUpdated:
+        $ref: '#/components/messages/sessionUpdated'
+      sessionIdleTimeout:
+        $ref: '#/components/messages/sessionIdleTimeout'
+      typedInputReady:
+        $ref: '#/components/messages/typedInputReady'
+      inputAudioBufferCleared:
+        $ref: '#/components/messages/inputAudioBufferCleared'
+      inputAudioBufferSpeechStarted:
+        $ref: '#/components/messages/inputAudioBufferSpeechStarted'
+      inputAudioBufferSpeechStopped:
+        $ref: '#/components/messages/inputAudioBufferSpeechStopped'
+      inputAudioBufferCommitted:
+        $ref: '#/components/messages/inputAudioBufferCommitted'
+      inputAudioBufferSpeechHint:
+        $ref: '#/components/messages/inputAudioBufferSpeechHint'
+      responseCreated:
+        $ref: '#/components/messages/responseCreated'
+      responseOutputItemAdded:
+        $ref: '#/components/messages/responseOutputItemAdded'
+      responseOutputItemDone:
+        $ref: '#/components/messages/responseOutputItemDone'
+      responseTextDelta:
+        $ref: '#/components/messages/responseTextDelta'
+      responseTextDone:
+        $ref: '#/components/messages/responseTextDone'
+      responseAudioDelta:
+        $ref: '#/components/messages/responseAudioDelta'
+      responseAudioDone:
+        $ref: '#/components/messages/responseAudioDone'
+      responseDone:
+        $ref: '#/components/messages/responseDone'
+      responseFunctionCallArgumentsDone:
+        $ref: '#/components/messages/responseFunctionCallArgumentsDone'
+      conversationItemCreated:
+        $ref: '#/components/messages/conversationItemCreated'
+      conversationItemTruncated:
+        $ref: '#/components/messages/conversationItemTruncated'
+      transcriptionDelta:
+        $ref: '#/components/messages/transcriptionDelta'
+      transcriptionCompleted:
+        $ref: '#/components/messages/transcriptionCompleted'
+      transcriptionFailed:
+        $ref: '#/components/messages/transcriptionFailed'
+      error:
+        $ref: '#/components/messages/error'
+
+operations:
+  # Actions are from the perspective of Prism, the described application.
+  receiveClientEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/realtime'
+    summary: Client to Prism events.
+    messages:
+      - $ref: '#/channels/realtime/messages/sessionUpdate'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferAppend'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferClear'
+      - $ref: '#/channels/realtime/messages/conversationItemCreate'
+      - $ref: '#/channels/realtime/messages/responseCreate'
+      - $ref: '#/channels/realtime/messages/responseCancel'
+      - $ref: '#/channels/realtime/messages/conversationItemTruncate'
+      - $ref: '#/channels/realtime/messages/playbackDrained'
+  sendServerEvent:
+    action: send
+    channel:
+      $ref: '#/channels/realtime'
+    summary: Prism to client events.
+    messages:
+      - $ref: '#/channels/realtime/messages/sessionCreated'
+      - $ref: '#/channels/realtime/messages/sessionUpdated'
+      - $ref: '#/channels/realtime/messages/sessionIdleTimeout'
+      - $ref: '#/channels/realtime/messages/typedInputReady'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferCleared'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferSpeechStarted'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferSpeechStopped'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferCommitted'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferSpeechHint'
+      - $ref: '#/channels/realtime/messages/responseCreated'
+      - $ref: '#/channels/realtime/messages/responseOutputItemAdded'
+      - $ref: '#/channels/realtime/messages/responseOutputItemDone'
+      - $ref: '#/channels/realtime/messages/responseTextDelta'
+      - $ref: '#/channels/realtime/messages/responseTextDone'
+      - $ref: '#/channels/realtime/messages/responseAudioDelta'
+      - $ref: '#/channels/realtime/messages/responseAudioDone'
+      - $ref: '#/channels/realtime/messages/responseDone'
+      - $ref: '#/channels/realtime/messages/responseFunctionCallArgumentsDone'
+      - $ref: '#/channels/realtime/messages/conversationItemCreated'
+      - $ref: '#/channels/realtime/messages/conversationItemTruncated'
+      - $ref: '#/channels/realtime/messages/transcriptionDelta'
+      - $ref: '#/channels/realtime/messages/transcriptionCompleted'
+      - $ref: '#/channels/realtime/messages/transcriptionFailed'
+      - $ref: '#/channels/realtime/messages/error'
+
+components:
+  messages:
+    sessionUpdate:
+      name: session.update
+      title: Update session settings
+      summary: >-
+        Initializes the session once. Supply all desired settings together;
+        omissions use deployment defaults. A failed attempt can be corrected,
+        but any update after successful initialization is rejected. Wait for
+        `session.updated`, which echoes this request's `event_id` as
+        `prsm_request_event_id`, before audio or response requests.
+      payload:
+        $ref: '#/components/schemas/sessionUpdateEvent'
+      examples:
+        - name: initializeVoiceSession
+          summary: Select the public voice-session modalities and a deployment voice.
+          payload:
+            type: session.update
+            event_id: evt_session_1
+            session:
+              modalities: [text, audio]
+              voice: DEPLOYMENT_VOICE
+              input_audio_format: pcm16
+    inputAudioBufferAppend:
+      name: input_audio_buffer.append
+      title: Append microphone audio
+      summary: >-
+        Appends one paced base64 16 kHz PCM16 chunk. There is no per-chunk
+        acknowledgment and no public manual commit event.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferAppendEvent'
+    inputAudioBufferClear:
+      name: input_audio_buffer.clear
+      title: Clear microphone input
+      summary: >-
+        Explicitly discards buffered microphone and deferred input. Confirmed
+        by `input_audio_buffer.cleared`.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferClearEvent'
+    conversationItemCreate:
+      name: conversation.item.create
+      title: Add a conversation item
+      summary: >-
+        Adds a history/context message or a tool result. A message only seeds
+        conversation history; it is not an active typed turn and does not
+        start generation. It needs both a role and text that is not only
+        whitespace; there are no defaults. Accepted input is acknowledged by
+        `conversation.item.created`, echoing this request's `event_id` as
+        `prsm_request_event_id`. Same-session identical tool-result
+        resends are idempotent. A first legal late real result may correct a
+        server provisional timeout outcome; after a real result is accepted,
+        a different result conflicts and never overwrites it.
+      payload:
+        $ref: '#/components/schemas/conversationItemCreateEvent'
+    responseCreate:
+      name: response.create
+      title: Request a response
+      summary: >-
+        Atomically supplies one typed user turn in an idle voice session, or
+        one whose tool round waits after the response that made the calls has
+        ended (announced by `prsm.typed_input.ready`), or requests one parent-bound
+        tool continuation after the parent is
+        terminal and all tool results are acknowledged. A typed turn is
+        accepted first as `conversation.item.created`; if it is not superseded
+        before generation, it then starts a bound `response.created`. Both
+        echo this request's `event_id` as `prsm_request_event_id`, as does an
+        accepted continuation's `response.created`.
+        A refused tool continuation returns an event-scoped `error` and no
+        `response.created`. A nudge (`prsm_cause: proactive`) asks for a reply
+        without new user input, under the typed turn's admission rule; its
+        optional `prsm_instruction` applies to that reply and is kept in
+        history as an instruction. It is the only request-level instruction,
+        and it does not replace the session instructions. A nudge taken and
+        then superseded by the user's speech before it runs gets
+        nudge_superseded, and no response.created.
+      payload:
+        $ref: '#/components/schemas/responseCreateEvent'
+      examples:
+        - name: continueAfterTools
+          summary: Continue the terminal parent after all tool results are acknowledged.
+          payload:
+            type: response.create
+            event_id: evt_continue_1
+            response:
+              metadata:
+                prsm_cause: tool_continuation
+                prsm_parent_response_id: resp_parent_1
+        - name: typedUserTurn
+          summary: Supply text as a new user turn and receive voice output.
+          payload:
+            type: response.create
+            event_id: evt_typed_1
+            response:
+              prsm_input_text: I need a flight next Tuesday.
+              metadata:
+                prsm_cause: user_text
+                customer_trace_id: trace_1
+        - name: nudge
+          summary: Have the assistant check in on a caller who has gone quiet.
+          payload:
+            type: response.create
+            event_id: evt_nudge_1
+            response:
+              prsm_instruction: The caller has gone quiet. Check in one short line.
+              metadata:
+                prsm_cause: proactive
+        - name: reportToolResult
+          summary: Report a tool result that arrived after its round was superseded.
+          payload:
+            type: response.create
+            event_id: evt_report_1
+            response:
+              prsm_call_id: call_1
+              prsm_instruction: Tell the caller, and apologise for the wait.
+              metadata:
+                prsm_cause: proactive
+    responseCancel:
+      name: response.cancel
+      title: Cancel a response
+      summary: >-
+        Stops generation of the response named by `response_id`, or of the
+        current response when it is omitted. A manual stop is not an
+        interruption: no new turn starts and the next reply does not
+        acknowledge an interruption. Success is the response's `response.done`
+        with `status: cancelled`. If nothing is cancelled (no response is
+        generating, the named response is not current, or generation already
+        finished) Prism returns the event-scoped error
+        `response_cancel_not_active` and nothing else changes. A requested
+        reply is not reliably cancellable before its `response.created`: wait
+        for the one naming the request's `event_id`, then cancel it by
+        `response_id`. This does
+        not clear the client's queued playback or undo dispatched tools. Do not
+        send `conversation.item.truncate` for a manual stop.
+      payload:
+        $ref: '#/components/schemas/responseCancelEvent'
+      examples:
+        - name: stopTheReplyBeingPlayed
+          summary: Stop one reply without touching a newer one.
+          payload:
+            type: response.cancel
+            event_id: evt_stop_1
+            response_id: resp_2
+    conversationItemTruncate:
+      name: conversation.item.truncate
+      title: Report an assistant playback boundary
+      summary: >-
+        Reports how far an assistant reply had played when the caller's speech
+        interrupted it: the item that was sounding, with `audio_end_ms` counted
+        from the start of that item's audio. Prism uses it to decide how much of
+        the reply the model keeps and whether the next reply acknowledges the
+        interruption. A reply interrupted after generation finished keeps the
+        share of its words that the share of its audio played, cut back to a
+        word (none, if no word fits; all, if heard to its end); a reply queued
+        behind it in the same turn, such as a tool round's answer, was not heard
+        and is dropped. A reply interrupted while still being generated is
+        cancelled, and its words leave the model's context whatever
+        `audio_end_ms` says. Tool calls, and the words of a reply that made
+        them, always stay. Decided when the next reply's prompt is built; for a
+        reply cut while Prism still counted it as playing, Prism waits up to
+        300 ms for a report, then estimates the heard position from when the
+        audio could start playing. A report for a reply of an earlier playback
+        run (the session went idle after it and a later reply has been announced
+        since) is refused with `truncate_not_current` and changes nothing.
+        An applied report emits `conversation.item.truncated`.
+      payload:
+        $ref: '#/components/schemas/conversationItemTruncateEvent'
+    playbackDrained:
+      name: prsm.playback.drained
+      title: Report response playback completion
+      summary: >-
+        Optional receipt: echoes the matching response's drain token after every queued source
+        has finished or been permanently stopped, including the client's
+        output-latency allowance. This is not proof that a person heard the
+        audio. There is no acknowledgment; stale, wrong, and duplicate
+        receipts are ignored. Without a receipt, Prism uses estimated playback
+        completion. An old interrupted response's receipt does not gate a new turn.
+      payload:
+        $ref: '#/components/schemas/playbackDrainedEvent'
+
+    sessionCreated:
+      name: session.created
+      title: Session created
+      summary: First server event on a new connection; supplies session identity and initial settings.
+      payload:
+        $ref: '#/components/schemas/sessionCreatedEvent'
+    sessionUpdated:
+      name: session.updated
+      title: Session updated
+      summary: >-
+        Returns the effective settings after an accepted initialization and
+        echoes the request's `event_id` as `prsm_request_event_id`.
+      payload:
+        $ref: '#/components/schemas/sessionUpdatedEvent'
+    sessionIdleTimeout:
+      name: session.idle_timeout
+      title: Session idle timeout
+      summary: Announces that the server is closing an idle session.
+      payload:
+        $ref: '#/components/schemas/sessionIdleTimeoutEvent'
+    typedInputReady:
+      name: prsm.typed_input.ready
+      title: Typed input would be accepted
+      summary: >-
+        Says that a typed user turn would be accepted now. Sent after
+        `session.updated`, then each time the session returns to that state:
+        after a reply ends, including a cancelled or failed one, and its
+        playback handoff finishes if it sent audio (sooner with a
+        `prsm.playback.drained` receipt), and when a response that made tool
+        calls ends. After
+        a turn-detection error it follows speech only, as admission does.
+        Never sent between a `response.created`
+        and its `response.done`, and not repeated while the session stays
+        idle. It describes the moment it was sent: new microphone speech can
+        make the session busy again before a request arrives, and that
+        request then receives `typed_turn_busy` and has no effect. A nudge,
+        with an instruction or without one, is taken on the same rule. Treat
+        typed input as unavailable from `response.created`,
+        `input_audio_buffer.speech_started`, or an accepted typed turn until
+        the next `prsm.typed_input.ready`.
+      payload:
+        $ref: '#/components/schemas/typedInputReadyEvent'
+    inputAudioBufferCleared:
+      name: input_audio_buffer.cleared
+      title: Input buffer cleared
+      summary: Acknowledges an explicit input-buffer clear.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferClearedEvent'
+    inputAudioBufferSpeechStarted:
+      name: input_audio_buffer.speech_started
+      title: User speech confirmed
+      summary: >-
+        Announces confirmed user speech and its item identity. In an
+        interruptible EOT session, Prism also cancels active generation.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferSpeechStartedEvent'
+    inputAudioBufferSpeechStopped:
+      name: input_audio_buffer.speech_stopped
+      title: User speech stopped
+      summary: Announces the detected end boundary for an utterance.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferSpeechStoppedEvent'
+    inputAudioBufferCommitted:
+      name: input_audio_buffer.committed
+      title: User audio committed
+      summary: Identifies the user item accepted for automatic turn processing.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferCommittedEvent'
+    inputAudioBufferSpeechHint:
+      name: prsm.input_audio_buffer.speech_hint
+      title: Advisory early speech hint
+      summary: >-
+        An optional, non-authoritative cue in an applicable interruptible EOT
+        deployment for temporary playback ducking. It must not be treated as
+        a confirmed turn, generation cancellation, history truncation, or tool
+        authorization.
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferSpeechHintEvent'
+    responseCreated:
+      name: response.created
+      title: Response created
+      summary: >-
+        Announces an accepted generation and its response identity. A
+        response opened by `response.create` echoes that request's `event_id`
+        as `prsm_request_event_id` and its `response.metadata.prsm_cause`; a
+        response without them is a reply to user speech. For a typed user
+        turn, `response.metadata.prsm_input_item_id` binds the generation to
+        the preceding server-created user item; a tool continuation names its
+        parent in `response.metadata.prsm_parent_response_id`.
+      payload:
+        $ref: '#/components/schemas/responseCreatedEvent'
+    responseOutputItemAdded:
+      name: response.output_item.added
+      title: Response output item added
+      summary: Announces a stable assistant-message or function-call item identity.
+      payload:
+        $ref: '#/components/schemas/responseOutputItemAddedEvent'
+    responseOutputItemDone:
+      name: response.output_item.done
+      title: Response output item done
+      summary: >-
+        Completes a function-call item in current emissions. Clients must not
+        wait for an assistant-message item-done event.
+      payload:
+        $ref: '#/components/schemas/responseOutputItemDoneEvent'
+    responseTextDelta:
+      name: response.text.delta
+      title: Response text delta
+      summary: Streams one incremental assistant-text fragment.
+      payload:
+        $ref: '#/components/schemas/responseTextDeltaEvent'
+    responseTextDone:
+      name: response.text.done
+      title: Response text done
+      summary: >-
+        Completes assistant text, including partial text after interruption or
+        failure. Generated text is not proof of audio heard by a listener.
+      payload:
+        $ref: '#/components/schemas/responseTextDoneEvent'
+    responseAudioDelta:
+      name: response.audio.delta
+      title: Response audio delta
+      summary: Streams one base64 raw 24 kHz mono PCM16 output chunk.
+      payload:
+        $ref: '#/components/schemas/responseAudioDeltaEvent'
+    responseAudioDone:
+      name: response.audio.done
+      title: Response audio done
+      summary: >-
+        Marks the generated audio stream complete, not playback complete.
+        Some terminal paths do not emit this event.
+      payload:
+        $ref: '#/components/schemas/responseAudioDoneEvent'
+    responseDone:
+      name: response.done
+      title: Response done
+      summary: >-
+        Terminates exactly one generation as completed, cancelled, or failed.
+        It does not terminate playback or establish tool completion.
+        A cancelled response with status_details.reason=superseded closes an
+        already announced response that has been replaced; continue receiving
+        its successor under
+        a new response ID rather than treating it as the end of the user turn.
+      payload:
+        $ref: '#/components/schemas/responseDoneEvent'
+    responseFunctionCallArgumentsDone:
+      name: response.function_call_arguments.done
+      title: Complete tool call
+      summary: >-
+        Delivers one complete tool call; each event carries exactly one call.
+        A response may deliver several calls with distinct `call_id` values,
+        and their events are not guaranteed to arrive adjacent to each other.
+        Deduplicate by `call_id`, authorize it, and execute it at most once;
+        no earlier arguments-delta is required.
+      payload:
+        $ref: '#/components/schemas/responseFunctionCallArgumentsDoneEvent'
+    conversationItemCreated:
+      name: conversation.item.created
+      title: Conversation item accepted
+      summary: >-
+        Minimal acknowledgment of a client item. Every message item carries a
+        server-created `item.id` — typed user turns and seeded history alike —
+        and a typed turn's response binds to it via
+        `metadata.prsm_input_item_id`. `prsm_request_event_id` echoes the
+        `event_id` of the request being acknowledged. Full message text and
+        tool output are not echoed.
+      payload:
+        $ref: '#/components/schemas/conversationItemCreatedEvent'
+    conversationItemTruncated:
+      name: conversation.item.truncated
+      title: Assistant item truncated
+      summary: >-
+        Acknowledges an applied assistant playback boundary. The model keeps
+        the part of the reply that played; see `conversation.item.truncate`.
+      payload:
+        $ref: '#/components/schemas/conversationItemTruncatedEvent'
+    transcriptionDelta:
+      name: conversation.item.input_audio_transcription.delta
+      title: User transcription delta
+      summary: Streams an available provisional user-transcription fragment.
+      payload:
+        $ref: '#/components/schemas/transcriptionDeltaEvent'
+    transcriptionCompleted:
+      name: conversation.item.input_audio_transcription.completed
+      title: User transcription completed
+      summary: >-
+        The words of a committed input audio item. Every committed input audio
+        item receives exactly one transcription outcome, this event or
+        `failed`, unless the session ends first. It is asynchronous: it can
+        arrive before or after that turn's response events, and before or
+        after the item's `input_audio_buffer.committed`. Match it to the item
+        by `item_id`. Its transcript is the text the session keeps for the
+        item.
+      payload:
+        $ref: '#/components/schemas/transcriptionCompletedEvent'
+    transcriptionFailed:
+      name: conversation.item.input_audio_transcription.failed
+      title: User transcription failed
+      summary: >-
+        The transcription outcome of a committed input audio item that has no
+        words, sent instead of `completed`.
+      payload:
+        $ref: '#/components/schemas/transcriptionFailedEvent'
+    error:
+      name: error
+      title: Operation error
+      summary: >-
+        Reports a handled error or degraded condition. It does not finish a
+        response by itself; use scope and owner to isolate the operation.
+      payload:
+        $ref: '#/components/schemas/errorEvent'
+
+  schemas:
+    identifier:
+      type: string
+
+    clientEvent:
+      type: object
+      properties:
+        event_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: >-
+            Client-chosen identity of this request, unique within the session.
+            Required on session.update, conversation.item.create, and
+            response.create, whose acknowledgments echo it as
+            prsm_request_event_id and whose rejections name it in
+            error.owner.event_id; optional on other client events. It is not
+            an idempotency key.
+
+    requestEventIdEcho:
+      allOf:
+        - $ref: '#/components/schemas/identifier'
+      description: >-
+        The event_id of the client request this event acknowledges, copied
+        unchanged. Settle the pending request that carries this value.
+
+    serverEvent:
+      type: object
+      required: [event_id]
+      properties:
+        event_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: Server-generated identity for this event.
+
+    pcm16Base64:
+      type: string
+      format: byte
+      # Canonical standard base64 (RFC 4648 section 4: padded, no line breaks,
+      # unused bits zero) of an even number of bytes: whole 16-bit samples.
+      # Groups of 8 characters are 6 bytes; the optional tail is 2 bytes
+      # (`xxy=`, y with its low 2 bits zero) or 4 (`xxxxxz==`, z with its low 4
+      # bits zero). (?!\n) keeps engines whose $ also matches before a final
+      # newline (Python's re) to the ECMA-262 meaning.
+      pattern: '^(?:[A-Za-z0-9+/]{8})*(?:[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=|[A-Za-z0-9+/]{5}[AQgw]==)?(?!\n)$'
+      description: >-
+        Canonical base64 (standard alphabet, padded, no line breaks, unused
+        bits zero) of raw little-endian mono PCM16: whole 16-bit samples, so
+        the decoded length is even. A chunk that is not such base64 or ends
+        in half a sample is rejected.
+
+    nullableNonnegativeNumber:
+      oneOf:
+        - type: number
+          minimum: 0
+        - type: 'null'
+
+    tool:
+      type: object
+      required: [type, function]
+      properties:
+        type:
+          const: function
+        function:
+          type: object
+          required: [name, parameters]
+          properties:
+            name:
+              type: string
+            description:
+              type: string
+            parameters:
+              type: object
+              additionalProperties: true
+
+    clientTool:
+      # A tool declaration as a client sends it: closed, unlike the tools a
+      # session view echoes (server events stay open). parameters is the
+      # customer's own JSON Schema and stays open.
+      allOf:
+        - $ref: '#/components/schemas/tool'
+      propertyNames:
+        enum: [type, function]
+      properties:
+        function:
+          propertyNames:
+            enum: [name, description, parameters]
+
+    turnDetection:
+      type: object
+      description: >-
+        Prism manages turn detection. The only customer setting is whether
+        confirmed user speech may interrupt a reply. Detector selection,
+        provider, thresholds, padding, silence timing, and Eager EOT tuning
+        are deployment controls, not customer API settings. Omission uses the
+        deployment's interruption default during initialization; the setting
+        is then fixed for the session. Null does not disable detection.
+      properties:
+        interrupt_response:
+          type: boolean
+          description: Requested interruption behavior; inspect prsm_effective_interrupt_response.
+
+    sessionViewModalities:
+      description: Exactly `["text"]` or `["text", "audio"]`; audio-only is unsupported.
+      oneOf:
+        - type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            const: text
+        - type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            - const: text
+            - const: audio
+          additionalItems: false
+
+    clientModalities:
+      description: The public voice-session modality pair.
+      type: array
+      minItems: 2
+      maxItems: 2
+      items:
+        - const: text
+        - const: audio
+      additionalItems: false
+
+    sessionSettings:
+      type: object
+      description: >-
+        Session initialization settings and their public view. Omitted values
+        use deployment defaults during initialization; successful initialization
+        locks the configuration for the lifetime of the session.
+      properties:
+        modalities:
+          $ref: '#/components/schemas/sessionViewModalities'
+        voice:
+          type: string
+          description: >-
+            Deployment-supported voice name. The effective session must have a
+            valid voice before audio output is enabled. Supply it during
+            initialization unless a valid deployment default is available.
+            It cannot be changed after initialization. Null is not a voice
+            selection or a reset operation.
+        instructions:
+          type: string
+          description: Assistant instructions selected at initialization and fixed for this session.
+        tools:
+          type: array
+          description: Complete tool list selected at initialization and fixed for this session.
+          items:
+            $ref: '#/components/schemas/tool'
+        input_audio_format:
+          const: pcm16
+          description: The current public handler supports only raw PCM16 input.
+        turn_detection:
+          $ref: '#/components/schemas/turnDetection'
+
+        prsm_client_caps:
+          type: array
+          maxItems: 1
+          uniqueItems: true
+          items:
+            const: playback_drained
+          description: >-
+            Declares that the client implements playback-drained receipts for
+            telemetry. It is not capability negotiation and does not enable a
+            server feature.
+
+    clientSessionSettings:
+      allOf:
+        - $ref: '#/components/schemas/sessionSettings'
+      type: object
+      # Closed by name: with allOf, additionalProperties here would not see
+      # the properties sessionSettings declares.
+      propertyNames:
+        enum: [modalities, voice, instructions, tools, input_audio_format, turn_detection, prsm_client_caps]
+      description: >-
+        Public one-time session initialization, not a dynamic configuration
+        API. Supply all desired settings together; omissions use deployment
+        defaults. Customers choose interruption behavior, not the detector
+        or its tuning. Only the fields listed here are settings. Any other
+        field is rejected: read-only fields of the session view (id, object,
+        model, prsm_effective_interrupt_response, prsm_tool_waits),
+        service-managed controls (temperature, generation output limits,
+        tool-call filler), internal controls, and misspelled or unknown
+        names. Reject such a field, or an invalid interruption value,
+        atomically with the proposed invalid_session_configuration code,
+        scope=event and owner.kind=event, naming the request's event_id.
+        Apply no fields and send no session.updated for that rejection. This
+        narrowed public admission contract requires Rust API and serving
+        integration; the current core server has a broader internal
+        configuration surface. Existing voice_required and
+        unsupported_modality errors retain their documented meanings.
+        All numbers must be finite JSON numbers, not NaN or Infinity.
+        When modalities is present it must select the voice-session pair.
+        The effective merged session must have a valid voice before audio
+        output is enabled; include voice in the initial audio-enabling update
+        unless the current session already supplies one.
+        Failed initialization leaves the session uninitialized. After successful
+        initialization, every session.update is rejected with the proposed
+        session_already_initialized code, even if its values are identical or
+        omitted. Audio append and response requests before initialization are
+        rejected with session_not_initialized, without input or generation
+        side effects. Both errors use scope=event and an event owner, including
+        the request event_id when supplied. Do not emit session.updated for a
+        rejected update. The gateway must serialize admission so that only one
+        initialization succeeds; lock at application, not client receipt of
+        the acknowledgment. These sequence rules require stateful runtime tests.
+      properties:
+        modalities:
+          $ref: '#/components/schemas/clientModalities'
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/clientTool'
+        turn_detection:
+          propertyNames:
+            enum: [interrupt_response]
+
+    sessionView:
+      allOf:
+        - $ref: '#/components/schemas/sessionSettings'
+        - type: object
+          required:
+            - id
+            - object
+            - model
+            - modalities
+            - instructions
+            - tools
+            - input_audio_format
+            - prsm_effective_interrupt_response
+          properties:
+            id:
+              $ref: '#/components/schemas/identifier'
+            object:
+              const: realtime.session
+            model:
+              type: string
+              description: Read-only deployment label, not a model-selection control.
+            prsm_effective_interrupt_response:
+              type: boolean
+              description: >-
+                Read-only server-applied interruption setting. Do not assume
+                the requested turn-detection value was accepted unchanged.
+            prsm_tool_waits:
+              type: object
+              additionalProperties: true
+              required: [result_timeout_s, continuation_timeout_s]
+              description: >-
+                Read-only total tool wait durations, in seconds, published by
+                the server from its deployment configuration. The value is
+                constant within a session and identical in `session.created`
+                and `session.updated`. `null` means that wait is not timed. A
+                missing field means an older server that does not publish the
+                durations; it does not mean the waits are unbounded, and
+                clients must not guess a value. It is read-only: a
+                `session.update` that sends it is rejected with
+                invalid_session_configuration. These are total durations, not
+                remaining time: the result wait starts when the parent
+                `response.done` is sent, and the continuation wait starts once
+                the parent has finished and every result has been accepted. An
+                acknowledgment does not restart either wait. A gateway in front
+                of the realtime handler must pass this field through to the
+                client that actually handles tools.
+              properties:
+                result_timeout_s:
+                  description: Total wait for every result of a tool batch, or null when not timed.
+                  oneOf:
+                    - type: number
+                      exclusiveMinimum: 0
+                    - type: 'null'
+                continuation_timeout_s:
+                  description: Total wait for the continuation request, or null when not timed.
+                  oneOf:
+                    - type: number
+                      exclusiveMinimum: 0
+                    - type: 'null'
+
+    inputMessage:
+      type: object
+      description: >-
+        One earlier turn of the conversation: who said it and what was said.
+        Both are required and there are no defaults; a message without a
+        role, or with no text beyond whitespace, is rejected with
+        invalid_client_event and adds nothing to history.
+      required: [type, role, text]
+      additionalProperties: false
+      properties:
+        type:
+          const: message
+        role:
+          type: string
+          enum: [user, assistant]
+        text:
+          type: string
+          pattern: '\S'
+          description: >-
+            What was said: at least one character that is not whitespace, as
+            ECMA-262 (the regular expressions of JSON Schema) defines it.
+
+    functionResult:
+      type: object
+      required: [type, call_id, output]
+      additionalProperties: false
+      properties:
+        type:
+          const: function_call_output
+        call_id:
+          $ref: '#/components/schemas/identifier'
+        output:
+          type: string
+          description: >-
+            Exact persisted tool-result string. Structured failure/cancellation/
+            uncertainty envelopes matching the `toolOutcome` schema are
+            serialized inside this string.
+
+    toolOutcome:
+      type: object
+      description: >-
+        Optional object serialized into `functionResult.output`; it is not an
+        independently sendable WebSocket event. Failed means no side effect,
+        cancelled requires executor confirmation, and unknown means execution
+        is unconfirmed. None authorizes an automatic rerun.
+      required: [status, reason, retryable, message, result]
+      properties:
+        status:
+          type: string
+          enum: [success, failed, cancelled, unknown]
+        reason:
+          type: string
+        retryable:
+          const: false
+        message:
+          type: string
+          description: Human-readable text; clients must not parse it for recovery.
+        result:
+          oneOf:
+            - type: string
+            - type: 'null'
+          description: Original tool-result string, or null when unavailable.
+        supersedes:
+          type: string
+          description: Earlier provisional reason corrected by this result.
+
+    responseMetadata:
+      type: object
+      properties:
+        prsm_cause:
+          type: string
+          enum: [proactive, tool_continuation, user_text]
+          description: >-
+            `tool_continuation` continues a parent after tools; `user_text`
+            identifies a response created from an atomic typed user turn;
+            `proactive` identifies a response to a nudge.
+        prsm_parent_response_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: Parent response for a tool continuation.
+        prsm_call_id:
+          type: string
+          description: >-
+            For a nudge that reports a tool call's result, the call it names.
+        prsm_input_item_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: >-
+            For a typed user turn, the server-created user item that this
+            response consumes. It matches the preceding
+            `conversation.item.created.item.id`.
+        prsm_drain_token:
+          type: string
+          description: >-
+            Opaque response-scoped receipt token, included in response.done
+            when that response emitted audio, regardless of terminal status.
+            Clients implementing optional playback receipts echo it with the
+            same response id in `prsm.playback.drained`. It is not authentication.
+
+    toolContinuationRequestMetadata:
+      type: object
+      required: [prsm_cause, prsm_parent_response_id]
+      additionalProperties: false
+      properties:
+        prsm_cause:
+          const: tool_continuation
+        prsm_parent_response_id:
+          $ref: '#/components/schemas/identifier'
+
+    typedTurnRequestMetadata:
+      type: object
+      required: [prsm_cause]
+      additionalProperties: false
+      patternProperties:
+        '^(?!prsm_)': {}
+      properties:
+        prsm_cause:
+          const: user_text
+          description: Marks the request as one new typed user turn.
+
+    nudgeRequestMetadata:
+      type: object
+      required: [prsm_cause]
+      additionalProperties: false
+      patternProperties:
+        '^(?!prsm_)': {}
+      properties:
+        prsm_cause:
+          const: proactive
+          description: Asks for a reply without new user input.
+
+    nudgeResponseRequest:
+      type: object
+      required: [metadata]
+      additionalProperties: false
+      properties:
+        prsm_instruction:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+          description: >-
+            An instruction for this one reply. Prism adds it at the end of the
+            conversation and keeps it in history as an instruction, never as
+            the user's words; it creates no conversation item event. Omitted,
+            the assistant responds to the conversation as it stands.
+        prsm_call_id:
+          type: string
+          minLength: 1
+          description: >-
+            Makes the nudge report one tool call's result: the call's id as the
+            tool call event gave it. Prism writes the call as it was made and its
+            latest recorded result into the reply's instruction, then
+            prsm_instruction or a default. Rejected with tool_call_not_found for
+            an unknown call and tool_result_not_ready for a call with no result
+            from the app yet. A report, like any nudge, supersedes whichever
+            tool round waits for its continuation when it is taken.
+        metadata:
+          $ref: '#/components/schemas/nudgeRequestMetadata'
+
+    toolContinuationResponseRequest:
+      type: object
+      required: [metadata]
+      additionalProperties: false
+      properties:
+        metadata:
+          $ref: '#/components/schemas/toolContinuationRequestMetadata'
+
+    typedTurnResponseRequest:
+      type: object
+      required: [prsm_input_text, metadata]
+      additionalProperties: false
+      properties:
+        prsm_input_text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+          description: >-
+            The complete new user utterance. It is committed atomically; Prism
+            does not synthesize microphone, VAD, or transcription events for it.
+        metadata:
+          $ref: '#/components/schemas/typedTurnRequestMetadata'
+
+    assistantContentPart:
+      oneOf:
+        - type: object
+          required: [type, text]
+          properties:
+            type:
+              const: text
+            text:
+              type: string
+        - type: object
+          required: [type, transcript]
+          properties:
+            type:
+              const: audio
+            transcript:
+              type: string
+              description: >-
+                The reply's generated words, as in its response.text.done; not a
+                transcription of the audio.
+
+    assistantItem:
+      type: object
+      required: [id, type, role]
+      properties:
+        id:
+          $ref: '#/components/schemas/identifier'
+        object:
+          const: realtime.item
+        type:
+          const: message
+        role:
+          const: assistant
+        status:
+          type: string
+        content:
+          type: array
+          maxItems: 1
+          description: >-
+            The message's one content part, at content_index 0: the audio, with
+            the reply's words as its transcript, when the reply sent audio; the
+            text otherwise. Some cancelled or failed replies list none.
+          items:
+            $ref: '#/components/schemas/assistantContentPart'
+
+    functionItem:
+      type: object
+      required: [id, type, name, call_id]
+      properties:
+        id:
+          $ref: '#/components/schemas/identifier'
+        object:
+          const: realtime.item
+        type:
+          const: function_call
+        name:
+          type: string
+        call_id:
+          $ref: '#/components/schemas/identifier'
+        arguments:
+          type: string
+          description: Complete JSON-string tool arguments when present.
+        status:
+          type: string
+
+    completedFunctionItem:
+      allOf:
+        - $ref: '#/components/schemas/functionItem'
+        - type: object
+          required: [arguments, status]
+          properties:
+            status:
+              const: completed
+
+    outputItem:
+      oneOf:
+        - $ref: '#/components/schemas/assistantItem'
+        - $ref: '#/components/schemas/functionItem'
+
+    responseView:
+      type: object
+      required: [id, status, output]
+      properties:
+        id:
+          $ref: '#/components/schemas/identifier'
+        object:
+          const: realtime.response
+        status:
+          type: string
+          enum: [in_progress, completed, cancelled, failed]
+        status_details:
+          type: object
+          properties:
+            reason:
+              type: string
+        output:
+          type: array
+          items:
+            $ref: '#/components/schemas/outputItem'
+        usage:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        metadata:
+          $ref: '#/components/schemas/responseMetadata'
+
+    errorOwner:
+      oneOf:
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              const: event
+            event_id:
+              oneOf:
+                - $ref: '#/components/schemas/identifier'
+                - type: 'null'
+        - type: object
+          required: [kind, item_id]
+          properties:
+            kind:
+              const: utterance
+            item_id:
+              oneOf:
+                - $ref: '#/components/schemas/identifier'
+                - type: 'null'
+        - type: object
+          required: [kind, response_id]
+          properties:
+            kind:
+              const: response
+            response_id:
+              $ref: '#/components/schemas/identifier'
+        - type: object
+          required: [kind, response_id, call_ids]
+          properties:
+            kind:
+              const: tool_roundtrip
+            response_id:
+              $ref: '#/components/schemas/identifier'
+            call_ids:
+              type: array
+              items:
+                $ref: '#/components/schemas/identifier'
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              const: session
+
+    errorInfo:
+      type: object
+      required: [type, code, message, scope, owner, correlation_id]
+      # scope and owner.kind name the same operation, so they must agree: an
+      # error scoped to the session cannot be owned by one response.
+      allOf:
+        - if: {properties: {scope: {const: event}}, required: [scope]}
+          then: {properties: {owner: {properties: {kind: {const: event}}}}}
+        - if: {properties: {scope: {const: utterance}}, required: [scope]}
+          then: {properties: {owner: {properties: {kind: {const: utterance}}}}}
+        - if: {properties: {scope: {const: response}}, required: [scope]}
+          then: {properties: {owner: {properties: {kind: {const: response}}}}}
+        - if: {properties: {scope: {const: tool_roundtrip}}, required: [scope]}
+          then: {properties: {owner: {properties: {kind: {const: tool_roundtrip}}}}}
+        - if: {properties: {scope: {const: session}}, required: [scope]}
+          then: {properties: {owner: {properties: {kind: {const: session}}}}}
+      properties:
+        type:
+          type: string
+        code:
+          type: string
+          description: >-
+            Stable diagnostic code. Documented Preview values include
+            unsupported_modality, voice_required, invalid_content_index,
+            item_not_found, truncate_not_current,
+            conflict, deferred_capture_lost, deferred_capture_overflow,
+            response_timeout, turn_failed, speculative_turn_failed, no_audio,
+            tool_result_timeout,
+            invalid_tool_continuation, tool_continuation_not_ready,
+            tool_continuation_unavailable,
+            invalid_typed_input, typed_turn_busy, typed_turn_superseded,
+            tool_call_not_found (event-scoped: a nudge's prsm_call_id, or a
+            tool result's call_id, names no call in this session; do not
+            resend), tool_result_not_ready (event-scoped: a nudge's
+            prsm_call_id names a call with no result from the app yet),
+            invalid_instruction (event-scoped: a nudge's prsm_instruction or
+            prsm_call_id was malformed, misplaced or on another request shape,
+            or the nudge carried a field it does not declare),
+            instructions_busy (event-scoped: a nudge with an instruction
+            arrived while a reply was being generated or played or the user
+            was speaking), proactive_unavailable (event-scoped: a nudge without
+            an instruction arrived while a reply was being generated or played
+            or the user was speaking; nothing was queued, send it again after
+            the next prsm.typed_input.ready), nudge_superseded (event-scoped:
+            an accepted nudge was superseded by the user's speech before it
+            ran; it will not run),
+            invalid_response_cause (event-scoped: a response.create with no
+            prsm_cause, another cause, or a nudge with a parent), conflict
+            (event-scoped: a different result for a call whose real result was
+            already accepted; the original stands), and
+            response_cancel_not_active (event-scoped: response.cancel found no
+            response being generated under the named or current id, so nothing
+            was cancelled and the session is unaffected).
+            speculative_turn_failed is a legacy name for failure after a
+            response is announced, not a private-preparation notification.
+            Private-preparation timeouts are internal. Do not suppress failures
+            of announced
+            responses based only on an error code's name.
+            Proposed configuration validation adds invalid_session_configuration
+            (event-scoped, zero-effect session.update rejection); it requires
+            runtime implementation and is not an existing core-server code.
+            Proposed initialization errors session_not_initialized and
+            session_already_initialized are also event-scoped and zero-effect:
+            initialize before sending input; create a new session to use a
+            different configuration. These codes require Rust API implementation.
+            Proposed event_id_required is the event-scoped, zero-effect
+            rejection of a session.update, conversation.item.create, or
+            response.create sent without an event_id (owner.event_id is null);
+            resend it with one. It also requires Rust API implementation.
+            Proposed invalid_client_event is the event-scoped, zero-effect
+            rejection of a client event whose shape this contract does not
+            declare: an undeclared or misspelled field, a missing required
+            field, or a value of the wrong type or format, such as audio that
+            is not base64 of whole PCM16 samples or a history message without
+            a role or text. It applies where no more specific code is
+            documented: session.update uses invalid_session_configuration,
+            response.create uses invalid_typed_input,
+            invalid_tool_continuation or invalid_instruction, a missing
+            event_id on a request that requires one uses event_id_required,
+            and a truncate content_index other than 0 uses
+            invalid_content_index. Correct the request before sending it
+            again. It also requires Rust API implementation.
+            Unknown codes must be handled using scope, owner, and the affected
+            operation's terminal/deadline contract.
+        message:
+          type: string
+          description: Human-readable text; clients must not parse it for recovery.
+        scope:
+          type: string
+          enum: [event, utterance, response, tool_roundtrip, session]
+          description: The affected operation; owner.kind always equals it.
+        owner:
+          $ref: '#/components/schemas/errorOwner'
+        correlation_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: Diagnostic identity for logs and support correlation.
+
+    sessionUpdateEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type, event_id, session]
+          propertyNames:
+            enum: [type, event_id, session]
+          properties:
+            type:
+              const: session.update
+            session:
+              $ref: '#/components/schemas/clientSessionSettings'
+
+    inputAudioBufferAppendEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type, audio]
+          propertyNames:
+            enum: [type, event_id, audio]
+          properties:
+            type:
+              const: input_audio_buffer.append
+            audio:
+              allOf:
+                - $ref: '#/components/schemas/pcm16Base64'
+              description: Base64 raw little-endian mono 16 kHz PCM16, whole samples.
+
+    inputAudioBufferClearEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type]
+          propertyNames:
+            enum: [type, event_id]
+          properties:
+            type:
+              const: input_audio_buffer.clear
+
+    conversationItemCreateEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type, event_id, item]
+          propertyNames:
+            enum: [type, event_id, item]
+          properties:
+            type:
+              const: conversation.item.create
+            item:
+              oneOf:
+                - $ref: '#/components/schemas/inputMessage'
+                - $ref: '#/components/schemas/functionResult'
+
+    responseCreateEvent:
+      type: object
+      required: [type, event_id, response]
+      additionalProperties: false
+      properties:
+        type:
+          const: response.create
+        event_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: >-
+            Required. Echoed as prsm_request_event_id by the acknowledgments
+            and named by error.owner.event_id in a rejection.
+        response:
+          oneOf:
+            - $ref: '#/components/schemas/typedTurnResponseRequest'
+            - $ref: '#/components/schemas/toolContinuationResponseRequest'
+            - $ref: '#/components/schemas/nudgeResponseRequest'
+
+    responseCancelEvent:
+      # Closed, like response.create: response_id is the only selector, and an
+      # unknown field must not look like another way to target a cancel.
+      type: object
+      required: [type]
+      additionalProperties: false
+      properties:
+        type:
+          const: response.cancel
+        event_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: Named by error.owner.event_id if nothing is cancelled.
+        response_id:
+          allOf:
+            - $ref: '#/components/schemas/identifier'
+          description: >-
+            The response to cancel. When it is not the response being
+            generated, nothing is cancelled and response_cancel_not_active is
+            returned; a newer response is never cancelled in its place. Omit
+            it to cancel whichever response is current.
+
+    conversationItemTruncateEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type, item_id, content_index, audio_end_ms]
+          propertyNames:
+            enum: [type, event_id, item_id, content_index, audio_end_ms]
+          properties:
+            type:
+              const: conversation.item.truncate
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            content_index:
+              const: 0
+            audio_end_ms:
+              type: integer
+              minimum: 0
+
+    playbackDrainedEvent:
+      allOf:
+        - $ref: '#/components/schemas/clientEvent'
+        - type: object
+          required: [type, response_id, drain_token]
+          propertyNames:
+            enum: [type, event_id, response_id, drain_token, played_ms, audible_tail_ms]
+          properties:
+            type:
+              const: prsm.playback.drained
+            response_id:
+              $ref: '#/components/schemas/identifier'
+            drain_token:
+              type: string
+              minLength: 1
+            played_ms:
+              $ref: '#/components/schemas/nullableNonnegativeNumber'
+            audible_tail_ms:
+              $ref: '#/components/schemas/nullableNonnegativeNumber'
+
+    sessionCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, session]
+          properties:
+            type:
+              const: session.created
+            session:
+              $ref: '#/components/schemas/sessionView'
+
+    sessionUpdatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, session, prsm_request_event_id]
+          properties:
+            type:
+              const: session.updated
+            session:
+              $ref: '#/components/schemas/sessionView'
+            prsm_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+
+    sessionIdleTimeoutEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, reason, idle_timeout_s]
+          properties:
+            type:
+              const: session.idle_timeout
+            reason:
+              const: idle_timeout
+            idle_timeout_s:
+              type: number
+              minimum: 0
+
+    typedInputReadyEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: prsm.typed_input.ready
+
+    inputAudioBufferClearedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: input_audio_buffer.cleared
+
+    inputAudioBufferSpeechStartedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, audio_start_ms]
+          properties:
+            type:
+              const: input_audio_buffer.speech_started
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            audio_start_ms:
+              type: number
+              minimum: 0
+              description: >-
+                A position on the timeline of all audio the client has sent in
+                this session, in milliseconds from its first byte: where the
+                audio given to the model begins, including the padding before
+                the speech. As in OpenAI's Realtime API.
+
+    inputAudioBufferSpeechStoppedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, audio_end_ms]
+          properties:
+            type:
+              const: input_audio_buffer.speech_stopped
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            audio_end_ms:
+              type: number
+              minimum: 0
+              description: >-
+                A position on the timeline of all audio the client has sent in
+                this session, in milliseconds from its first byte: where the
+                detector decided the turn was over, including the silence it
+                waited for. As in OpenAI's Realtime API. It is not when Prism
+                handled the event, so a client can time its latency from it
+                against its own sending clock. The audio given to the model can
+                end before or after it, depending on the detector.
+
+    inputAudioBufferCommittedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id]
+          properties:
+            type:
+              const: input_audio_buffer.committed
+            item_id:
+              $ref: '#/components/schemas/identifier'
+
+    inputAudioBufferSpeechHintEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, audio_start_ms]
+          properties:
+            type:
+              const: prsm.input_audio_buffer.speech_hint
+            audio_start_ms:
+              type: number
+              minimum: 0
+              description: >-
+                A position on the timeline of all audio the client has sent in
+                this session, in milliseconds from its first byte: how much
+                audio Prism had received when the hint fired.
+
+    responseCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response]
+          # A response opened by response.create names that request and says
+          # which kind it was; a response to user speech does neither. The two
+          # rules below tie them together in both directions, so a
+          # continuation can drop neither its metadata nor the request id: a
+          # plugin must tell the reply it asked for from an automatic reply to
+          # new microphone speech, or it settles the wrong pending request.
+          allOf:
+            - if:
+                required: [prsm_request_event_id]
+              then:
+                properties:
+                  response:
+                    required: [metadata]
+                    properties:
+                      metadata:
+                        required: [prsm_cause]
+            - if:
+                required: [response]
+                properties:
+                  response:
+                    required: [metadata]
+                    properties:
+                      metadata:
+                        required: [prsm_cause]
+              then:
+                required: [prsm_request_event_id]
+          properties:
+            type:
+              const: response.created
+            prsm_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            response:
+              type: object
+              # A response opened by a typed user turn echoes the caller's
+              # `prsm_cause: user_text` and must also carry the binding back.
+              # `prsm_cause` is what makes "this is a typed turn" visible on the
+              # wire, so the requirement is expressible here rather than only in
+              # prose: without it a client cannot tell this response from one it
+              # never asked for, which is the confusion the atomic request shape
+              # exists to remove. A continuation must likewise name its parent.
+              required: [id, object, status, output]
+              allOf:
+                - if:
+                    properties:
+                      metadata:
+                        properties:
+                          prsm_cause:
+                            const: user_text
+                        required: [prsm_cause]
+                    required: [metadata]
+                  then:
+                    properties:
+                      metadata:
+                        required: [prsm_cause, prsm_input_item_id]
+                - if:
+                    properties:
+                      metadata:
+                        properties:
+                          prsm_cause:
+                            const: tool_continuation
+                        required: [prsm_cause]
+                    required: [metadata]
+                  then:
+                    properties:
+                      metadata:
+                        required: [prsm_cause, prsm_parent_response_id]
+              properties:
+                id:
+                  $ref: '#/components/schemas/identifier'
+                object:
+                  const: realtime.response
+                status:
+                  const: in_progress
+                output:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/outputItem'
+                metadata:
+                  $ref: '#/components/schemas/responseMetadata'
+
+    responseOutputItemAddedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, output_index, item]
+          properties:
+            type:
+              const: response.output_item.added
+            response_id:
+              $ref: '#/components/schemas/identifier'
+            output_index:
+              type: integer
+              minimum: 0
+            item:
+              $ref: '#/components/schemas/outputItem'
+
+    responseOutputItemDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, output_index, item]
+          properties:
+            type:
+              const: response.output_item.done
+            response_id:
+              $ref: '#/components/schemas/identifier'
+            output_index:
+              type: integer
+              minimum: 0
+            item:
+              $ref: '#/components/schemas/completedFunctionItem'
+
+    responseTextDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, delta]
+          properties:
+            type:
+              const: response.text.delta
+            delta:
+              type: string
+
+    responseTextDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, text]
+          properties:
+            type:
+              const: response.text.done
+            text:
+              type: string
+
+    responseAudioDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, delta]
+          properties:
+            type:
+              const: response.audio.delta
+            delta:
+              allOf:
+                - $ref: '#/components/schemas/pcm16Base64'
+              description: Base64 raw little-endian mono 24 kHz PCM16, whole samples.
+
+    responseAudioDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: response.audio.done
+
+    streamCoordinates:
+      type: object
+      required: [response_id, item_id, output_index, content_index]
+      properties:
+        response_id:
+          $ref: '#/components/schemas/identifier'
+        item_id:
+          $ref: '#/components/schemas/identifier'
+        output_index:
+          type: integer
+          minimum: 0
+        content_index:
+          const: 0
+          description: >-
+            The part's position in the item's content array. An assistant
+            message has one content part, so every text and audio stream event
+            of a reply names 0, as conversation.item.truncate does.
+
+    responseDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response]
+          properties:
+            type:
+              const: response.done
+            response:
+              allOf:
+                - $ref: '#/components/schemas/responseView'
+                - type: object
+                  properties:
+                    status:
+                      type: string
+                      enum: [completed, cancelled, failed]
+
+    responseFunctionCallArgumentsDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, item_id, output_index, name, call_id, arguments]
+          properties:
+            type:
+              const: response.function_call_arguments.done
+            response_id:
+              $ref: '#/components/schemas/identifier'
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            output_index:
+              type: integer
+              minimum: 0
+            name:
+              type: string
+            call_id:
+              $ref: '#/components/schemas/identifier'
+            arguments:
+              type: string
+              description: Complete JSON-string tool arguments.
+
+    conversationItemCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item, prsm_request_event_id]
+          properties:
+            type:
+              const: conversation.item.created
+            prsm_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            item:
+              oneOf:
+                - type: object
+                  # **Every** acknowledged message item carries an id, whatever
+                  # its role and wherever it came from — an accepted typed turn
+                  # or seeded history. That id is the identity things are bound
+                  # to: the typed response echoes it as
+                  # `metadata.prsm_input_item_id`, and `typed_turn_superseded`
+                  # names it.
+                  #
+                  # Apply this to all message acknowledgments. The wire has no
+                  # discriminator between seeded history and typed input, and
+                  # both have a server-created item id.
+                  required: [id, type, role]
+                  properties:
+                    id:
+                      allOf:
+                        - $ref: '#/components/schemas/identifier'
+                      description: >-
+                        Stable identity for this item. Present on every message
+                        acknowledgment; a typed turn's response binds to it via
+                        `metadata.prsm_input_item_id`.
+                    type:
+                      const: message
+                    role:
+                      type: string
+                      enum: [user, assistant]
+                - type: object
+                  required: [type, call_id]
+                  properties:
+                    type:
+                      const: function_call_output
+                    call_id:
+                      $ref: '#/components/schemas/identifier'
+
+    conversationItemTruncatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, audio_end_ms]
+          properties:
+            type:
+              const: conversation.item.truncated
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            content_index:
+              const: 0
+            audio_end_ms:
+              type: integer
+              minimum: 0
+
+    transcriptionDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, delta]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.delta
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            content_index:
+              type: integer
+              minimum: 0
+            delta:
+              type: string
+
+    transcriptionCompletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, transcript]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.completed
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            content_index:
+              type: integer
+              minimum: 0
+            transcript:
+              type: string
+
+    transcriptionFailedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, error]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.failed
+            item_id:
+              $ref: '#/components/schemas/identifier'
+            content_index:
+              type: integer
+              minimum: 0
+            error:
+              type: object
+              required: [type, code, message]
+              properties:
+                type:
+                  const: transcription_failed
+                code:
+                  const: no_transcript
+                message:
+                  type: string
+
+    errorEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, error]
+          properties:
+            type:
+              const: error
+            error:
+              $ref: '#/components/schemas/errorInfo'

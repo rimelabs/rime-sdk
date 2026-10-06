@@ -41,3 +41,21 @@ against the corresponding SDK before publishing. Keep both languages' examples
 and option tables consistent while preserving their different API conventions.
 
 See [RELEASING.md](RELEASING.md) for release PRs, registry setup, and recovery.
+
+## Prism and the local LiveKit plugin
+
+The Python realtime module owns the Prism protocol. The LiveKit Rime plugin owns
+LiveKit history, generation streams, and playback reports. Keep raw wire events
+out of the plugin. Test the public SDK with a controlled peer; the pinned schema
+is in `conformance/prism/`.
+
+To test both checkouts before the SDK release, run from the `agents` checkout:
+
+```sh
+uv pip install --python .venv/bin/python --editable ../rime-sdk/python
+uv run --no-sync pytest tests/test_plugin_rime_realtime.py -q --unit
+```
+
+`--no-sync` keeps the local SDK installation for this run. No local filesystem
+path belongs in a published dependency. Publish the Prism-enabled SDK and set the
+plugin's minimum SDK version to that release before publishing the plugin.

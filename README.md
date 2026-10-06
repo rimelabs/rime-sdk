@@ -4,7 +4,10 @@ First-party Python and Node.js SDKs for Coda and Mist v3 streaming speech.
 Both packages accept complete text or an async text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
-The default model is `coda`. Select `mistv3` to use Mist v3:
+The Python package also supports [Prism speech-to-speech sessions](python/README.md#prism-speech-to-speech)
+through `client.realtime.connect`. Prism requires an explicit realtime endpoint.
+
+The default TTS model is `coda`. Select `mistv3` to use Mist v3:
 `Rime(model="mistv3")` in Python or `new Rime({ model: "mistv3" })` in Node.js.
 The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
@@ -45,4 +48,5 @@ See [RELEASING.md](RELEASING.md) for setup, release steps, and recovery.
 ## License
 
 The SDK is licensed under the [MIT License](LICENSE).
+The Python Prism protocol module uses the [Apache 2.0 license](python/LICENSE-PRISM).
 Third-party components retain their own licenses.

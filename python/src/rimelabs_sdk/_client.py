@@ -21,10 +21,11 @@ from ._errors import (
     RimeUnavailableError,
 )
 from ._stream import _CONSTRUCTION_KEY, AudioStream
+from .realtime import Realtime
 
 
 class Rime:
-    """Speech and discovery for model='coda' or model='mistv3'."""
+    """Async TTS, voice discovery, and Prism realtime conversations."""
 
     def __init__(
         self,
@@ -47,6 +48,7 @@ class Rime:
         self._streams: set[AudioStream] = set()
         self._discovery_tasks: set[asyncio.Task[Any]] = set()
         self._close_task: asyncio.Task[None] | None = None
+        self.realtime = Realtime(self)
         self.tts = _TTS(self)
         self.voices = _Voices(self)
         self.languages = _Languages(self)
@@ -121,6 +123,7 @@ class Rime:
             self._discovery_tasks.discard(task)
 
     async def _shutdown(self):
+        await self.realtime._close()
         await asyncio.gather(*(stream.cancel() for stream in list(self._streams)))
         for task in self._discovery_tasks:
             task.cancel()

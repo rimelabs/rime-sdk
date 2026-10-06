@@ -1,16 +1,18 @@
 [project]
 name = "rimelabs-sdk"
 version = "0.1.0a5"
-description = "Async Rime text-to-speech SDK"
+description = "Async Rime speech SDK"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND Apache-2.0"
+license-files = ["LICENSE", "LICENSE-PRISM", "NOTICE-PRISM"]
 requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.74,<2",
     "rime-api==0.1.0",
     "livekit-blingfire==1.1.0",
     "httpx>=0.28,<1",
+    "websockets>=15,<17",
+    "audioop-lts>=0.2,<1 ; python_full_version >= '3.13'",
 ]
 [build-system]
 requires = ["hatchling"]
@@ -23,7 +25,8 @@ dev = [
     "pytest-asyncio>=1",
     "ruff>=0.15",
     "mypy>=1.15",
-    "audioop-lts>=0.2,<1 ; python_full_version >= '3.13'",
+    "jsonschema>=4.26.0",
+    "pyyaml>=6.0.3",
 ]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
