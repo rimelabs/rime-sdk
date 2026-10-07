@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.7](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.6...typescript-v0.1.0-alpha.7) (2026-10-07)
+
+
+### Bug Fixes
+
+* publish npm releases under the latest tag ([#20](https://github.com/rimelabs/rime-sdk/issues/20)) ([40cf8a4](https://github.com/rimelabs/rime-sdk/commit/40cf8a44720be24cd42acc5f9f97f1269b786e3e))
+
 ## [0.1.0-alpha.6](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.5...typescript-v0.1.0-alpha.6) (2026-10-07)
 
 
