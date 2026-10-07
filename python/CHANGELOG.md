@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.6](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.5...python-v0.1.0-alpha.6) (2026-10-07)
+
+
+### Features
+
+* add Prism realtime support to Python and TypeScript ([#18](https://github.com/rimelabs/rime-sdk/issues/18)) ([af56a96](https://github.com/rimelabs/rime-sdk/commit/af56a96f909b53ca1818b3cbc942f8d0812092ea))
+
 ## [0.1.0-alpha.5](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.4...python-v0.1.0-alpha.5) (2026-09-29)
 
 
