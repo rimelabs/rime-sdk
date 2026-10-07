@@ -5,12 +5,12 @@ The schema is based on Rime PR #1894, commit
 
 Source: https://github.com/rimelabs/rime/blob/32d6bd1021f55dc43ed133180faa64ae86bad6a7/interfaces/speech_to_speech.asyncapi.yaml
 
-It includes one compatibility backport from
-[Rime PR #2681](https://github.com/rimelabs/rime/pull/2681), commit
-`cbf7d8cb54c2ae9fea3a35a081fbddf232f85e69`: server response causes, statuses,
-error scopes, and owner kinds accept future string values. Known error owners
-still require their identity fields, and client request causes remain strict.
-The snapshot retains the 0.4.0 contract; it does not adopt the upstream 1.0.0 API.
+The SDK snapshot includes one local compatibility adjustment: server response
+causes, statuses, error scopes, and owner kinds accept future string values.
+This follows the contract's requirement that clients tolerate unknown server
+values. The source schema remains unchanged and rejects these unknown values.
+Known error owners still require their identity fields, and client request
+causes remain strict. The SDK continues to target API version 0.4.0.
 
 Python and TypeScript protocol tests validate outgoing messages against this snapshot. The
 SDK uses the readiness, typed-input, tool and playback contracts from this
@@ -40,8 +40,7 @@ types and tool call identities. Tool-result acknowledgments use `call_id` and
 do not require an item ID.
 
 Shared schema cases in `schema.json` check server extensibility and client
-validation in both languages. The same cases also validate the upstream
-compatibility correction.
+validation against the SDK snapshot in both languages.
 
 | Design requirement | Implementation and verification |
 | --- | --- |
