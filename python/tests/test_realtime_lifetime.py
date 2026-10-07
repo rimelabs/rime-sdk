@@ -10,6 +10,68 @@ from rimelabs_sdk import Rime, RimeInputError
 from rimelabs_sdk.realtime import _client, _session
 
 
+@pytest.mark.parametrize("initialization_fails", [False, True])
+async def test_cancelled_context_cleanup_remains_tracked(monkeypatch, initialization_fails):
+    peer = Peer()
+    close_started = asyncio.Event()
+    release_close = asyncio.Event()
+    close_socket = peer.close
+    initialize = _session.RealtimeSession._initialize
+
+    async def connect(*args, **kwargs):
+        return peer
+
+    async def slow_close():
+        close_started.set()
+        await release_close.wait()
+        await close_socket()
+
+    async def failing_initialize(current, settings):
+        await initialize(current, settings)
+        raise ValueError("initialization failed")
+
+    monkeypatch.setattr(_client, "connect", connect)
+    monkeypatch.setattr(peer, "close", slow_close)
+    if initialization_fails:
+        monkeypatch.setattr(_session.RealtimeSession, "_initialize", failing_initialize)
+    client = Rime(api_key="test")
+
+    async def application():
+        async with client.realtime.connect(endpoint="ws://localhost/v1/realtime"):
+            pass
+
+    owner = asyncio.create_task(application())
+    try:
+        await asyncio.wait_for(close_started.wait(), 1)
+        current = next(iter(client.realtime._sessions))
+        owner.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await owner
+        assert current in client.realtime._sessions
+        assert not current._close_task.done()
+
+        rejoined = asyncio.Event()
+        close_session = current.close
+
+        async def observed_close():
+            rejoined.set()
+            await close_session()
+
+        monkeypatch.setattr(current, "close", observed_close)
+        closing = asyncio.create_task(client.close())
+        await asyncio.wait_for(rejoined.wait(), 1)
+        assert not closing.done()
+        release_close.set()
+        await asyncio.wait_for(closing, 1)
+        assert peer.closed
+        assert current._reader.done()
+        assert not client.realtime._sessions
+    finally:
+        release_close.set()
+        await client.close()
+        await asyncio.gather(owner, return_exceptions=True)
+
+
 async def test_cancel_after_opening_closes_undelivered_session(monkeypatch):
     peer = Peer()
     initialize = _session.RealtimeSession._initialize

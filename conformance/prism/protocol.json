@@ -648,7 +648,8 @@
       "session": {
         "id": "session-1",
         "prsm_tool_waits": {}
-      }
+      },
+      "prsm_request_event_id": "request-1"
     },
     "invalid": true
   },
@@ -661,7 +662,8 @@
         "prsm_tool_waits": {
           "continuation_timeout_s": 5
         }
-      }
+      },
+      "prsm_request_event_id": "request-1"
     },
     "invalid": true
   },
@@ -674,7 +676,8 @@
         "prsm_tool_waits": {
           "result_timeout_s": 10
         }
-      }
+      },
+      "prsm_request_event_id": "request-1"
     },
     "invalid": true
   },

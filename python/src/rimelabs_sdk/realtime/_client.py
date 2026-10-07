@@ -142,10 +142,7 @@ class Realtime:
                 self._client._check_open()
             except BaseException:
                 if session is not None:
-                    try:
-                        await session.close()
-                    finally:
-                        self._sessions.discard(session)
+                    await self._close_session(session)
                 raise
             return session
 
@@ -161,10 +158,24 @@ class Realtime:
             # Cancellation can prevent delivery of a successful opening result.
             if opening.done() and not opening.cancelled() and opening.exception() is None:
                 session = opening.result()
-                try:
-                    await session.close()
-                finally:
+                await self._close_session(session)
+
+    async def _close_session(self, session: RealtimeSession) -> None:
+        try:
+            await session.close()
+        finally:
+            # close() shields shutdown, which can outlive its cancelled caller.
+            shutdown = session._close_task
+            if shutdown is not None and not shutdown.done():
+
+                def finished(task: asyncio.Task[None]) -> None:
                     self._sessions.discard(session)
+                    if not task.cancelled():
+                        task.exception()
+
+                shutdown.add_done_callback(finished)
+            else:
+                self._sessions.discard(session)
 
     async def _close(self) -> None:
         opening = list(self._opening)
