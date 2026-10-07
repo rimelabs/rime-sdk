@@ -1,0 +1,24 @@
+python/src/rimelabs_sdk/realtime/_client.py
+  s_d239dfcb061240::t_35dac3d49af1f0 145,161-169,177-178
+  s_d239dfcb061240::t_a5e2920a0dd9df 170-171,173-176
+python/tests/test_realtime_lifetime.py
+  s_d239dfcb061240::t_319b44f2bce202 13-74
+conformance/prism/protocol.json
+  s_d239dfcb061240::t_9d5cd8a0c501d5 651-652,665-666,679-680
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b009b48485bf4c281a56ddd9f52d7b381f74535e",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
