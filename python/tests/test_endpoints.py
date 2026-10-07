@@ -5,7 +5,8 @@ import grpc
 import pytest
 from fake_service import FakeService
 
-from rimelabs_sdk import Rime, RimeInputError, _auth, _policy, _transport
+from rimelabs_sdk import Rime, RimeInputError, _auth
+from rimelabs_sdk.tts import _policy, _transport
 
 
 @pytest.mark.parametrize(
@@ -134,6 +135,6 @@ async def test_custom_hostname_defaults_to_port_443_and_tls(monkeypatch):
 
     monkeypatch.setattr(grpc.aio, "secure_channel", capture)
     async with Rime(api_key="test-key", endpoint="Customer.Example") as client:
-        channel = _transport.make_channel(client._policy)
+        channel = _transport.make_channel(client.tts._policy)
         await channel.close()
     assert targets == ["customer.example:443"]

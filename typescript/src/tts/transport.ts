@@ -7,8 +7,9 @@ import {
   type MessageShape,
 } from "@bufbuild/protobuf";
 import * as schema from "@rimelabs/api";
-import { policy, abortable } from "./policy.js";
-import * as errors from "./errors.js";
+import { policy } from "./policy.js";
+import { abortable } from "../cancellation.js";
+import * as errors from "../errors.js";
 export type Connection = grpc.Client;
 export interface PreparedConnection {
   client: Connection;

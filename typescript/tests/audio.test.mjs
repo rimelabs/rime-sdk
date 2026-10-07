@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { AudioFormat, Converter } from "../dist/audio.js";
+import { AudioFormat, Converter } from "../dist/tts/audio.js";
 
 const fixture = JSON.parse(
   fs.readFileSync(new URL("../../conformance/mulaw.json", import.meta.url)),

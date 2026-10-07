@@ -24,9 +24,9 @@ from rimelabs_sdk import (
     RimeUnavailableError,
     _auth,
 )
-from rimelabs_sdk._audio import Converter
-from rimelabs_sdk._sentences import SentenceBuffer
-from rimelabs_sdk._transport import rpc_error
+from rimelabs_sdk.tts._audio import Converter
+from rimelabs_sdk.tts._sentences import SentenceBuffer
+from rimelabs_sdk.tts._transport import rpc_error
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = json.loads((ROOT / "conformance/contract.json").read_text())
@@ -104,7 +104,7 @@ def test_sentence_storage_does_not_grow_with_completed_text():
 
 
 def test_long_sentence_does_not_scan_once_per_source_chunk(monkeypatch):
-    from rimelabs_sdk import _sentences
+    from rimelabs_sdk.tts import _sentences
 
     detector = _sentences.sentence_ends
     calls = 0
@@ -216,7 +216,7 @@ async def test_complete_and_incremental_shared_rpc(setup):
     assert service.calls[0][0].header.speaker == "clementine"
     assert service.calls[0][0].header.language == "en"
     assert service.metadata[0]["authorization"] == "Bearer test-token"
-    assert not client._streams
+    assert not client.tts._streams
 
 
 async def test_incremental_audio_before_input_end(setup):
@@ -258,7 +258,7 @@ async def test_cancel_keeps_sibling(setup):
         await anext(a)
     service.mode = "normal"
     assert await collect(b)
-    assert not client._streams
+    assert not client.tts._streams
 
 
 async def test_overall_timeout_while_paused(setup):
@@ -364,7 +364,7 @@ async def test_source_cancellation_stops_stream(setup, submit_sentence):
             await asyncio.wait_for(collect(audio), 1)
         await asyncio.wait_for(asyncio.shield(audio._worker), 1)
         assert closed.is_set()
-        assert not client._streams
+        assert not client.tts._streams
         assert not any(
             task.get_name() in {"rime:input", "rime:audio"} for task in asyncio.all_tasks()
         )
@@ -376,7 +376,7 @@ async def test_source_cancellation_stops_stream(setup, submit_sentence):
 @pytest.mark.parametrize("cleanup_stalls", [False, True])
 async def test_cancel_allows_source_cleanup_within_budget(setup, cleanup_stalls):
     _, client = setup
-    client._policy = replace(client._policy, cleanup_timeout=0.1)
+    client.tts._policy = replace(client.tts._policy, cleanup_timeout=0.1)
     waiting = asyncio.Event()
     cleanup_started = asyncio.Event()
     closed = asyncio.Event()
@@ -401,7 +401,7 @@ async def test_cancel_allows_source_cleanup_within_budget(setup, cleanup_stalls)
     assert cleanup_started.is_set()
     assert closed.is_set() is not cleanup_stalls
     assert audio._worker.done()
-    assert not client._streams
+    assert not client.tts._streams
 
 
 @pytest.mark.parametrize("operation", ["voices", "languages"])
@@ -415,7 +415,7 @@ async def test_discovery_deadline_preserves_headers(setup, operation, request_id
     with pytest.raises(RimeTimeoutError) as caught:
         await getattr(client, operation).list(timeout=0.04)
     assert caught.value.request_id == request_id
-    assert not client._discovery_tasks
+    assert not client.tts._discovery_tasks
 
 
 async def test_discovery_retry_and_auth_singleflight(setup, monkeypatch):
@@ -468,7 +468,7 @@ async def test_python_task_cancellation(setup):
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
-    assert not client._streams
+    assert not client.tts._streams
 
 
 async def test_timeout_inheritance_and_explicit_disablement(setup):
@@ -520,7 +520,7 @@ async def test_concurrent_operations_have_no_fixed_cap(setup):
     _, client = setup
     results = await asyncio.gather(*(collect(client.tts.stream("Hello.")) for _ in range(20)))
     assert all(results)
-    assert not client._streams
+    assert not client.tts._streams
 
 
 async def test_slow_input_is_not_a_service_stall(setup):
@@ -551,7 +551,7 @@ async def test_failed_operation_releases_state(setup):
         with pytest.raises(RimeUnavailableError):
             await collect(client.tts.stream("Hello."))
         await asyncio.sleep(0.01)
-        assert not client._streams
+        assert not client.tts._streams
 
 
 async def test_client_shutdown_stops_paused_output(setup):
@@ -562,7 +562,7 @@ async def test_client_shutdown_stops_paused_output(setup):
     await anext(audio)
     await asyncio.sleep(0.03)
     await client.close()
-    assert not client._streams
+    assert not client.tts._streams
     with pytest.raises(RimeCancelledError):
         await anext(audio)
     with pytest.raises(RimeInputError):
@@ -573,24 +573,24 @@ async def test_client_shutdown_stops_paused_output(setup):
 async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     service, client = setup
     # Test queue limits without making FIR conversion race the short stall timeout.
-    client._policy = replace(client._policy, output_bytes=96, output_chunk_bytes=16)
+    client.tts._policy = replace(client.tts._policy, output_bytes=96, output_chunk_bytes=16)
     # Mu-law emits one byte per three PCM samples. Exceed the queue in both formats.
-    samples = 3 * (client._policy.output_bytes + 1)
+    samples = 3 * (client.tts._policy.output_bytes + 1)
     service.payload = b"\x00\x00" * samples
     async with client.tts.stream("Hello.", audio_format=profile) as audio:
         chunks = [part async for part in audio]
-    assert all(0 < len(part) <= client._policy.output_chunk_bytes for part in chunks)
+    assert all(0 < len(part) <= client.tts._policy.output_chunk_bytes for part in chunks)
     expected = (
         service.payload if profile is AudioFormat.PCM_24000 else b"\xff" * ((samples + 2) // 3)
     )
-    assert len(expected) > client._policy.output_bytes
+    assert len(expected) > client.tts._policy.output_bytes
     assert b"".join(chunks) == expected
 
 
 @pytest.mark.parametrize("queued", [False, True])
 async def test_overall_timeout_after_producer_completion(setup, queued):
     service, client = setup
-    service.payload = b"\x00\x00" * (client._policy.output_chunk_bytes if queued else 1)
+    service.payload = b"\x00\x00" * (client.tts._policy.output_chunk_bytes if queued else 1)
     async with client.tts.stream("Hello.", timeout=0.1) as audio:
         assert await anext(audio)
         # Wait for production to finish without observing iterator completion.
@@ -602,10 +602,10 @@ async def test_overall_timeout_after_producer_completion(setup, queued):
 
 async def test_slow_consumer_does_not_trigger_stall_timeout(setup):
     service, client = setup
-    client._policy = replace(client._policy, progress_timeout=0.02)
+    client.tts._policy = replace(client.tts._policy, progress_timeout=0.02)
     # Keep the RPC open while a large response waits for output capacity.
     service.mode = "partial_error"
-    service.payload = b"\x00\x00" * client._policy.output_bytes
+    service.payload = b"\x00\x00" * client.tts._policy.output_bytes
     async with client.tts.stream("Hello.") as audio:
         assert await anext(audio)
         await asyncio.sleep(0.08)

@@ -1,4 +1,4 @@
-import { RimeAudioFormatError } from "./errors.js";
+import { RimeAudioFormatError } from "../errors.js";
 export class AudioFormat {
   static readonly PCM_24000 = Object.freeze(
     new AudioFormat("pcm_s16le", 24000, 1),

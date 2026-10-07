@@ -9,8 +9,8 @@ from rimelabs_sdk import (
     RimeResourceLimitError,
     RimeUnavailableError,
     _auth,
-    _policy,
 )
+from rimelabs_sdk.tts import _policy
 
 
 async def test_temporary_bearer_auth():

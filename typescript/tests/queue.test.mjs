@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { ByteQueue } from "../dist/queue.js";
+import { ByteQueue } from "../dist/tts/queue.js";
 
 for (const [limit, chunkSize] of [
   [6, 2],

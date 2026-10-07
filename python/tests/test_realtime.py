@@ -13,6 +13,7 @@ from jsonschema import Draft7Validator
 from rimelabs_sdk import (
     Rime,
     RimeAudioFormatError,
+    RimeCancelledError,
     RimeInputError,
     RimeResourceLimitError,
     RimeStreamError,
@@ -122,6 +123,49 @@ async def accepted_turn(current, peer):
     request = await peer.next("response.create")
     peer.accepted(request)
     return await task
+
+
+async def test_client_close_stops_tts_and_realtime(setup, monkeypatch):
+    _, client = setup
+    peer = Peer()
+
+    async def connect(endpoint, **kwargs):
+        assert kwargs["additional_headers"] == {"Authorization": "Bearer test-key"}
+        return peer
+
+    monkeypatch.setattr(_client, "connect", connect)
+    source_waiting = asyncio.Event()
+    source_closed = asyncio.Event()
+
+    async def text():
+        try:
+            source_waiting.set()
+            await asyncio.Event().wait()
+            yield "Never sent."
+        finally:
+            source_closed.set()
+
+    async with (
+        client.realtime.connect(endpoint="ws://localhost/v1/realtime") as current,
+        client.tts.stream(text()) as audio,
+    ):
+        reading = asyncio.create_task(anext(audio))
+        await asyncio.wait_for(source_waiting.wait(), 1)
+        clearing = asyncio.create_task(current.clear_audio())
+        await peer.next("input_audio_buffer.clear")
+        await client.close()
+        with pytest.raises(RimeCancelledError):
+            await reading
+        with pytest.raises(RimeStreamError, match="closed"):
+            await clearing
+        assert source_closed.is_set()
+        assert peer.closed
+        with pytest.raises(RimeInputError, match="closed"):
+            client.tts.stream("After close.")
+        with pytest.raises(RimeInputError, match="closed"):
+            await client.voices.list()
+        with pytest.raises(RimeInputError, match="closed"):
+            await current.send_text("After close.")
 
 
 async def test_configuration_and_typed_events(monkeypatch):

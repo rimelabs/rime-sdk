@@ -13,7 +13,7 @@ from rimelabs_sdk import (
     RimePermissionError,
     RimeUnavailableError,
 )
-from rimelabs_sdk._transport import SynthesisCall, discover
+from rimelabs_sdk.tts._transport import SynthesisCall, discover
 
 
 @pytest.fixture

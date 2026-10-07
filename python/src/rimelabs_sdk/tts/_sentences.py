@@ -2,7 +2,7 @@
 
 from livekit import blingfire
 
-from ._errors import RimeResourceLimitError
+from .._errors import RimeResourceLimitError
 
 # Punctuation from the pinned BlingFire sentence rules schedules scans only.
 # BlingFire, not this set, decides whether a sentence ends here.

@@ -1,4 +1,4 @@
-import { policy, abortable } from "./policy.js";
+import { abortable } from "./cancellation.js";
 import {
   RimeError,
   RimeAuthenticationError,
@@ -8,6 +8,11 @@ import {
   RimeResourceLimitError,
   RimeUnavailableError,
 } from "./errors.js";
+export interface AuthenticationConfiguration {
+  exchangeUrl: string;
+  audience: string;
+  authTimeout: number;
+}
 export interface Token {
   value: string;
   expiresAt: number;
@@ -16,7 +21,7 @@ export interface Token {
 export async function exchangeKey(
   key: string,
   signal: AbortSignal,
-  configuration: Readonly<typeof policy> = policy,
+  configuration: Readonly<AuthenticationConfiguration>,
 ): Promise<Token> {
   try {
     const response = await fetch(configuration.exchangeUrl, {
@@ -97,7 +102,7 @@ export class Credentials {
   private closed = false;
   constructor(
     private key: string,
-    private readonly configuration: Readonly<typeof policy> = policy,
+    private readonly configuration: Readonly<AuthenticationConfiguration>,
   ) {}
   async metadata(signal: AbortSignal): Promise<string> {
     // TEMPORARY until Themis is ready: replace this body with the call below.

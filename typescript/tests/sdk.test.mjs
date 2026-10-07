@@ -14,11 +14,11 @@ import {
   RimePermissionError,
   RimeResourceLimitError,
 } from "../dist/index.js";
-import { SentenceBuffer, ready } from "../dist/sentences.js";
-import { Converter } from "../dist/audio.js";
+import { SentenceBuffer, ready } from "../dist/tts/sentences.js";
+import { Converter } from "../dist/tts/audio.js";
 import { authentication, Credentials } from "../dist/auth.js";
-import { transport, rpcError } from "../dist/transport.js";
-import { policy } from "../dist/policy.js";
+import { transport, rpcError } from "../dist/tts/transport.js";
+import { policy } from "../dist/tts/policy.js";
 import { FakeService } from "./service.mjs";
 const fixtures = JSON.parse(
   fs.readFileSync(new URL("../../conformance/sentences.json", import.meta.url)),
@@ -60,7 +60,7 @@ async function setup(fn) {
   }
 }
 test("temporary bearer auth", async () => {
-  const credentials = new Credentials("test-key");
+  const credentials = new Credentials("test-key", policy);
   const signal = new AbortController().signal;
   assert.equal(await credentials.metadata(signal), "Bearer test-key");
   await credentials.close();
@@ -327,29 +327,38 @@ test("shared refresh and discovery retries", () =>
 test("private Themis HTTP exchange", async () => {
   const { createServer } = await import("node:http");
   const { exchangeKey } = await import("../dist/auth.js");
+  const configuration = {
+    exchangeUrl: "",
+    audience: "auth.example",
+    authTimeout: 10,
+  };
   let status = 200;
   let body = {
     access_token: "token",
     expires_in: 60,
-    audience: policy.audience,
+    audience: configuration.audience,
   };
   const server = createServer(async (request, response) => {
     assert.equal(request.headers.authorization, "Api-Key local-test-secret");
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
     assert.deepEqual(JSON.parse(Buffer.concat(chunks).toString()), {
-      audience: policy.audience,
+      audience: configuration.audience,
     });
     response.writeHead(status, { "content-type": "application/json" });
     response.end(JSON.stringify(body));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const original = policy.exchangeUrl;
-  policy.exchangeUrl = `http://127.0.0.1:${server.address().port}/v1/token`;
+  configuration.exchangeUrl = `http://127.0.0.1:${server.address().port}/v1/token`;
   try {
     assert.equal(
-      (await exchangeKey("local-test-secret", new AbortController().signal))
-        .value,
+      (
+        await exchangeKey(
+          "local-test-secret",
+          new AbortController().signal,
+          configuration,
+        )
+      ).value,
       "token",
     );
     for (const [code, errorType] of [
@@ -363,7 +372,12 @@ test("private Themis HTTP exchange", async () => {
     ]) {
       status = code;
       await assert.rejects(
-        () => exchangeKey("local-test-secret", new AbortController().signal),
+        () =>
+          exchangeKey(
+            "local-test-secret",
+            new AbortController().signal,
+            configuration,
+          ),
         (error) =>
           error instanceof errorType &&
           !error.message.includes("local-test-secret"),
@@ -372,11 +386,15 @@ test("private Themis HTTP exchange", async () => {
     status = 200;
     body = { ...body, audience: "wrong" };
     await assert.rejects(
-      () => exchangeKey("local-test-secret", new AbortController().signal),
+      () =>
+        exchangeKey(
+          "local-test-secret",
+          new AbortController().signal,
+          configuration,
+        ),
       RimeAuthenticationError,
     );
   } finally {
-    policy.exchangeUrl = original;
     await new Promise((resolve) => server.close(resolve));
   }
 });
@@ -402,9 +420,11 @@ for (const [status, errorType] of [
       // Keep the body open. The SDK must cancel it when rejecting the status.
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const original = policy.exchangeUrl;
-    policy.exchangeUrl = `http://127.0.0.1:${server.address().port}/v1/token`;
-    const credentials = new Credentials("local-test-secret");
+    const credentials = new Credentials("local-test-secret", {
+      exchangeUrl: `http://127.0.0.1:${server.address().port}/v1/token`,
+      audience: "auth.example",
+      authTimeout: 10,
+    });
     let timer;
     try {
       await assert.rejects(
@@ -423,7 +443,6 @@ for (const [status, errorType] of [
     } finally {
       clearTimeout(timer);
       await credentials.close();
-      policy.exchangeUrl = original;
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
     }
@@ -526,7 +545,7 @@ test("source errors keep their cause and release operation state", async () => {
       (error) => error instanceof RimeInputError && error.cause === cause,
     );
     await sleep(10);
-    assert.equal(client.streams.size, 0);
+    assert.equal(client.ttsClient.streams.size, 0);
   });
 });
 
@@ -547,9 +566,35 @@ for (const code of [undefined, 14]) {
         (error) => error instanceof RimeInputError && error.cause === cause,
       );
       await audio.cancel();
-      assert.equal(client.streams.size, 0);
+      assert.equal(client.ttsClient.streams.size, 0);
     }));
 }
+
+for (const operation of ["voices", "languages"])
+  test(`close waits for discovery cleanup / ${operation}`, () =>
+    setup(async (service, client) => {
+      service.mode = "discovery_timeout";
+      const discovery = assert.rejects(
+        client[operation].list(),
+        RimeCancelledError,
+      );
+      await service.headersSent;
+      const connection = client.ttsClient.client;
+      const close = connection.close.bind(connection);
+      let activeAtClose;
+      let closeCalls = 0;
+      connection.close = () => {
+        activeAtClose = client.ttsClient.discoveryOperations.size;
+        closeCalls++;
+        close();
+      };
+
+      await Promise.all([client.close(), client.close()]);
+      await discovery;
+
+      assert.equal(activeAtClose, 0);
+      assert.equal(closeCalls, 1);
+    }));
 
 for (const operation of ["voices", "languages"])
   for (const requestId of ["discovery-id", null])
@@ -566,7 +611,7 @@ for (const operation of ["voices", "languages"])
               error instanceof RimeTimeoutError &&
               error.requestId === requestId,
           );
-          assert.equal(client.discoveryControllers.size, 0);
+          assert.equal(client.ttsClient.discoveryOperations.size, 0);
         }));
 
 for (const size of [1024, 100000])
@@ -609,7 +654,7 @@ test("client shutdown stops paused output", async () => {
     await audio.next();
     await sleep(30);
     await client.close();
-    assert.equal(client.streams.size, 0);
+    assert.equal(client.ttsClient.streams.size, 0);
     await assert.rejects(audio.next(), RimeCancelledError);
     assert.throws(() => client.tts.stream("Later."), RimeInputError);
   });
