@@ -10,7 +10,7 @@ Requires Node.js 22 or later. This alpha package uses ESM and includes TypeScrip
 types. Browser use is not supported.
 
 ```sh
-npm install @rimelabs/sdk@next
+npm install @rimelabs/sdk
 export RIME_API_KEY="your-api-key"
 ```
 
