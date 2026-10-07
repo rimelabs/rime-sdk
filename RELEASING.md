@@ -116,10 +116,13 @@ and updates `uv.lock` on the release PR before CI runs. The old
 `python-v0.1.0a1` tag remains unchanged. Future Python tags use the SemVer spelling.
 The bootstrap commit and manifest start tracking after the first published alphas.
 
-npm alpha releases use the `next` distribution tag. Stable releases use `latest`.
-The initial npm publication also assigned `latest` to alpha.1; this workflow does
-not move `latest` when it publishes another alpha. Use `@rimelabs/sdk@next` for
-the current alpha.
+All npm releases use the `latest` distribution tag, including alpha releases.
+Use `npm install @rimelabs/sdk` to install the current release. The version still
+identifies it as alpha. The workflow no longer updates the `next` tag.
+
+PyPI has no equivalent distribution tag to move. A new version appears when
+publication succeeds. Use `uv add --prerelease=allow rimelabs-sdk` while the
+package remains in alpha.
 
 To leave alpha, make a separate reviewed PR that sets `prerelease` to `false`,
 changes `versioning` to `default`, and sets a deliberate `release-as` version

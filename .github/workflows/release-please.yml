@@ -176,6 +176,4 @@ jobs:
       - run: npm test
       - run: npm pack
       - name: Publish package
-        run: |
-          tag=$(node -p 'require("./package.json").version.includes("-") ? "next" : "latest"')
-          npm publish --access public --tag "$tag"
+        run: npm publish --access public --tag latest
