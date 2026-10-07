@@ -172,6 +172,11 @@ function session(value: unknown): SessionView {
     view.prsm_tool_waits === undefined
       ? {}
       : object(view.prsm_tool_waits, "session.prsm_tool_waits");
+  if (
+    view.prsm_tool_waits !== undefined &&
+    (!("result_timeout_s" in waits) || !("continuation_timeout_s" in waits))
+  )
+    invalid("session.prsm_tool_waits");
   const interrupt = view.prsm_effective_interrupt_response;
   if (interrupt !== undefined && typeof interrupt !== "boolean")
     invalid("session.prsm_effective_interrupt_response");
@@ -444,6 +449,7 @@ function decodeValue(
           : null;
       if (item && string(item.type, "item.type") !== "message") return null;
       const contentIndex =
+        kind === "response.output_item.added" &&
         event.content_index === undefined
           ? 0
           : integer(event.content_index, "content_index");

@@ -1132,7 +1132,7 @@ components:
       properties:
         prsm_cause:
           type: string
-          enum: [proactive, tool_continuation, user_text]
+          examples: [proactive, tool_continuation, user_text]
           description: >-
             `tool_continuation` continues a parent after tools; `user_text`
             identifies a response created from an atomic typed user turn;
@@ -1333,7 +1333,7 @@ components:
           const: realtime.response
         status:
           type: string
-          enum: [in_progress, completed, cancelled, failed]
+          examples: [in_progress, completed, cancelled, failed]
         status_details:
           type: object
           properties:
@@ -1394,6 +1394,14 @@ components:
           properties:
             kind:
               const: session
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              type: string
+              not:
+                enum: [event, utterance, response, tool_roundtrip, session]
+              description: A future owner kind, treated as unknown by the client.
 
     errorInfo:
       type: object
@@ -1484,7 +1492,7 @@ components:
           description: Human-readable text; clients must not parse it for recovery.
         scope:
           type: string
-          enum: [event, utterance, response, tool_roundtrip, session]
+          examples: [event, utterance, response, tool_roundtrip, session]
           description: The affected operation; owner.kind always equals it.
         owner:
           $ref: '#/components/schemas/errorOwner'
@@ -1827,7 +1835,8 @@ components:
                 object:
                   const: realtime.response
                 status:
-                  const: in_progress
+                  type: string
+                  examples: [in_progress]
                 output:
                   type: array
                   items:
@@ -1948,7 +1957,7 @@ components:
                   properties:
                     status:
                       type: string
-                      enum: [completed, cancelled, failed]
+                      examples: [completed, cancelled, failed]
 
     responseFunctionCallArgumentsDoneEvent:
       allOf:

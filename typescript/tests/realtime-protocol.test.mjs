@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import Ajv from "ajv";
+import { parse } from "yaml";
 import { Rime, RimeStreamError } from "../dist/index.js";
 import { decode } from "../dist/realtime/protocol.js";
 import { Peer } from "./realtime-peer.mjs";
@@ -11,6 +13,31 @@ const cases = JSON.parse(
     "utf8",
   ),
 );
+const schemaCases = JSON.parse(
+  readFileSync(
+    new URL("../../conformance/prism/schema.json", import.meta.url),
+    "utf8",
+  ),
+);
+const contract = parse(
+  readFileSync(
+    new URL(
+      "../../conformance/prism/speech_to_speech.asyncapi.yaml",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+const ajv = new Ajv({ strict: false, validateFormats: false });
+for (const item of schemaCases) {
+  test(`schema compatibility: ${item.name}`, () => {
+    const validate = ajv.compile({
+      $ref: `#/components/schemas/${item.schema}`,
+      components: contract.components,
+    });
+    assert.equal(validate(item.value), item.valid);
+  });
+}
 async function setup(t) {
   const peer = await new Peer().start();
   const client = new Rime({ apiKey: "test" });

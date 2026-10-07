@@ -47,9 +47,13 @@ class Rime:
         self._loop = loop
 
     async def _shutdown(self):
-        await self.realtime._close()
-        await self.tts._close()
-        await self._credentials.close()
+        try:
+            await self.realtime._close()
+        finally:
+            try:
+                await self.tts._close()
+            finally:
+                await self._credentials.close()
 
     async def close(self) -> None:
         self._check_loop()

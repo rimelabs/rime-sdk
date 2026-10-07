@@ -1,9 +1,16 @@
 # Prism contract
 
-The schema is copied without changes from Rime PR #1894, commit
-`32d6bd1021f55dc43ed133180faa64ae86bad6a7`, AsyncAPI 0.4.0.
+The schema is based on Rime PR #1894, commit
+`32d6bd1021f55dc43ed133180faa64ae86bad6a7`, API version 0.4.0 using AsyncAPI 3.0.0.
 
 Source: https://github.com/rimelabs/rime/blob/32d6bd1021f55dc43ed133180faa64ae86bad6a7/interfaces/speech_to_speech.asyncapi.yaml
+
+It includes one compatibility backport from
+[Rime PR #2681](https://github.com/rimelabs/rime/pull/2681), commit
+`cbf7d8cb54c2ae9fea3a35a081fbddf232f85e69`: server response causes, statuses,
+error scopes, and owner kinds accept future string values. Known error owners
+still require their identity fields, and client request causes remain strict.
+The snapshot retains the 0.4.0 contract; it does not adopt the upstream 1.0.0 API.
 
 Python and TypeScript protocol tests validate outgoing messages against this snapshot. The
 SDK uses the readiness, typed-input, tool and playback contracts from this
@@ -31,6 +38,10 @@ check the fields the SDK uses, while preserving unknown events, extra fields,
 and unknown enum values. Session tests also verify request-specific acknowledgment
 types and tool call identities. Tool-result acknowledgments use `call_id` and
 do not require an item ID.
+
+Shared schema cases in `schema.json` check server extensibility and client
+validation in both languages. The same cases also validate the upstream
+compatibility correction.
 
 | Design requirement | Implementation and verification |
 | --- | --- |

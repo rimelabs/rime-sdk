@@ -986,6 +986,38 @@ test("submitted cancelled continuation cannot be repeated", async (t) => {
   peer.ended("reply-2", "cancelled");
 });
 
+for (const refusal of [
+  "tool_continuation_not_ready",
+  "tool_continuation_unavailable",
+]) {
+  test(`cancelled continuation handles late ${refusal}`, async (t) => {
+    const { session, peer, events } = await setup(t);
+    const { ref } = await round(session, peer, events);
+    const controller = new AbortController();
+    const continuation = watch(
+      session.continueReply(ref, { signal: controller.signal }),
+    );
+    const request = await peer.next("response.create");
+    controller.abort();
+    await assert.rejects(continuation, RimeCancelledError);
+    peer.fault(request, refusal);
+    await payload(events, "error");
+    // A subsequent acknowledgment confirms the preceding refusal was handled.
+    const barrier = watch(session.addMessage("user", "history"));
+    peer.ack(await peer.next("conversation.item.create"));
+    await barrier;
+    if (refusal === "tool_continuation_not_ready") {
+      const retry = watch(session.continueReply(ref));
+      const retried = await peer.next("response.create");
+      assert.notEqual(retried.event_id, request.event_id);
+      peer.accepted(retried, "reply-2");
+      assert.equal((await retry).responseId, "reply-2");
+    } else {
+      await assert.rejects(session.continueReply(ref), /already continued/);
+    }
+  });
+}
+
 test("duplicate tool and terminal events are emitted once; unknown events are ignored", async (t) => {
   const { session, peer, events } = await setup(t);
   await turn(session, peer);

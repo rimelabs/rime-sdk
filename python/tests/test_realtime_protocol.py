@@ -5,13 +5,23 @@ import json
 from pathlib import Path
 
 import pytest
-from test_realtime import _VALIDATORS, accepted_turn, session
+from jsonschema import Draft7Validator
+from test_realtime import _CONTRACT, _VALIDATORS, accepted_turn, session
 
 from rimelabs_sdk import RimeStreamError
 from rimelabs_sdk import realtime as r
 from rimelabs_sdk.realtime import _protocol as protocol
 
 CASES = json.loads((Path(__file__).parents[2] / "conformance/prism/protocol.json").read_text())
+SCHEMA_CASES = json.loads((Path(__file__).parents[2] / "conformance/prism/schema.json").read_text())
+
+
+@pytest.mark.parametrize("case", SCHEMA_CASES, ids=lambda case: case["name"])
+def test_schema_preserves_server_extensibility_and_client_validation(case):
+    validator = Draft7Validator(
+        {"$ref": "#/components/schemas/" + case["schema"], "components": _CONTRACT["components"]}
+    )
+    assert validator.is_valid(case["value"]) == case["valid"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["name"])

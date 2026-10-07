@@ -603,5 +603,122 @@
       "delta": "AAAA===="
     },
     "invalid": true
+  },
+  {
+    "name": "session.created tool waits empty",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {}
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.created tool waits missing result",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "continuation_timeout_s": 5
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.created tool waits missing continuation",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": 10
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated tool waits empty",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {}
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated tool waits missing result",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "continuation_timeout_s": 5
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated tool waits missing continuation",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": 10
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.text.delta missing content index",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "delta": "hello"
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.text.done missing content index",
+    "event": {
+      "type": "response.text.done",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "text": "hello"
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.audio.delta missing content index",
+    "event": {
+      "type": "response.audio.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "delta": "AAA="
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.audio.done missing content index",
+    "event": {
+      "type": "response.audio.done",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0
+    },
+    "invalid": true
   }
 ]

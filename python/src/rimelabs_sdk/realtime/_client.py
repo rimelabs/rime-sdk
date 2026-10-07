@@ -142,22 +142,29 @@ class Realtime:
                 self._client._check_open()
             except BaseException:
                 if session is not None:
-                    await session.close()
-                    self._sessions.discard(session)
+                    try:
+                        await session.close()
+                    finally:
+                        self._sessions.discard(session)
                 raise
             return session
 
         opening = asyncio.create_task(open_session(), name="rime:realtime-connect")
         self._opening.add(opening)
         try:
-            session = await opening
-        finally:
-            self._opening.discard(opening)
-        try:
+            try:
+                session = await opening
+            finally:
+                self._opening.discard(opening)
             yield session
         finally:
-            await session.close()
-            self._sessions.discard(session)
+            # Cancellation can prevent delivery of a successful opening result.
+            if opening.done() and not opening.cancelled() and opening.exception() is None:
+                session = opening.result()
+                try:
+                    await session.close()
+                finally:
+                    self._sessions.discard(session)
 
     async def _close(self) -> None:
         opening = list(self._opening)

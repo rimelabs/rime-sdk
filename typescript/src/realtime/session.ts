@@ -334,6 +334,13 @@ export class RealtimeSession {
       }
       return await abortable(result.promise, deadline.signal);
     } catch (error) {
+      if (
+        continuation &&
+        error instanceof t.RimeRealtimeError &&
+        error.fault.scope === "event" &&
+        error.fault.code === "tool_continuation_not_ready"
+      )
+        continuation.continued = false;
       if (error instanceof RimeTimeoutError || error instanceof RimeStreamError)
         this.fail(error);
       throw error;
@@ -530,32 +537,22 @@ export class RealtimeSession {
       } finally {
         ready.dispose();
       }
-      try {
-        return (
-          await this.request(
-            p.requests.create,
-            {
-              response: {
-                metadata: {
-                  prsm_cause: "tool_continuation",
-                  prsm_parent_response_id: ref.responseId,
-                },
+      return (
+        await this.request(
+          p.requests.create,
+          {
+            response: {
+              metadata: {
+                prsm_cause: "tool_continuation",
+                prsm_parent_response_id: ref.responseId,
               },
             },
-            signal,
-            undefined,
-            state,
-          )
-        ).response;
-      } catch (error) {
-        if (
-          error instanceof t.RimeRealtimeError &&
-          error.fault.scope === "event" &&
-          error.fault.code === "tool_continuation_not_ready"
+          },
+          signal,
+          undefined,
+          state,
         )
-          state.continued = false;
-        throw error;
-      }
+      ).response;
     });
   }
   async cancel(

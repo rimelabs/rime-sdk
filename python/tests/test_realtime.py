@@ -1076,7 +1076,11 @@ async def test_client_close_during_connect_does_not_cancel_application_owner(mon
     await started.wait()
     await asyncio.wait_for(client.close(), 1)
     result = await asyncio.wait_for(asyncio.gather(owner, return_exceptions=True), 1)
+    # The opening operation is cancelled, not the application task itself.
+    assert owner.cancelling() == 0
     assert isinstance(result[0], asyncio.CancelledError)
+    assert not client.realtime._opening
+    assert not client.realtime._sessions
 
 
 async def test_concurrent_cancel_and_playback_stop_share_one_cancel(monkeypatch):

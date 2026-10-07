@@ -276,6 +276,15 @@ class RealtimeSession:
             if abandoned.is_set() and isinstance(result, t.ResponseStarted):
                 self._abandon_response(result.response)
             return result
+        except t.RimeRealtimeError as refusal:
+            if (
+                continuation is not None
+                and refusal.fault.scope == "event"
+                and refusal.fault.code == "tool_continuation_not_ready"
+            ):
+                # A correlated zero-effect refusal releases even an abandoned request.
+                continuation.continued = False
+            raise
         except TimeoutError:
             error = RimeTimeoutError(
                 f"{kind}: no acknowledgment; outcome unknown", request_id=event_id
@@ -416,27 +425,20 @@ class RealtimeSession:
             raise t.RealtimeAdmissionTimeout(
                 "Tool results or parent completion did not arrive before ready_s expired"
             ) from None
-        try:
-            return (
-                await self._request(
-                    p.CREATE,
-                    {
-                        "response": {
-                            "metadata": {
-                                "prsm_cause": "tool_continuation",
-                                "prsm_parent_response_id": parent.response_id,
-                            }
+        return (
+            await self._request(
+                p.CREATE,
+                {
+                    "response": {
+                        "metadata": {
+                            "prsm_cause": "tool_continuation",
+                            "prsm_parent_response_id": parent.response_id,
                         }
-                    },
-                    continuation=response,
-                )
-            ).response
-        except t.RimeRealtimeError as error:
-            if error.fault.scope == "event" and error.fault.code == "tool_continuation_not_ready":
-                # Only a correlated, zero-effect refusal permits another
-                # request after submission. Unknown outcomes stay protected.
-                response.continued = False
-            raise
+                    }
+                },
+                continuation=response,
+            )
+        ).response
 
     async def cancel(self, response: t.ResponseRef) -> None:
         """Request a stop if needed; return when the response is terminal.
@@ -743,12 +745,14 @@ class RealtimeSession:
         if not self._closed:
             self._fail(RimeStreamError("Realtime session closed"))
             self._failure = None  # explicit close ends the iterator normally
-        await self._socket.close()
-        self._reader.cancel()
-        await asyncio.gather(self._reader, return_exceptions=True)
-        tasks = list(self._tasks)
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        if self._created.done() and not self._created.cancelled():
-            self._created.exception()
+        try:
+            await self._socket.close()
+        finally:
+            self._reader.cancel()
+            await asyncio.gather(self._reader, return_exceptions=True)
+            tasks = list(self._tasks)
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            if self._created.done() and not self._created.cancelled():
+                self._created.exception()

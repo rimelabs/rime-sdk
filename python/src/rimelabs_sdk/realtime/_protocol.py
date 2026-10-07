@@ -205,6 +205,10 @@ def _session(value: object) -> SessionView:
         if "prsm_tool_waits" in view
         else {}
     )
+    if "prsm_tool_waits" in view and (
+        "result_timeout_s" not in waits or "continuation_timeout_s" not in waits
+    ):
+        _invalid("session.prsm_tool_waits")
     interrupt = view.get("prsm_effective_interrupt_response")
     if not isinstance(interrupt, bool):
         if "prsm_effective_interrupt_response" in view:
@@ -424,7 +428,12 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         item = _object(event.get("item"), "item") if kind == "response.output_item.added" else None
         if item is not None and _string(item.get("type"), "item.type") != "message":
             return None
-        content_index = _integer(event.get("content_index", 0), "content_index")
+        content_index = _integer(
+            event.get("content_index", 0)
+            if kind == "response.output_item.added"
+            else event.get("content_index"),
+            "content_index",
+        )
         if content_index != 0:
             raise RimeStreamError("Unsupported Prism contract: content_index must be zero")
         output = t.OutputRef(
