@@ -1,0 +1,21 @@
+python/tests/test_sdk.py
+  s_d239dfcb061240::t_309a82fa8c96da 662-666
+python/tests/fake_service.py
+  s_d239dfcb061240::t_18ff956a0f4f90 45,59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5905a88fac6d478b5f23c623cac12041e918f5d8",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
