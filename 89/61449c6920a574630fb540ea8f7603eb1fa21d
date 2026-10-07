@@ -1,0 +1,23 @@
+.github/workflows/release-please.yml
+  s_d239dfcb061240::t_12481e89ed75f2 179
+typescript/README.md
+  s_d239dfcb061240::t_12481e89ed75f2 13
+RELEASING.md
+  s_d239dfcb061240::t_12481e89ed75f2 119-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8961449c6920a574630fb540ea8f7603eb1fa21d",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
