@@ -1,0 +1,71 @@
+examples/python/realtime/typed_turn.py
+  s_d239dfcb061240::t_619a377b51a797 1-18,21-38,43-45,51-54
+  s_d239dfcb061240::t_8784fd9f0986ad 19-20,39-42,46-50
+.github/workflows/checks.yml
+  s_d239dfcb061240::t_913b287399c530 58-59
+  s_d239dfcb061240::t_692ab6625cf427 35
+examples/README.md
+  s_d239dfcb061240::t_8784fd9f0986ad 45
+  s_d239dfcb061240::t_913b287399c530 52-54
+  s_d239dfcb061240::t_a2a72acb005c88 1-38,40-44,46-51,55-67
+  s_d239dfcb061240::t_e47827f3a00ad1 39
+python/tests/test_examples.py
+  s_d239dfcb061240::t_284dc8d55f149e 1-46,48-131
+  s_d239dfcb061240::t_8784fd9f0986ad 47
+typescript/docs/tts.md
+  s_d239dfcb061240::t_913b287399c530 1-4,6-132
+  s_d239dfcb061240::t_35bba0188230bf 5
+python/docs/realtime.md
+  s_d239dfcb061240::t_a2a72acb005c88 1-7,10-30,32-103,105-181,183-208,211-215,217-218
+  s_d239dfcb061240::t_e47827f3a00ad1 31,182,209-210
+  s_d239dfcb061240::t_6f9a4dd655cd42 8-9,104,216
+.github/workflows/release-please.yml
+  s_d239dfcb061240::t_8784fd9f0986ad 128-129
+typescript/package.json
+  s_d239dfcb061240::t_913b287399c530 24
+  s_d239dfcb061240::t_8784fd9f0986ad 35
+python/docs/tts.md
+  s_d239dfcb061240::t_913b287399c530 1-4,6-121
+  s_d239dfcb061240::t_81b605ea5c790e 5
+examples/typescript/package.json
+  s_d239dfcb061240::t_619a377b51a797 1-11
+CONTRIBUTING.md
+  s_d239dfcb061240::t_e019c3a839c216 29
+  s_d239dfcb061240::t_e47827f3a00ad1 24,92
+  s_d239dfcb061240::t_913b287399c530 42-43,72-81
+  s_d239dfcb061240::t_c71ffc54a95204 82
+README.md
+  s_d239dfcb061240::t_e47827f3a00ad1 10
+  s_d239dfcb061240::t_913b287399c530 7,20-23
+  s_d239dfcb061240::t_ad809230d06922 24
+examples/python/tts/stream.py
+  s_d239dfcb061240::t_8784fd9f0986ad 1-25
+examples/python/realtime/tools.py
+  s_d239dfcb061240::t_d377c8fb043c02 47,53,61-62
+  s_d239dfcb061240::t_619a377b51a797 1-46,48-52,54-60,63-71,76-79,85-88
+  s_d239dfcb061240::t_8784fd9f0986ad 72-75,80-84
+examples/typescript/package-lock.json
+  s_d239dfcb061240::t_37566b07f6ac8a 1-35
+examples/typescript/tts/stream.mjs
+  s_d239dfcb061240::t_f985cb75ef9f4a 1,3,15-17
+python/README.md
+  s_d239dfcb061240::t_b2205d9e30481d 3-4,15-18,39-40,42-43,45,47-49,55-70,74,77,79-81,87-88,90-93,95,97-99,101-102
+typescript/README.md
+  s_d239dfcb061240::t_a33f27c4366d8a 3-4,16-19,37-38,40-42,44,46-47,51-54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1cd0e87b6190f48e6179d7e62698a12a27f6518c",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
