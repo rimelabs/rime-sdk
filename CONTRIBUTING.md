@@ -21,12 +21,12 @@ TTS owns synthesis streams, discovery requests, and the gRPC connection.
 Realtime owns WebSocket connections and conversation state. Shared credentials
 retain the TTS token-exchange implementation as well as direct API-key handling.
 
-TypeScript credentials accept an explicit authentication configuration with
+Authentication in TypeScript accepts an explicit configuration with
 `exchangeUrl`, `audience`, and `authTimeout`. TTS supplies these values from its
 deployment configuration. Shared authentication does not import TTS modules.
 The shared `cancellation.ts` module owns the `abortable` helper.
 
-Applications continue to use package-level imports and `client.tts.stream(...)`.
+Public imports and `client.tts.stream(...)` remain unchanged.
 Python also exposes `client.realtime.connect(...)`. Moving implementation files
 does not change these interfaces or the top-level voice and language discovery
 methods. Tests that use private dependency seams import them from the feature
@@ -39,8 +39,8 @@ Use Python 3.11 or later and `uv`:
 ```sh
 cd python
 uv sync --locked --dev
-uv run ruff check src tests
-uv run ruff format --check src tests
+uv run ruff check src tests ../examples/python
+uv run ruff format --check src tests ../examples/python
 uv run mypy src
 uv run pytest
 uv build
@@ -69,6 +69,17 @@ Public documentation ships with each package release. Check README examples
 against the corresponding SDK before publishing. Keep both languages' examples
 and option tables consistent while preserving their different API conventions.
 
+Each package README contains installation and quick starts. Detailed API guides
+live in `python/docs/` and `typescript/docs/`; examples are grouped by language
+and API under `examples/`. Use absolute repository URLs in package READMEs so
+guide links work on PyPI and npm. The Python source distribution and npm package
+include their guides.
+
+Prism example tests use a controlled WebSocket peer and require no credentials
+or audio hardware. The example scripts themselves connect to the endpoint the
+reader configures. A microphone example still needs validation of capture,
+playback, interruption, and cleanup on real devices before it is added.
+
 See [RELEASING.md](RELEASING.md) for release PRs, registry setup, and recovery.
 
 ## Prism and the local LiveKit plugin
@@ -78,7 +89,7 @@ LiveKit history, generation streams, and playback reports. Keep raw wire events
 out of the plugin. Test the public SDK with a controlled peer; the pinned schema
 is in `conformance/prism/`.
 
-To test both checkouts before the SDK release, run from the `agents` checkout:
+Run these commands from the `agents` checkout to test both checkouts before release:
 
 ```sh
 uv pip install --python .venv/bin/python --editable ../rime-sdk/python

@@ -1,0 +1,11 @@
+{
+  "name": "rime-sdk-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tts": "node tts/stream.mjs"
+  },
+  "dependencies": {
+    "@rimelabs/sdk": "file:../../typescript"
+  }
+}

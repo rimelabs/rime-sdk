@@ -4,10 +4,10 @@ First-party Python and Node.js SDKs for Coda and Mist v3 streaming speech.
 Both packages accept complete text or an async text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
-The Python package also supports [Prism speech-to-speech sessions](python/README.md#prism-speech-to-speech)
+The Python package also supports [Prism speech-to-speech sessions](python/docs/realtime.md)
 through `client.realtime.connect`. Prism requires an explicit realtime endpoint.
 
-The default TTS model is `coda`. Select `mistv3` to use Mist v3:
+Coda is the default TTS model. Select `mistv3` to use Mist v3:
 `Rime(model="mistv3")` in Python or `new Rime({ model: "mistv3" })` in Node.js.
 The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
@@ -16,6 +16,11 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
+
+Use the package READMEs for installation and quick starts. Detailed guides cover
+[Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md), and
+[Node.js TTS](typescript/docs/tts.md). Runnable scripts are in the
+[example index](examples/README.md).
 
 ## Local setup
 
