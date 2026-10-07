@@ -5,7 +5,7 @@ import struct
 from collections import deque
 from enum import Enum
 
-from ._errors import RimeAudioFormatError
+from .._errors import RimeAudioFormatError
 
 
 class AudioFormat(Enum):

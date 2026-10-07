@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { RimeInputError, RimeResourceLimitError } from "./errors.js";
+import { RimeInputError, RimeResourceLimitError } from "../errors.js";
 const require = createRequire(import.meta.url);
 interface BlingFire {
   ready: Promise<BlingFire>;
@@ -13,7 +13,7 @@ interface BlingFire {
   ): number;
   HEAPU8: Uint8Array;
 }
-const module = require("../vendor/blingfire.cjs") as BlingFire;
+const module = require("../../vendor/blingfire.cjs") as BlingFire;
 export const ready = module.ready;
 // These marks schedule scans. Only BlingFire decides sentence boundaries.
 // Keep the set and code-point counts in sync with Python's _sentences.py.

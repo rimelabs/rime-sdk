@@ -5,6 +5,8 @@ export {
   type DiscoveryOptions,
   type VoiceListOptions,
 } from "./client.js";
-export { AudioStream } from "./stream.js";
-export { AudioFormat } from "./audio.js";
+export { AudioStream } from "./tts/stream.js";
+export { AudioFormat } from "./tts/audio.js";
 export * from "./errors.js";
+export { RealtimeSession } from "./realtime/session.js";
+export * from "./realtime/types.js";

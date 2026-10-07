@@ -4,7 +4,10 @@ First-party Python and Node.js SDKs for Coda and Mist v3 streaming speech.
 Both packages accept complete text or an async text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
-The default model is `coda`. Select `mistv3` to use Mist v3:
+Both packages support Prism speech-to-speech sessions through
+`client.realtime.connect`. Prism requires an explicit realtime endpoint.
+
+Coda is the default TTS model. Select `mistv3` to use Mist v3:
 `Rime(model="mistv3")` in Python or `new Rime({ model: "mistv3" })` in Node.js.
 The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
@@ -13,6 +16,12 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
+
+Use the package READMEs for installation and quick starts. Detailed guides cover
+[Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),
+[Node.js TTS](typescript/docs/tts.md), and [Node.js Realtime](typescript/docs/realtime.md).
+Runnable scripts are in the
+[example index](examples/README.md).
 
 ## Local setup
 
@@ -45,4 +54,5 @@ See [RELEASING.md](RELEASING.md) for setup, release steps, and recovery.
 ## License
 
 The SDK is licensed under the [MIT License](LICENSE).
+The Python and TypeScript Prism protocol modules use the [Apache 2.0 license](python/LICENSE-PRISM).
 Third-party components retain their own licenses.

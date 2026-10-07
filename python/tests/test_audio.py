@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rimelabs_sdk._audio import AudioFormat, Converter, _mulaw
+from rimelabs_sdk.tts._audio import AudioFormat, Converter, _mulaw
 
 FIXTURE = json.loads((Path(__file__).resolve().parents[2] / "conformance/mulaw.json").read_text())
 

@@ -1,7 +1,6 @@
-// From the repository root: node examples/typescript/stream.mjs
-// Build typescript/ first. Applications import from "@rimelabs/sdk".
+// From the repository root: npm --prefix examples/typescript run tts
 import { writeFile } from "node:fs/promises";
-import { Rime } from "../../typescript/dist/index.js";
+import { Rime } from "@rimelabs/sdk";
 
 async function* text() {
   yield "Hello. ";
@@ -13,7 +12,9 @@ const client = new Rime();
 try {
   const audio = client.tts.stream(text());
   await writeFile("speech.pcm", audio);
-  console.log(`Wrote mono 24 kHz signed 16-bit PCM; requestId=${audio.requestId}`);
+  console.log(
+    `Wrote mono 24 kHz signed 16-bit PCM; requestId=${audio.requestId}`,
+  );
 } finally {
   await client.close();
 }

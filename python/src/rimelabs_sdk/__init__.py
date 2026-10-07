@@ -1,4 +1,3 @@
-from ._audio import AudioFormat
 from ._client import Rime
 from ._errors import (
     RimeAudioFormatError,
@@ -12,7 +11,8 @@ from ._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
-from ._stream import AudioStream
+from .tts._audio import AudioFormat
+from .tts._stream import AudioStream
 
 __all__ = [
     "AudioFormat",

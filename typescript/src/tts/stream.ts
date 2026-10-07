@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { debuglog } from "node:util";
 const log = debuglog("rime-sdk");
 import { AudioFormat, Converter } from "./audio.js";
-import { policy, abortable } from "./policy.js";
+import { policy } from "./policy.js";
+import { abortable } from "../cancellation.js";
 import { ByteQueue } from "./queue.js";
 import { SentenceBuffer, ready } from "./sentences.js";
 import { SynthesisCall, type PreparedConnection } from "./transport.js";
@@ -12,7 +13,7 @@ import {
   RimeCancelledError,
   RimeTimeoutError,
   RimeStreamError,
-} from "./errors.js";
+} from "../errors.js";
 
 export interface StreamOwner {
   prepare(signal: AbortSignal): Promise<PreparedConnection>;

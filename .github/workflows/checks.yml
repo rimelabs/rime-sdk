@@ -32,7 +32,7 @@ jobs:
               case "$path" in
                 python/*|examples/python/*) python=true ;;
                 typescript/*|examples/typescript/*) typescript=true ;;
-                conformance/*|docs/*|.github/*|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true ;;
+                conformance/*|docs/*|.github/*|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
           fi
@@ -55,8 +55,8 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --dev
       - run: uv run python ../.github/scripts/check-release-versions.py
-      - run: uv run ruff check src tests
-      - run: uv run ruff format --check src tests
+      - run: uv run ruff check src tests ../examples/python
+      - run: uv run ruff format --check src tests ../examples/python
       - run: uv run mypy src
       - run: uv run pytest
       - run: uv build

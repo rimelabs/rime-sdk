@@ -4,7 +4,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import * as grpc from "@grpc/grpc-js";
 import { create } from "@bufbuild/protobuf";
 import * as schema from "@rimelabs/api";
-import { SynthesisCall, discover } from "../dist/transport.js";
+import { SynthesisCall, discover } from "../dist/tts/transport.js";
 import {
   RimeAudioFormatError,
   RimeAuthenticationError,

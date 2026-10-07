@@ -4,7 +4,7 @@ import math
 import re
 from dataclasses import dataclass, replace
 
-from ._errors import RimeInputError
+from .._errors import RimeInputError
 
 INHERIT = object()
 _CODA_HOSTNAME = "coda.api.rime.ai"

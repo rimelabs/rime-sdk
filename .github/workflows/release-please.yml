@@ -125,8 +125,8 @@ jobs:
           if config['prerelease']:
               assert Version(version).pre and Version(version).pre[0] == 'a'
           PY
-      - run: uv run ruff check src tests
-      - run: uv run ruff format --check src tests
+      - run: uv run ruff check src tests ../examples/python
+      - run: uv run ruff format --check src tests ../examples/python
       - run: uv run mypy src
       - run: uv run pytest
       - run: uv build

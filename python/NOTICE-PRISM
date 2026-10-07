@@ -1,0 +1,10 @@
+Prism protocol implementation
+
+The realtime session and LiveKit mapping use the reference implementations in
+rimelabs/sglang-omni at bc8a500249536f369d20bc094baa9169e5986758:
+  clients/prism_realtime/prism_realtime/client.py
+  clients/livekit_plugin/livekit/plugins/prism/realtime.py
+
+The reference files identify their license as Apache-2.0. See LICENSE-PRISM.
+This SDK replaces raw event dictionaries with typed values and adds admission,
+request lifetime, tool-round, audio conversion and resource-limit handling.

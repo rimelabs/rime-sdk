@@ -6,7 +6,7 @@ import grpc
 from google.protobuf.message_factory import GetMessageClass
 from rime_api import text_to_speech_pb2 as proto
 
-from ._errors import (
+from .._errors import (
     RimeAudioFormatError,
     RimeAuthenticationError,
     RimeCancelledError,

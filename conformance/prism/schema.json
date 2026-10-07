@@ -1,0 +1,106 @@
+[
+  {
+    "name": "known response cause",
+    "schema": "responseMetadata",
+    "value": { "prsm_cause": "user_text" },
+    "valid": true
+  },
+  {
+    "name": "future response cause",
+    "schema": "responseMetadata",
+    "value": { "prsm_cause": "future" },
+    "valid": true
+  },
+  {
+    "name": "nonstring response cause",
+    "schema": "responseMetadata",
+    "value": { "prsm_cause": 123 },
+    "valid": false
+  },
+  {
+    "name": "future response status",
+    "schema": "responseView/properties/status",
+    "value": "future",
+    "valid": true
+  },
+  {
+    "name": "nonstring response status",
+    "schema": "responseView/properties/status",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "future terminal status",
+    "schema": "responseDoneEvent/allOf/1/properties/response/allOf/1/properties/status",
+    "value": "future",
+    "valid": true
+  },
+  {
+    "name": "nonstring terminal status",
+    "schema": "responseDoneEvent/allOf/1/properties/response/allOf/1/properties/status",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "future error scope",
+    "schema": "errorInfo/properties/scope",
+    "value": "future",
+    "valid": true
+  },
+  {
+    "name": "nonstring error scope",
+    "schema": "errorInfo/properties/scope",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "known error owner",
+    "schema": "errorOwner",
+    "value": { "kind": "response", "response_id": "reply-1" },
+    "valid": true
+  },
+  {
+    "name": "known error owner missing identity",
+    "schema": "errorOwner",
+    "value": { "kind": "response" },
+    "valid": false
+  },
+  {
+    "name": "future error owner",
+    "schema": "errorOwner",
+    "value": { "kind": "future", "future_id": "future-1" },
+    "valid": true
+  },
+  {
+    "name": "nonstring error owner kind",
+    "schema": "errorOwner",
+    "value": { "kind": 123 },
+    "valid": false
+  },
+  {
+    "name": "known client cause",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
+        "metadata": { "prsm_cause": "user_text" },
+        "prsm_input_text": "hello"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "unknown client cause",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
+        "metadata": { "prsm_cause": "future" },
+        "prsm_input_text": "hello"
+      }
+    },
+    "valid": false
+  }
+]

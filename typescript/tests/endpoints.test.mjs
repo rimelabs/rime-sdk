@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import * as grpc from "@grpc/grpc-js";
 import { Rime, RimeInputError } from "../dist/index.js";
 import { authentication, Credentials } from "../dist/auth.js";
-import { transport } from "../dist/transport.js";
-import { policy } from "../dist/policy.js";
+import { transport } from "../dist/tts/transport.js";
+import { policy } from "../dist/tts/policy.js";
 import { FakeService } from "./service.mjs";
 
 for (const endpoint of [

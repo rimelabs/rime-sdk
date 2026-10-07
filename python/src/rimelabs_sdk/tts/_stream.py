@@ -9,15 +9,15 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Self
 
-from . import _transport
-from ._audio import AudioFormat, Converter
-from ._errors import (
+from .._errors import (
     RimeCancelledError,
     RimeError,
     RimeInputError,
     RimeStreamError,
     RimeTimeoutError,
 )
+from . import _transport
+from ._audio import AudioFormat, Converter
 from ._queue import ByteQueue
 from ._sentences import SentenceBuffer
 

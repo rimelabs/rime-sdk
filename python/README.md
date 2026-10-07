@@ -1,6 +1,7 @@
 # Rime SDK for Python
 
-Stream speech from a string or async text source with Rime.
+Use TTS to turn your text into speech, or Prism to run a conversation with text,
+audio, and tool calls. Both use the same `Rime` client and credentials.
 
 ## Install
 
@@ -11,13 +12,17 @@ uv add --prerelease=allow rimelabs-sdk
 export RIME_API_KEY="your-api-key"
 ```
 
-## Quick start
+An explicit `Rime(api_key="...")` overrides the environment. The SDK does not
+load `.env` files.
+
+## TTS quick start
 
 Save this as `speech.py` and run `uv run speech.py`:
 
 ```python
 import asyncio
 from rimelabs_sdk import Rime
+
 
 async def main():
     async with Rime() as client:
@@ -27,127 +32,71 @@ async def main():
                     output.write(chunk)
             print(audio.request_id)
 
+
 asyncio.run(main())
 ```
 
-Output is raw mono 24 kHz signed 16-bit little-endian PCM. Configure your player
-for this format; there is no WAV header.
+Output is raw mono 24 kHz signed little-endian PCM16, with no WAV header.
+The default model is Coda. Select Mist v3 with `Rime(model="mistv3")`.
 
-## Stream incoming text
+For streamed text, voices, audio formats, and cancellation, read the
+[TTS guide](https://github.com/rimelabs/rime-sdk/blob/main/python/docs/tts.md).
 
-Add this async text source before `main()` in the quick start:
+## Prism quick start
 
-```python
-async def text():
-    yield "Hello. "
-    yield "This text arrives in separate chunks."
-```
-
-Use `client.tts.stream(text())` in the same audio loop. The SDK handles sentence
-boundaries. Do not await `tts.stream()`; entering its async context or reading
-the first chunk starts work.
-
-## Configuration
-
-Select Mist v3 with `Rime(model="mistv3")`. Mist v1 and v2 are not supported.
-
-| Model | Standard endpoint | Default voice |
-| --- | --- | --- |
-| `coda` | `coda.api.rime.ai:443` | `clementine` |
-| `mistv3` | `mist.api.rime.ai:443` | `astra` |
-
-### Client options
-
-| `Rime(...)` option | Default | Meaning |
-| --- | --- | --- |
-| `api_key` | `RIME_API_KEY` | API key; an explicit value overrides the environment |
-| `model` | `"coda"` | Model for speech and discovery |
-| `endpoint` | Model's standard endpoint | Custom hostname and optional port for speech and discovery |
-| `timeout` | `None` | Positive seconds for an overall deadline; `None` disables it |
-
-Authentication uses bearer tokens over TLS. The SDK does not load `.env` files.
-
-Custom deployments use `Rime(model="coda", endpoint="host:8443")`. Omit the scheme
-and path. TLS is required; the default port is `443`. Model defaults still apply.
-
-### Synthesis options
-
-Pass these options to `client.tts.stream(text, ...)`:
-
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `voice` | Model's default voice | Voice name from `client.voices.list()` |
-| `language` | `"en"` | Language code |
-| `audio_format` | `AudioFormat.PCM_24000` | Output profile, imported from `rimelabs_sdk` |
-| `timeout` | Client setting | Seconds; pass `None` to disable the overall deadline |
-
-### Audio formats
-
-Both profiles return raw audio without a file header.
-
-| `AudioFormat` profile | Encoding | Sample rate | Channels |
-| --- | --- | --- | --- |
-| `PCM_24000` | Signed 16-bit little-endian PCM | 24 kHz | Mono |
-| `MULAW_8000` | G.711 mu-law | 8 kHz | Mono |
-
-Chunks contain complete sample frames, but their sizes vary. Inspect the read-only
-`audio.format.encoding`, `audio.format.sample_rate`, and `audio.format.channels`.
-
-### Timeouts
-
-An overall deadline includes pauses between reads. Disabling it leaves internal
-connection and progress limits active. Discovery allows at most 10 seconds;
-a shorter supplied timeout takes precedence.
-
-## Discover voices and languages
-
-List voices and languages inside `main()`:
+Prism needs a full WebSocket endpoint that accepts the Rime API key as a Bearer
+token. Set `PRISM_URL` to that endpoint. Set `PRISM_VOICE` if the deployment has
+no default voice.
 
 ```python
-async with Rime(model="mistv3") as client:
-    voices = await client.voices.list(language="en")
-    languages = await client.languages.list()
-    print(voices, languages)
+import asyncio
+import os
+from rimelabs_sdk import Rime
+from rimelabs_sdk.realtime import FaultEvent, ResponseEnded, RimeRealtimeError, TextDelta
+
+
+async def read_reply(session):
+    async for event in session.events:
+        payload = event.payload
+        if isinstance(payload, TextDelta):
+            print(payload.delta, end="", flush=True)
+        elif isinstance(payload, FaultEvent):
+            raise RimeRealtimeError(payload.error)
+        elif isinstance(payload, ResponseEnded):
+            if payload.status != "completed":
+                raise RuntimeError(f"Response {payload.status}: {payload.reason}")
+            print()
+            return
+    raise RuntimeError("Session closed before the response ended")
+
+
+async def main():
+    async with asyncio.timeout(60), Rime() as client:
+        async with client.realtime.connect(
+            endpoint=os.environ["PRISM_URL"],
+            voice=os.getenv("PRISM_VOICE"),
+        ) as session:
+            async with asyncio.TaskGroup() as tasks:
+                tasks.create_task(read_reply(session))
+                await session.send_text("Hello!")
+
+
+asyncio.run(main())
 ```
 
-Both return string lists and accept `timeout`. Omit `language` to disable filtering.
+This prints the text from one reply and discards its audio. Keep event consumption
+running alongside input tasks; each session supports one event consumer.
 
-## Errors and cancellation
+Connection options, audio input, tools, playback, and errors are in the
+[Realtime guide](https://github.com/rimelabs/rime-sdk/blob/main/python/docs/realtime.md).
+The client-level `model`, `endpoint`, and `timeout` options apply to TTS and
+discovery. Configure Prism through `realtime.connect(...)`.
 
-Replace the quick start's final `asyncio.run(main())` to report SDK errors and request IDs:
+## Examples and license
 
-```python
-from rimelabs_sdk import RimeError
+Run the [examples](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md)
+from a source checkout. They cover streamed TTS text, saved Prism audio, and a
+tool round.
 
-try:
-    asyncio.run(main())
-except RimeError as error:
-    print(f"Speech failed: {error}; request_id={error.request_id}")
-    raise
-```
-
-Each SDK error inherits from `RimeError`:
-
-| Error | Meaning |
-| --- | --- |
-| `RimeAuthenticationError` | Missing or rejected credentials |
-| `RimePermissionError` | Access denied |
-| `RimeInputError` | Invalid input or client use |
-| `RimeResourceLimitError` | Service resource limit reached |
-| `RimeUnavailableError` | Service unavailable |
-| `RimeTimeoutError` | Overall or internal deadline reached |
-| `RimeAudioFormatError` | Unsupported or unexpected audio format |
-| `RimeCancelledError` | Operation cancelled |
-| `RimeStreamError` | Other stream or transport failure |
-
-Partial audio can arrive before an error. Output is complete only after successful
-iteration. Synthesis is not retried automatically.
-
-Keep the stream's `async with` block to cancel unfinished work on exit.
-`await audio.cancel()` stops one operation; `await client.close()` stops all client
-work. Both are safe to repeat. A client belongs to one process and event loop.
-Python task cancellation remains `asyncio.CancelledError`.
-
-## License
-
-The SDK uses the [MIT License](LICENSE).
+The SDK uses the [MIT license](https://github.com/rimelabs/rime-sdk/blob/main/python/LICENSE).
+The Prism protocol module uses [Apache 2.0](https://github.com/rimelabs/rime-sdk/blob/main/python/LICENSE-PRISM).
