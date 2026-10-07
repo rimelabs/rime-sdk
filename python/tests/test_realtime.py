@@ -20,7 +20,7 @@ from rimelabs_sdk import (
     RimeTimeoutError,
 )
 from rimelabs_sdk import realtime as r
-from rimelabs_sdk.realtime import _client, _session
+from rimelabs_sdk.realtime import _client, _protocol, _session
 
 _CONTRACT = yaml.safe_load(
     (Path(__file__).parents[2] / "conformance/prism/speech_to_speech.asyncapi.yaml").read_text()
@@ -454,7 +454,7 @@ async def test_tools_wait_for_result_ack_and_parent_done(monkeypatch):
         peer.emit(
             "conversation.item.created",
             prsm_request_event_id=request["event_id"],
-            item={"id": "result"},
+            item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
         request = await peer.next("response.create")
@@ -497,7 +497,7 @@ async def test_continuation_retries_only_after_confirmed_not_ready(monkeypatch, 
         peer.emit(
             "conversation.item.created",
             prsm_request_event_id=request["event_id"],
-            item={"id": "result"},
+            item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
         peer.ended()
@@ -553,7 +553,7 @@ async def completed_tool_round(current, peer):
     peer.emit(
         "conversation.item.created",
         prsm_request_event_id=request["event_id"],
-        item={"id": "result"},
+        item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
     )
     await result
     peer.ended()
@@ -943,7 +943,7 @@ async def test_late_tool_result_is_recorded_and_reported_by_call_id(monkeypatch)
         peer.emit(
             "conversation.item.created",
             prsm_request_event_id=request["event_id"],
-            item={"id": "result"},
+            item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
         with pytest.raises(RimeInputError, match="superseded"):
@@ -979,7 +979,7 @@ async def test_cancelled_tool_result_still_updates_round_after_ack(monkeypatch):
         peer.emit(
             "conversation.item.created",
             prsm_request_event_id=request["event_id"],
-            item={"id": "result"},
+            item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         peer.ended()
         continuation = asyncio.create_task(current.continue_reply(parent))
@@ -1214,13 +1214,18 @@ async def test_abandoned_response_notice_is_once_and_does_not_report_playback(
         if accepted_before_cancel:
             # Dispatch acceptance synchronously, then cancel before the caller
             # receives the reference. This exercises the completion race.
-            current._dispatch(
-                {
-                    "type": "response.created",
-                    "prsm_request_event_id": request["event_id"],
-                    "response": {"id": "reply-1", "metadata": {}},
-                }
+            decoded = _protocol.decode(
+                json.dumps(
+                    {
+                        "type": "response.created",
+                        "prsm_request_event_id": request["event_id"],
+                        "response": {"id": "reply-1", "metadata": {}},
+                    }
+                ),
+                current.info.session_id,
             )
+            assert decoded is not None
+            current._dispatch(decoded)
             await asyncio.sleep(0)
         task.cancel()
         with pytest.raises(asyncio.CancelledError):

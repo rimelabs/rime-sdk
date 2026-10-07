@@ -1,0 +1,607 @@
+[
+  {
+    "name": "text delta",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "hello"
+    },
+    "expected_kind": "text.delta"
+  },
+  {
+    "name": "extra fields",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "hello",
+      "future": {
+        "x": null
+      }
+    },
+    "expected_kind": "text.delta"
+  },
+  {
+    "name": "unknown event ignores its fields",
+    "event": {
+      "type": "future.event",
+      "event_id": 123,
+      "unexpected": false
+    },
+    "expected_kind": "ignored"
+  },
+  {
+    "name": "unknown output item",
+    "event": {
+      "type": "response.output_item.added",
+      "item": {
+        "type": "future_item"
+      }
+    },
+    "expected_kind": "ignored"
+  },
+  {
+    "name": "speech response without metadata",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2"
+      }
+    },
+    "expected_kind": "response.started"
+  },
+  {
+    "name": "unknown cause",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prsm_cause": "future"
+        }
+      }
+    },
+    "expected_kind": "response.started"
+  },
+  {
+    "name": "unknown status",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "future"
+      }
+    },
+    "expected_kind": "response.ended"
+  },
+  {
+    "name": "unknown fault scope",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "example",
+        "message": "message",
+        "scope": "future",
+        "owner": {
+          "event_id": "request-1"
+        }
+      }
+    },
+    "expected_kind": "error"
+  },
+  {
+    "name": "tool result acknowledgment without item ID",
+    "event": {
+      "type": "conversation.item.created",
+      "item": {
+        "type": "function_call_output",
+        "call_id": "call-1"
+      }
+    },
+    "expected_kind": "tool.result.created"
+  },
+  {
+    "name": "nested tool arguments",
+    "event": {
+      "type": "response.function_call_arguments.done",
+      "response_id": "reply-1",
+      "item_id": "tool-1",
+      "call_id": "call-1",
+      "name": "lookup",
+      "arguments": "{\"n\":[null,true,1,\"text\",{\"value\":2.5}]}"
+    },
+    "expected_kind": "tool.call"
+  },
+  {
+    "name": "omitted tool waits on session creation",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1"
+      }
+    },
+    "expected_kind": "session.created"
+  },
+  {
+    "name": "omitted tool waits on session update",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1"
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "null server tool deadlines on session creation",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": null,
+          "continuation_timeout_s": null
+        }
+      }
+    },
+    "expected_kind": "session.created"
+  },
+  {
+    "name": "null server tool deadlines",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": null,
+          "continuation_timeout_s": null
+        }
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "root array",
+    "event": [],
+    "invalid": true
+  },
+  {
+    "name": "nonstring type",
+    "event": {
+      "type": 123
+    },
+    "invalid": true
+  },
+  {
+    "name": "numeric text delta",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": 123
+    },
+    "invalid": true
+  },
+  {
+    "name": "missing text delta",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0
+    },
+    "invalid": true
+  },
+  {
+    "name": "null transcript",
+    "event": {
+      "type": "conversation.item.input_audio_transcription.completed",
+      "item_id": "speech",
+      "transcript": null
+    },
+    "invalid": true
+  },
+  {
+    "name": "numeric response ID",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": 123
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "blank response ID",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": ""
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "numeric item ID",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": 123,
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "hello"
+    },
+    "invalid": true
+  },
+  {
+    "name": "string output index",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": "0",
+      "content_index": 0,
+      "delta": "hello"
+    },
+    "invalid": true
+  },
+  {
+    "name": "boolean content index",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": false,
+      "delta": "hello"
+    },
+    "invalid": true
+  },
+  {
+    "name": "negative speech time",
+    "event": {
+      "type": "input_audio_buffer.speech_started",
+      "item_id": "speech",
+      "audio_start_ms": -1
+    },
+    "invalid": true
+  },
+  {
+    "name": "boolean speech time",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": true
+    },
+    "invalid": true
+  },
+  {
+    "name": "metadata array",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": []
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring cause",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prsm_cause": false
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "numeric parent ID",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prsm_parent_response_id": 123
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring status",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": 123
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid terminal reason",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "status_details": {
+          "reason": []
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid drain token",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "metadata": {
+          "prsm_drain_token": 123
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring voice",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "voice": false
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonboolean interruption setting",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_effective_interrupt_response": 1
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "null tool waits on session creation",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "null tool waits on session update",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "string tool deadline",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": "10"
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "zero tool deadline",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prsm_tool_waits": {
+          "result_timeout_s": 0
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid item acknowledgment",
+    "event": {
+      "type": "conversation.item.created",
+      "item": {
+        "id": false
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "missing tool acknowledgment identity",
+    "event": {
+      "type": "conversation.item.created",
+      "item": {
+        "type": "function_call_output"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring tool name",
+    "event": {
+      "type": "response.function_call_arguments.done",
+      "response_id": "reply-1",
+      "item_id": "tool-1",
+      "call_id": "call-1",
+      "name": false,
+      "arguments": "{}"
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring call ID",
+    "event": {
+      "type": "response.function_call_arguments.done",
+      "response_id": "reply-1",
+      "item_id": "tool-1",
+      "call_id": [],
+      "name": "lookup",
+      "arguments": "{}"
+    },
+    "invalid": true
+  },
+  {
+    "name": "array tool arguments",
+    "event": {
+      "type": "response.function_call_arguments.done",
+      "response_id": "reply-1",
+      "item_id": "tool-1",
+      "call_id": "call-1",
+      "name": "lookup",
+      "arguments": "[]"
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonfinite tool argument",
+    "event": {
+      "type": "response.function_call_arguments.done",
+      "response_id": "reply-1",
+      "item_id": "tool-1",
+      "call_id": "call-1",
+      "name": "lookup",
+      "arguments": "{\"number\":1e999}"
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid fault owner",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "example",
+        "message": "message",
+        "scope": "event",
+        "owner": []
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid fault request identity",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "example",
+        "message": "message",
+        "scope": "event",
+        "owner": {
+          "event_id": {}
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid fault call IDs",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "example",
+        "message": "message",
+        "scope": "event",
+        "owner": {
+          "call_ids": [
+            1
+          ]
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring event ID",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "hello",
+      "event_id": 123
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring request echo",
+    "event": {
+      "type": "response.text.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "hello",
+      "prsm_request_event_id": {}
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid audio base64",
+    "event": {
+      "type": "response.audio.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "???"
+    },
+    "invalid": true
+  },
+  {
+    "name": "incomplete audio frame",
+    "event": {
+      "type": "response.audio.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "AA=="
+    },
+    "invalid": true
+  },
+  {
+    "name": "excess base64 padding",
+    "event": {
+      "type": "response.audio.delta",
+      "response_id": "reply-1",
+      "item_id": "message-1",
+      "output_index": 0,
+      "content_index": 0,
+      "delta": "AAAA===="
+    },
+    "invalid": true
+  }
+]

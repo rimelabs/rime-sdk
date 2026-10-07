@@ -116,7 +116,7 @@ async def test_tool_example_waits_for_all_results_before_continuing(prism_peer, 
             peer.emit(
                 "conversation.item.created",
                 prsm_request_event_id=result["event_id"],
-                item={"id": f"result-{index}"},
+                item={"type": "function_call_output", "call_id": result["item"]["call_id"]},
             )
         if call_count:
             continuation = await peer.next("response.create")

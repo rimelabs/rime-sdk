@@ -104,6 +104,11 @@ export class Credentials {
     private key: string,
     private readonly configuration: Readonly<AuthenticationConfiguration>,
   ) {}
+  realtimeAuthorization(): string {
+    if (this.closed)
+      throw new RimeAuthenticationError("Credentials are closed");
+    return `Bearer ${this.key}`;
+  }
   async metadata(signal: AbortSignal): Promise<string> {
     // TEMPORARY until Themis is ready: replace this body with the call below.
     // return this.themisMetadata(signal);

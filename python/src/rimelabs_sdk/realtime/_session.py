@@ -16,7 +16,7 @@ import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar
 
 from websockets.exceptions import ConnectionClosed
 
@@ -28,7 +28,10 @@ from .._errors import (
     RimeStreamError,
     RimeTimeoutError,
 )
+from . import _protocol as p
 from . import _types as t
+
+_ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
 _NOT_READY = {"typed_turn_busy", "instructions_busy", "proactive_unavailable"}
 _LIMIT = 128
@@ -49,8 +52,8 @@ class _Response:
 
 @dataclass
 class _Pending:
-    kind: str
-    future: asyncio.Future[Any]
+    request: p.Request[p.Acknowledgment]
+    future: asyncio.Future[p.Acknowledgment]
     target: str | None = None
     item_id: str | None = None
 
@@ -69,7 +72,7 @@ class RealtimeSession:
         self._socket = socket
         self._timeouts = timeouts
         self._info: t.SessionInfo | None = None
-        self._created: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
+        self._created: asyncio.Future[p.SessionView] = asyncio.get_running_loop().create_future()
         self._queue: asyncio.Queue[t.SessionEvent | None] = asyncio.Queue(256)
         self._failure: RimeError | None = None
         self._closed = False
@@ -120,25 +123,22 @@ class RealtimeSession:
         finally:
             self._consuming = False
 
-    async def _initialize(self, settings: dict[str, Any]) -> None:
+    async def _initialize(self, settings: p.SessionSettings) -> None:
         try:
             created = await asyncio.wait_for(
                 asyncio.shield(self._created), self._timeouts.connect_s
             )
-            session = await self._request("session.update", {"session": settings})
-            view = session["session"]
+            session = await self._request(p.UPDATE, {"session": settings})
+            view = session.session
             self._info = t.SessionInfo(
-                session_id=created["id"],
+                session_id=created.id,
                 model="prism",
-                voice=view.get("voice", ""),
-                interrupt_on_speech=view.get(
-                    "prsm_effective_interrupt_response",
-                    settings["turn_detection"]["interrupt_response"],
-                ),
-                tool_result_timeout_s=(view.get("prsm_tool_waits") or {}).get("result_timeout_s"),
-                tool_continuation_timeout_s=(view.get("prsm_tool_waits") or {}).get(
-                    "continuation_timeout_s"
-                ),
+                voice=view.voice,
+                interrupt_on_speech=view.interrupt_on_speech
+                if view.interrupt_on_speech is not None
+                else settings["turn_detection"]["interrupt_response"],
+                tool_result_timeout_s=view.tool_result_timeout_s,
+                tool_continuation_timeout_s=view.tool_continuation_timeout_s,
             )
         except TimeoutError:
             raise RimeTimeoutError("No session.created event arrived") from None
@@ -164,7 +164,7 @@ class RealtimeSession:
 
     async def _send(
         self,
-        event: dict[str, Any],
+        event: dict[str, object],
         abandoned: asyncio.Event | None = None,
         *,
         submitted: asyncio.Event | None = None,
@@ -191,12 +191,13 @@ class RealtimeSession:
 
     async def _request(
         self,
-        kind: str,
-        body: dict[str, Any],
+        request: p.Request[_ResultT],
+        body: dict[str, object],
         target: str | None = None,
         *,
         continuation: _Response | None = None,
-    ) -> Any:
+    ) -> _ResultT:
+        kind = request.kind
         self._check()
         if len(self._tasks) >= _LIMIT:
             raise RimeResourceLimitError("Too many pending realtime operations")
@@ -209,13 +210,13 @@ class RealtimeSession:
                 self._ready.clear()
         abandoned = asyncio.Event()
         task = asyncio.create_task(
-            self._run_request(kind, body, target, abandoned, self._ready_epoch, continuation)
+            self._run_request(request, body, target, abandoned, self._ready_epoch, continuation)
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
         try:
-            return await asyncio.shield(task)
+            return request.result(await asyncio.shield(task))
         except asyncio.CancelledError:
             abandoned.set()
             if kind != "response.create":
@@ -233,7 +234,9 @@ class RealtimeSession:
                 and task.exception() is None
                 and kind == "response.create"
             ):
-                self._abandon_response(task.result())
+                accepted = task.result()
+                if isinstance(accepted, t.ResponseStarted):
+                    self._abandon_response(accepted.response)
             raise
 
     def _abandon_response(self, response: t.ResponseRef) -> None:
@@ -252,16 +255,17 @@ class RealtimeSession:
 
     async def _run_request(
         self,
-        kind: str,
-        body: dict[str, Any],
+        request: p.Request[p.Acknowledgment],
+        body: dict[str, object],
         target: str | None,
         abandoned: asyncio.Event,
         ready_epoch: int,
         continuation: _Response | None,
-    ) -> Any:
+    ) -> p.Acknowledgment:
+        kind = request.kind
         event_id = "evt_" + uuid.uuid4().hex
-        future = asyncio.get_running_loop().create_future()
-        self._pending[event_id] = _Pending(kind, future, target)
+        future: asyncio.Future[p.Acknowledgment] = asyncio.get_running_loop().create_future()
+        self._pending[event_id] = _Pending(request, future, target)
         submitted = asyncio.Event()
         try:
             async with asyncio.timeout(self._timeouts.request_s):
@@ -269,8 +273,8 @@ class RealtimeSession:
                     {"type": kind, "event_id": event_id, **body}, abandoned, submitted=submitted
                 )
                 result = await future
-            if abandoned.is_set() and kind == "response.create":
-                self._abandon_response(result)
+            if abandoned.is_set() and isinstance(result, t.ResponseStarted):
+                self._abandon_response(result.response)
             return result
         except TimeoutError:
             error = RimeTimeoutError(
@@ -295,7 +299,9 @@ class RealtimeSession:
         if not isinstance(value, str) or not value.strip() or len(value) > 4000:
             raise RimeInputError("Text must be nonblank and at most 4000 characters")
 
-    async def _create(self, body: dict[str, Any]) -> t.ResponseRef:
+    async def _create(
+        self, body: dict[str, object], request: p.Request[t.ResponseStarted] = p.CREATE
+    ) -> t.ResponseRef:
         deadline = self._loop.time() + self._timeouts.ready_s
         try:
             async with asyncio.timeout_at(deadline):
@@ -316,7 +322,7 @@ class RealtimeSession:
                 try:
                     # Once submitted, request_s governs the acknowledgment. An
                     # admission timeout must never hide an unknown wire outcome.
-                    return await self._request("response.create", {"response": body})
+                    return (await self._request(request, {"response": body})).response
                 except t.RimeRealtimeError as error:
                     if error.fault.scope != "event" or error.fault.code not in _NOT_READY:
                         raise
@@ -327,13 +333,13 @@ class RealtimeSession:
         """Start a typed user turn. Wait for readiness and return at response creation."""
         self._text(text)
         return await self._create(
-            {"prsm_input_text": text, "metadata": {"prsm_cause": "user_text"}}
+            {"prsm_input_text": text, "metadata": {"prsm_cause": "user_text"}}, p.TEXT
         )
 
     async def request_reply(
         self, *, instruction: str | None = None, tool_call: t.ToolCallRef | None = None
     ) -> t.ResponseRef:
-        body: dict[str, Any] = {"metadata": {"prsm_cause": "proactive"}}
+        body: dict[str, object] = {"metadata": {"prsm_cause": "proactive"}}
         if instruction is not None:
             self._text(instruction)
             body["prsm_instruction"] = instruction
@@ -349,9 +355,9 @@ class RealtimeSession:
             raise RimeInputError("History role must be user or assistant")
         self._text(text)
         event = await self._request(
-            "conversation.item.create", {"item": {"type": "message", "role": role, "text": text}}
+            p.ITEM, {"item": {"type": "message", "role": role, "text": text}}
         )
-        return t.ItemRef(session_id=self.info.session_id, item_id=event["item"]["id"])
+        return t.ItemRef(session_id=self.info.session_id, item_id=event.item_id)
 
     async def submit_tool_result(self, call: t.ToolCallRef, output: str) -> None:
         self._response(call)
@@ -375,7 +381,7 @@ class RealtimeSession:
                     raise RimeInputError("A recorded tool result cannot change")
                 return
             await self._request(
-                "conversation.item.create",
+                p.TOOL_RESULT,
                 {
                     "item": {
                         "type": "function_call_output",
@@ -383,6 +389,7 @@ class RealtimeSession:
                         "output": output,
                     }
                 },
+                call.call_id,
             )
             response.calls[call.call_id] = digest
             response.changed.set()
@@ -410,18 +417,20 @@ class RealtimeSession:
                 "Tool results or parent completion did not arrive before ready_s expired"
             ) from None
         try:
-            return await self._request(
-                "response.create",
-                {
-                    "response": {
-                        "metadata": {
-                            "prsm_cause": "tool_continuation",
-                            "prsm_parent_response_id": parent.response_id,
+            return (
+                await self._request(
+                    p.CREATE,
+                    {
+                        "response": {
+                            "metadata": {
+                                "prsm_cause": "tool_continuation",
+                                "prsm_parent_response_id": parent.response_id,
+                            }
                         }
-                    }
-                },
-                continuation=response,
-            )
+                    },
+                    continuation=response,
+                )
+            ).response
         except t.RimeRealtimeError as error:
             if error.fault.scope == "event" and error.fault.code == "tool_continuation_not_ready":
                 # Only a correlated, zero-effect refusal permits another
@@ -440,12 +449,12 @@ class RealtimeSession:
         async with state.cancel_lock:
             if not state.done.is_set():
                 await self._request(
-                    "response.cancel", {"response_id": response.response_id}, response.response_id
+                    p.CANCEL, {"response_id": response.response_id}, response.response_id
                 )
 
     async def clear_audio(self) -> None:
         async with self._audio_lock, self._clear_lock:
-            await self._request("input_audio_buffer.clear", {})
+            await self._request(p.CLEAR, {})
 
     async def send_audio(self, chunk: t.AudioChunk) -> None:
         """Send one bounded chunk with transport backpressure.
@@ -497,7 +506,7 @@ class RealtimeSession:
                 raise RimeInputError("Unknown output reference")
             async with self._truncate_lock:
                 await self._request(
-                    "conversation.item.truncate",
+                    p.TRUNCATE,
                     {
                         "item_id": report.output.item_id,
                         "content_index": report.output.content_index,
@@ -525,13 +534,17 @@ class RealtimeSession:
                     }
                 )
 
-    def _settle(self, key: str | None, result: Any = None, error: Exception | None = None) -> None:
+    def _settle(self, key: str | None, result: p.Acknowledgment) -> None:
+        pending = self._pending.get(key or "")
+        if pending is not None:
+            pending.request.result(result)
+            if not pending.future.done():
+                pending.future.set_result(result)
+
+    def _reject(self, key: str | None, error: RimeError) -> None:
         pending = self._pending.get(key or "")
         if pending is not None and not pending.future.done():
-            if error is not None:
-                pending.future.set_exception(error)
-            else:
-                pending.future.set_result(result)
+            pending.future.set_exception(error)
 
     def _fail(self, error: RimeError) -> None:
         if self._closed:
@@ -555,7 +568,9 @@ class RealtimeSession:
     async def _read(self) -> None:
         try:
             async for raw in self._socket:
-                self._dispatch(json.loads(raw))
+                event = p.decode(raw, self._created.result().id if self._created.done() else None)
+                if event is not None:
+                    self._dispatch(event)
             if not self._closed:
                 self._fail(
                     RimeStreamError("Realtime connection closed; reconnect is not automatic")
@@ -571,86 +586,64 @@ class RealtimeSession:
         finally:
             await self._socket.close()
 
-    def _fault(self, error: dict[str, Any]) -> t.RealtimeFault:
-        owner = error.get("owner") or {}
-        return t.RealtimeFault(
-            code=error.get("code", "unknown"),
-            message=error.get("message", ""),
-            scope=error["scope"]
-            if error.get("scope") in ("event", "utterance", "response", "tool_roundtrip", "session")
-            else "unknown",
-            request_id=owner.get("event_id"),
-            response_id=owner.get("response_id"),
-            item_id=owner.get("item_id"),
-            call_ids=tuple(owner.get("call_ids") or ()),
-            correlation_id=error.get("correlation_id"),
-            parameter=error.get("param"),
-        )
-
-    def _dispatch(self, event: dict[str, Any]) -> None:
-        kind = event["type"]
-        echo = event.get("prsm_request_event_id")
-        payload: Any = None
-        if kind == "session.created":
-            if not self._created.done():
-                self._created.set_result(event["session"])
-        elif kind == "session.updated":
-            self._settle(echo, event)
-        elif kind == "conversation.item.created":
+    def _dispatch(self, event: p.ServerEvent) -> None:
+        payload, echo = event.payload, event.request_id
+        # Reject mismatched echoed acknowledgments before changing session state.
+        if isinstance(
+            payload, (p.SessionUpdated, p.ItemCreated, p.ToolResultCreated, t.ResponseStarted)
+        ):
             pending = self._pending.get(echo or "")
-            if pending and pending.kind == "response.create":
-                pending.item_id = event["item"]["id"]
+            if pending and not (
+                isinstance(payload, p.ItemCreated) and pending.request.allows_item_created
+            ):
+                pending.request.result(payload)
+            if (
+                pending
+                and isinstance(payload, p.ToolResultCreated)
+                and pending.target != payload.call_id
+            ):
+                raise RimeStreamError("Tool result acknowledgment names another call")
+        if isinstance(payload, p.SessionCreated):
+            if not self._created.done():
+                self._created.set_result(payload.session)
+            return
+        if isinstance(payload, (p.SessionUpdated, p.ToolResultCreated)):
+            self._settle(echo, payload)
+            return
+        if isinstance(payload, p.ItemCreated):
+            pending = self._pending.get(echo or "")
+            if pending and pending.request.allows_item_created:
+                pending.item_id = payload.item_id
             else:
-                self._settle(echo, event)
-        elif kind == "input_audio_buffer.cleared":
-            for key, p in self._pending.items():
-                if p.kind == "input_audio_buffer.clear":
-                    # A cancelled caller still needs the acknowledged reset.
+                self._settle(echo, payload)
+            return
+        if isinstance(payload, p.AudioCleared):
+            for key, pending in self._pending.items():
+                if pending.request.kind == "input_audio_buffer.clear":
                     self._resample_state = None
-                    self._settle(key, event)
+                    self._settle(key, payload)
                     break
-        elif kind == "conversation.item.truncated":
-            for key, p in self._pending.items():
+            return
+        if isinstance(payload, p.ItemTruncated):
+            for key, pending in self._pending.items():
                 if (
-                    p.kind == "conversation.item.truncate"
-                    and p.target == event["item_id"]
-                    and event["content_index"] == 0
+                    pending.request.kind == "conversation.item.truncate"
+                    and pending.target == payload.item_id
+                    and payload.content_index == 0
                 ):
-                    self._settle(key, event)
-        elif kind == "prsm.typed_input.ready":
+                    self._settle(key, payload)
+            return
+        if isinstance(payload, t.InputReady):
             self._ready_epoch += 1
             self._ready.set()
-            payload = t.InputReady()
-        elif kind == "input_audio_buffer.speech_started":
+        elif isinstance(payload, t.SpeechStarted):
             self._ready_epoch += 1
             self._ready.clear()
             for state in self._responses.values():
                 state.changed.set()
             self._latest = None
-            payload = t.SpeechStarted(
-                item_id=event["item_id"], audio_start_ms=event["audio_start_ms"]
-            )
-        elif kind == "input_audio_buffer.speech_stopped":
-            payload = t.SpeechStopped(item_id=event["item_id"], audio_end_ms=event["audio_end_ms"])
-        elif kind == "input_audio_buffer.committed":
-            payload = t.InputCommitted(item_id=event["item_id"])
-        elif kind == "conversation.item.input_audio_transcription.delta":
-            payload = t.TranscriptDelta(item_id=event["item_id"], delta=event["delta"])
-        elif kind == "conversation.item.input_audio_transcription.completed":
-            payload = t.TranscriptFinal(item_id=event["item_id"], text=event["transcript"])
-        elif kind == "conversation.item.input_audio_transcription.failed":
-            payload = t.TranscriptFailed(
-                item_id=event["item_id"],
-                error=t.RealtimeFault(
-                    code=event["error"]["code"],
-                    message=event["error"]["message"],
-                    scope="utterance",
-                    item_id=event["item_id"],
-                ),
-            )
-        elif kind == "response.created":
-            resp = event["response"]
-            ref = t.ResponseRef(session_id=self._session_id(), response_id=resp["id"])
+        elif isinstance(payload, t.ResponseStarted):
+            ref = payload.response
             if ref.response_id in self._responses:
                 raise RimeStreamError("Duplicate response.created")
             self._responses[ref.response_id] = _Response(ref)
@@ -664,122 +657,58 @@ class RealtimeSession:
                     raise RimeResourceLimitError("Too many retained active responses")
                 self._responses.popitem(last=False)
             self._ready.clear()
-            meta = resp.get("metadata") or {}
-            parent = meta.get("prsm_parent_response_id")
-            payload = t.ResponseStarted(
-                response=ref,
-                cause=cast(
-                    Literal["speech", "text", "proactive", "tools", "unknown"],
-                    {
-                        "user_text": "text",
-                        "tool_continuation": "tools",
-                        "proactive": "proactive",
-                    }.get(meta["prsm_cause"], "unknown")
-                    if "prsm_cause" in meta
-                    else "speech",
-                ),
-                parent=t.ResponseRef(session_id=ref.session_id, response_id=parent)
-                if parent
-                else None,
-                input_item_id=meta.get("prsm_input_item_id"),
-            )
-            self._settle(echo, ref)
-        elif kind == "response.done":
-            resp = event["response"]
-            state = self._responses[resp["id"]]
+            self._settle(echo, payload)
+        elif isinstance(payload, p.ResponseEnded):
+            state = self._responses[payload.response.response_id]
             if state.done.is_set():
                 return
-            state.token = (resp.get("metadata") or {}).get("prsm_drain_token")
+            state.token = payload.drain_token
             state.done.set()
             state.changed.set()
-            for key, p in self._pending.items():
-                if p.kind == "response.cancel" and p.target == resp["id"]:
-                    self._settle(key)
-            details = resp.get("status_details") or {}
-            payload = t.ResponseEnded(
-                response=state.ref,
-                status=resp["status"]
-                if resp["status"] in ("completed", "cancelled", "failed")
-                else "unknown",
-                reason=details.get("reason"),
+            for key, pending in self._pending.items():
+                if (
+                    pending.request.kind == "response.cancel"
+                    and pending.target == state.ref.response_id
+                ):
+                    self._settle(key, payload)
+            self._publish(
+                t.ResponseEnded(response=state.ref, status=payload.status, reason=payload.reason),
+                event_id=event.event_id,
+                request_id=echo,
             )
-        elif kind == "response.function_call_arguments.done":
-            state = self._responses[event["response_id"]]
-            call_id = event["call_id"]
+            return
+        elif isinstance(payload, t.ToolCall):
+            state = self._responses[payload.call.response_id]
+            call_id = payload.call.call_id
             if call_id in state.calls:
                 return
             if any(call_id in other.calls for other in self._responses.values()):
                 raise RimeStreamError("Tool call ID reused by another response")
             if len(state.calls) >= 128:
                 raise RimeResourceLimitError("Too many tool calls in one response")
-            args = json.loads(event["arguments"])
-            if not isinstance(args, dict):
-                raise RimeStreamError("Tool arguments must be a JSON object")
             state.calls[call_id] = None
-            payload = t.ToolCall(
-                call=t.ToolCallRef(
-                    session_id=self._session_id(),
-                    response_id=state.ref.response_id,
-                    call_id=call_id,
-                ),
-                item_id=event["item_id"],
-                name=event["name"],
-                arguments=args,
-            )
-        elif kind in (
-            "response.output_item.added",
-            "response.text.delta",
-            "response.text.done",
-            "response.audio.delta",
-            "response.audio.done",
-        ):
-            state = self._responses[event["response_id"]]
-            item = event.get("item") or {}
-            if kind == "response.output_item.added" and item.get("type") != "message":
-                return
-            output = t.OutputRef(
-                response=state.ref,
-                item_id=item.get("id") or event["item_id"],
-                output_index=event["output_index"],
-                content_index=event.get("content_index", 0),
-            )
-            if output.content_index != 0:
-                raise RimeStreamError("Unsupported Prism contract: content_index must be zero")
-            if kind == "response.output_item.added":
-                if len(state.outputs) >= 128:
-                    raise RimeResourceLimitError("Too many messages in one response")
-                state.outputs.add(output)
-                payload = t.MessageStarted(output=output)
-            elif kind == "response.text.delta":
-                payload = t.TextDelta(output=output, delta=event["delta"])
-            elif kind == "response.text.done":
-                payload = t.TextDone(output=output, text=event["text"])
-            elif kind == "response.audio.delta":
-                payload = t.AudioDelta(
-                    output=output,
-                    audio=t.AudioChunk(
-                        data=base64.b64decode(event["delta"], validate=True),
-                        format=t.PCMFormat(sample_rate=24000),
-                    ),
-                )
-            else:
-                payload = t.AudioDone(output=output)
-        elif kind == "error":
-            fault = self._fault(event["error"])
+        elif isinstance(payload, t.MessageStarted):
+            state = self._responses[payload.output.response.response_id]
+            if len(state.outputs) >= 128:
+                raise RimeResourceLimitError("Too many messages in one response")
+            state.outputs.add(payload.output)
+        elif isinstance(payload, (t.TextDelta, t.TextDone, t.AudioDelta, t.AudioDone)):
+            if payload.output.response.response_id not in self._responses:
+                raise RimeStreamError("Event refers to an unknown response")
+        elif isinstance(payload, t.FaultEvent):
+            fault = payload.error
             error = t.RimeRealtimeError(fault)
             if fault.code in _NOT_READY:
                 self._ready.clear()
-            self._settle(fault.request_id, error=error)
+            self._reject(fault.request_id, error)
             if fault.code == "typed_turn_superseded":
-                for key, p in self._pending.items():
-                    if p.item_id == fault.item_id and fault.item_id:
-                        self._settle(key, error=error)
+                for key, pending in self._pending.items():
+                    if pending.item_id == fault.item_id and fault.item_id:
+                        self._reject(key, error)
             if fault.scope == "session":
                 self._fail(error)
                 return
-            payload = t.FaultEvent(error=fault)
-        if payload is not None:
-            self._publish(payload, event_id=event.get("event_id", ""), request_id=echo)
+        self._publish(payload, event_id=event.event_id, request_id=echo)
 
     def _publish(
         self,
@@ -803,7 +732,7 @@ class RealtimeSession:
             raise error from None
 
     def _session_id(self) -> str:
-        return self._created.result()["id"]
+        return self._created.result().id
 
     async def close(self) -> None:
         if self._close_task is None:

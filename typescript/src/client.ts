@@ -8,6 +8,9 @@ import {
 } from "./tts/client.js";
 import { resolve, timeout } from "./tts/policy.js";
 import { type AudioStream, type TextSource } from "./tts/stream.js";
+import { Realtime } from "./realtime/client.js";
+import type { RealtimeConnectOptions } from "./realtime/types.js";
+import type { RealtimeSession } from "./realtime/session.js";
 
 export type {
   SynthesisOptions,
@@ -26,6 +29,10 @@ export interface RimeOptions {
 export class Rime {
   private readonly credentials: Credentials;
   private readonly ttsClient: TTS;
+  private readonly realtimeClient: Realtime;
+  readonly realtime: {
+    connect: (options: RealtimeConnectOptions) => Promise<RealtimeSession>;
+  };
   private closed = false;
   private closing: Promise<void> | null = null;
   readonly tts: {
@@ -46,6 +53,12 @@ export class Rime {
     const defaultTimeout = timeout(options.timeout);
     const deployment = resolve(options.model ?? "coda", options.endpoint);
     this.credentials = new Credentials(key, deployment);
+    this.realtimeClient = new Realtime(this.credentials, () =>
+      this.checkOpen(),
+    );
+    this.realtime = {
+      connect: (options) => this.realtimeClient.connect(options),
+    };
     this.ttsClient = new TTS(this.credentials, deployment, defaultTimeout, () =>
       this.checkOpen(),
     );
@@ -64,7 +77,10 @@ export class Rime {
     if (!this.closing) {
       this.closed = true;
       this.closing = (async () => {
-        await this.ttsClient.close();
+        await Promise.all([
+          this.ttsClient.close(),
+          this.realtimeClient.close(),
+        ]);
         await this.credentials.close();
       })();
     }

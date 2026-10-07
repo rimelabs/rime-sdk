@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
 from websockets.asyncio.client import connect
@@ -18,6 +19,7 @@ from .._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
+from ._protocol import SessionSettings
 from ._session import RealtimeSession
 from ._types import RealtimeTimeouts, ToolDefinition
 
@@ -72,7 +74,7 @@ class Realtime:
             raise RimeInputError("Use wss:// outside localhost to protect credentials")
         if model != "prism":
             raise RimeInputError("The realtime model must be prism")
-        settings: dict[str, Any] = {
+        settings: SessionSettings = {
             "modalities": ["text", "audio"],
             "input_audio_format": "pcm16",
             "turn_detection": {"interrupt_response": interrupt_on_speech},
@@ -92,14 +94,18 @@ class Realtime:
             if value is not None:
                 if not isinstance(value, str) or not value.strip():
                     raise RimeInputError(f"{name} must be nonblank")
-                settings[name] = value
+                if name == "voice":
+                    settings["voice"] = value
+                else:
+                    settings["instructions"] = value
         if any(not tool.name.strip() for tool in tools) or len(
             {tool.name for tool in tools}
         ) != len(tools):
             raise RimeInputError("Tool names must be nonblank and unique")
         try:
             # Copy mutable schemas before an await, so callers cannot change initialization.
-            settings = json.loads(json.dumps(settings, allow_nan=False))
+            settings = copy.deepcopy(settings)
+            json.dumps(settings, allow_nan=False)
         except (ValueError, TypeError):
             raise RimeInputError("Tool schemas must contain finite JSON values") from None
 

@@ -9,6 +9,8 @@ and local package builds. Run the commands below from the repository root.
 | [Node.js TTS](typescript/tts/stream.mjs) | Runs the same flow with an async text generator. |
 | [Python Prism: typed turn](python/realtime/typed_turn.py) | Sends one user turn, prints text, and saves `reply.pcm`. |
 | [Python Prism: tools](python/realtime/tools.py) | Handles a tool call with local fixture data, submits its result, and continues the reply. |
+| [Node.js Prism: typed turn](typescript/realtime/typed-turn.mjs) | Sends one user turn, prints text, and saves `reply.pcm`. |
+| [Node.js Prism: tools](typescript/realtime/tools.mjs) | Handles tools with the same local order data as the Python example. |
 
 ## Python
 
@@ -47,10 +49,18 @@ export RIME_API_KEY="your-api-key"
 npm --prefix examples/typescript run tts
 ```
 
-Realtime / Prism is currently Python-only.
+Prism uses the same endpoint and voice variables as the Python examples:
 
-The Node.js script writes `examples/typescript/speech.pcm`. Python scripts write
-their output in the directory where you run them.
+```sh
+export PRISM_URL="wss://your-prism-host/v1/realtime"
+export PRISM_VOICE="your-deployment-voice"
+npm --prefix examples/typescript run prism
+npm --prefix examples/typescript run prism:tools
+```
+
+All Prism scripts use a 60-second application deadline. The Node.js scripts write
+`speech.pcm` or `reply.pcm` in `examples/typescript/` when run through npm. Python
+scripts write their output in the directory where you run them.
 
 ## Audio and cleanup
 
@@ -63,5 +73,5 @@ audio file, so check the exit status before treating the output as complete.
 Prism playback receipts are omitted because these scripts have no player.
 
 Read the API guides for [Python TTS](../python/docs/tts.md),
-[Python Realtime](../python/docs/realtime.md), and
-[Node.js TTS](../typescript/docs/tts.md) before adapting the examples for continuous use.
+[Python Realtime](../python/docs/realtime.md), [Node.js TTS](../typescript/docs/tts.md),
+and [Node.js Realtime](../typescript/docs/realtime.md) before adapting the examples for continuous use.

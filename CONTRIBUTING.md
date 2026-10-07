@@ -14,7 +14,7 @@ state.
 | Shared client and cleanup | `python/src/rimelabs_sdk/_client.py` | `typescript/src/client.ts` |
 | Shared credentials and errors | `_auth.py`, `_errors.py` | `auth.ts`, `errors.ts` |
 | TTS, voice and language discovery | `python/src/rimelabs_sdk/tts/` | `typescript/src/tts/` |
-| Realtime / Prism | `python/src/rimelabs_sdk/realtime/` | Not implemented yet; add a sibling `typescript/src/realtime/` when implemented. |
+| Realtime / Prism | `python/src/rimelabs_sdk/realtime/` | `typescript/src/realtime/` |
 
 The shared client delegates feature cleanup and then releases credentials.
 TTS owns synthesis streams, discovery requests, and the gRPC connection.
@@ -27,7 +27,7 @@ deployment configuration. Shared authentication does not import TTS modules.
 The shared `cancellation.ts` module owns the `abortable` helper.
 
 Public imports and `client.tts.stream(...)` remain unchanged.
-Python also exposes `client.realtime.connect(...)`. Moving implementation files
+Both packages expose `client.realtime.connect(...)`. Moving implementation files
 does not change these interfaces or the top-level voice and language discovery
 methods. Tests that use private dependency seams import them from the feature
 directories.

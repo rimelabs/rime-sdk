@@ -202,6 +202,10 @@ the affected request. Its `.fault` contains `code`, `message`, `scope`, and any
 request, response, item, or tool-call identifiers. A fault does not by itself
 end a response. Session-scoped faults and transport failures end the session.
 
+Malformed fields in known events and mismatched request acknowledgments close
+the session with `RimeStreamError`. Unknown event kinds and extra fields remain
+accepted and ignored. The SDK does not replay a request after a protocol failure.
+
 Cancelling a reply request prevents an unsent request or cancels its late accepted
 response. A control operation may wait for acknowledgment during cancellation.
 Cancelling `send_audio` after its first socket send starts closes the session
