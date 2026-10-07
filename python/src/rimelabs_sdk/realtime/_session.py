@@ -21,6 +21,7 @@ from typing import Any, Literal, cast
 from websockets.exceptions import ConnectionClosed
 
 from .._errors import (
+    RimeAudioFormatError,
     RimeError,
     RimeInputError,
     RimeResourceLimitError,
@@ -188,13 +189,27 @@ class RealtimeSession:
             self._fail(failure)
             raise failure from None
 
-    async def _request(self, kind: str, body: dict[str, Any], target: str | None = None) -> Any:
+    async def _request(
+        self,
+        kind: str,
+        body: dict[str, Any],
+        target: str | None = None,
+        *,
+        continuation: _Response | None = None,
+    ) -> Any:
         self._check()
         if len(self._tasks) >= _LIMIT:
             raise RimeResourceLimitError("Too many pending realtime operations")
+        # Reserve the turn only after local admission checks pass, and before
+        # yielding so concurrent callers cannot reserve the same turn.
+        if kind == "response.create":
+            if continuation is not None:
+                continuation.continued = True
+            else:
+                self._ready.clear()
         abandoned = asyncio.Event()
         task = asyncio.create_task(
-            self._run_request(kind, body, target, abandoned, self._ready_epoch)
+            self._run_request(kind, body, target, abandoned, self._ready_epoch, continuation)
         )
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
@@ -242,22 +257,17 @@ class RealtimeSession:
         target: str | None,
         abandoned: asyncio.Event,
         ready_epoch: int,
+        continuation: _Response | None,
     ) -> Any:
         event_id = "evt_" + uuid.uuid4().hex
         future = asyncio.get_running_loop().create_future()
         self._pending[event_id] = _Pending(kind, future, target)
+        submitted = asyncio.Event()
         try:
             async with asyncio.timeout(self._timeouts.request_s):
-                try:
-                    await self._send({"type": kind, "event_id": event_id, **body}, abandoned)
-                except asyncio.CancelledError:
-                    if (
-                        kind == "response.create"
-                        and ready_epoch == self._ready_epoch
-                        and body["response"]["metadata"]["prsm_cause"] != "tool_continuation"
-                    ):
-                        self._ready.set()
-                    raise
+                await self._send(
+                    {"type": kind, "event_id": event_id, **body}, abandoned, submitted=submitted
+                )
                 result = await future
             if abandoned.is_set() and kind == "response.create":
                 self._abandon_response(result)
@@ -269,6 +279,13 @@ class RealtimeSession:
             self._fail(error)
             raise error from None
         finally:
+            # A send that started can have an unknown outcome. Release only
+            # unsent reservations, without overriding newer server readiness.
+            if kind == "response.create" and not submitted.is_set():
+                if continuation is not None:
+                    continuation.continued = False
+                elif ready_epoch == self._ready_epoch:
+                    self._ready.set()
             self._pending.pop(event_id, None)
             if future.done() and not future.cancelled():
                 future.exception()
@@ -296,7 +313,6 @@ class RealtimeSession:
                         "Prism did not admit the turn before ready_s expired"
                     ) from None
                 self._check()
-                self._ready.clear()
                 try:
                     # Once submitted, request_s governs the acknowledgment. An
                     # admission timeout must never hide an unknown wire outcome.
@@ -393,7 +409,6 @@ class RealtimeSession:
             raise t.RealtimeAdmissionTimeout(
                 "Tool results or parent completion did not arrive before ready_s expired"
             ) from None
-        response.continued = True
         try:
             return await self._request(
                 "response.create",
@@ -405,11 +420,12 @@ class RealtimeSession:
                         }
                     }
                 },
+                continuation=response,
             )
         except t.RimeRealtimeError as error:
             if error.fault.scope == "event" and error.fault.code == "tool_continuation_not_ready":
                 # Only a correlated, zero-effect refusal permits another
-                # request. Cancellation and unknown outcomes stay protected.
+                # request after submission. Unknown outcomes stay protected.
                 response.continued = False
             raise
 
@@ -441,6 +457,8 @@ class RealtimeSession:
 
         async with self._audio_lock:
             self._check()
+            if len(chunk.data) > 192000:
+                raise RimeAudioFormatError("Send audio in chunks of at most 192000 bytes")
             previous_format, previous_state = self._audio_format, self._resample_state
             submitted = asyncio.Event()
             if chunk.format != self._audio_format:

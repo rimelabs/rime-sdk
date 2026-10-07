@@ -12,13 +12,14 @@ from jsonschema import Draft7Validator
 
 from rimelabs_sdk import (
     Rime,
+    RimeAudioFormatError,
     RimeInputError,
     RimeResourceLimitError,
     RimeStreamError,
     RimeTimeoutError,
 )
 from rimelabs_sdk import realtime as r
-from rimelabs_sdk.realtime import _client
+from rimelabs_sdk.realtime import _client, _session
 
 _CONTRACT = yaml.safe_load(
     (Path(__file__).parents[2] / "conformance/prism/speech_to_speech.asyncapi.yaml").read_text()
@@ -151,6 +152,53 @@ async def test_configuration_and_typed_events(monkeypatch):
         assert (await anext(iterator)).payload.audio.format.sample_rate == 24000
         assert (await anext(iterator)).payload.status == "completed"
         await iterator.aclose()
+
+
+async def test_received_audio_can_exceed_outgoing_chunk_limit(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        ref = await accepted_turn(current, peer)
+        data = b"\x01\x00" * 96001
+        event = {
+            "type": "response.audio.delta",
+            "event_id": "audio-event",
+            "response_id": ref.response_id,
+            "item_id": "msg",
+            "output_index": 0,
+            "content_index": 0,
+            "delta": base64.b64encode(data).decode(),
+        }
+        _VALIDATORS[event["type"]].validate(event)
+        assert len(json.dumps(event).encode()) < 1024 * 1024
+        peer.incoming.put_nowait(json.dumps(event))
+        peer.ended()
+        audio = []
+        async for event in current.events:
+            if isinstance(event.payload, r.AudioDelta):
+                audio.append(event.payload.audio)
+            if isinstance(event.payload, r.ResponseEnded):
+                break
+        assert audio == [r.AudioChunk(data=data, format=r.PCMFormat(sample_rate=24000))]
+        assert not peer.closed
+
+
+async def test_outgoing_audio_limit_preserves_conversion_state(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        await current.send_audio(
+            r.AudioChunk(data=b"\x01\x00" * 5, format=r.PCMFormat(sample_rate=24000))
+        )
+        await peer.next("input_audio_buffer.append")
+        previous = current._audio_format, current._resample_state
+        chunk = r.AudioChunk(data=b"\x02\x00" * 96001)
+        with pytest.raises(RimeAudioFormatError, match="at most 192000 bytes"):
+            await current.send_audio(chunk)
+        assert (current._audio_format, current._resample_state) == previous
+        assert peer.sent.empty()
+        await current.send_audio(r.AudioChunk(data=b"\x00\x00" * 96000))
+        audio = b""
+        while not peer.sent.empty():
+            audio += base64.b64decode((await peer.next("input_audio_buffer.append"))["audio"])
+        assert audio == b"\x00\x00" * 96000
+        assert not peer.closed
 
 
 @pytest.mark.parametrize(
@@ -441,6 +489,119 @@ async def test_continuation_retries_only_after_confirmed_not_ready(monkeypatch, 
                     await current.continue_reply(parent)
         assert peer.sent.empty()
         await iterator.aclose()
+
+
+async def completed_tool_round(current, peer):
+    parent = await accepted_turn(current, peer)
+    peer.emit(
+        "response.function_call_arguments.done",
+        response_id=parent.response_id,
+        call_id="call",
+        item_id="tool",
+        name="lookup",
+        arguments="{}",
+    )
+    iterator = current.events
+    for _ in range(3):
+        event = await anext(iterator)
+    result = asyncio.create_task(current.submit_tool_result(event.payload.call, "answer"))
+    request = await peer.next("conversation.item.create")
+    peer.emit(
+        "conversation.item.created",
+        prsm_request_event_id=request["event_id"],
+        item={"id": "result"},
+    )
+    await result
+    peer.ended()
+    async for event in iterator:
+        if isinstance(event.payload, r.ResponseEnded):
+            break
+    await iterator.aclose()
+    return parent
+
+
+@pytest.mark.parametrize("turn_kind", ["text", "tools"])
+@pytest.mark.parametrize("failure", ["operation_limit", "cancel_before_send"])
+async def test_unsent_turn_can_be_retried(monkeypatch, turn_kind, failure):
+    async with session(monkeypatch) as (current, peer, _):
+        if turn_kind == "tools":
+            parent = await completed_tool_round(current, peer)
+
+            def start_turn():
+                return current.continue_reply(parent)
+
+        else:
+            peer.emit("prsm.typed_input.ready")
+            await current._ready.wait()
+
+            def start_turn():
+                return current.send_text("hello")
+
+        if failure == "operation_limit":
+            monkeypatch.setattr(_session, "_LIMIT", 1)
+            clearing = asyncio.create_task(current.clear_audio())
+            await peer.next("input_audio_buffer.clear")
+            with pytest.raises(RimeResourceLimitError, match="Too many pending"):
+                await start_turn()
+            assert peer.sent.empty()
+            peer.emit("input_audio_buffer.cleared")
+            await clearing
+        else:
+            async with current._write_lock:
+                waiting = asyncio.create_task(start_turn())
+                async with asyncio.timeout(1):
+                    while not current._pending:
+                        await asyncio.sleep(0)
+                waiting.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await waiting
+                assert peer.sent.empty()
+            await asyncio.gather(*current._tasks, return_exceptions=True)
+
+        retry = asyncio.create_task(start_turn())
+        request = await peer.next("response.create")
+        peer.accepted(request, "retried")
+        assert (await retry).response_id == "retried"
+        assert peer.sent.empty()
+        assert not peer.closed
+
+
+async def test_unsent_turn_does_not_restore_readiness_after_speech(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        peer.emit("prsm.typed_input.ready")
+        async with current._write_lock:
+            waiting = asyncio.create_task(current.send_text("cancelled"))
+            async with asyncio.timeout(1):
+                while not current._pending:
+                    await asyncio.sleep(0)
+            peer.emit("input_audio_buffer.speech_started", item_id="speech", audio_start_ms=0)
+            async for event in current.events:
+                if isinstance(event.payload, r.SpeechStarted):
+                    break
+            waiting.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await waiting
+        await asyncio.gather(*current._tasks, return_exceptions=True)
+        assert not current._ready.is_set()
+        assert peer.sent.empty()
+        await accepted_turn(current, peer)
+
+
+async def test_cancelled_submitted_continuation_cannot_be_retried(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        parent = await completed_tool_round(current, peer)
+        continuation = asyncio.create_task(current.continue_reply(parent))
+        request = await peer.next("response.create")
+        continuation.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await continuation
+        with pytest.raises(RimeInputError, match="already continued"):
+            await current.continue_reply(parent)
+        assert peer.sent.empty()
+        peer.accepted(request, "continued")
+        cancel = await peer.next("response.cancel")
+        assert cancel["response_id"] == "continued"
+        peer.ended("continued", status="cancelled")
 
 
 async def test_audio_conversion_is_stateful_and_chunked(monkeypatch):

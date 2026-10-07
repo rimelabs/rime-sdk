@@ -52,8 +52,6 @@ class AudioChunk:
     def __post_init__(self):
         if not isinstance(self.data, bytes) or len(self.data) % (2 * self.format.channels):
             raise RimeAudioFormatError("Audio must contain complete PCM16 frames as bytes")
-        if len(self.data) > 192000:
-            raise RimeAudioFormatError("Send audio in chunks of at most 192000 bytes")
 
 
 @dataclass(frozen=True, kw_only=True)
