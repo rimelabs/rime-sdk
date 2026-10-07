@@ -1,0 +1,55 @@
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_d239dfcb061240::t_7b3aa82231409b 208-210
+  s_d239dfcb061240::t_c94e84f50ff010 211,431-436
+python/src/rimelabs_sdk/_client.py
+  s_d239dfcb061240::t_c94e84f50ff010 50-56
+python/tests/test_realtime_protocol.py
+  s_d239dfcb061240::t_8d50aa5cb17a2d 8-9,16-24
+typescript/tests/realtime.test.mjs
+  s_d239dfcb061240::t_9629fb70f73d90 989-1020
+python/tests/test_realtime.py
+  s_d239dfcb061240::t_eb97204713cb0e 1079-1080,1082-1083
+typescript/src/realtime/protocol.ts
+  s_d239dfcb061240::t_c94e84f50ff010 175-179,452
+python/tests/test_realtime_lifetime.py
+  s_d239dfcb061240::t_29b5e21a1f17d2 5,115
+  s_d239dfcb061240::t_c5d0de26c4497e 41-43,128-142
+  s_d239dfcb061240::t_eb97204713cb0e 1-4,6-40,44-114,116-127
+python/src/rimelabs_sdk/realtime/_session.py
+  s_d239dfcb061240::t_c5d0de26c4497e 279,282-283
+  s_d239dfcb061240::t_c94e84f50ff010 280-281,284-287,428-435,437-441,748-758
+typescript/src/realtime/session.ts
+  s_d239dfcb061240::t_627be8a68f4257 337-343,540-547,550-553,555
+conformance/prism/schema.json
+  s_d239dfcb061240::t_8d50aa5cb17a2d 1-17
+  s_d239dfcb061240::t_dd417ff6798ecc 18-106
+conformance/prism/README.md
+  s_d239dfcb061240::t_ff671dd639988b 3-4,8-14,42-44
+  s_d239dfcb061240::t_563db079a17b5f 45
+python/src/rimelabs_sdk/realtime/_client.py
+  s_d239dfcb061240::t_c94e84f50ff010 145-148,155-158,161-167
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_d239dfcb061240::t_8d50aa5cb17a2d 1838-1839
+  s_d239dfcb061240::t_067fbc2c33988c 1135,1336,1397-1404,1495,1960
+typescript/tests/realtime-protocol.test.mjs
+  s_d239dfcb061240::t_8d50aa5cb17a2d 4-5,16-31,38
+  s_d239dfcb061240::t_cada50d3319279 32-37,39-40
+conformance/prism/protocol.json
+  s_d239dfcb061240::t_db3721d1b7f5b5 606-722
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "64fa30d98f98f3e433a3dd858a7f39bb4f16f823",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
