@@ -36,15 +36,13 @@ class FakeService:
             first = await anext(requests)
             messages.append(first)
             assert first.WhichOneof("payload") == "header"
-            if self.mode == "empty_no_headers":
-                return
             if self.mode == "error_before_audio":
                 context.set_trailing_metadata((("x-request-id", "rejected-request"),))
                 await context.abort(self.rejection_status, "test admission failure")
             metadata = dict(self.response_metadata)
             if self.mode == "wrong_format":
                 metadata["x-rime-audio-content-type"] = "audio/wav"
-            if self.mode != "headers_after_text":
+            if self.mode not in {"headers_after_text", "empty_no_headers"}:
                 await context.send_initial_metadata(tuple(metadata.items()))
                 self.headers_sent.set()
             context.set_trailing_metadata(self.trailing_metadata)
@@ -58,7 +56,7 @@ class FakeService:
                     self.headers_sent.set()
                 self.received.set()
                 assert message.WhichOneof("payload") == "text_chunk"
-                if self.mode == "empty_audio":
+                if self.mode in {"empty_audio", "empty_no_headers"}:
                     continue
                 if self.mode == "silence":
                     await self.release.wait()

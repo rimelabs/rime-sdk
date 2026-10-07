@@ -659,6 +659,11 @@ async def test_missing_audio_metadata_cannot_succeed(setup, mode):
     async with client.tts.stream("Hello.", timeout=1) as audio:
         with pytest.raises(RimeAudioFormatError):
             await anext(audio)
+    assert len(service.calls) == 1
+    assert [message.WhichOneof("payload") for message in service.calls[0]] == [
+        "header",
+        "text_chunk",
+    ]
 
 
 async def test_trailers_only_synthesis_error_keeps_request_id(setup):
