@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/rimelabs/rime-sdk/go/internal/proto"
+	pb "github.com/rimelabs/rime-api/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -543,6 +543,18 @@ func TestContextCancellationAndConcurrentReader(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { _, err := s.Recv(); done <- err }()
 	<-entered
+	// The source can start before the reader goroutine. Wait until Recv owns
+	// the reader slot so this check does not depend on scheduler order.
+	deadline := time.After(5 * time.Second)
+	for !s.reading.Load() {
+		select {
+		case err := <-done:
+			t.Fatalf("reader stopped before cancellation: %v", err)
+		case <-deadline:
+			t.Fatal("reader did not start")
+		case <-time.After(time.Millisecond):
+		}
+	}
 	if _, err := s.Recv(); !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}

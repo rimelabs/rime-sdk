@@ -8,7 +8,7 @@ license-files = ["LICENSE", "LICENSE-PRISM", "NOTICE-PRISM"]
 requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.74,<2",
-    "rime-api==0.2.0",
+    "rime-api==0.3.0",
     "livekit-blingfire==1.1.0",
     "httpx>=0.28,<1",
     "websockets>=15,<17",
