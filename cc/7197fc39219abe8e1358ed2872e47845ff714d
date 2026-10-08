@@ -1,0 +1,19 @@
+.gitattributes
+  s_264b98dc6486d6::t_4f9064ea662d41 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cc7197fc39219abe8e1358ed2872e47845ff714d",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
