@@ -1,0 +1,28 @@
+examples/python/audio_devices.py
+  s_d239dfcb061240::t_892fcd0513b8f6 41-43,132-134
+.github/scripts/update-example-dependency.py
+  s_d239dfcb061240::t_892fcd0513b8f6 49-58
+  s_d239dfcb061240::t_cd985adc4971a3 64-65
+python/tests/test_voice_examples.py
+  s_d239dfcb061240::t_2ae1f0db08173f 53-89,91,98,100-101,103,113-139,305
+  s_d239dfcb061240::t_31013fc4975438 202,221,252,261,361
+.github/scripts/tests/test_update_example_dependency.py
+  s_d239dfcb061240::t_892fcd0513b8f6 57-61
+  s_d239dfcb061240::t_a5d9a051a033c0 62-63,70-71,83-84,96-97,114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "657ac5f4aa98897839e0e1327b686cb20ea521cf",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
