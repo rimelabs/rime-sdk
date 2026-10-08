@@ -1,0 +1,29 @@
+.github/scripts/tests/test_update_example_dependency.py
+  s_264b98dc6486d6::t_05a191bba75b8f 66-67,114,117,121,123-142
+.github/scripts/update-example-dependency.py
+  s_264b98dc6486d6::t_2e7525a2b9fc71 7,27-40,63,70,75,82,93,98
+examples/python/pyproject.toml
+  s_264b98dc6486d6::t_206dbb2f3ddcb1 5-7,12-15
+examples/python/uv.lock
+  s_264b98dc6486d6::t_0816ee4760397a 362,368,370,388,395,405,407
+examples/typescript/package-lock.json
+  s_264b98dc6486d6::t_6e4414cf8f2bd0 9,566-568,575-577,582
+examples/typescript/package.json
+  s_264b98dc6486d6::t_024f92989c205f 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6b7f274b41d9cd867c5263f3b3e2ed505c468f13",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
