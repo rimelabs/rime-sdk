@@ -4,16 +4,12 @@ A conversation keeps producing events while your application sends input, runs
 tools, and plays audio. Keep one event consumer running for the session.
 The SDK handles protocol state; your application handles those external actions.
 
-Start with the [voice conversation](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/realtime/voice.py)
-for microphone input, playback, and caller interruption. The
-[recorded-speech example](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/realtime/recorded.py)
-saves a spoken reply without audio hardware. See the
-[example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md)
-for commands, device requirements, and the voice tool example.
+Start with the [recorded-speech quick start](../README.md#prism-send-recorded-speech)
+to save a spoken reply without audio hardware.
 
-Typed turns remain useful for connection checks and mixed text/voice applications.
-The live examples keep the session open after normal cancellation and report
-playback from the output clock. Saving a file is not playback.
+For live conversations, keep the session open after normal cancellation and
+report playback from the output clock. Saving a file is not playback.
+Typed turns also support mixed text and voice applications.
 
 ## Connect
 
@@ -108,10 +104,9 @@ Execution follows this order:
 4. Call `continue_reply(parent)` if the assistant should answer. The SDK waits
    for the parent to end and for every tool result acknowledgment.
 
-The [tool example](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/realtime/tools.py) uses local order data
-and keeps the event consumer running during result submission and continuation.
-Slow tools also need a worker or async implementation that does not block the
-event loop.
+Keep the event consumer running while submitting tool results and requesting
+continuation. Run slow tools asynchronously or in a worker so they do not block
+the event loop.
 
 A new user turn or proactive reply supersedes the old tool round. Late results
 can still be recorded; `request_reply(tool_call=call)` asks the assistant to report
@@ -224,6 +219,5 @@ Keep up with the event stream: its queue holds 256 events, and incoming WebSocke
 messages are limited to 1 MiB. A slow consumer or lost connection ends the session.
 There is no automatic reconnect, history replay, or live configuration update.
 
-The [pinned protocol contract](https://github.com/rimelabs/rime-sdk/blob/main/conformance/prism/README.md) records the test
-target. Local peer tests cover the SDK; the deployed gateway handshake and endpoint
-behavior still need validation for the deployment you use.
+Local peer tests cover the SDK protocol handling. Validate the gateway handshake
+and endpoint behavior for the deployment you use.

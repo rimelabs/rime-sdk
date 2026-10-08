@@ -3,11 +3,6 @@
   "version": "0.1.0-alpha.8",
   "description": "Rime streaming TTS and Prism realtime SDK for Node.js",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/rimelabs/rime-sdk.git",
-    "directory": "typescript"
-  },
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -49,5 +44,6 @@
     "prettier": "3.9.8",
     "typescript": "^5.9.0",
     "yaml": "^2.9.1"
-  }
+  },
+  "homepage": "https://docs.rime.ai/"
 }

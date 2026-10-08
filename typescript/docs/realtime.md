@@ -4,16 +4,12 @@ Keep one event consumer running while your application sends input, runs tools,
 and plays audio. The SDK manages the protocol state. Your application owns
 microphone capture, tool execution, and playback.
 
-Start with the [voice conversation](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/voice.ts)
-for microphone input, playback, and caller interruption. The
-[recorded-speech example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/recorded.ts)
-saves a spoken reply without audio hardware. See the
-[example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md)
-for commands, device requirements, and the voice tool example.
+Start with the [recorded-speech quick start](../README.md#prism-send-recorded-speech)
+to save a spoken reply without audio hardware.
 
-Typed turns remain useful for connection checks and mixed text/voice applications.
-The live examples keep the session open after normal cancellation and report
-playback from the output clock. Saving a file is not playback.
+For live conversations, keep the session open after normal cancellation and
+report playback from the output clock. Saving a file is not playback.
+Typed turns also support mixed text and voice applications.
 
 ## Connect
 
@@ -112,10 +108,9 @@ Use `JSON.stringify(...)` for a structured result. Call
 `continueReply(payload.call)` when the assistant should answer; a tool call
 reference also carries its parent response identity.
 
-The [tool example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/tools.mjs)
-keeps the event consumer running while result submissions and continuation wait.
-It uses local order data. Slow tools need asynchronous work or a worker thread
-so they do not block the Node.js event loop.
+Keep the event consumer running while submitting tool results and requesting
+continuation. Run slow tools asynchronously or in a worker so they do not block
+the event loop.
 
 A new user turn or proactive reply supersedes the old tool round. Late results
 can still be recorded. Use `requestReply({ toolCall: call })` to ask the assistant
@@ -221,6 +216,5 @@ Keep up with the event stream. The queue holds 256 events; incoming messages
 are limited to 1 MiB. A slow consumer ends the session. There is no automatic
 reconnect, history replay, or live configuration update.
 
-The [pinned contract](https://github.com/rimelabs/rime-sdk/blob/main/conformance/prism/README.md)
-is the local test target. The deployed gateway handshake and endpoint behavior
-still need validation for the deployment you use.
+Local peer tests cover the SDK protocol handling. Validate the gateway handshake
+and endpoint behavior for the deployment you use.
