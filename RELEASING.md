@@ -1,7 +1,49 @@
 # Releases
 
-We publish `rimelabs-sdk` to PyPI and `@rimelabs/sdk` to npm.
-The source repository stays private. The packages are public.
+We publish `rimelabs-sdk` to PyPI, `@rimelabs/sdk` to npm, and
+`github.com/rimelabs/rime-sdk/go` from the `go/` directory of this repository.
+
+## Make this repository public and release Go
+
+1. Open the code PR for Go support. Use a title such as `feat: add Go TTS SDK`.
+   Wait for **Package checks** to pass.
+2. Before changing visibility, confirm that the repository's source, Git history,
+   and Actions logs can be public. GitHub exposes these when visibility changes.
+3. Open the repository's **Settings > General > Danger Zone > Change repository
+   visibility**. Select **Public**, then complete GitHub's confirmation steps.
+   An organization owner may need to permit this change.
+4. Complete the one-time Actions setting below if it is not already enabled.
+   Go needs no registry account, publishing token, or separate repository.
+5. Squash and merge the code PR with its `feat:` title. Release Please then opens
+   or updates the release PR. Check that it includes Go and that `go/version.txt`
+   agrees with the Go entry in `.release-please-manifest.json`.
+6. Wait for all release PR checks. Review every package listed in the PR, since
+   merging releases all of them. Then merge the release PR.
+7. The **Release** workflow creates a tag such as `go/v0.1.0-alpha.2`. Use the
+   actual version from the release PR. The Go job tests the tagged source, then
+   downloads and builds the public module in a clean temporary project. Check
+   that this job passes before announcing the release.
+8. In a new Go project, install the released version:
+
+   ```sh
+   go mod init example.com/rime-test
+   go get github.com/rimelabs/rime-sdk/go@v0.1.0-alpha.2
+   ```
+
+   Replace the example version with the released version. Import the SDK with
+   `rime "github.com/rimelabs/rime-sdk/go"`. Follow [the Go README](go/README.md)
+   to synthesize speech with `RIME_API_KEY`.
+
+Go publication happens when the tag is public. There is no package upload step.
+The tag prefix must be `go/v`, because the module is in `go/`. Python and
+TypeScript keep their existing tag formats. Release Please creates all tags.
+The Go job requests the exact version from `proxy.golang.org` and verifies it
+through `sum.golang.org`. It uses no Git credentials or local module replacement.
+
+The checks after tagging cannot prevent publication. The release PR checks must
+pass before you merge. Never move or replace a published Go version. For a code
+fix, release a new version. For a temporary proxy or visibility failure, use the
+`go_tag` recovery input with the existing tag, such as `go/v0.1.0-alpha.2`.
 
 ## One-time setup
 
@@ -38,8 +80,8 @@ The workflow does not read `PYPI_TOKEN` or `NPM_TOKEN`.
 After a successful release through each trusted publisher, remove its old GitHub
 secret and revoke the corresponding registry token.
 
-npm Trusted Publishing works with our private repository. npm provenance does
-not support private source repositories, so this workflow disables provenance.
+The visibility change does not change the existing PyPI or npm trusted publisher
+identities. npm provenance remains disabled under the current workflow policy.
 
 ## Routine release
 
@@ -61,7 +103,8 @@ not support private source repositories, so this workflow disables provenance.
    **Package checks** results. Wait for checks on the latest commit. Do not enable
    automatic merging for release PRs.
 5. Merge the release PR. The **Release** workflow creates tags and GitHub releases,
-   then checks, builds, and publishes each affected package.
+   then runs each affected package job. Go publication starts when its tag exists;
+   its job checks the public module download.
 6. Confirm that the publishing jobs passed. Check the version on
    [PyPI](https://pypi.org/project/rimelabs-sdk/) and
    [npm](https://www.npmjs.com/package/@rimelabs/sdk).
@@ -70,12 +113,12 @@ not support private source repositories, so this workflow disables provenance.
    **Package checks**, then merge it to update the examples.
 
 You do not need to edit package versions or create tags for routine releases.
-Python and Node.js have independent versions. One release PR can include either
-package or both. Merging that PR releases every package listed in it.
+Go, Python, and Node.js have independent versions. One release PR can include
+one or more packages. Merging that PR releases every package listed in it.
 
 Release Please uses changed file paths to select packages. A commit that only
 changes shared files such as `conformance/`, `docs/`, or workflows does not by
-itself select either package. If a shared change needs a package release, include
+itself select a package. If a shared change needs a package release, include
 an appropriate change inside each affected package with a `fix:` or `feat:` commit.
 Maintenance commits alone generally do not start a release. Use `fix:` or `feat:`
 for user-visible package changes, and describe breaking changes in the PR body.
@@ -121,13 +164,14 @@ registries, so no change to the API release workflow is needed.
 
 ## Alpha versions
 
-Both packages remain in alpha. The config uses the `prerelease` versioning strategy
+All three packages remain in alpha. The config uses the `prerelease` versioning strategy
 and marks GitHub releases as prereleases. Starting from the current versions,
 fixes and features advance the alpha number.
 
 | Location | Example next version or tag |
 | --- | --- |
-| Release Please manifest, both packages | `0.1.0-alpha.2` |
+| Release Please manifest, all packages | `0.1.0-alpha.2` |
+| Go `version.txt` and Git tag | `0.1.0-alpha.2`, `go/v0.1.0-alpha.2` |
 | Python package and `uv.lock` | `0.1.0a2` |
 | Python Git tag | `python-v0.1.0-alpha.2` |
 | Node.js package and Git tag | `0.1.0-alpha.2`, `typescript-v0.1.0-alpha.2` |
@@ -166,7 +210,7 @@ Only runs on `main` can prepare or publish releases.
 ## Failed runs and recovery
 
 If release PR preparation or its checks fail, fix the cause first. You can run
-**Release** from the Actions page on `main` with both recovery fields empty to
+**Release** from the Actions page on `main` with all recovery fields empty to
 retry preparation. This also updates Python metadata and starts release PR checks.
 
 If a publishing job fails, the GitHub tag or release can already exist. Check the
@@ -174,9 +218,10 @@ registry before retrying. A GitHub release alone does not prove that upload succ
 
 1. Fix the cause, such as a trusted publisher setting.
 2. Open **Actions > Release > Run workflow**, and select `main`.
-3. Enter the existing tag in `python_tag` or `typescript_tag` for the package that
-   still needs publication. Leave the other field empty unless both failed.
-   These inputs skip Release Please and publish the selected tagged source.
+3. Enter the existing tag in `python_tag`, `typescript_tag`, or `go_tag` for the
+   failed package job. Leave other fields empty unless those jobs also failed.
+   These inputs skip Release Please. Python and TypeScript publish the selected
+   tagged source. Go verifies its existing public release.
 4. Check the jobs and registries again.
 
 PyPI retries use `uv publish --check-url` to check existing files. npm rejects a
@@ -193,3 +238,7 @@ release PR. A retry builds the original tagged source, not the current package c
 - [Release Please Action and GitHub token behavior](https://github.com/googleapis/release-please-action#github-credentials)
 - [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/adding-a-publisher/)
 - [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers/)
+
+- [Go module publishing](https://go.dev/doc/modules/publishing)
+- [Go module tags for subdirectories](https://go.dev/ref/mod#vcs-version)
+- [GitHub repository visibility](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)

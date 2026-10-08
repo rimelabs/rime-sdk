@@ -1,6 +1,6 @@
 # Development
 
-These instructions require access to the private source repository.
+Clone this repository to develop and test the SDKs.
 Start each command block from the repository root.
 
 ## Source layout
@@ -75,6 +75,22 @@ release checks are listed in `examples/README.md`.
 
 For changes to example release automation, run
 `uv run --project python pytest .github/scripts/tests` from the repository root.
+
+## Go
+
+From the repository root:
+
+```sh
+cd go
+go vet ./...
+go test -race ./...
+CGO_ENABLED=0 go build ./...
+```
+
+The Go module supports TTS only. Keep `go/testdata/` copies of the four shared TTS
+fixtures identical to `conformance/`; CI checks them. Each module export includes
+those fixtures so tests work outside the monorepo. Generated protocol and
+BlingFire build instructions are in `go/internal/`. Run `gofmt` on Go changes.
 
 ## Documentation
 

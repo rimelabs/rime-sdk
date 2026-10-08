@@ -1,0 +1,6 @@
+Rime API
+Copyright 2026 Rime.
+
+Distributions include Google RPC definitions from Google APIs under the Apache
+License 2.0, and Protobuf well-known type definitions under PROTOBUF_LICENSE.
+The source files retain their copyright notices.

@@ -12,6 +12,10 @@ on:
         description: 'Recovery only: existing Node.js release tag to publish'
         type: string
         default: ''
+      go_tag:
+        description: 'Recovery only: existing Go release tag to verify'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -22,7 +26,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag
+    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,6 +36,7 @@ jobs:
     outputs:
       python_tag: ${{ steps.release.outputs['python--tag_name'] }}
       typescript_tag: ${{ steps.release.outputs['typescript--tag_name'] }}
+      go_tag: ${{ steps.release.outputs['go--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
@@ -151,7 +156,7 @@ jobs:
       id-token: write
     env:
       RELEASE_TAG: ${{ needs.prepare.outputs.typescript_tag || inputs.typescript_tag }}
-      # npm cannot create provenance for a package built from a private repo.
+      # Retain the existing npm provenance policy during the visibility change.
       NPM_CONFIG_PROVENANCE: 'false'
     defaults:
       run:
@@ -186,6 +191,48 @@ jobs:
       - run: npm pack
       - name: Publish package
         run: npm publish --access public --tag latest
+
+  go:
+    timeout-minutes: 15
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.go_tag != '' || inputs.go_tag != '')
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.go_tag || inputs.go_tag }}
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - name: Verify public repository access
+        working-directory: ${{ runner.temp }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" != false ]; then
+            echo 'Make the repository public before verifying the Go release.' >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Check release version and fixtures
+        run: |
+          test "$RELEASE_TAG" = "go/v$(cat version.txt)"
+          for fixture in sentences contract audio mulaw; do
+            cmp "../conformance/$fixture.json" "testdata/$fixture.json"
+          done
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: CGO_ENABLED=0 go build ./...
+      - name: Download and build the published Go module
+        run: bash tools/check-public-release.sh "$RELEASE_TAG"
 
   update-python-examples:
     needs: python

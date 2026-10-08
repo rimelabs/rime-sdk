@@ -1,7 +1,8 @@
 # Shared conformance cases
 
-Both package test runners read these files directly. Changes to this directory
-run both language jobs in CI.
+Python and TypeScript test runners read these files directly. The Go module uses
+copies in `go/testdata/` so exported modules can run their tests. CI checks that
+the copies match. Changes to this directory run all three language jobs.
 
 - `sentences.json` gives the exact expected sequence, including original whitespace.
 - `contract.json` gives chunk sizes, invalid timeouts, audio profiles, gRPC error
