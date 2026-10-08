@@ -1,0 +1,33 @@
+python/pyproject.toml
+  s_d239dfcb061240::t_e00e26d9190b1c 17-19
+python/README.md
+  s_d239dfcb061240::t_6914ec7c0795a9 3-4,8-9,12-13,18-20,22,24,26-28,30,33-44,47-48,50-51,53-57,59,61-63,66-132,135-139,141,143-144,146-147
+python/docs/realtime.md
+  s_d239dfcb061240::t_5998197df9f50b 7-8,10-12,107-109,222-223
+python/docs/tts.md
+  s_d239dfcb061240::t_263c854cde6f10 4-5
+typescript/README.md
+  s_d239dfcb061240::t_1ee7ae59399f3f 3-4,8-9,12-15,19-54,57-59,61-65,67,69-71,74-75,78-158,161-165,168-171,173-175
+typescript/docs/realtime.md
+  s_d239dfcb061240::t_33bc58d615ab20 7-8,10-12,111-113,219-220
+typescript/docs/tts.md
+  s_d239dfcb061240::t_e49b7d60c261e9 4-5,20
+typescript/package.json
+  s_d239dfcb061240::t_6c51edc99bd6b5 47-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a0847ddbff5a66d8bac3bf555ef54e01a1e6d190",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
