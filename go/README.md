@@ -157,5 +157,9 @@ CGO_ENABLED=0 go build ./...
 
 Tests use a local gRPC service and need no credentials. `testdata/` contains copies
 of the repository's shared TTS fixtures. CI verifies that those copies match.
-Generated protocol code and the embedded BlingFire binary include their source
+The versioned `github.com/rimelabs/rime-api/go` dependency supplies the protocol
+types and gRPC client. Dependabot checks for API releases daily and opens a PR;
+CI and review are required before the SDK is released.
+
+The embedded BlingFire binary includes its source
 details and licenses in `internal/`.

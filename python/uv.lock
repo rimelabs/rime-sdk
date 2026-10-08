@@ -690,15 +690,15 @@ wheels = [
 
 [[package]]
 name = "rime-api"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "googleapis-common-protos" },
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/77/bb/7ca28ec40f3cd768511f40c64899534488a2e6884bb7763e2707d7fb5684/rime_api-0.2.0.tar.gz", hash = "sha256:e6fa0c6319bb1adf4cdf337a82400d778e1727674fded5ac1f13e81a0042af3c", size = 33084, upload-time = "2026-10-08T20:36:09.37Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/7d/9f479ae56a78f6fbee54691010e33c04f9f102ed2774e051f1f3f557fbd0/rime_api-0.3.0.tar.gz", hash = "sha256:d6cdc75ea23f63338f177074f7fac80d6c26ff98c3fcf2f3d14d014264053871", size = 33583, upload-time = "2026-10-08T21:55:28.408Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f2/0b/cfb7c5a61dcafeb3711138935270f721743de928de92228d7722fd94a7af/rime_api-0.2.0-py3-none-any.whl", hash = "sha256:2a0355bd7112d9334f8b990fce96a535a640bfecd3ac49fa84d3d8308b1f5eab", size = 42969, upload-time = "2026-10-08T20:36:08.215Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/dd/02ce69baba5c1b01c00398608ef9447abd4c7fd59b536ac16c751eed9ba4/rime_api-0.3.0-py3-none-any.whl", hash = "sha256:5d77adb5adc29b0d6674b4eae5677d1b3757a0ad6d28ebb4624e23ef42ce449d", size = 43520, upload-time = "2026-10-08T21:55:27.538Z" },
 ]
 
 [[package]]
@@ -730,7 +730,7 @@ requires-dist = [
     { name = "grpcio", specifier = ">=1.74,<2" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "livekit-blingfire", specifier = "==1.1.0" },
-    { name = "rime-api", specifier = "==0.2.0" },
+    { name = "rime-api", specifier = "==0.3.0" },
     { name = "websockets", specifier = ">=15,<17" },
 ]
 

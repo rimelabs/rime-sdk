@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	pb "github.com/rimelabs/rime-sdk/go/internal/proto"
+	pb "github.com/rimelabs/rime-api/go"
 	"github.com/rimelabs/rime-sdk/go/internal/sentences"
 )
 

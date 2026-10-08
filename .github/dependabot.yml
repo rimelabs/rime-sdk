@@ -3,7 +3,11 @@ updates:
   - package-ecosystem: gomod
     directory: /go
     schedule:
-      interval: weekly
+      interval: daily
+    cooldown:
+      default-days: 3
+      exclude:
+        - github.com/rimelabs/rime-api/go
     commit-message:
       prefix: fix
       include: scope
