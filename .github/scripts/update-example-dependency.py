@@ -46,14 +46,23 @@ def update(root, language, version):
     project = str(manifest.parent)
     if language == "python":
         subprocess.run(
-            ["uv", "add", "--project", project, "--no-sync", f"rimelabs-sdk=={target}"],
+            [
+                "uv",
+                "add",
+                "--project",
+                project,
+                "--no-sync",
+                "--default-index",
+                "https://pypi.org/simple",
+                f"rimelabs-sdk=={target}",
+            ],
             cwd=root,
             check=True,
         )
         lock = tomllib.loads((root / project / "uv.lock").read_text())
         sdk = next(p for p in lock["package"] if p["name"] == "rimelabs-sdk")
-        if "registry" not in sdk["source"]:
-            raise ValueError("The Python example must use a registry package")
+        if sdk["source"].get("registry", "").rstrip("/") != "https://pypi.org/simple":
+            raise ValueError("The Python example must use the published PyPI package")
     else:
         subprocess.run(
             [

@@ -3,7 +3,6 @@
 import asyncio
 import base64
 import importlib
-import time
 import wave
 from pathlib import Path
 from types import SimpleNamespace
@@ -51,19 +50,57 @@ def devices(examples, monkeypatch):
     return examples.devices
 
 
-async def test_output_waits_for_device_tail_and_excludes_unplayed_audio(devices):
+class DeviceClock:
+    """Control device time and completion callbacks without changing asyncio's clock."""
+
+    def __init__(self):
+        self.now = 100.0
+        self.callbacks = []
+        self.create_future = asyncio.get_running_loop().create_future
+
+    def monotonic(self):
+        return self.now
+
+    def call_soon_threadsafe(self, callback, *args):
+        self.call_later(0, callback, *args)
+
+    def call_later(self, delay, callback, *args):
+        self.callbacks.append((self.now + delay, callback, args))
+
+    def advance(self, seconds):
+        end = self.now + seconds
+        while self.callbacks:
+            self.callbacks.sort(key=lambda entry: entry[0])
+            if self.callbacks[0][0] > end:
+                break
+            self.now, callback, args = self.callbacks.pop(0)
+            callback(*args)
+        self.now = end
+
+
+async def wait_for_sealed_playback(speaker, previous=None):
+    async with asyncio.timeout(1):
+        while speaker.current is previous or not speaker.current.sealed:
+            await asyncio.sleep(0)
+
+
+async def test_output_waits_for_device_tail_and_excludes_unplayed_audio(devices, monkeypatch):
+    clock = DeviceClock()
+    monkeypatch.setattr(devices, "time", clock)
     with devices.Speaker() as speaker:
+        speaker.loop = clock
         playback = speaker.begin()
         speaker.write(playback, b"\x01\0" * 480)
         speaker.end(playback)
         speaker._render(
             bytearray(960), 480, SimpleNamespace(outputBufferDacTime=1.05, currentTime=1.0), None
         )
-        await asyncio.sleep(0.01)
+        clock.advance(0.01)
         assert not playback.done.done()
-        assert await asyncio.wait_for(playback.done, 1) == pytest.approx(0.02)
+        clock.advance(0.061)
+        assert playback.done.result() == pytest.approx(0.02)
         second = speaker.begin()
-        second.runs.extend([(time.monotonic() - 0.1, 0.05), (time.monotonic() + 1, 0.02)])
+        second.runs.extend([(clock.now - 0.1, 0.05), (clock.now + 1, 0.02)])
         speaker.write(second, bytes(48000))
         speaker.interrupt()
         assert await second.done == pytest.approx(0.05)
@@ -71,6 +108,33 @@ async def test_output_waits_for_device_tail_and_excludes_unplayed_audio(devices)
         speaker.write(second, b"\0\0")
         assert not second.buffer
     assert speaker.stream.closed
+
+
+@pytest.mark.parametrize("status", ["output underflow", "priming output"])
+async def test_output_callback_flags_do_not_stop_playback(devices, monkeypatch, status):
+    clock = DeviceClock()
+    monkeypatch.setattr(devices, "time", clock)
+    with devices.Speaker() as speaker:
+        speaker.loop = clock
+        playback = speaker.begin()
+        frame = b"\x01\0" * 480
+        speaker.write(playback, frame)
+        speaker.end(playback)
+        output = bytearray(960)
+        speaker._render(output, 480, SimpleNamespace(outputBufferDacTime=0, currentTime=0), status)
+        assert output == frame and not playback.buffer
+        clock.advance(0.021)
+        assert playback.done.result() == pytest.approx(0.02)
+        assert not speaker.stream.aborted
+
+
+async def test_input_overflow_does_not_stop_capture(devices):
+    with devices.Microphone() as microphone:
+        frame = b"\x01\0" * 640
+        microphone._capture(frame, 640, None, "input overflow")
+        assert await asyncio.wait_for(microphone.read(), 1) == frame
+        microphone._capture(frame, 640, None, None)
+        assert await asyncio.wait_for(microphone.read(), 1) == frame
 
 
 async def test_microphone_continues_during_playback_and_has_a_bound(devices):
@@ -135,6 +199,7 @@ class Session:
         self.reports = asyncio.Queue()
         self.info = SimpleNamespace(interrupt_on_speech=True)
         self.results = []
+        self.result_recorded = asyncio.Event()
         self.continued = []
 
     @property
@@ -153,6 +218,7 @@ class Session:
 
     async def submit_tool_result(self, call, result):
         self.results.append((call, result))
+        self.result_recorded.set()
 
     async def continue_reply(self, response):
         self.continued.append(response)
@@ -183,6 +249,7 @@ async def test_voice_interruption_clears_audio_and_next_turn_finishes(examples, 
             report = await asyncio.wait_for(session.reports.get(), 1)
             assert isinstance(report, r.PlaybackInterrupted) and report.audio_end_ms == 0
             assert not speaker.current.buffer
+            first_playback = speaker.current
             session.queue.put_nowait(
                 r.ResponseEnded(response=first, status="cancelled", reason="turn_detected")
             )
@@ -191,7 +258,7 @@ async def test_voice_interruption_clears_audio_and_next_turn_finishes(examples, 
             session.queue.put_nowait(
                 r.ResponseEnded(response=second, status="completed", reason="stop")
             )
-            await asyncio.sleep(0.01)
+            await wait_for_sealed_playback(speaker, first_playback)
             speaker._render(
                 bytearray(960), 480, SimpleNamespace(outputBufferDacTime=0, currentTime=0), None
             )
@@ -235,7 +302,7 @@ async def test_new_speech_during_tool_work_records_result_without_old_continuati
             session.queue.put_nowait(r.SpeechStarted(item_id="user", audio_start_ms=0))
             await asyncio.sleep(0)
             release.set()
-            await asyncio.sleep(0.01)
+            await asyncio.wait_for(session.result_recorded.wait(), 1)
             assert len(session.results) == 1 and not session.continued
         finally:
             task.cancel()
@@ -291,7 +358,7 @@ async def test_tool_continuation_refusal_keeps_next_turn_open(examples, devices,
                     session.queue.put_nowait(
                         r.ResponseEnded(response=second, status="completed", reason="stop")
                     )
-                    await asyncio.sleep(0.01)
+                    await wait_for_sealed_playback(speaker)
                     speaker._render(
                         bytearray(960),
                         480,

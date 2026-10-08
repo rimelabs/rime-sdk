@@ -54,14 +54,21 @@ def test_recovery_preserves_a_newer_pending_pr(tmp_path, monkeypatch, language):
 
 
 @pytest.mark.parametrize("language", ["python", "typescript"])
-@pytest.mark.parametrize("outcome", ["published", "missing", "local-link", "wrong-version"])
-def test_update_requires_the_requested_registry_package(tmp_path, monkeypatch, language, outcome):
+@pytest.mark.parametrize("pending_branch", [True, False])
+@pytest.mark.parametrize(
+    "outcome", ["published", "missing", "local-link", "wrong-version", "other-index"]
+)
+def test_update_requires_the_requested_registry_package(
+    tmp_path, monkeypatch, language, outcome, pending_branch
+):
     path = project(tmp_path, language, "0.1.0-alpha.6")
     commands = []
 
     def run(command, **kwargs):
         commands.append(command)
         if command[0] == "git":
+            if not pending_branch:
+                return subprocess.CompletedProcess(command, 128, "", "Unknown revision")
             # Retry an existing PR with the same target version.
             return subprocess.CompletedProcess(command, 0, manifest(language, "0.1.0-alpha.7"))
         if outcome == "missing":
@@ -73,6 +80,8 @@ def test_update_requires_the_requested_registry_package(tmp_path, monkeypatch, l
             source = '{ registry = "https://pypi.org/simple" }'
             if outcome == "local-link":
                 source = '{ editable = "../../python" }'
+            elif outcome == "other-index":
+                source = '{ registry = "https://packages.example.com/simple" }'
             (path.parent / "uv.lock").write_text(
                 f'[[package]]\nname = "rimelabs-sdk"\nversion = "{locked}"\nsource = {source}\n'
             )
@@ -84,6 +93,8 @@ def test_update_requires_the_requested_registry_package(tmp_path, monkeypatch, l
             }
             if outcome == "local-link":
                 sdk = {"link": True, "resolved": "../../typescript"}
+            elif outcome == "other-index":
+                sdk["resolved"] = "https://packages.example.com/sdk.tgz"
             (path.parent / "package-lock.json").write_text(
                 json.dumps({"packages": {"node_modules/@rimelabs/sdk": sdk}})
             )
@@ -100,6 +111,7 @@ def test_update_requires_the_requested_registry_package(tmp_path, monkeypatch, l
             updater.update(tmp_path, language, "0.1.0-alpha.7")
     if language == "python":
         assert "rimelabs-sdk==0.1.0a7" in commands[-1]
+        assert commands[-1][commands[-1].index("--default-index") + 1] == "https://pypi.org/simple"
     else:
         assert "@rimelabs/sdk@0.1.0-alpha.7" in commands[-1]
         assert "--@rimelabs:registry=https://registry.npmjs.org/" in commands[-1]

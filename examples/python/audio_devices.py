@@ -38,8 +38,9 @@ class Microphone:
         )
 
     def _capture(self, data, frames, clock, status):
-        value = RuntimeError(f"Microphone: {status}") if status else bytes(data)
-        self.loop.call_soon_threadsafe(self._offer, value)
+        if status:
+            self.loop.call_soon_threadsafe(print, f"Microphone: {status}")
+        self.loop.call_soon_threadsafe(self._offer, bytes(data))
 
     def _offer(self, value):
         if self.closed:
@@ -128,14 +129,12 @@ class Speaker:
 
     def _render(self, output, frames, clock, status):
         output[:] = bytes(len(output))
+        # Callback flags report gaps or priming, not a failed stream.
+        if status:
+            self.loop.call_soon_threadsafe(print, f"Speaker: {status}")
         with self.lock:
             playback = self.current
             if playback is None or playback.interrupted or playback.done.done():
-                return
-            if status:
-                self.loop.call_soon_threadsafe(
-                    self._fail, playback, RuntimeError(f"Speaker: {status}")
-                )
                 return
             now = time.monotonic()
             count = min(len(output), len(playback.buffer))
@@ -151,11 +150,6 @@ class Speaker:
                 self.loop.call_soon_threadsafe(
                     self._schedule_completion, playback, max(0, finish - now), duration
                 )
-
-    @staticmethod
-    def _fail(playback, error):
-        if not playback.done.done():
-            playback.done.set_exception(error)
 
     def interrupt(self):
         with self.lock:
