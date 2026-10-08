@@ -1,0 +1,2 @@
+# gofmt requires LF line endings on every platform.
+*.go text eol=lf
