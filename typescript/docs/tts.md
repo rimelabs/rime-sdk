@@ -1,12 +1,8 @@
 # TTS for Node.js
 
 You supply text; the SDK handles sentence boundaries and streams audio back.
-Your application owns playback. Start with the [package quick start](../README.md),
-or run the [streaming example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/tts/stream.mjs).
-
-For a playable file, use [save speech](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/tts/save.ts).
-For immediate playback and cancellation, use [stream and play](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/tts/play.ts).
-Both accept the same SDK text stream; device dependencies stay in the examples.
+Your application owns playback. Start with the complete WAV example in the
+[package quick start](../README.md#tts-save-speech).
 
 ## Stream incoming text
 
@@ -21,7 +17,7 @@ async function* text() {
 
 Use `client.tts.stream(text())` with the same file write and cleanup.
 The SDK handles sentence boundaries. Do not await `tts.stream()`; the first
-iterator read starts work. `writeFile` consumes the stream for you.
+iterator read starts work. The quick start collects chunks before writing a WAV file.
 
 ## Configuration
 

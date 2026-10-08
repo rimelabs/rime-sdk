@@ -1,12 +1,8 @@
 # TTS for Python
 
 You supply text; the SDK handles sentence boundaries and streams audio back.
-Your application owns playback. Start with the [package quick start](../README.md),
-or run the [streaming example](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/tts/stream.py).
-
-For a playable file, use [save speech](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/tts/save.py).
-For immediate playback and cancellation, use [stream and play](https://github.com/rimelabs/rime-sdk/blob/main/examples/python/tts/play.py).
-Both accept the same SDK text stream; device dependencies stay in the examples.
+Your application owns playback. Start with the complete WAV example in the
+[package quick start](../README.md#tts-save-speech).
 
 ## Stream incoming text
 
