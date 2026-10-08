@@ -59,6 +59,20 @@ npm test
 npm pack
 ```
 
+Check the published-package examples from the repository root:
+
+```sh
+uv sync --project examples/python --locked
+npm --prefix examples/typescript ci
+npm --prefix examples/typescript run check
+npm --prefix examples/typescript test
+```
+
+Python example tests run with the SDK's pytest suite. Node.js example tests
+use the shared controlled Prism peer, so install the TypeScript SDK's development
+dependencies before running them. Neither suite opens audio devices. Device
+release checks are listed in `examples/README.md`.
+
 ## Documentation
 
 Keep the package READMEs focused on users of the installed SDKs. Show package

@@ -10,3 +10,6 @@ coverage/
 *.egg-info/
 *.tgz
 *.pcm
+/speech.wav
+/reply.wav
+/examples/typescript/*.wav
