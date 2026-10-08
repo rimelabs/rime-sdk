@@ -1,0 +1,43 @@
+.github/dependabot.yml
+  s_264b98dc6486d6::t_0826a6ff142ebf 6-10
+README.md
+  s_264b98dc6486d6::t_55dbb0c3e1fe7a 48-52
+go/README.md
+  s_264b98dc6486d6::t_8e8f1663cfa864 160-164
+go/client.go
+  s_264b98dc6486d6::t_71a1ec7ecda768 15
+go/client_test.go
+  s_264b98dc6486d6::t_454cd804dd55f3 17,546-557
+go/go.mod
+  s_264b98dc6486d6::t_280967e48ec0ef 6,15-16
+go/go.sum
+  s_264b98dc6486d6::t_84d130327162b2 13-14
+go/stream.go
+  s_264b98dc6486d6::t_65c4d414372a0c 13
+go/stream_state_test.go
+  s_264b98dc6486d6::t_cce8b5a6ec9273 10
+python/pyproject.toml
+  s_264b98dc6486d6::t_60e8e354985b3e 11
+python/uv.lock
+  s_264b98dc6486d6::t_8fea18a922b35e 693,699,701,733
+typescript/package-lock.json
+  s_264b98dc6486d6::t_9cfe24e7f25445 14,134-136
+typescript/package.json
+  s_264b98dc6486d6::t_ab3c39cd55cb54 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3f0d542f868cbb8768e41f3261649fcc5ac4b0b3",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
