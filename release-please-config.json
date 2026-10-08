@@ -13,7 +13,8 @@
       "release-type": "simple",
       "prerelease-type": "alpha.1",
       "component": "go",
-      "package-name": "github.com/rimelabs/rime-go"
+      "package-name": "github.com/rimelabs/rime-sdk/go",
+      "tag-separator": "/"
     },
     "python": {
       "release-type": "python",

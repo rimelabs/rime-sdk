@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	rime "github.com/rimelabs/rime-go"
+	rime "github.com/rimelabs/rime-sdk/go"
 )
 
 func main() {

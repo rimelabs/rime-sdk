@@ -1,6 +1,6 @@
 # Development
 
-These instructions require access to the private source repository.
+Clone this repository to develop and test the SDKs.
 Start each command block from the repository root.
 
 ## Source layout

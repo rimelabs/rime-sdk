@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/rimelabs/rime-go/internal/proto"
+	pb "github.com/rimelabs/rime-sdk/go/internal/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )

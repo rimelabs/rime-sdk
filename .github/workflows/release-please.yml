@@ -13,7 +13,7 @@ on:
         type: string
         default: ''
       go_tag:
-        description: 'Recovery only: existing Go release tag to export'
+        description: 'Recovery only: existing Go release tag to verify'
         type: string
         default: ''
 
@@ -156,7 +156,7 @@ jobs:
       id-token: write
     env:
       RELEASE_TAG: ${{ needs.prepare.outputs.typescript_tag || inputs.typescript_tag }}
-      # npm cannot create provenance for a package built from a private repo.
+      # Retain the existing npm provenance policy during the visibility change.
       NPM_CONFIG_PROVENANCE: 'false'
     defaults:
       run:
@@ -193,6 +193,7 @@ jobs:
         run: npm publish --access public --tag latest
 
   go:
+    timeout-minutes: 15
     needs: prepare
     if: >-
       !cancelled() && github.ref == 'refs/heads/main' &&
@@ -204,6 +205,15 @@ jobs:
       run:
         working-directory: go
     steps:
+      - name: Verify public repository access
+        working-directory: ${{ runner.temp }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" != false ]; then
+            echo 'Make the repository public before verifying the Go release.' >&2
+            exit 1
+          fi
       - uses: actions/checkout@v4
         with:
           ref: refs/tags/${{ env.RELEASE_TAG }}
@@ -212,20 +222,17 @@ jobs:
         with:
           go-version-file: go/go.mod
           cache-dependency-path: go/go.sum
-      - name: Check export version and fixtures
+      - name: Check release version and fixtures
         run: |
-          test "$RELEASE_TAG" = "go-v$(cat version.txt)"
+          test "$RELEASE_TAG" = "go/v$(cat version.txt)"
           for fixture in sentences contract audio mulaw; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
       - run: go vet ./...
       - run: go test -race ./...
       - run: CGO_ENABLED=0 go build ./...
-      - run: bash tools/package.sh "$RUNNER_TEMP/rime-go.tar.gz"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rime-go-source
-          path: ${{ runner.temp }}/rime-go.tar.gz
+      - name: Download and build the published Go module
+        run: bash tools/check-public-release.sh "$RELEASE_TAG"
 
   update-python-examples:
     needs: python

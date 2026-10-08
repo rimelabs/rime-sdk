@@ -1,4 +1,4 @@
-module github.com/rimelabs/rime-go
+module github.com/rimelabs/rime-sdk/go
 
 go 1.24.0
 

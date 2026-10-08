@@ -30,6 +30,14 @@ assert node_lock["packages"][""]["version"] == node["version"], (
 assert (root / "go/version.txt").read_text().strip() == manifest["go"], (
     "Go manifest mismatch"
 )
+go_module = (root / "go/go.mod").read_text().splitlines()[0].removeprefix("module ")
+go_config = config["packages"]["go"]
+assert go_module == go_config["package-name"] == "github.com/rimelabs/rime-sdk/go", (
+    "Go module must match the public repository and subdirectory"
+)
+assert go_config["component"] == "go" and go_config["tag-separator"] == "/", (
+    "Go releases require go/v tags for the go/ subdirectory"
+)
 
 if config["prerelease"]:
     for component, version in manifest.items():

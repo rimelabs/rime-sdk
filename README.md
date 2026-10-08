@@ -16,7 +16,7 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
-| `github.com/rimelabs/rime-go` | [go](go/) | Go 1.24+; TTS only; public release pending |
+| `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS only |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
 [Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),

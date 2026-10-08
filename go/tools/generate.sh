@@ -18,9 +18,9 @@ GOBIN="$build_directory/bin" go install google.golang.org/grpc/cmd/protoc-gen-go
 mkdir "$build_directory/generated"
 PATH="$build_directory/bin:$PATH" protoc -I "$schema" \
   --go_out="$build_directory/generated" --go_opt=paths=source_relative \
-  --go_opt=Mrime/text_to_speech.proto=github.com/rimelabs/rime-go/internal/proto \
+  --go_opt=Mrime/text_to_speech.proto=github.com/rimelabs/rime-sdk/go/internal/proto \
   --go-grpc_out="$build_directory/generated" --go-grpc_opt=paths=source_relative \
-  --go-grpc_opt=Mrime/text_to_speech.proto=github.com/rimelabs/rime-go/internal/proto \
+  --go-grpc_opt=Mrime/text_to_speech.proto=github.com/rimelabs/rime-sdk/go/internal/proto \
   rime/text_to_speech.proto
 cp "$build_directory/generated/rime/"*.go "$package_root/internal/proto/"
 cp "$build_directory/package/"{LICENSE,NOTICE,SOURCE.json} "$package_root/internal/proto/"

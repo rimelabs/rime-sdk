@@ -6,15 +6,17 @@ deadlines, and cancellation. Your application owns playback.
 
 Go 1.24 or later is required. The SDK does not require cgo.
 
-The module path is `github.com/rimelabs/rime-go`. This module is prepared for
-publication but is not yet available through a public release. To use this
-checkout from another Go project:
+Install a published version from the public `rimelabs/rime-sdk` repository:
 
 ```sh
-go mod edit -require=github.com/rimelabs/rime-go@v0.1.0-alpha.1
-go mod edit -replace=github.com/rimelabs/rime-go=/absolute/path/to/rime-sdk/go
-go mod tidy
+go get github.com/rimelabs/rime-sdk/go@latest
 ```
+
+The module is in the repository's `go/` directory. Release tags use `go/v…`.
+To select an exact release, pass its version without the directory prefix, for
+example `go get github.com/rimelabs/rime-sdk/go@v0.1.0-alpha.2`.
+The repository must be public and the release tag must exist before installation.
+See [the release guide](../RELEASING.md).
 
 Set `RIME_API_KEY` in the application environment. The SDK does not load `.env` files.
 
@@ -29,7 +31,7 @@ import (
     "log"
     "os"
 
-    rime "github.com/rimelabs/rime-go"
+    rime "github.com/rimelabs/rime-sdk/go"
 )
 
 func main() {
@@ -135,6 +137,17 @@ are safe to repeat. Clients support concurrent operations. Each stream permits
 one concurrent reader. Always release both the stream and the client.
 
 ## Development
+
+To use a local checkout from another Go project before publication:
+
+```sh
+go mod edit -require=github.com/rimelabs/rime-sdk/go@v0.1.0-alpha.1
+go mod edit -replace=github.com/rimelabs/rime-sdk/go=/absolute/path/to/rime-sdk/go
+go mod tidy
+```
+
+Run these checks from the SDK's `go/` directory:
+
 
 ```sh
 go test -race ./...

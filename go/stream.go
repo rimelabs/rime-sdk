@@ -10,8 +10,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	pb "github.com/rimelabs/rime-go/internal/proto"
-	"github.com/rimelabs/rime-go/internal/sentences"
+	pb "github.com/rimelabs/rime-sdk/go/internal/proto"
+	"github.com/rimelabs/rime-sdk/go/internal/sentences"
 )
 
 // TextSource returns the next UTF-8 fragment or io.EOF. It must honor cancellation.
