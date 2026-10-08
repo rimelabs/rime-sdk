@@ -12,6 +12,10 @@ on:
         description: 'Recovery only: existing Node.js release tag to publish'
         type: string
         default: ''
+      go_tag:
+        description: 'Recovery only: existing Go release tag to export'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -22,7 +26,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag
+    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -32,6 +36,7 @@ jobs:
     outputs:
       python_tag: ${{ steps.release.outputs['python--tag_name'] }}
       typescript_tag: ${{ steps.release.outputs['typescript--tag_name'] }}
+      go_tag: ${{ steps.release.outputs['go--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
@@ -186,6 +191,41 @@ jobs:
       - run: npm pack
       - name: Publish package
         run: npm publish --access public --tag latest
+
+  go:
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.go_tag != '' || inputs.go_tag != '')
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.go_tag || inputs.go_tag }}
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - name: Check export version and fixtures
+        run: |
+          test "$RELEASE_TAG" = "go-v$(cat version.txt)"
+          for fixture in sentences contract audio mulaw; do
+            cmp "../conformance/$fixture.json" "testdata/$fixture.json"
+          done
+      - run: go vet ./...
+      - run: go test -race ./...
+      - run: CGO_ENABLED=0 go build ./...
+      - run: bash tools/package.sh "$RUNNER_TEMP/rime-go.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rime-go-source
+          path: ${{ runner.temp }}/rime-go.tar.gz
 
   update-python-examples:
     needs: python

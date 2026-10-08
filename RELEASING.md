@@ -3,6 +3,29 @@
 We publish `rimelabs-sdk` to PyPI and `@rimelabs/sdk` to npm.
 The source repository stays private. The packages are public.
 
+## Go module exports
+
+The Go module path is `github.com/rimelabs/rime-go`. Release Please tracks its
+version in `go/version.txt` and creates private tags such as
+`go-v0.1.0-alpha.2`. The Go release job tests and exports a source archive as a
+workflow artifact. It does not publish a public Go module.
+
+To publish, create the public `rimelabs/rime-go` repository, place the archive
+contents at its root, and tag the exported commit with `v0.1.0-alpha.2`. Use the
+version from the archive's `version.txt`. Preserve the embedded WASM, generated
+code, licenses, and test fixtures. Test `go get` from a clean external module.
+The private component tag is not a valid version tag for the public root module.
+
+Until that repository exists, use the local replacement described in the Go
+README. To make an export locally:
+
+```sh
+bash go/tools/package.sh /absolute/path/rime-go.tar.gz
+```
+
+The Go release job can be retried with the `go_tag` recovery input. An archive or
+a private GitHub release does not mean that the public Go module is available.
+
 ## One-time setup
 
 Complete these settings before merging the first release PR.

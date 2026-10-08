@@ -1,5 +1,12 @@
 version: 2
 updates:
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      include: scope
   - package-ecosystem: uv
     directory: /python
     schedule:

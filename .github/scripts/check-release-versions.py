@@ -27,6 +27,10 @@ assert node_lock["packages"][""]["version"] == node["version"], (
     "Node.js root lock mismatch"
 )
 
+assert (root / "go/version.txt").read_text().strip() == manifest["go"], (
+    "Go manifest mismatch"
+)
+
 if config["prerelease"]:
     for component, version in manifest.items():
         parsed = Version(version)

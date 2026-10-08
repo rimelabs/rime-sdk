@@ -1,10 +1,10 @@
 # Rime SDK
 
-First-party Python and Node.js SDKs for Coda and Mist v3 streaming speech.
-Both packages accept complete text or an async text source and return audio chunks.
+First-party Python, Node.js, and Go SDKs for Coda and Mist v3 streaming speech.
+All three accept complete text or an incremental text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
-Both packages support Prism speech-to-speech sessions through
+Python and Node.js support Prism speech-to-speech sessions through
 `client.realtime.connect`. Prism requires an explicit realtime endpoint.
 
 Coda is the default TTS model. Select `mistv3` to use Mist v3:
@@ -16,6 +16,7 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
+| `github.com/rimelabs/rime-go` | [go](go/) | Go 1.24+; TTS only; public release pending |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
 [Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),
@@ -32,6 +33,8 @@ uv run pytest
 cd ../typescript
 npm ci
 npm test
+cd ../go
+go test -race ./...
 ```
 
 Set `RIME_API_KEY` in your application environment. The SDK does not load `.env` files.
@@ -44,6 +47,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package checks and build com
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
 - Canonical schemas remain in their existing repository. These packages consume
   published `rime-api` and `@rimelabs/api` version 0.1.0.
+- Go ships internal code generated from the same published TTS schema. Its module
+  includes BlingFire WASM and requires no C toolchain. See [Go setup](go/README.md).
 
 ## Releases
 

@@ -9,6 +9,12 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "packages": {
+    "go": {
+      "release-type": "simple",
+      "prerelease-type": "alpha.1",
+      "component": "go",
+      "package-name": "github.com/rimelabs/rime-go"
+    },
     "python": {
       "release-type": "python",
       "prerelease-type": "alpha.1",

@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "schema": "rime/text_to_speech.proto",
+  "sha256": "6a5707f207c95fcb32557f4b811e30fb67c01df8fc4dc60ec823e592cc477e5e",
+  "asyncapi": {
+    "schema": "text_to_speech.asyncapi.yaml",
+    "sha256": "00e1223faf9858c278046bf774cf9f328606cfc336b02c71fdbf52c82a85ee35"
+  }
+}
