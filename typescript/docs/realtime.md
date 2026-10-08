@@ -4,10 +4,16 @@ Keep one event consumer running while your application sends input, runs tools,
 and plays audio. The SDK manages the protocol state. Your application owns
 microphone capture, tool execution, and playback.
 
-Start with the [package quick start](../README.md#prism-quick-start), or run the
-[typed-turn example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/typed-turn.mjs).
-The [example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md#nodejs)
-lists the commands and environment variables. This API requires Node.js 22 or later.
+Start with the [voice conversation](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/voice.ts)
+for microphone input, playback, and caller interruption. The
+[recorded-speech example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/realtime/recorded.ts)
+saves a spoken reply without audio hardware. See the
+[example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md)
+for commands, device requirements, and the voice tool example.
+
+Typed turns remain useful for connection checks and mixed text/voice applications.
+The live examples keep the session open after normal cancellation and report
+playback from the output clock. Saving a file is not playback.
 
 ## Connect
 
@@ -174,8 +180,8 @@ nonnegative milliseconds. The SDK waits for generation completion and supplies
 the server's drain token.
 
 Saving audio does not establish playback. Reports are optional. If you cannot
-measure playback, omit them and let the server use its estimate. The examples
-have no player and omit these reports.
+measure playback, omit them and let the server use its estimate. The recorded and typed examples have no player and omit these reports.
+The voice examples report actual playback.
 
 ## Timeouts and failures
 
@@ -185,8 +191,8 @@ tool readiness, and waiting for generation to end before a playback report.
 Once a request is submitted, `requestS` bounds its write and acknowledgment.
 
 These limits do not bound the entire conversation or generation after creation.
-Set an application deadline and close the session when it expires. Both examples
-use a 60-second deadline.
+Set an application deadline and close the session when it expires. The recorded and typed examples use a 60-second deadline. Voice conversations
+run until stopped or the connection fails.
 
 `RealtimeAdmissionTimeout` means readiness expired with no request outstanding;
 the session remains usable. An unknown request outcome closes the connection and

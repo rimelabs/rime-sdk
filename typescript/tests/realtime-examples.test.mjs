@@ -109,20 +109,3 @@ for (const calls of [0, 1, 2]) {
     assert.equal(continuation, calls > 0);
   });
 }
-
-test("README Prism quick start runs through the public package", async (t) => {
-  const readme = await readFile(
-    new URL("../README.md", import.meta.url),
-    "utf8",
-  );
-  const snippet = readme
-    .split("## Prism quick start")[1]
-    .match(/```javascript\n([\s\S]*?)```/)[1];
-  const result = await run(
-    t,
-    "readme.mjs",
-    (peer, request) => reply(peer, request),
-    snippet,
-  );
-  assert.match(result.stdout, /Hello\./);
-});

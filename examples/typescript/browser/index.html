@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rime voice example</title>
+  <style>
+    body {
+      max-width: 46rem;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      font: 18px system-ui;
+    }
+    button {
+      font: inherit;
+      padding: 0.5rem 1rem;
+    }
+    pre {
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+  </style>
+  <h1>Rime voice example</h1>
+  <p>
+    Use headphones. Press Start, then speak when Ready appears. Speak during a
+    reply to interrupt it. Stop ends the session.
+  </p>
+  <p>
+    For the order example, say “Please check order demo-123.” The order data is
+    a demo.
+  </p>
+  <button id="start">Start</button>
+  <button id="stop" disabled>Stop</button>
+  <pre id="log" role="log" aria-live="polite"></pre>
+  <script type="module" src="/app.js"></script>
+</html>

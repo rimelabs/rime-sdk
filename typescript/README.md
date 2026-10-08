@@ -19,70 +19,51 @@ does not load `.env` files.
 
 ## TTS quick start
 
-Save this as `speech.mjs` and run `node speech.mjs`:
+Save playable speech with the
+[WAV example](https://github.com/rimelabs/rime-sdk/blob/main/examples/typescript/tts/save.ts).
+After the [example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md#nodejs), run from the repository root:
 
-```javascript
-import { writeFile } from "node:fs/promises";
-import { Rime } from "@rimelabs/sdk";
-
-const client = new Rime();
-try {
-  const audio = client.tts.stream("Hello. This is Rime.");
-  await writeFile("speech.pcm", audio);
-  console.log(audio.requestId);
-} finally {
-  await client.close();
-}
+```sh
+npm --prefix examples/typescript run tts:save
 ```
 
-Output is raw mono 24 kHz signed little-endian PCM16, with no WAV header.
-The default model is Coda. Select Mist v3 with `new Rime({ model: "mistv3" })`.
+Open `examples/typescript/speech.wav` in your audio player. To hear streamed text
+as it arrives, run `npm --prefix examples/typescript run tts:play`, open the printed
+local URL, and press **Start**. **Stop** cancels generation and playback.
 
-For streamed text, voices, audio formats, and cancellation, read the
-[TTS guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/tts.md).
-Runnable scripts are in the [examples](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md).
+Replace the example's async text source with your LLM's text stream. The SDK
+handles sentence boundaries. Coda is the default; select Mist v3 with
+`new Rime({ model: "mistv3" })`.
+The [TTS guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/tts.md)
+covers voices, formats, and cancellation.
 
 ## Prism quick start
 
-Set `PRISM_URL` to your deployment's full `wss://host/v1/realtime` endpoint.
-Supply `PRISM_VOICE` unless the deployment has a default voice.
+Start a voice conversation in your browser. The Node.js server uses the SDK;
+the browser captures your microphone and plays replies. Use headphones, and
+speak during a reply to interrupt it. The API key stays on the local server.
 
-```javascript
-import { Rime, RimeRealtimeError } from "@rimelabs/sdk";
+Set `PRISM_URL` to your deployment's full WebSocket URL ending in `/v1/realtime`.
+Set `PRISM_VOICE` unless that deployment has a default. Obtain these values from
+your deployment operator; the TTS endpoint does not serve Prism.
 
-const client = new Rime();
-const deadline = setTimeout(() => void client.close(), 60_000);
-let reading;
-try {
-  const session = await client.realtime.connect({
-    endpoint: process.env.PRISM_URL,
-    voice: process.env.PRISM_VOICE,
-  });
-  reading = (async () => {
-    for await (const { payload } of session.events) {
-      if (payload.kind === "text.delta") process.stdout.write(payload.delta);
-      if (payload.kind === "error") throw new RimeRealtimeError(payload.error);
-      if (payload.kind === "response.ended") {
-        if (payload.status !== "completed")
-          throw new Error(`Response ${payload.status}`);
-        return;
-      }
-    }
-    throw new Error("Session closed before the response ended");
-  })();
-  await Promise.all([reading, session.sendText("Hello!")]);
-} finally {
-  clearTimeout(deadline);
-  await client.close();
-  await reading?.catch(() => {});
-}
+After the [example setup](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md#nodejs), run from the repository root:
+
+```sh
+npm --prefix examples/typescript run prism:voice
 ```
 
-This example prints text and discards audio. The
-[Realtime guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/realtime.md)
-covers audio input, tools, playback reports, and cancellation. Runnable
-[Prism examples](https://github.com/rimelabs/rime-sdk/blob/main/examples/README.md#nodejs)
-save audio and handle tools. TTS settings do not apply to Prism sessions.
+Open the printed local URL and press **Start**. Without a microphone, send the
+included speech recording and save `reply.wav`:
+
+```sh
+npm --prefix examples/typescript run prism:recorded
+```
+
+Run `prism:voice-tools` for the same conversation with a demo order lookup.
+The [Realtime guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/realtime.md)
+covers audio, tools, playback reports, errors, and optional typed input.
+TTS settings do not configure Prism sessions.
 
 ## License
 
