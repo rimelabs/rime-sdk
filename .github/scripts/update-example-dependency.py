@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import subprocess
+import time
 import tomllib
 from pathlib import Path
 
@@ -21,6 +22,20 @@ def pinned_version(language, text):
     dependencies = tomllib.loads(text)["project"]["dependencies"]
     pin = next(value for value in dependencies if value.startswith("rimelabs-sdk=="))
     return Version(pin.removeprefix("rimelabs-sdk=="))
+
+
+def run_registry_update(command, root):
+    # Registry indexes can lag behind a successful publish. Refresh metadata on
+    # each bounded retry; keep lockfile and registry checks outside this loop.
+    for attempt in range(1, 11):
+        try:
+            subprocess.run(command, cwd=root, check=True)
+            return
+        except subprocess.CalledProcessError:
+            if attempt == 10:
+                raise
+            print(f"Registry update failed; retrying in 15 seconds ({attempt}/10).", flush=True)
+            time.sleep(15)
 
 
 def update(root, language, version):
@@ -45,26 +60,26 @@ def update(root, language, version):
 
     project = str(manifest.parent)
     if language == "python":
-        subprocess.run(
+        run_registry_update(
             [
                 "uv",
                 "add",
                 "--project",
                 project,
                 "--no-sync",
+                "--refresh",  # Publication can be newer than the restored uv cache.
                 "--default-index",
                 "https://pypi.org/simple",
                 f"rimelabs-sdk=={target}",
             ],
-            cwd=root,
-            check=True,
+            root,
         )
         lock = tomllib.loads((root / project / "uv.lock").read_text())
         sdk = next(p for p in lock["package"] if p["name"] == "rimelabs-sdk")
         if sdk["source"].get("registry", "").rstrip("/") != "https://pypi.org/simple":
             raise ValueError("The Python example must use the published PyPI package")
     else:
-        subprocess.run(
+        run_registry_update(
             [
                 "npm",
                 "--prefix",
@@ -75,12 +90,12 @@ def update(root, language, version):
                 "--no-audit",
                 "--no-fund",
                 "--save-exact",
+                "--prefer-online",
                 f"@rimelabs/sdk@{version}",
                 "--registry=https://registry.npmjs.org/",
                 "--@rimelabs:registry=https://registry.npmjs.org/",
             ],
-            cwd=root,
-            check=True,
+            root,
         )
         lock = json.loads((root / project / "package-lock.json").read_text())
         sdk = lock["packages"]["node_modules/@rimelabs/sdk"]
