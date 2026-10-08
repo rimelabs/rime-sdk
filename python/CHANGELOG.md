@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.9](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.8...python-v0.1.0-alpha.9) (2026-10-08)
+
+
+### Bug Fixes
+
+* **deps:** bump rime-api from 0.1.0 to 0.2.0 in /python ([#32](https://github.com/rimelabs/rime-sdk/issues/32)) ([85cc364](https://github.com/rimelabs/rime-sdk/commit/85cc364d02a42b4940148d6a7126cc7fa62de8d7))
+* **deps:** use versioned API packages across SDKs ([#34](https://github.com/rimelabs/rime-sdk/issues/34)) ([bde6ecb](https://github.com/rimelabs/rime-sdk/commit/bde6ecbb50028d9f920883d5c82732e3d14fb2ed))
+
 ## [0.1.0-alpha.8](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.7...python-v0.1.0-alpha.8) (2026-10-08)
 
 
