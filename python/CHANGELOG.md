@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.8](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.7...python-v0.1.0-alpha.8) (2026-10-08)
+
+
+### Bug Fixes
+
+* make package quickstarts usable without repository access ([#24](https://github.com/rimelabs/rime-sdk/issues/24)) ([3a30b83](https://github.com/rimelabs/rime-sdk/commit/3a30b83ecaad1740c84d1e8c005520522cf56d26))
+
 ## [0.1.0-alpha.7](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.6...python-v0.1.0-alpha.7) (2026-10-08)
 
 
