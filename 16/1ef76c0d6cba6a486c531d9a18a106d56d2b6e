@@ -1,0 +1,56 @@
+README.md
+  s_264b98dc6486d6::t_386ead6dfcfa3e 19
+go/examples/save/main.go
+  s_264b98dc6486d6::t_386ead6dfcfa3e 14
+.github/workflows/release-please.yml
+  s_264b98dc6486d6::t_6503ef702f6bcd 208-216
+  s_264b98dc6486d6::t_386ead6dfcfa3e 16,159,196,225,227,234-235
+go/stream_state_test.go
+  s_264b98dc6486d6::t_386ead6dfcfa3e 10
+go/tools/check-public-release.sh
+  s_264b98dc6486d6::t_34c744b71710ac 12-13
+  s_264b98dc6486d6::t_8c4de626c8e4ff 1-11,14-50
+go/client.go
+  s_264b98dc6486d6::t_386ead6dfcfa3e 15
+go/README.md
+  s_264b98dc6486d6::t_386ead6dfcfa3e 9,12,15-20,34,141-150
+  s_264b98dc6486d6::t_5722db05c80a10 151
+CONTRIBUTING.md
+  s_264b98dc6486d6::t_386ead6dfcfa3e 3
+go/tools/generate.sh
+  s_264b98dc6486d6::t_386ead6dfcfa3e 21,23
+release-please-config.json
+  s_264b98dc6486d6::t_386ead6dfcfa3e 16-17
+.github/scripts/tests/test_go_release.py
+  s_264b98dc6486d6::t_991f8de3d8689b 1-57,59,65-94,96-100
+  s_264b98dc6486d6::t_5645c706e278cd 95
+  s_264b98dc6486d6::t_52e777cc6869cd 58,60-64
+go/go.mod
+  s_264b98dc6486d6::t_386ead6dfcfa3e 1
+go/client_test.go
+  s_264b98dc6486d6::t_386ead6dfcfa3e 17
+.github/scripts/check-release-versions.py
+  s_264b98dc6486d6::t_9219be85538203 33-40
+go/stream.go
+  s_264b98dc6486d6::t_386ead6dfcfa3e 13-14
+RELEASING.md
+  s_264b98dc6486d6::t_7d91c4b035cb53 3-46,83-84,106-107,116-117,121,167,173-174,213,221-224,241-244
+go/tools/package.sh
+  s_264b98dc6486d6::t_98657aeba8137d 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "161ef76c0d6cba6a486c531d9a18a106d56d2b6e",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
