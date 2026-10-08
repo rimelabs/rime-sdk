@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.7](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.6...python-v0.1.0-alpha.7) (2026-10-08)
+
+
+### Features
+
+* add voice examples and automate example dependency updates ([#22](https://github.com/rimelabs/rime-sdk/issues/22)) ([dea7044](https://github.com/rimelabs/rime-sdk/commit/dea7044831058ebee9ae536e8d822a4d7fabbd3d))
+
 ## [0.1.0-alpha.6](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.5...python-v0.1.0-alpha.6) (2026-10-07)
 
 

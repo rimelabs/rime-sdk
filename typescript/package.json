@@ -1,6 +1,6 @@
 {
   "name": "@rimelabs/sdk",
-  "version": "0.1.0-alpha.7",
+  "version": "0.1.0-alpha.8",
   "description": "Rime streaming TTS and Prism realtime SDK for Node.js",
   "license": "MIT",
   "repository": {
