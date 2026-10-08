@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.2](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.1...go/v0.1.0-alpha.2) (2026-10-08)
+
+
+### Features
+
+* add Go TTS SDK and public module releases ([#26](https://github.com/rimelabs/rime-sdk/issues/26)) ([dc03e89](https://github.com/rimelabs/rime-sdk/commit/dc03e8999797d9a3af84c512e9b774d6e4f8c770))
+
 ## 0.1.0-alpha.1
 
 - Add Go TTS support for Coda and Mist v3.
