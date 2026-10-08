@@ -60,6 +60,11 @@ jobs:
       - run: uv run ruff format --check src tests ../examples/python
       - run: uv run mypy src
       - run: uv run pytest
+      - name: Check release automation
+        run: |
+          uv run ruff check ../.github/scripts/update-example-dependency.py ../.github/scripts/tests
+          uv run ruff format --check ../.github/scripts/update-example-dependency.py ../.github/scripts/tests
+          uv run pytest ../.github/scripts/tests
       - run: uv build
   typescript:
     needs: changes

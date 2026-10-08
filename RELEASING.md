@@ -66,6 +66,8 @@ not support private source repositories, so this workflow disables provenance.
    [PyPI](https://pypi.org/project/rimelabs-sdk/) and
    [npm](https://www.npmjs.com/package/@rimelabs/sdk).
    Test an install of the exact version in a clean project before announcing it.
+7. Review the example dependency PR for each published package. Wait for
+   **Package checks**, then merge it to update the examples.
 
 You do not need to edit package versions or create tags for routine releases.
 Python and Node.js have independent versions. One release PR can include either
@@ -77,6 +79,25 @@ itself select either package. If a shared change needs a package release, includ
 an appropriate change inside each affected package with a `fix:` or `feat:` commit.
 Maintenance commits alone generally do not start a release. Use `fix:` or `feat:`
 for user-visible package changes, and describe breaking changes in the PR body.
+
+## Example dependency updates
+
+After a publishing job succeeds, the release workflow opens or updates a PR on
+`automation/examples-python` or `automation/examples-typescript`. Each PR updates
+the example's exact SDK version and lockfile using the published package. Python
+and TypeScript updates run independently. Failed publishing jobs do not update
+examples, and recovery runs do not downgrade existing pins or newer pending PRs.
+
+The workflow checks the updated example install and starts **Package checks** on
+the PR branch. It uses the existing `GITHUB_TOKEN`; no additional secret is needed.
+Review and merge these PRs. Keep their `chore(examples):` titles so dependency
+updates do not request another SDK release.
+
+If the update fails after publication, rerun its failed job. You can also run
+**Update example SDK dependency** from the Actions tab on `main`, with the language
+and an already published version. Use the PyPI spelling for Python, such as
+`0.1.0a7`, and the npm spelling for TypeScript, such as `0.1.0-alpha.7`.
+This workflow only updates examples; it does not publish packages.
 
 ## API dependency updates
 

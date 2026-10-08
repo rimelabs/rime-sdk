@@ -73,6 +73,9 @@ use the shared controlled Prism peer, so install the TypeScript SDK's developmen
 dependencies before running them. Neither suite opens audio devices. Device
 release checks are listed in `examples/README.md`.
 
+For changes to example release automation, run
+`uv run --project python pytest .github/scripts/tests` from the repository root.
+
 ## Documentation
 
 Keep the package READMEs focused on users of the installed SDKs. Show package

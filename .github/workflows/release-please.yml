@@ -93,6 +93,8 @@ jobs:
       (needs.prepare.outputs.python_tag != '' || inputs.python_tag != '')
     runs-on: ubuntu-latest
     environment: pypi
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     permissions:
       contents: read
       id-token: write
@@ -111,6 +113,7 @@ jobs:
           python-version: '3.12'
       - run: uv sync --locked --dev
       - name: Verify release version and alpha policy
+        id: version
         run: |
           uv run python - <<'PY'
           import json, os, tomllib
@@ -124,6 +127,8 @@ jobs:
           assert Version(version) == Version(manifest['python'])
           if config['prerelease']:
               assert Version(version).pre and Version(version).pre[0] == 'a'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\n')
           PY
       - run: uv run ruff check src tests ../examples/python
       - run: uv run ruff format --check src tests ../examples/python
@@ -139,6 +144,8 @@ jobs:
       (needs.prepare.outputs.typescript_tag != '' || inputs.typescript_tag != '')
     runs-on: ubuntu-latest
     environment: npm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     permissions:
       contents: read
       id-token: write
@@ -161,6 +168,7 @@ jobs:
       - run: npm install --global npm@11.18.0
       - run: npm ci
       - name: Verify release version and alpha policy
+        id: version
         run: |
           node --input-type=commonjs <<'JS'
           const assert = require('node:assert/strict');
@@ -170,6 +178,7 @@ jobs:
           assert.equal(process.env.RELEASE_TAG, 'typescript-v' + version);
           assert.equal(version, manifest.typescript);
           if (config.prerelease) assert.match(version, /^\d+\.\d+\.\d+-alpha\.\d+$/);
+          require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, `version=${version}\n`);
           JS
       - run: npm run check
       - run: npm run lint
@@ -177,3 +186,27 @@ jobs:
       - run: npm pack
       - name: Publish package
         run: npm publish --access public --tag latest
+
+  update-python-examples:
+    needs: python
+    if: ${{ !cancelled() && needs.python.result == 'success' }}
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: ./.github/workflows/update-examples.yml
+    with:
+      language: python
+      version: ${{ needs.python.outputs.version }}
+
+  update-typescript-examples:
+    needs: typescript
+    if: ${{ !cancelled() && needs.typescript.result == 'success' }}
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    uses: ./.github/workflows/update-examples.yml
+    with:
+      language: typescript
+      version: ${{ needs.typescript.outputs.version }}

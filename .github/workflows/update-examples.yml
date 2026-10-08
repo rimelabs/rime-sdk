@@ -1,0 +1,95 @@
+name: Update example SDK dependency
+on:
+  workflow_call:
+    inputs:
+      language:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      language:
+        description: Example language
+        type: choice
+        options: [python, typescript]
+        required: true
+      version:
+        description: Already published SDK version
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: example-dependency-${{ inputs.language }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      EXAMPLE_LANGUAGE: ${{ inputs.language }}
+      SDK_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        if: inputs.language == 'typescript'
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Update the published dependency and lockfile
+        id: update
+        run: >-
+          uv run --project python --locked python .github/scripts/update-example-dependency.py
+          "$EXAMPLE_LANGUAGE" "$SDK_VERSION"
+      - name: Check the Python example install
+        if: steps.update.outputs.changed == 'true' && inputs.language == 'python'
+        run: |
+          uv sync --project examples/python --locked
+          uv run --project examples/python --locked python -c 'from rimelabs_sdk import Rime; from rimelabs_sdk.realtime import AudioChunk'
+      - name: Check the TypeScript examples
+        if: steps.update.outputs.changed == 'true' && inputs.language == 'typescript'
+        run: |
+          npm --prefix typescript ci
+          npm --prefix examples/typescript ci
+          npm --prefix examples/typescript run check
+          npm --prefix examples/typescript test
+      - name: Open or update the dependency PR
+        if: steps.update.outputs.changed == 'true'
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: automation/examples-${{ inputs.language }}
+          base: main
+          add-paths: examples/${{ inputs.language }}/
+          commit-message: 'chore(examples): use ${{ inputs.language }} SDK ${{ inputs.version }}'
+          title: 'chore(examples): use ${{ inputs.language }} SDK ${{ inputs.version }}'
+          body: |
+            Update the example SDK dependency and lockfile to published version `${{ inputs.version }}`.
+
+            Review the Package checks results before merging.
+      # PRs created with GITHUB_TOKEN do not trigger pull_request workflows.
+      - name: Run checks on the dependency PR
+        if: steps.pr.outputs.pull-request-number != ''
+        uses: actions/github-script@v7
+        env:
+          UPDATE_BRANCH: ${{ steps.pr.outputs.pull-request-branch }}
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
+              workflow_id: 'checks.yml',
+              ref: process.env.UPDATE_BRANCH,
+            });
