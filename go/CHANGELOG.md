@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.3](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.2...go/v0.1.0-alpha.3) (2026-10-08)
+
+
+### Bug Fixes
+
+* **deps:** use versioned API packages across SDKs ([#34](https://github.com/rimelabs/rime-sdk/issues/34)) ([bde6ecb](https://github.com/rimelabs/rime-sdk/commit/bde6ecbb50028d9f920883d5c82732e3d14fb2ed))
+
 ## [0.1.0-alpha.2](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.1...go/v0.1.0-alpha.2) (2026-10-08)
 
 
