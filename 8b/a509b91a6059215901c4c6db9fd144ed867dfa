@@ -1,0 +1,33 @@
+.github/workflows/update-examples.yml
+  s_d239dfcb061240::t_2c4f8383a397cb 1-95
+.github/workflows/release-please.yml
+  s_d239dfcb061240::t_2c4f8383a397cb 96-97,116,130-131,147-148,171,181,189-212
+.github/scripts/update-example-dependency.py
+  s_d239dfcb061240::t_64ef574dcfac38 1-39,41-59,71-103
+  s_d239dfcb061240::t_4fac115baf7980 40,60-70
+.github/workflows/checks.yml
+  s_d239dfcb061240::t_bc4417b9a4e97a 63-67
+CONTRIBUTING.md
+  s_d239dfcb061240::t_bc4417b9a4e97a 76-78
+RELEASING.md
+  s_d239dfcb061240::t_64ef574dcfac38 69-70,83-100
+  s_d239dfcb061240::t_07a891140828a4 101
+.github/scripts/tests/test_update_example_dependency.py
+  s_d239dfcb061240::t_5bb1905be90b27 1-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ba509b91a6059215901c4c6db9fd144ed867dfa",
+  "prompts": {},
+  "sessions": {
+    "s_d239dfcb061240": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1140e-097a-7500-8842-e83935fdb028",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
