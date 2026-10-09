@@ -63,6 +63,8 @@ def test_update_requires_the_requested_registry_package(
 ):
     path = project(tmp_path, language, "0.1.0-alpha.6")
     commands = []
+    delays = []
+    monkeypatch.setattr(updater.time, "sleep", delays.append)
 
     def run(command, **kwargs):
         commands.append(command)
@@ -109,9 +111,32 @@ def test_update_requires_the_requested_registry_package(
     else:
         with pytest.raises(ValueError):
             updater.update(tmp_path, language, "0.1.0-alpha.7")
+    assert len(delays) == (9 if outcome == "missing" else 0)
     if language == "python":
         assert "rimelabs-sdk==0.1.0a7" in commands[-1]
+        assert "--refresh" in commands[-1]
         assert commands[-1][commands[-1].index("--default-index") + 1] == "https://pypi.org/simple"
     else:
         assert "@rimelabs/sdk@0.1.0-alpha.7" in commands[-1]
+        assert "--prefer-online" in commands[-1]
         assert "--@rimelabs:registry=https://registry.npmjs.org/" in commands[-1]
+
+
+def test_registry_update_recovers_after_publication_delay(tmp_path, monkeypatch):
+    calls = []
+    delays = []
+    command = ["package-manager", "install", "new-release"]
+
+    def run(arguments, **kwargs):
+        assert arguments == command
+        assert kwargs == {"cwd": tmp_path, "check": True}
+        calls.append(arguments)
+        if len(calls) < 3:
+            raise subprocess.CalledProcessError(1, arguments)
+        return subprocess.CompletedProcess(arguments, 0)
+
+    monkeypatch.setattr(updater.subprocess, "run", run)
+    monkeypatch.setattr(updater.time, "sleep", delays.append)
+    updater.run_registry_update(command, tmp_path)
+    assert len(calls) == 3
+    assert delays == [15, 15]

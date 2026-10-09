@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.10](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.9...typescript-v0.1.0-alpha.10) (2026-10-08)
+
+
+### Bug Fixes
+
+* **deps:** bump @rimelabs/api from 0.1.0 to 0.2.0 in /typescript ([#31](https://github.com/rimelabs/rime-sdk/issues/31)) ([8a89dad](https://github.com/rimelabs/rime-sdk/commit/8a89dad7a5b0ca94da47641e5e91e031cf1ace6d))
+* **deps:** use versioned API packages across SDKs ([#34](https://github.com/rimelabs/rime-sdk/issues/34)) ([bde6ecb](https://github.com/rimelabs/rime-sdk/commit/bde6ecbb50028d9f920883d5c82732e3d14fb2ed))
+
 ## [0.1.0-alpha.9](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.8...typescript-v0.1.0-alpha.9) (2026-10-08)
 
 
