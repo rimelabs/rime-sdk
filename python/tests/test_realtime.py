@@ -231,11 +231,11 @@ async def test_outgoing_audio_limit_preserves_conversion_state(monkeypatch):
             r.AudioChunk(data=b"\x01\x00" * 5, format=r.PCMFormat(sample_rate=24000))
         )
         await peer.next("input_audio_buffer.append")
-        previous = current._audio_format, current._resample_state
+        previous = current._input_converter
         chunk = r.AudioChunk(data=b"\x02\x00" * 96001)
         with pytest.raises(RimeAudioFormatError, match="at most 192000 bytes"):
             await current.send_audio(chunk)
-        assert (current._audio_format, current._resample_state) == previous
+        assert current._input_converter is previous
         assert peer.sent.empty()
         await current.send_audio(r.AudioChunk(data=b"\x00\x00" * 96000))
         audio = b""
@@ -1281,3 +1281,30 @@ async def test_unknown_request_outcome_is_not_an_admission_timeout(monkeypatch):
         assert not isinstance(raised.value, r.RealtimeAdmissionTimeout)
         with pytest.raises(RimeTimeoutError):
             await current.send_text("next")
+
+
+_AUDIO_VECTORS = json.loads((Path(__file__).parents[2] / "conformance/pcm-input.json").read_text())[
+    "vectors"
+]
+
+
+@pytest.mark.parametrize("vector", _AUDIO_VECTORS)
+@pytest.mark.parametrize("split", [False, True])
+async def test_realtime_input_matches_shared_pcm_vectors(monkeypatch, vector, split):
+    import struct
+
+    def pcm(samples):
+        return struct.pack(f"<{len(samples)}h", *samples)
+
+    async with session(monkeypatch) as (current, peer, _):
+        source = pcm(vector["input"])
+        format = r.PCMFormat(sample_rate=vector["sampleRate"], channels=vector["channels"])
+        step = 2 * format.channels if split else len(source)
+        for offset in range(0, len(source), step):
+            await current.send_audio(
+                r.AudioChunk(data=source[offset : offset + step], format=format)
+            )
+        output = []
+        while not peer.sent.empty():
+            output.append(base64.b64decode((await peer.next("input_audio_buffer.append"))["audio"]))
+        assert b"".join(output) == pcm(vector["output"])

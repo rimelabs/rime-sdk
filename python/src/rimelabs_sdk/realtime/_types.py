@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from .._errors import RimeAudioFormatError, RimeError, RimeInputError, RimeTimeoutError
+from .._pcm import PCMFormat
 
 
 class RealtimeAdmissionTimeout(RimeTimeoutError):
@@ -27,21 +28,6 @@ class RealtimeTimeouts:
         for value in (self.connect_s, self.ready_s, self.request_s):
             if not math.isfinite(value) or value <= 0:
                 raise RimeInputError("Timeouts must be finite and positive")
-
-
-@dataclass(frozen=True, kw_only=True)
-class PCMFormat:
-    sample_rate: Literal[8000, 16000, 24000, 48000] = 16000
-    channels: Literal[1, 2] = 1
-    encoding: Literal["pcm_s16le"] = "pcm_s16le"
-
-    def __post_init__(self):
-        if (
-            self.sample_rate not in (8000, 16000, 24000, 48000)
-            or self.channels not in (1, 2)
-            or self.encoding != "pcm_s16le"
-        ):
-            raise RimeAudioFormatError("Use PCM16 at 8, 16, 24 or 48 kHz, with one or two channels")
 
 
 @dataclass(frozen=True, kw_only=True)

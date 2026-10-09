@@ -11,12 +11,14 @@ from ._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
+from ._pcm import PCMFormat
 from .tts._audio import AudioFormat
 from .tts._stream import AudioStream
 
 __all__ = [
     "AudioFormat",
     "AudioStream",
+    "PCMFormat",
     "Rime",
     "RimeAudioFormatError",
     "RimeAuthenticationError",
@@ -28,4 +30,17 @@ __all__ = [
     "RimeStreamError",
     "RimeTimeoutError",
     "RimeUnavailableError",
+    "TranscriptStream",
+    "TranscriptionFinal",
+    "TranscriptionMode",
+    "TranscriptionPartial",
+    "TranscriptionUpdate",
 ]
+
+from .stt import (
+    TranscriptionFinal,
+    TranscriptionMode,
+    TranscriptionPartial,
+    TranscriptionUpdate,
+    TranscriptStream,
+)

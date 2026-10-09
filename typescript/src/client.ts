@@ -1,3 +1,6 @@
+import { STT } from "./stt/client.js";
+import type { AudioSource, TranscriptionOptions } from "./stt/types.js";
+import type { TranscriptStream } from "./stt/stream.js";
 import { Credentials } from "./auth.js";
 import { RimeAuthenticationError, RimeInputError } from "./errors.js";
 import {
@@ -24,11 +27,20 @@ export interface RimeOptions {
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
+  /** Recognition hostname and optional port; defaults to stt.api.rime.ai:443. */
+  sttEndpoint?: string | null;
 }
 
 export class Rime {
   private readonly credentials: Credentials;
   private readonly ttsClient: TTS;
+  private readonly sttClient: STT;
+  readonly stt: {
+    stream: (
+      audio: AudioSource,
+      options: TranscriptionOptions,
+    ) => TranscriptStream;
+  };
   private readonly realtimeClient: Realtime;
   readonly realtime: {
     connect: (options: RealtimeConnectOptions) => Promise<RealtimeSession>;
@@ -53,6 +65,12 @@ export class Rime {
     const defaultTimeout = timeout(options.timeout);
     const deployment = resolve(options.model ?? "coda", options.endpoint);
     this.credentials = new Credentials(key, deployment);
+    this.sttClient = new STT(this.credentials, options.sttEndpoint, () =>
+      this.checkOpen(),
+    );
+    this.stt = {
+      stream: (audio, options) => this.sttClient.stream(audio, options),
+    };
     this.realtimeClient = new Realtime(this.credentials, () =>
       this.checkOpen(),
     );
@@ -77,11 +95,17 @@ export class Rime {
     if (!this.closing) {
       this.closed = true;
       this.closing = (async () => {
-        await Promise.all([
-          this.ttsClient.close(),
-          this.realtimeClient.close(),
-        ]);
-        await this.credentials.close();
+        try {
+          const results = await Promise.allSettled([
+            this.ttsClient.close(),
+            this.sttClient.close(),
+            this.realtimeClient.close(),
+          ]);
+          for (const result of results)
+            if (result.status === "rejected") throw result.reason;
+        } finally {
+          await this.credentials.close();
+        }
       })();
     }
     await this.closing;

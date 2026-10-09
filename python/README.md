@@ -1,7 +1,8 @@
 # Rime SDK for Python
 
-Generate speech with TTS, or send speech to Prism and receive a spoken reply.
-Both APIs use the `Rime` client. Your application handles audio capture and playback.
+Generate speech with TTS, transcribe audio with STT, or send speech to Prism
+and receive a spoken reply. All use the `Rime` client. Your application handles
+audio capture and playback.
 
 ## Install
 
@@ -55,6 +56,26 @@ Coda is the default model. Use `Rime(model="mistv3")` for Mist v3, or pass
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
 To supply text from an LLM, pass an async iterable of strings instead of a string.
 The SDK handles sentence boundaries.
+
+## STT quick start
+
+Stream one utterance of headerless signed PCM16 little-endian audio. Specify the
+spoken language; exhaust the audio source when the utterance ends. Each update
+replaces the complete current transcript.
+
+```python
+from rimelabs_sdk import Rime
+
+
+async def recognize(audio_chunks):
+    async with Rime() as client:
+        async with client.stt.stream(audio_chunks, language="en") as transcript:
+            async for update in transcript:
+                print(update.kind, update.text)
+```
+
+Input defaults to 16 kHz mono. The [STT guide](https://github.com/rimelabs/rime-sdk/blob/main/python/docs/stt.md)
+covers other PCM formats, written/verbatim output, recognition hints and cancellation.
 
 ## Prism: send recorded speech
 

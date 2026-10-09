@@ -92,15 +92,21 @@ func (s *testService) GetSupportedSpeakers(ctx context.Context, request *pb.GetS
 
 func setupClient(t *testing.T, service *testService) *Client {
 	t.Helper()
+	return setupServices(t, func(server *grpc.Server) { pb.RegisterTextToSpeechServer(server, service) })
+}
+
+func setupServices(t *testing.T, register func(*grpc.Server)) *Client {
+	t.Helper()
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer()
-	pb.RegisterTextToSpeechServer(server, service)
+	register(server)
 	go func() { _ = server.Serve(listener) }()
 	c, err := NewClient(Config{APIKey: "test-key"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	c.dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() })}
+	c.sttDialOptions = c.dialOptions
 	t.Cleanup(func() { c.Close(); server.Stop(); listener.Close() })
 	return c
 }

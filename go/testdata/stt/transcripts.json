@@ -1,0 +1,563 @@
+{
+  "cases": [
+    {
+      "name": "replacement snapshots",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "I scream",
+            "revision": "1"
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "Ice cream",
+            "revision": "2"
+          }
+        },
+        {
+          "done": {
+            "text": "Ice cream",
+            "revision": "2",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "expected": [
+        {
+          "kind": "partial",
+          "text": "I scream"
+        },
+        {
+          "kind": "partial",
+          "text": "Ice cream"
+        },
+        {
+          "kind": "final",
+          "text": "Ice cream",
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "name": "silence",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "expected": [
+        {
+          "kind": "final",
+          "text": "",
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "name": "unknown payloads and fields",
+      "messages": [
+        {
+          "futureEvent": {}
+        },
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "futureEvent": {}
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "futureEvent": {}
+        }
+      ],
+      "expected": [
+        {
+          "kind": "final",
+          "text": "",
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "name": "missing final",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "1"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "no responses",
+      "messages": [],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "partial before acceptance",
+      "messages": [
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "1"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "done before acceptance",
+      "messages": [
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "duplicate acceptance",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "wrong contract",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": 1
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "no language at acceptance",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": 2
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "unresolved language at acceptance",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": 2,
+            "language": {
+              "tag": "en"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "delta under revised contract",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "delta": {
+            "text": "hello"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "revision zero",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "0"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "initial revision two",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "2"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "duplicate revision",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "1"
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hi",
+            "revision": "1"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "regressing revision",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "a",
+            "revision": "1"
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "ab",
+            "revision": "3"
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "abc",
+            "revision": "2"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "mismatched final revision",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hi",
+            "revision": "1"
+          }
+        },
+        {
+          "done": {
+            "text": "hi",
+            "revision": "2",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "mismatched final text",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hi",
+            "revision": "1"
+          }
+        },
+        {
+          "done": {
+            "text": "bye",
+            "revision": "1",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "mismatched final language",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "es",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "missing final language",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {}
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "duplicate final",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "hypothesis after final",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hi",
+            "revision": "1"
+          }
+        }
+      ],
+      "error": "RimeStreamError"
+    },
+    {
+      "name": "early final",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "error": "RimeStreamError",
+      "inputDone": false
+    }
+  ]
+}

@@ -12,7 +12,9 @@
     "prism:voice": "tsx realtime/voice.ts",
     "prism:voice-tools": "tsx realtime/voice-tools.ts",
     "check": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.mjs"
+    "test": "tsx --test tests/*.test.mjs",
+    "stt": "node stt/stream.mjs",
+    "stt:voice": "node stt/voice.mjs"
   },
   "dependencies": {
     "@rimelabs/sdk": "0.1.0-alpha.10",
