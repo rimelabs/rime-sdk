@@ -1,0 +1,31 @@
+go/client.go
+  s_a1d869d7294c6e::t_327c3f8f382d15 28,121
+python/src/rimelabs_sdk/stt/_policy.py
+  s_a1d869d7294c6e::t_327c3f8f382d15 12
+go/README.md
+  s_a1d869d7294c6e::t_327c3f8f382d15 196
+typescript/src/stt/policy.ts
+  s_a1d869d7294c6e::t_327c3f8f382d15 3
+typescript/docs/stt.md
+  s_a1d869d7294c6e::t_327c3f8f382d15 55
+python/docs/stt.md
+  s_a1d869d7294c6e::t_327c3f8f382d15 57
+typescript/src/client.ts
+  s_a1d869d7294c6e::t_327c3f8f382d15 30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3bc488585525c99ed77fdddd730d71d0919e77d2",
+  "prompts": {},
+  "sessions": {
+    "s_a1d869d7294c6e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1219a-8289-70a1-95c7-0b7ac659995a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
