@@ -113,6 +113,11 @@ func (s *AudioStream) setID(id string) {
 }
 func (s *AudioStream) complete() { s.finishOnce.Do(func() { close(s.done); s.op.close() }) }
 func (s *AudioStream) fail(err error) {
+	// Transport cancellation can arrive before watch observes the context.
+	// Preserve the original cancellation or deadline cause in either order.
+	if cause := context.Cause(s.op.ctx); cause != nil {
+		err = cause
+	}
 	mapped := operationError(err, s.RequestID())
 	s.queue.fail(mapped)
 	s.op.cancel(mapped)
