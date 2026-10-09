@@ -195,8 +195,8 @@ stream lifetime rules.
 | `Timeout` | `0` | Overall TTS operation duration; zero disables it |
 | `STTEndpoint` | `stt.api.rime.ai:443` | Independent STT TLS hostname with optional port; no scheme or path |
 
-Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
-`mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.
+Coda uses `coda.api.rime.ai:50051` and voice `clementine`. Mist v3 uses
+`mist.api.rime.ai:50051` and voice `astra`. Both use language `en` by default.
 
 `SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, and `Timeout`.
 Empty voice and language values select defaults. Audio formats are `PCM24000`

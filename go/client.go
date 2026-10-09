@@ -104,9 +104,9 @@ func NewClient(config Config) (*Client, error) {
 	if model == "" {
 		model = "coda"
 	}
-	target, voice := "coda.api.rime.ai:443", "clementine"
+	target, voice := "coda.api.rime.ai:50051", "clementine"
 	if model == "mistv3" {
-		target, voice = "mist.api.rime.ai:443", "astra"
+		target, voice = "mist.api.rime.ai:50051", "astra"
 	} else if model != "coda" {
 		return nil, failure(ErrInput, "model must be coda or mistv3")
 	}

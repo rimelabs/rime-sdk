@@ -3,7 +3,7 @@ export { timeout } from "../validation.js";
 import { RimeInputError } from "../errors.js";
 const codaHostname = "coda.api.rime.ai";
 export const policy = {
-  target: `${codaHostname}:443`,
+  target: `${codaHostname}:50051`,
   audience: codaHostname,
   defaultVoice: "clementine",
   exchangeUrl: "https://themis.api.rime.ai/v1/token",
@@ -26,7 +26,7 @@ export function resolve(
   const deployment = { ...policy };
   if (model === "mistv3") {
     const hostname = "mist.api.rime.ai";
-    deployment.target = `${hostname}:443`;
+    deployment.target = `${hostname}:50051`;
     deployment.audience = hostname;
     deployment.defaultVoice = "astra";
   } else if (model !== "coda") {

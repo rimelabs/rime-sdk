@@ -12,7 +12,7 @@ _CODA_HOSTNAME = "coda.api.rime.ai"
 
 @dataclass(frozen=True)
 class Policy:
-    target: str = f"{_CODA_HOSTNAME}:443"
+    target: str = f"{_CODA_HOSTNAME}:50051"
     audience: str = _CODA_HOSTNAME
     default_voice: str = "clementine"
     exchange_url: str = "https://themis.api.rime.ai/v1/token"
@@ -38,7 +38,7 @@ def resolve(model: str, endpoint: str | None) -> Policy:
     elif model == "mistv3":
         hostname = "mist.api.rime.ai"
         deployment = replace(
-            POLICY, target=f"{hostname}:443", audience=hostname, default_voice="astra"
+            POLICY, target=f"{hostname}:50051", audience=hostname, default_voice="astra"
         )
     else:
         raise RimeInputError("model must be 'coda' or 'mistv3'")
