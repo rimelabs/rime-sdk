@@ -194,10 +194,9 @@ async def main(options):
         raise RuntimeError("Set RIME_API_KEY in your environment")
     if not options.no_playback and not shutil.which("sox"):
         raise RuntimeError("Install SoX (brew install sox), or pass --no-playback")
-    track = "canary" if options.canary else "stable"
-    directory = options.output_dir or Path(tempfile.mkdtemp(prefix=f"rime-coda-{track}-"))
+    directory = options.output_dir or Path(tempfile.mkdtemp(prefix="rime-coda-"))
     directory.mkdir(parents=True, exist_ok=True)
-    headers = {"Authorization": f"Bearer {key}", "x-rime-track": track}
+    headers = {"Authorization": f"Bearer {key}"}
     transport = None
     try:
         async with connect(
@@ -214,7 +213,7 @@ async def main(options):
                 raise RuntimeError("Expected Coda WebSocket protocol v1 readiness")
             if options.language not in ready.get("languages", []):
                 raise ValueError(f"Unsupported language. Available: {ready.get('languages')}")
-            print(f"Connected: {options.url} | track={track} | voice={options.voice}")
+            print(f"Connected: {options.url} | voice={options.voice}")
             print(
                 "Input: complete text in start"
                 if options.complete_text
@@ -277,11 +276,6 @@ async def main(options):
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--canary",
-        action="store_true",
-        help="Select x-rime-track: canary (default: stable)",
-    )
     parser.add_argument("--voice", default="lyra")
     parser.add_argument("--language", default="en")
     parser.add_argument("--url", default=URL)

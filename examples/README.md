@@ -34,12 +34,10 @@ The guide includes the setup for this unreleased STT development checkout.
 With `RIME_API_KEY` set and SoX installed (`brew install sox` on macOS), run:
 
 ```sh
-uv run --project python python examples/python/tts/coda_ws.py --canary
+uv run --project python python examples/python/tts/coda_ws.py
 ```
 
-This connects directly to `wss://api.rime.ai/coda/ws`. `--canary` sends
-`x-rime-track: canary`; omit it to select `stable` explicitly. The track selects
-a deployment, and the readiness message does not identify its model version.
+This connects directly to `wss://api.rime.ai/coda/ws`.
 
 Enter complete sentences or stable clauses, one per line. Each line becomes a
 `text` message in the same synthesis context, and audio plays as it arrives.
@@ -52,7 +50,7 @@ text stream finishes, rather than waiting for audio to finish.
 For listening to complete typed turns, add `--auto-end`:
 
 ```sh
-uv run --project python python examples/python/tts/coda_ws.py --canary --auto-end
+uv run --project python python examples/python/tts/coda_ws.py --auto-end
 ```
 
 Each entered line sends a `text` message followed immediately by `end`. Audio
@@ -68,7 +66,7 @@ subsequent runs), `--voice NAME` to select a voice, or `--no-playback` to save o
 A single command can also send multiple chunks with a pause between them:
 
 ```sh
-uv run --project python python examples/python/tts/coda_ws.py --canary \
+uv run --project python python examples/python/tts/coda_ws.py \
   --text "Hello from Coda." \
   --text "This sentence arrives two seconds later." --chunk-delay 2
 ```
@@ -76,17 +74,17 @@ uv run --project python python examples/python/tts/coda_ws.py --canary \
 The tester prints each sent chunk, the request ID, and elapsed time from `start`
 to the first received audio byte. This timing excludes speaker buffering.
 
-To isolate synthesis input mode, use exactly the same text, voice, and track:
+To isolate synthesis input mode, use exactly the same text and voice:
 
 ```sh
 # Complete input in start.text; output audio still streams.
-uv run --project python python examples/python/tts/coda_ws.py --canary \
+uv run --project python python examples/python/tts/coda_ws.py \
   --complete-text --text "Your appointment is confirmed for tomorrow at ten."
 # Streaming input: empty start, one text message, then immediate end.
-uv run --project python python examples/python/tts/coda_ws.py --canary \
+uv run --project python python examples/python/tts/coda_ws.py \
   --text "Your appointment is confirmed for tomorrow at ten."
 # Same streaming input with additional initial text context.
-uv run --project python python examples/python/tts/coda_ws.py --canary \
+uv run --project python python examples/python/tts/coda_ws.py \
   --lookahead-tokens 8 --text "Your appointment is confirmed for tomorrow at ten."
 ```
 

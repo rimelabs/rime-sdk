@@ -103,10 +103,7 @@ async def test_audio_plays_before_next_text_and_connection_survives_turns(
     assert b"".join(samples) == b"\x01\x00\x02\x00\x03\x00" * 2
 
 
-@pytest.mark.parametrize("canary", [False, True])
-async def test_track_header_and_incomplete_audio_never_saved_as_success(
-    example, monkeypatch, tmp_path, canary
-):
+async def test_incomplete_audio_never_saved_as_success(example, monkeypatch, tmp_path):
     monkeypatch.setenv("RIME_API_KEY", "test-key")
     headers = []
 
@@ -123,11 +120,8 @@ async def test_track_header_and_incomplete_audio_never_saved_as_success(
     async with serve(peer, "127.0.0.1", 0, subprotocols=["rime.v1.json"]) as server:
         url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
         args = ["--url", url, "--text", "Hello.", "--no-playback", "--output-dir", str(tmp_path)]
-        if canary:
-            args.append("--canary")
         with pytest.raises(ExceptionGroup):
             await asyncio.wait_for(example.main(example.arguments(args)), 5)
-    assert headers[0]["x-rime-track"] == ("canary" if canary else "stable")
     assert headers[0]["Authorization"] == "Bearer test-key"
     assert not list(tmp_path.iterdir())
 
@@ -142,7 +136,6 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
 
     async def peer(socket):
         peers.append(socket)
-        assert socket.request.headers["x-rime-track"] == "canary"
         await socket.send(json.dumps({"ready": {"protocol": 1, "languages": ["en"]}}))
         for text in ("First complete turn. ", "Second complete turn. "):
             start = json.loads(await socket.recv())
@@ -163,7 +156,6 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
             example.__file__,
             "--url",
             url,
-            "--canary",
             "--auto-end",
             "--no-playback",
             "--output-dir",
