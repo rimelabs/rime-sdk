@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -385,14 +385,14 @@ audio = [
 
 [package.metadata]
 requires-dist = [
-    { name = "rimelabs-sdk", specifier = "==0.1.0a9" },
+    { name = "rimelabs-sdk", specifier = "==0.1.0a10" },
     { name = "sounddevice", marker = "extra == 'audio'", specifier = ">=0.5.6,<0.6" },
 ]
 provides-extras = ["audio"]
 
 [[package]]
 name = "rimelabs-sdk"
-version = "0.1.0a9"
+version = "0.1.0a10"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
@@ -402,9 +402,9 @@ dependencies = [
     { name = "rime-api" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bd/48/c9d986177c1e64bcbc445fef366daee141df03070b12d8ed6db2d80f3c80/rimelabs_sdk-0.1.0a9.tar.gz", hash = "sha256:5c1249c153a566f7b8c5d60aaf205fe2a9aaea1c4c259a9be8be3b19ba0b4baa", size = 135941, upload-time = "2026-10-08T22:20:32.539Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/ab/c88e7a67bdf444b4fec3d96f44a710536178b6240abe8a68c18a6bc225d3/rimelabs_sdk-0.1.0a10.tar.gz", hash = "sha256:ba2a936693f77e45d3f946e93318de06ecee8fb2854a8f411e279a4015e68522", size = 153338, upload-time = "2026-10-09T06:12:07.166Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1f/2d/b9863fd9e515eb17ec64dd932c974daae74f2616aa6f1d24cc0b30b451e2/rimelabs_sdk-0.1.0a9-py3-none-any.whl", hash = "sha256:5116764099c56c9b2e77573450c200af3cf101309291a78b3d1a04f3decc904f", size = 41772, upload-time = "2026-10-08T22:20:31.486Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/51/9fcba2bc298ee6eb6ca85020eac82c3577be912c64332d263684419df0af/rimelabs_sdk-0.1.0a10-py3-none-any.whl", hash = "sha256:fc09cf5b305219508316fb2364f02524e799c4a5e87357a9e0a24b5c78857375", size = 53497, upload-time = "2026-10-09T06:12:06.094Z" },
 ]
 
 [[package]]
