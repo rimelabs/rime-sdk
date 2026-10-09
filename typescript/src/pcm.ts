@@ -11,6 +11,11 @@ export interface PCMFormat {
 }
 
 export function resolvePCMFormat(input?: PCMFormat): Required<PCMFormat> {
+  if (
+    input !== undefined &&
+    (input === null || typeof input !== "object" || Array.isArray(input))
+  )
+    throw new RimeAudioFormatError("Input format must be a PCM format object");
   const format = {
     sampleRate: input?.sampleRate ?? 16000,
     channels: input?.channels ?? 1,

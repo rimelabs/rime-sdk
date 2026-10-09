@@ -197,6 +197,24 @@ test("rejected TTS never starts playback", async (t) => {
   state.assertStopped();
 });
 
+test(
+  "abort cancels TTS while waiting for the first audio chunk",
+  { timeout: 5000 },
+  async (t) => {
+    const state = await setup(t);
+    state.synthesis.mode = "silence";
+    const stop = new AbortController();
+    const operation = voice.speak(state.client, "Hello.", options, stop.signal);
+    const failed = assert.rejects(operation, /cancelled/);
+    failed.catch(() => {});
+    await state.synthesis.headersSent;
+    stop.abort(new Error("cancelled"));
+    await failed;
+    assert.equal(state.synthesis.calls.length, 1);
+    state.assertStopped();
+  },
+);
+
 test("explicit output does not open a speaker", async (t) => {
   const state = await setup(t);
   await voice.speak(
@@ -316,8 +334,14 @@ test("terminal STT failure stops a microphone blocked on its next chunk", async 
   const failed = assert.rejects(operation, RimeUnavailableError);
   failed.catch(() => {});
   await ready;
-  while (state.recognition.calls[0].length < 2)
+  const deadline = Date.now() + 3000;
+  while (state.recognition.calls[0].length < 2) {
+    assert.ok(
+      Date.now() < deadline,
+      "recognition did not receive microphone audio",
+    );
     await new Promise((resolve) => setTimeout(resolve, 5));
+  }
   state.recognition.release();
   await failed;
   assert.equal(state.synthesis.calls.length, 0);

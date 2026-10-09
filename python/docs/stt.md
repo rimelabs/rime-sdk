@@ -6,13 +6,14 @@ revisions, backpressure, and cancellation. Your application decides when speech
 ends by exhausting the source.
 
 ```python
+import asyncio
 from pathlib import Path
 from rimelabs_sdk import PCMFormat, Rime, TranscriptionMode
 
 
 async def audio_chunks():
     with Path("utterance.pcm").open("rb") as audio:
-        while data := audio.read(3200):
+        while data := await asyncio.to_thread(audio.read, 3200):
             yield data
 
 
@@ -34,9 +35,9 @@ async def transcribe():
             print("Request:", transcript.request_id)
 ```
 
-Run `asyncio.run(transcribe())` from a script. For blocking devices or files in a
-live application, perform reads off the event loop. The runnable
-[example](../../examples/python/stt/stream.py) uses `asyncio.to_thread` for file reads.
+Run `asyncio.run(transcribe())` from a script. File reads run off the event loop
+using `asyncio.to_thread`, as in the runnable
+[example](../../examples/python/stt/stream.py).
 
 ## Options
 

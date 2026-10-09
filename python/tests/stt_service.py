@@ -17,9 +17,19 @@ class RecognitionService:
         self.input_finished = asyncio.Event()
         self.release = asyncio.Event()
         self.cancelled = asyncio.Event()
+        self.completed = asyncio.Event()
         self.active = 0
 
     async def streaming(self, requests, context):
+        handler = asyncio.current_task()
+
+        def finished(context):
+            # Peer cancellation can cancel the handler without changing the context status.
+            if context.cancelled() or handler.cancelling():
+                self.cancelled.set()
+            self.completed.set()
+
+        context.add_done_callback(finished)
         messages = []
         self.calls.append(messages)
         self.metadata.append(dict(context.invocation_metadata()))
@@ -92,7 +102,6 @@ class RecognitionService:
                 )
         finally:
             self.active -= 1
-            self.cancelled.set()
 
     async def __aenter__(self):
         service = proto.DESCRIPTOR.services_by_name["SpeechToText"]

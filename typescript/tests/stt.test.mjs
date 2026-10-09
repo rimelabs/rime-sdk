@@ -271,16 +271,35 @@ test("cancellation releases a stuck source and invokes return", async (t) => {
   await assert.rejects(stream.next(), sdk.RimeCancelledError);
 });
 
-test("overall timeout runs while consumer is paused and queue is bounded", async (t) => {
-  const { service, client } = await setup(t);
-  service.mode = "burst";
-  const stream = client.stt.stream(source(), { language: "en", timeout: 0.05 });
-  assert.equal((await stream.next()).value.kind, "partial");
-  await sleep(90);
-  assert.ok(stream.queue.items.length <= policy.queuedUpdates);
-  await assert.rejects(stream.next(), sdk.RimeTimeoutError);
-  await stream.cancel();
-});
+test(
+  "overall timeout runs while consumer is paused and queue is bounded",
+  { timeout: 5000 },
+  async (t) => {
+    const { service, client } = await setup(t);
+    service.mode = "burst";
+    policy.acceptanceTimeout = 2;
+    policy.completionTimeout = 2;
+    const stream = client.stt.stream(source(), { language: "en", timeout: 1 });
+    const full = deferred();
+    const put = stream.queue.put.bind(stream.queue);
+    t.mock.method(stream.queue, "put", (update) => {
+      if (stream.queue.items.length === policy.queuedUpdates) full.resolve();
+      return put(update);
+    });
+    assert.equal((await stream.next()).value.kind, "partial");
+    await full.promise;
+    assert.equal(stream.queue.items.length, policy.queuedUpdates);
+    await sleep(1100);
+    await assert.rejects(
+      stream.next(),
+      (error) =>
+        error instanceof sdk.RimeTimeoutError &&
+        error.message === "Overall transcription deadline expired",
+    );
+    assert.deepEqual(stream.queue.items, []);
+    await stream.cancel();
+  },
+);
 
 test("one concurrent reader and cancellation before start", async (t) => {
   const { service, client } = await setup(t);
@@ -332,7 +351,9 @@ test("overall deadline still applies to a completed transcription", async (t) =>
   });
   assert.equal((await stream.next()).value.kind, "partial");
   await stream.worker;
+  assert.equal(client.sttClient.streams.has(stream), true);
   await sleep(450);
+  assert.equal(client.sttClient.streams.has(stream), false);
   await assert.rejects(
     stream.next(),
     (error) =>
@@ -340,6 +361,21 @@ test("overall deadline still applies to a completed transcription", async (t) =>
       error.message === "Overall transcription deadline expired",
   );
   await stream.cancel();
+});
+
+test("AbortSignal releases a completed transcription before consumer cleanup", async (t) => {
+  const { client } = await setup(t);
+  const controller = new AbortController();
+  const stream = client.stt.stream(source(), {
+    language: "en",
+    signal: controller.signal,
+  });
+  assert.equal((await stream.next()).value.kind, "partial");
+  await stream.worker;
+  assert.equal(client.sttClient.streams.has(stream), true);
+  controller.abort();
+  assert.equal(client.sttClient.streams.has(stream), false);
+  await assert.rejects(stream.next(), sdk.RimeCancelledError);
 });
 
 test("client close cancels started and unstarted operations", async (t) => {

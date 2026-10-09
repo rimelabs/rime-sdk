@@ -62,8 +62,9 @@ func TestCaptureFileAndFailure(t *testing.T) {
 					continue
 				}
 				if fail {
-					if err == io.EOF {
-						t.Fatal("failed recorder committed its utterance")
+					var exitError *exec.ExitError
+					if !errors.As(err, &exitError) || exitError.ExitCode() != 7 {
+						t.Fatalf("expected recorder exit code 7, got %v", err)
 					}
 				} else if err != io.EOF {
 					t.Fatal(err)
@@ -117,6 +118,9 @@ func TestCaptureEnterAndCancel(t *testing.T) {
 }
 
 func TestUnexpectedMicrophoneExitIsFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows microphone mode is rejected before capture starts")
+	}
 	fakeAudio(t, false, false)
 	input := &capture{lines: make(chan string)}
 	defer input.close()
@@ -125,8 +129,42 @@ func TestUnexpectedMicrophoneExitIsFailure(t *testing.T) {
 	if _, err := input.next(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := input.next(ctx); err == nil || err == io.EOF {
-		t.Fatal("unexpected microphone exit accepted")
+	if _, err := input.next(ctx); err == nil || err == io.EOF || errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected unexpected microphone exit failure, got %v", err)
+	}
+}
+
+func TestCaptureModeSupport(t *testing.T) {
+	for _, operatingSystem := range []string{"windows", "darwin", "linux"} {
+		for _, filename := range []string{"", "recording.wav"} {
+			t.Run(operatingSystem+"/"+filename, func(t *testing.T) {
+				err := validateCaptureMode(filename, operatingSystem)
+				if operatingSystem == "windows" && filename == "" {
+					if err == nil || !strings.Contains(err.Error(), "--input recording.wav") {
+						t.Fatalf("expected actionable Windows microphone rejection, got %v", err)
+					}
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+}
+
+func TestWindowsMicrophoneRejectedBeforeCapture(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows microphone restriction")
+	}
+	fakeAudio(t, false, false)
+	input := &capture{lines: make(chan string)}
+	defer input.close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if _, err := input.next(ctx); err == nil || !strings.Contains(err.Error(), "--input recording.wav") {
+		t.Fatalf("expected actionable Windows microphone rejection, got %v", err)
+	}
+	if input.command != nil {
+		t.Fatal("unsupported microphone mode started a recorder")
 	}
 }
 

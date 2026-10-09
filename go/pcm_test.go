@@ -89,3 +89,49 @@ func TestPCMTruncationAndStateIsolation(t *testing.T) {
 		}
 	}
 }
+
+func TestPCMFragmentedInputAllocation(t *testing.T) {
+	input := newPCMInput(PCMFormat{SampleRate: 16000, Channels: 1})
+	input.pending = make([]byte, 0, 2)
+	ctx := context.Background()
+	fragment := []byte{0}
+	allocations := testing.AllocsPerRun(100, func() {
+		input.pending = input.pending[:0]
+		if err := input.feed(ctx, fragment, func([]byte) error {
+			t.Fatal("incomplete frame emitted")
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("incomplete frame allocated %.0f times", allocations)
+	}
+	emitted := false
+	if err := input.feed(ctx, fragment, func(chunk []byte) error {
+		emitted = true
+		if len(chunk) != 2 || cap(chunk) > 64 {
+			t.Fatalf("one sample used %d bytes with capacity %d", len(chunk), cap(chunk))
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !emitted {
+		t.Fatal("complete frame was not emitted")
+	}
+}
+
+func BenchmarkPCMByteFragments(b *testing.B) {
+	input := newPCMInput(PCMFormat{SampleRate: 16000, Channels: 1})
+	fragment := []byte{0}
+	ctx := context.Background()
+	emit := func([]byte) error { return nil }
+	b.ReportAllocs()
+	b.SetBytes(1)
+	for range b.N {
+		if err := input.feed(ctx, fragment, emit); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

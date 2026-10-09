@@ -45,7 +45,8 @@ func (input *pcmInput) feed(ctx context.Context, data []byte, emit func([]byte) 
 		input.pending = append(input.pending, data[:count]...)
 		data = data[count:]
 		complete := len(input.pending) / frameBytes * frameBytes
-		output := make([]byte, 0, portionBytes*2)
+		outputSamples := (complete/frameBytes*16000 + input.format.SampleRate - 1) / input.format.SampleRate
+		output := make([]byte, 0, outputSamples*2)
 		for offset := 0; offset < complete; offset += frameBytes {
 			current := int(int16(binary.LittleEndian.Uint16(input.pending[offset:])))
 			if input.format.Channels == 2 {

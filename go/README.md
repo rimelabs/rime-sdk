@@ -115,6 +115,8 @@ loop and speaks the final transcript through TTS. Install SoX, then run
 and Ctrl+C to cancel. `--mode`, repeatable `--term` and `--voice` select recognition
 and playback options. To avoid opening audio devices, use
 `--input recording.wav --output reply.wav` for one recorded turn.
+Microphone mode supports macOS and Linux. On Windows, use `--input`; microphone
+mode is rejected because the recorder cannot be stopped with a POSIX interrupt.
 
 ### Supply audio
 

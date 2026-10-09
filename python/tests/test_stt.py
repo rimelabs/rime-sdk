@@ -202,6 +202,19 @@ async def test_rejection_keeps_status_and_trailing_request_id(stt_setup, status,
             await anext(stream)
     assert caught.value.request_id == stream.request_id == "stt-rejected"
     assert service.calls[0][0].config.language == "und"
+    await asyncio.wait_for(service.completed.wait(), 1)
+    assert service.cancelled.is_set() == (status == grpc.StatusCode.CANCELLED)
+
+
+@pytest.mark.parametrize("language", ["", " \t\n"])
+async def test_blank_language_is_passed_unchanged_for_service_validation(stt_setup, language):
+    service, client = stt_setup
+    service.mode, service.rejection = "reject", grpc.StatusCode.INVALID_ARGUMENT
+    async with client.stt.stream(source(), language=language) as stream:
+        with pytest.raises(RimeInputError) as caught:
+            await anext(stream)
+    assert service.calls[0][0].config.language == language
+    assert caught.value.request_id == "stt-rejected"
 
 
 async def test_valid_silence_has_an_empty_final(stt_setup):
@@ -209,6 +222,9 @@ async def test_valid_silence_has_an_empty_final(stt_setup):
     service.mode = "silence"
     async with client.stt.stream(source(), language="en") as stream:
         assert [update async for update in stream] == [TranscriptionFinal(text="", language="en")]
+    await asyncio.wait_for(service.completed.wait(), 1)
+    assert service.active == 0
+    assert not service.cancelled.is_set()
 
 
 async def test_arbitrary_audio_chunks_are_converted_before_writing(stt_setup):
@@ -366,10 +382,11 @@ async def test_overall_deadline_still_applies_to_a_completed_transcription(stt_s
     stream = client.stt.stream(source(), language="en", timeout=0.4)
     assert (await anext(stream)).kind == "partial"
     await asyncio.wait_for(asyncio.shield(stream._worker), 1)
+    assert stream in client.stt._streams
     await asyncio.sleep(0.45)
+    assert stream not in client.stt._streams
     with pytest.raises(RimeTimeoutError, match="Overall transcription deadline expired"):
         await anext(stream)
-    await stream.cancel()
 
 
 async def test_single_reader_and_cancel_before_start(stt_setup):

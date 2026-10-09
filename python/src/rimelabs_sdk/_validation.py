@@ -31,11 +31,15 @@ def endpoint_address(endpoint):
 def timeout(value, inherited=None):
     if value is INHERIT:
         return inherited
-    if value is not None and (
-        isinstance(value, bool)
-        or not isinstance(value, (float, int))
-        or not math.isfinite(value)
-        or value <= 0
-    ):
+    try:
+        valid = value is None or (
+            not isinstance(value, bool)
+            and isinstance(value, (float, int))
+            and math.isfinite(value)
+            and value > 0
+        )
+    except OverflowError:
+        valid = False
+    if not valid:
         raise RimeInputError("timeout must be finite positive seconds or None")
     return value

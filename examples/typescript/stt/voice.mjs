@@ -125,9 +125,12 @@ export async function speak(client, text, options, signal) {
       : undefined;
   const output = directory ? join(directory, "reply.wav") : options.output;
   let child;
-  const abort = () => child?.process.kill("SIGKILL");
-  signal.addEventListener("abort", abort, { once: true });
   let audio;
+  const abort = () => {
+    child?.process.kill("SIGKILL");
+    void audio?.cancel().catch(() => {});
+  };
+  signal.addEventListener("abort", abort, { once: true });
   try {
     signal.throwIfAborted();
     child = audioProcess(

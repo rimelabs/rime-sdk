@@ -32,8 +32,10 @@ cancellation. Playback starts after synthesis finishes. Linux streams replies
 directly to SoX. This keeps each platform's audio path consistent across languages
 without native Node/Go bindings.
 The continuous Prism examples keep their existing PortAudio/browser audio paths.
-The terminal examples target macOS and Linux; Windows microphone operation is
-not qualified.
+The terminal examples target macOS and Linux. The Go example rejects microphone
+mode on Windows; use `--input recording.wav`, optionally with `--output reply.wav`,
+to test a recorded utterance there. Windows microphone operation in the Python
+and JavaScript examples is not qualified.
 
 On macOS:
 

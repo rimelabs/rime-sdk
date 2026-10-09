@@ -40,6 +40,13 @@ func pcmOptions(rate int) []string {
 
 var audioCommand = exec.CommandContext
 
+func validateCaptureMode(input, operatingSystem string) error {
+	if operatingSystem == "windows" && input == "" {
+		return fmt.Errorf("microphone capture is not supported on Windows; use --input recording.wav")
+	}
+	return nil
+}
+
 type capture struct {
 	input            string
 	lines            <-chan string
@@ -53,6 +60,9 @@ type capture struct {
 }
 
 func (input *capture) start(ctx context.Context) error {
+	if err := validateCaptureMode(input.input, runtime.GOOS); err != nil {
+		return err
+	}
 	name := "-d"
 	if input.input != "" {
 		var err error
@@ -298,6 +308,9 @@ func run() error {
 	}
 	if settings.output != "" && settings.input == "" {
 		return fmt.Errorf("--output requires --input")
+	}
+	if err := validateCaptureMode(settings.input, runtime.GOOS); err != nil {
+		return err
 	}
 	if _, err := exec.LookPath("sox"); err != nil {
 		return fmt.Errorf("install SoX first: brew install sox (macOS)")

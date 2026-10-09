@@ -32,6 +32,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
   private readonly queue = new TranscriptQueue(policy.queuedUpdates);
   private readonly timers = new Set<ReturnType<typeof scope>>();
   private worker: Promise<void> | null = null;
+  private workerFinished = false;
   private call: TranscriptionCall | null = null;
   private failure: RimeError | null = null;
   private reading = false;
@@ -100,7 +101,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
     this.controller.abort(error);
     this.call?.cancel();
     this.options.signal?.removeEventListener("abort", this.externalAbort);
-    if (!this.worker) {
+    if (!this.worker || this.workerFinished) {
       this.source = null;
       this.owner.forget(this);
     }
@@ -210,6 +211,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
       this.call?.cancel();
       await Promise.allSettled(tasks);
       this.source = null;
+      this.workerFinished = true;
       if (this.failure) this.owner.forget(this);
     }
   }

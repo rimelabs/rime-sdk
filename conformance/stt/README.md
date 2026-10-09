@@ -1,8 +1,12 @@
 # STT conformance and qualification
 
-`transcripts.json` contains protobuf-JSON response sequences consumed by all three
-SDK test suites. Each partial is a replacement snapshot. A final requires source
-exhaustion, matching text/revision/language, and successful gRPC completion.
+`transcripts.json` contains protobuf-JSON response sequences read directly by the
+Python and Node.js test suites. The Go suite reads the synchronized copy at
+`go/testdata/stt/transcripts.json`; update both files when changing these cases.
+CI checks that the copies are identical.
+
+Each partial is a replacement snapshot. A final requires source exhaustion,
+matching text/revision/language, and successful gRPC completion.
 Unknown future payloads are ignored; known messages in an invalid order fail.
 
 Shared PCM vectors are in `../pcm-input.json`. Language-specific audio tests also

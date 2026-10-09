@@ -118,6 +118,11 @@ test("refuse non-byte chunks and unsupported formats", () => {
       RimeAudioFormatError,
     );
   for (const format of [
+    null,
+    "pcm_s16le",
+    16000,
+    true,
+    [],
     { sampleRate: 44100 },
     { channels: 0 },
     { channels: true },
@@ -125,6 +130,14 @@ test("refuse non-byte chunks and unsupported formats", () => {
     { encoding: "mulaw" },
   ])
     assert.throws(() => new InputAudio(format), RimeAudioFormatError);
+});
+
+test("omitted and empty PCM format objects retain default input conversion", () => {
+  for (const format of [undefined, {}]) {
+    const audio = new InputAudio(format);
+    assert.deepEqual([...audio.feed(pcm([1234, -4321]))], [pcm([1234, -4321])]);
+    audio.finish();
+  }
 });
 
 test("empty chunks do not flush pending bytes or add samples", () => {

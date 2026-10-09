@@ -82,7 +82,9 @@ class TranscriptStream:
             timer.cancel()
         if self._call:
             self._call.cancel()
-        if self._worker and self._worker is not asyncio.current_task():
+        if self._worker and self._worker.done():
+            self._owner._streams.discard(self)
+        elif self._worker and self._worker is not asyncio.current_task():
             self._worker.cancel()
 
     async def _produce(self):
