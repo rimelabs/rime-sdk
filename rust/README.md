@@ -26,6 +26,8 @@ Use `.model(Model::MistV3)` to select Mist v3. Coda is the default.
 It preserves source text while detecting sentences. Input errors cancel the
 request. Audio can arrive before input ends. Successful completion requires
 reading the audio stream to its end; earlier chunks can precede a later error.
+An error discards audio still in the SDK queue and takes priority on the next
+read. Audio already returned to the application remains available to it.
 
 Dropping an audio stream requests cancellation. `audio.close().await` also
 waits for its worker to stop. `client.close().await` cancels all operations on

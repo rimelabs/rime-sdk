@@ -100,6 +100,8 @@ impl Stream for AudioStream {
             }
         }
         if let Some(Err(error)) = &this.terminal {
+            // Match the other SDKs: failure takes priority over queued audio.
+            // A paused consumer must observe cancellation or timeout on its next read.
             let error = error.clone();
             this.consumed = true;
             this.receiver.close();
