@@ -1,7 +1,8 @@
 # SDK examples
 
-Start with a WAV file, then try a live conversation. These examples use the
-published SDK packages. They require a Rime API key; Prism also requires a
+Start with a WAV file, then try a live conversation. Most examples use the
+published SDK packages; the terminal and cascaded agents use this checkout.
+They require a Rime API key; Prism also requires a
 deployment URL and voice. Run the commands from the repository root.
 
 | Use case | Python | Node.js / TypeScript | Result |
@@ -19,10 +20,86 @@ See [manual checks](#manual-checks).
 
 ## Terminal STT voice loop
 
+For a conversation with an LLM, use the [cascaded voice agent guide](agent/README.md).
+It includes Python, TypeScript, and Go versions using Rime STT/TTS and OpenAI,
+plus manual checks for Mist v3 timestamps, Coda custom lexicons, and useful errors.
+
 Use the [terminal voice guide](TERMINAL_VOICE.md) to speak, inspect partial/final
 transcripts, and hear the final text through TTS in Python, JavaScript or Go.
 It uses Enter to start/end a turn and requires only a Rime API key and SoX.
 The guide includes the setup for this unreleased STT development checkout.
+
+## Coda WebSocket streaming from the terminal
+
+With `RIME_API_KEY` set and SoX installed (`brew install sox` on macOS), run:
+
+```sh
+uv run --project python python examples/python/tts/coda_ws.py --canary
+```
+
+This connects directly to `wss://api.rime.ai/coda/ws`. `--canary` sends
+`x-rime-track: canary`; omit it to select `stable` explicitly. The track selects
+a deployment, and the readiness message does not identify its model version.
+
+Enter complete sentences or stable clauses, one per line. Each line becomes a
+`text` message in the same synthesis context, and audio plays as it arrives.
+Enter `/end` to finish that turn. The WebSocket stays open for the next turn.
+An unfinished input can pause synthesis mid-sentence until more text or `/end`
+arrives, even when the last chunk ends in punctuation. Send `/end` as soon as
+you have supplied all text for that turn. With an LLM, send it when the LLM's
+text stream finishes, rather than waiting for audio to finish.
+
+For listening to complete typed turns, add `--auto-end`:
+
+```sh
+uv run --project python python examples/python/tts/coda_ws.py --canary --auto-end
+```
+
+Each entered line sends a `text` message followed immediately by `end`. Audio
+still streams back, and the same WebSocket serves subsequent turns. This mode
+tests streaming audio with a single text chunk per turn. Omit `--auto-end` to
+manually test multiple text chunks within one turn.
+
+`/quit` finishes any active turn and exits; Ctrl+C immediately stops the client
+and playback. Each completed turn saves a WAV in the printed temporary directory.
+Use `--output-dir PATH` to choose the directory (turn filenames are reused on
+subsequent runs), `--voice NAME` to select a voice, or `--no-playback` to save only.
+
+A single command can also send multiple chunks with a pause between them:
+
+```sh
+uv run --project python python examples/python/tts/coda_ws.py --canary \
+  --text "Hello from Coda." \
+  --text "This sentence arrives two seconds later." --chunk-delay 2
+```
+
+The tester prints each sent chunk, the request ID, and elapsed time from `start`
+to the first received audio byte. This timing excludes speaker buffering.
+
+To isolate synthesis input mode, use exactly the same text, voice, and track:
+
+```sh
+# Complete input in start.text; output audio still streams.
+uv run --project python python examples/python/tts/coda_ws.py --canary \
+  --complete-text --text "Your appointment is confirmed for tomorrow at ten."
+# Streaming input: empty start, one text message, then immediate end.
+uv run --project python python examples/python/tts/coda_ws.py --canary \
+  --text "Your appointment is confirmed for tomorrow at ten."
+# Same streaming input with additional initial text context.
+uv run --project python python examples/python/tts/coda_ws.py --canary \
+  --lookahead-tokens 8 --text "Your appointment is confirmed for tomorrow at ten."
+```
+
+`--complete-text` requires exactly one `--text` and sends no `text` or `end`
+messages. `--auto-end` still uses streaming-input mode. `--lookahead-tokens`
+defaults to zero and applies only to streaming input. More lookahead can trade
+first-audio latency for additional text context. Compare saved WAVs for speech
+quality and live playback for delivery gaps, and repeat samples because model
+generation can vary between requests.
+
+It uses the [Coda JSON WebSocket protocol](https://rimelabs-docs-coda-websocket-reference.mintlify.site/api-reference/coda/websockets)
+and needs no LLM key. The existing cascaded agent waits for a complete LLM reply;
+use this tester to exercise incremental text input independently.
 
 ## Python
 

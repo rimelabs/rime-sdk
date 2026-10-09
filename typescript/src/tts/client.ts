@@ -1,4 +1,5 @@
 import { AudioFormat } from "./audio.js";
+import { snapshot, type PronunciationEntry } from "./lexicon.js";
 import { AudioStream, constructionKey, type TextSource } from "./stream.js";
 import { Credentials } from "../auth.js";
 import { policy, timeout, nonempty } from "./policy.js";
@@ -22,6 +23,12 @@ export interface SynthesisOptions {
   voice?: string | null;
   language?: string;
   audioFormat?: AudioFormat | null;
+  /** Request final word timestamps. Supported only with model="mistv3". */
+  timestamps?: boolean;
+  /** Request-wide pronunciation overrides; requires a phoneme-capable Coda deployment. */
+  customLexicon?: readonly PronunciationEntry[];
+  /** Send one complete string with Synthesize; audio still streams. */
+  completeText?: boolean;
   timeout?: number | null;
 }
 export interface DiscoveryOptions {
@@ -66,6 +73,31 @@ export class TTS {
   }
   stream(text: TextSource, options: SynthesisOptions = {}) {
     this.checkOpen();
+    const lexicon = snapshot(options.customLexicon);
+    const completeText = options.completeText ?? false;
+    if (
+      options.completeText !== undefined &&
+      typeof options.completeText !== "boolean"
+    )
+      throw new RimeInputError("completeText must be a boolean");
+    if (completeText) {
+      if (typeof text !== "string")
+        throw new RimeInputError(
+          "completeText=true requires a string, not a text source",
+        );
+      if (Buffer.byteLength(text, "utf8") > policy.sentenceBytes)
+        throw new RimeInputError(
+          "Complete text must be at most 65536 UTF-8 bytes",
+        );
+    }
+    const timestamps =
+      options.timestamps === undefined ? false : options.timestamps;
+    if (typeof timestamps !== "boolean")
+      throw new RimeInputError("timestamps must be a boolean");
+    if (timestamps && this.deployment.model !== "mistv3")
+      throw new RimeInputError(
+        "Word timestamps are supported only with model='mistv3'",
+      );
     if (typeof text === "string") {
       if (!text.trim())
         throw new RimeInputError("Text must contain non-whitespace characters");
@@ -93,6 +125,9 @@ export class TTS {
       language,
       format,
       timeout(options.timeout, this.defaultTimeout),
+      timestamps,
+      lexicon,
+      completeText,
     );
     this.streams.add(audio);
     return audio;

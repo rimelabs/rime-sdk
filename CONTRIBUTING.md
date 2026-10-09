@@ -106,12 +106,19 @@ uv sync --project examples/python --locked
 npm --prefix examples/typescript ci
 npm --prefix examples/typescript run check
 npm --prefix examples/typescript test
+npm --prefix examples/typescript run check:agent
+npm --prefix examples/typescript run test:agent
 ```
 
 Python example tests run with the SDK's pytest suite. Node.js example tests
 use the shared controlled Prism peer, so install the TypeScript SDK's development
 dependencies before running them. Neither suite opens audio devices. Device
 release checks are listed in `examples/README.md`.
+
+The [cascaded voice agents](examples/agent/README.md) use the development SDK in
+all three languages. The TypeScript agent's tsconfig maps its SDK import to local
+source; both the SDK and example dependencies must be installed. Its tests use
+that same mapping, without changing the other examples' published SDK pin.
 
 For changes to example release automation, run
 `uv run --project python pytest .github/scripts/tests` from the repository root.

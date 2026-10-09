@@ -20,21 +20,37 @@ from . import _transport
 from ._audio import AudioFormat, Converter
 from ._queue import ByteQueue
 from ._sentences import SentenceBuffer
+from ._timestamps import TimestampResult
 
 _LOG = logging.getLogger(__name__)
 _CONSTRUCTION_KEY = object()
 
 
 class AudioStream:
-    def __init__(self, key, client, source, voice, language, profile, timeout):
+    def __init__(
+        self,
+        key,
+        client,
+        source,
+        voice,
+        language,
+        profile,
+        timeout,
+        timestamps=False,
+        custom_lexicon=(),
+        complete_text=False,
+    ):
         if key is not _CONSTRUCTION_KEY:
             raise TypeError("AudioStream is returned by client.tts.stream()")
         self._client = client
         self._source = source
         self._voice = voice
         self._language = language
+        self._custom_lexicon = custom_lexicon
+        self._complete_text = complete_text
         self._format = profile
         self._timeout = timeout
+        self._timestamps_requested = timestamps
         self._operation_id = uuid.uuid4().hex
         self._queue = ByteQueue(client._policy.output_bytes, client._policy.output_chunk_bytes)
         self._worker = None
@@ -58,6 +74,21 @@ class AudioStream:
     @property
     def request_id(self) -> str | None:
         return self._call.request_id if self._call is not None else None
+
+    async def timestamps(self) -> TimestampResult:
+        """Read requested timestamps after consuming all audio; never drains audio.
+
+        Calling before iteration completes raises RimeInputError. Synthesis
+        errors are raised here too; alignment failures are returned in status.
+        """
+        if not self._timestamps_requested:
+            raise RimeInputError("Enable timestamps=True when creating the stream")
+        if self._error:
+            raise self._error
+        if not self._finished:
+            raise RimeInputError("Consume all audio before reading timestamps")
+        assert self._call is not None
+        return self._call.timestamp_result()
 
     def _start(self):
         self._client._check_loop()
@@ -187,12 +218,20 @@ class AudioStream:
         tasks = []
         try:
             channel, metadata = await self._client._prepare()
-            self._call = _transport.SynthesisCall(channel, metadata)
-            await self._call.start(self._voice, self._language)
-            tasks = [
-                asyncio.create_task(self._produce(), name="rime:input"),
-                asyncio.create_task(self._read(), name="rime:audio"),
-            ]
+            self._call = _transport.SynthesisCall(channel, metadata, self._complete_text)
+            await self._call.start(
+                self._voice,
+                self._language,
+                self._timestamps_requested,
+                self._custom_lexicon,
+                self._source if self._complete_text else None,
+            )
+            if self._complete_text:
+                self._input_done = self._submitted = True
+                self._progress_at = time.monotonic()
+            else:
+                tasks.append(asyncio.create_task(self._produce(), name="rime:input"))
+            tasks.append(asyncio.create_task(self._read(), name="rime:audio"))
             # The worker owns child cancellation. Unlike gather(), wait() does
             # not cancel children when the worker is cancelled.
             # FIRST_EXCEPTION does not wake for a cancelled child task.

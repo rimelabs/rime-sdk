@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "paths": {
+      "@rimelabs/sdk": ["../../../typescript/src/index.ts"]
+    }
+  },
+  "include": ["*.ts", "../../../typescript/tests/agent.test.ts"]
+}

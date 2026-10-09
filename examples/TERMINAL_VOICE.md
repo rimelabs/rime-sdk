@@ -12,9 +12,9 @@ flowchart TD
 ```
 
 This is the first stage of a cascaded voice agent. It speaks back what STT heard,
-so recognition errors stay visible. It needs only `RIME_API_KEY`. To add a
-conversational agent later, replace the response step with an LLM call using the
-final transcript and conversation history; send the generated reply to TTS.
+so recognition errors stay visible. It needs only `RIME_API_KEY`. For an LLM-backed
+conversation, use the [cascaded voice agents](agent/README.md). Those examples
+also expose Mist v3 timestamps and Coda pronunciation controls for manual testing.
 
 The SDK calls Rime's remote services. The terminal, microphone and speaker run
 locally. No LiveKit/Pipecat adapter, browser, VAD or LLM provider is involved.

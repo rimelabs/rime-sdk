@@ -8,6 +8,7 @@ import { SynthesisCall, discover } from "../dist/tts/transport.js";
 import {
   RimeAudioFormatError,
   RimeAuthenticationError,
+  RimeInputError,
   RimePermissionError,
   RimeTimeoutError,
   RimeUnavailableError,
@@ -43,6 +44,7 @@ for (const [status, errorType] of [
   [grpc.status.UNAVAILABLE, RimeUnavailableError],
   [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
   [grpc.status.PERMISSION_DENIED, RimePermissionError],
+  [grpc.status.INVALID_ARGUMENT, RimeInputError],
 ]) {
   test(`write after rejection without reader / ${status}`, () =>
     setup(async (server, prepared, signal) => {
@@ -57,6 +59,7 @@ for (const [status, errorType] of [
           call.write("Hello."),
           (error) =>
             error instanceof errorType &&
+            error.message === "test service rejection" &&
             error.requestId === "rejected-request",
         );
         assert.equal(call.requestId, "rejected-request");
@@ -129,6 +132,20 @@ test("discovery transport does not retry", () =>
       RimeUnavailableError,
     );
     assert.equal(server.discoveryCalls, 1);
+  }));
+
+test("discovery preserves service message", () =>
+  setup(async (server, prepared, signal) => {
+    server.mode = "discovery_error";
+    server.rejectionStatus = grpc.status.INVALID_ARGUMENT;
+    server.rejectionMessage = 'unsupported language "xx"';
+    await assert.rejects(
+      discover(prepared, "voices", "xx", signal),
+      (error) =>
+        error instanceof RimeInputError &&
+        error.message === server.rejectionMessage &&
+        error.requestId === "test-request",
+    );
   }));
 
 for (const [name, payload] of [

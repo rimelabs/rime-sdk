@@ -6,6 +6,8 @@ import { policy } from "./policy.js";
 import { abortable } from "../cancellation.js";
 import { ByteQueue } from "./queue.js";
 import { SentenceBuffer, ready } from "./sentences.js";
+import type { TimestampResult } from "./timestamps.js";
+import type { PronunciationEntry } from "./lexicon.js";
 import { SynthesisCall, type PreparedConnection } from "./transport.js";
 import {
   RimeError,
@@ -51,6 +53,9 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     private language: string,
     private formatValue: AudioFormat,
     private timeout: number | null,
+    private timestampsRequested = false,
+    private customLexicon: readonly PronunciationEntry[] = [],
+    private completeText = false,
   ) {
     if (key !== constructionKey)
       throw new TypeError("AudioStream is returned by client.tts.stream()");
@@ -60,6 +65,20 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   }
   get requestId(): string | null {
     return this.call?.requestId ?? null;
+  }
+  /** Read requested timestamps after consuming all audio; never drains audio.
+   * Calling before iteration completes rejects with RimeInputError. Synthesis
+   * errors reject here too; alignment failures are returned in status.
+   */
+  async timestamps(): Promise<TimestampResult> {
+    if (!this.timestampsRequested)
+      throw new RimeInputError(
+        "Enable timestamps: true when creating the stream",
+      );
+    if (this.failure) throw this.failure;
+    if (!this.finished)
+      throw new RimeInputError("Consume all audio before reading timestamps");
+    return this.call!.timestampResult();
   }
   private start() {
     if (this.failure) throw this.failure;
@@ -220,11 +239,25 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private async run() {
     let tasks: Promise<void>[] = [];
     try {
-      await abortable(ready, this.controller.signal);
+      if (!this.completeText) await abortable(ready, this.controller.signal);
       const prepared = await this.owner.prepare(this.controller.signal);
-      this.call = new SynthesisCall(prepared, this.controller.signal);
-      await this.call.start(this.voice, this.language);
-      tasks = [this.produce(), this.read()];
+      this.call = new SynthesisCall(
+        prepared,
+        this.controller.signal,
+        this.completeText,
+      );
+      await this.call.start(
+        this.voice,
+        this.language,
+        this.timestampsRequested,
+        this.customLexicon,
+        this.completeText ? (this.source as string) : undefined,
+      );
+      if (this.completeText) {
+        this.inputDone = this.submitted = true;
+        this.progressAt = performance.now();
+      } else tasks.push(this.produce());
+      tasks.push(this.read());
       await Promise.all(tasks);
       this.queue.finish();
     } catch (error) {

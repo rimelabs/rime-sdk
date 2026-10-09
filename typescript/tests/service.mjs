@@ -4,13 +4,16 @@ import * as schema from "@rimelabs/api";
 export class FakeService {
   mode = "normal";
   rejectionStatus = grpc.status.UNAVAILABLE;
+  rejectionMessage = "test service rejection";
   responseMetadata = {
     "x-rime-audio-content-type": "audio/pcm",
     "x-request-id": "test-request",
   };
   trailingMetadata = {};
   finalResponses = [];
+  beforeFinalResponses = null;
   calls = [];
+  completeCalls = [];
   metadata = [];
   discoveryCalls = 0;
   discoveryFailures = 0;
@@ -32,6 +35,7 @@ export class FakeService {
       if (
         ![
           "synthesizeStreaming",
+          "synthesize",
           "getSupportedSpeakers",
           "getSupportedLanguages",
         ].includes(name)
@@ -40,13 +44,39 @@ export class FakeService {
       methods[name] = {
         path: "/rime.TextToSpeech/" + descriptor.name,
         requestStream: descriptor.methodKind === "bidi_streaming",
-        responseStream: descriptor.methodKind === "bidi_streaming",
+        responseStream: ["bidi_streaming", "server_streaming"].includes(
+          descriptor.methodKind,
+        ),
         requestSerialize: (m) => Buffer.from(toBinary(descriptor.input, m)),
         requestDeserialize: (b) => fromBinary(descriptor.input, b),
         responseSerialize: (m) => Buffer.from(toBinary(descriptor.output, m)),
         responseDeserialize: (b) => fromBinary(descriptor.output, b),
       };
     }
+    handlers.synthesize = (call) => {
+      this.completeCalls.push(call.request);
+      this.calls.push([call.request]);
+      this.metadata.push(call.metadata);
+      if (this.mode === "error_before_audio") {
+        call.emit("error", this.rejection());
+        return;
+      }
+      call.sendMetadata(this.makeMetadata(this.responseMetadata));
+      this.markHeadersSent();
+      const send = () => {
+        call.write(
+          create(schema.SynthesisResponseStreamSchema, {
+            payload: { case: "audio", value: this.payload },
+          }),
+        );
+        for (const response of this.finalResponses) call.write(response);
+        call.end();
+      };
+      if (this.mode === "silence") this.release = send;
+      else if (this.mode === "no_audio_error")
+        call.emit("error", this.rejection());
+      else send();
+    };
     handlers.synthesizeStreaming = (call) => {
       this.calls.push([]);
       const messages = this.calls.at(-1);
@@ -111,8 +141,13 @@ export class FakeService {
               }),
             );
       });
-      call.on("end", () => {
+      call.on("end", async () => {
+        if (this.beforeFinalResponses) await this.beforeFinalResponses();
         for (const response of this.finalResponses) call.write(response);
+        if (this.mode === "error_after_trailer") {
+          call.emit("error", this.rejection());
+          return;
+        }
         if (!["partial_error", "silence", "no_audio_error"].includes(this.mode))
           call.end(this.makeMetadata(this.trailingMetadata));
       });
@@ -181,7 +216,7 @@ export class FakeService {
     return metadata;
   }
   rejection() {
-    return Object.assign(new Error("test service rejection"), {
+    return Object.assign(new Error(this.rejectionMessage), {
       code: this.rejectionStatus,
       metadata: this.makeMetadata(this.trailingMetadata),
     });

@@ -14,7 +14,10 @@
     "check": "tsc --noEmit",
     "test": "tsx --test tests/*.test.mjs",
     "stt": "node stt/stream.mjs",
-    "stt:voice": "node stt/voice.mjs"
+    "stt:voice": "node stt/voice.mjs",
+    "agent:voice": "tsx --tsconfig agent/tsconfig.json agent/voice.ts",
+    "check:agent": "tsc --noEmit -p agent/tsconfig.json",
+    "test:agent": "tsx --tsconfig agent/tsconfig.json --test ../../typescript/tests/agent.test.ts"
   },
   "dependencies": {
     "@rimelabs/sdk": "0.1.0-alpha.10",
