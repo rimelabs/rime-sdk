@@ -486,6 +486,53 @@ func TestTranscriptionPreCancelledAndUncooperativeSource(t *testing.T) {
 	awaitSignal(t, readDone)
 }
 
+func TestTranscriptionPreservesContextCauseBeforeFailure(t *testing.T) {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
+		for _, path := range []string{"transport", "close"} {
+			t.Run(cause.Error()+"/"+path, func(t *testing.T) {
+				client, _ := setupRecognition(t, recognizeSilence)
+				ctx, cancel := context.WithCancelCause(context.Background())
+				defer cancel(nil)
+				stream, err := client.STT.Stream(ctx, emptyAudio, TranscriptionOptions{Language: "en"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { stream.Close() })
+				stream.setRequestID("stt-request")
+				// Force failure handling ahead of the asynchronous context callback.
+				stream.stopCancellation()
+				cancel(cause)
+				if path == "transport" {
+					stream.fail(status.Error(codes.Canceled, "transport cancelled"))
+				} else {
+					stream.Close()
+				}
+				_, err = stream.Recv()
+				kind := ErrCancelled
+				if cause == context.DeadlineExceeded {
+					kind = ErrTimeout
+				}
+				var sdkError *Error
+				if !errors.Is(err, cause) || !errors.Is(err, kind) || !errors.As(err, &sdkError) || sdkError.RequestID != "stt-request" {
+					t.Fatalf("context cause or request ID lost: %v (cause %v)", err, errors.Unwrap(err))
+				}
+			})
+		}
+	}
+}
+
+func TestTranscriptionPreservesServiceFailureDuringCleanup(t *testing.T) {
+	client, _ := setupRecognition(t, recognizeSilence)
+	stream := mustTranscribe(t, client, emptyAudio, TranscriptionOptions{Language: "en"})
+	serviceError := status.Error(codes.Unavailable, "service unavailable")
+	stream.fail(serviceError)
+	stream.Close()
+	_, err := stream.Recv()
+	if !errors.Is(err, serviceError) || !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("service failure lost: %v", err)
+	}
+}
+
 func TestTranscriptionValidationAndEndpoint(t *testing.T) {
 	client, err := NewClient(Config{APIKey: "test-key", Model: "mistv3", Endpoint: "TTS.Example:8443", STTEndpoint: "STT.Example"})
 	if err != nil {

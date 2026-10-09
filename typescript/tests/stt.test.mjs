@@ -297,6 +297,51 @@ test("one concurrent reader and cancellation before start", async (t) => {
   assert.equal(service.calls.length, 1);
 });
 
+for (const queueLimit of [1, 16])
+  test(
+    `completed transcription survives a paused consumer with queue limit ${queueLimit}`,
+    { timeout: 5000 },
+    async (t) => {
+      const { client } = await setup(t);
+      policy.queuedUpdates = queueLimit;
+      const stream = client.stt.stream(source(), { language: "en" });
+      const finalReady = deferred();
+      const put = stream.queue.put.bind(stream.queue);
+      t.mock.method(stream.queue, "put", async (update) => {
+        if (update.kind === "final") finalReady.resolve();
+        await put(update);
+      });
+      assert.equal((await stream.next()).value.text, "I scream");
+      await finalReady.promise;
+      await sleep(policy.completionTimeout * 1000 + 50);
+      const updates = [];
+      for await (const update of stream) updates.push(update);
+      assert.deepEqual(updates, [
+        { kind: "partial", text: "Ice cream" },
+        { kind: "final", text: "Ice cream", language: "en" },
+      ]);
+      assert.equal(stream.requestId, "stt-request");
+    },
+  );
+
+test("overall deadline still applies to a completed transcription", async (t) => {
+  const { client } = await setup(t);
+  const stream = client.stt.stream(source(), {
+    language: "en",
+    timeout: 0.4,
+  });
+  assert.equal((await stream.next()).value.kind, "partial");
+  await stream.worker;
+  await sleep(450);
+  await assert.rejects(
+    stream.next(),
+    (error) =>
+      error instanceof sdk.RimeTimeoutError &&
+      error.message === "Overall transcription deadline expired",
+  );
+  await stream.cancel();
+});
+
 test("client close cancels started and unstarted operations", async (t) => {
   const { service, client } = await setup(t);
   service.mode = "no_acceptance";

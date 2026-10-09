@@ -88,8 +88,10 @@ stream leaves its siblings running.
 The SDK bounds the transcript queue to 16 updates, each with at most 64 KiB of
 UTF-8 text, and bounds gRPC responses to 256 KiB. Slow consumers apply backpressure.
 Internal connection and acceptance waits are 10 seconds; completion after source
-exhaustion is bounded to 120 seconds. Source iterators should honor task
-cancellation; source cleanup is attempted for at most two seconds.
+exhaustion is bounded to 120 seconds. The completion timer stops after successful
+gRPC completion. The optional overall timeout remains active until the final
+result is consumed. Source iterators should honor task cancellation; source
+cleanup is attempted for at most two seconds.
 
 Server input-idle, utterance-size, request-duration and model-context limits still
 apply. The current wire limit is 16 MiB per utterance; model context can impose a

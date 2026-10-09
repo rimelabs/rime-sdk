@@ -167,8 +167,10 @@ immediately, including before the first read and while either source or consumer
 is paused.
 
 Connection and acceptance each have a 10-second limit. Once source EOF is reached,
-completion has a 120-second limit. Transcript snapshots are limited to 64 KiB of
-UTF-8 text, incoming gRPC messages to 256 KiB, and the output queue to 16 snapshots.
+completion has a 120-second limit. The completion timer stops after successful
+gRPC completion. The optional overall timeout remains active until the final
+result is consumed. Transcript snapshots are limited to 64 KiB of UTF-8 text,
+incoming gRPC messages to 256 KiB, and the output queue to 16 snapshots.
 The queue preserves entire updates. Slow consumers apply backpressure.
 
 An audio source error becomes `ErrInput`, preserving the original error as its

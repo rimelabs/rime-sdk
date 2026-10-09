@@ -86,9 +86,11 @@ one stream leaves its siblings running.
 The SDK bounds the transcript queue to 16 updates, each with at most 64 KiB of
 UTF-8 text, and bounds gRPC responses to 256 KiB. Slow consumers apply backpressure.
 Internal connection and acceptance waits are 10 seconds; completion after source
-exhaustion is bounded to 120 seconds. An outstanding source `next()` cannot be forcibly stopped by JavaScript; the SDK
-stops waiting for it and attempts `return()` for at most two seconds. Sources
-that own devices should support cancellation themselves.
+exhaustion is bounded to 120 seconds. The completion timer stops after successful
+gRPC completion. The optional overall timeout remains active until the final
+result is consumed. An outstanding source `next()` cannot be forcibly stopped by
+JavaScript; the SDK stops waiting for it and attempts `return()` for at most two
+seconds. Sources that own devices should support cancellation themselves.
 
 Server input-idle, utterance-size, request-duration and model-context limits still
 apply. The current wire limit is 16 MiB per utterance; model context can impose a

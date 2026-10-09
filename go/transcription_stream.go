@@ -109,6 +109,10 @@ func (stream *TranscriptionStream) complete() {
 	})
 }
 func (stream *TranscriptionStream) fail(err error) {
+	// Transport failures and Close can race with the context cancellation callback.
+	if cause := context.Cause(stream.op.ctx); cause != nil {
+		err = cause
+	}
 	stream.queue.fail(operationError(err, stream.RequestID()))
 	stream.complete()
 }

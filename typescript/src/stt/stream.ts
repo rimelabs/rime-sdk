@@ -42,6 +42,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
     this.accepted = resolve;
   });
   private admission: ReturnType<typeof scope> | null = null;
+  private completion: ReturnType<typeof scope> | null = null;
   private readonly externalAbort = () =>
     this.fail(new RimeCancelledError("Transcription cancelled"));
 
@@ -133,7 +134,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
       }
       audio.finish();
       this.inputDone = true;
-      this.deadline(
+      this.completion = this.deadline(
         policy.completionTimeout,
         "Transcription completion timed out",
       );
@@ -193,6 +194,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
         reader = this.read();
       tasks = [producer, reader];
       const [, final] = await Promise.all([producer, reader]);
+      this.completion?.dispose();
       await this.queue.put(final);
       this.queue.finish();
     } catch (error) {

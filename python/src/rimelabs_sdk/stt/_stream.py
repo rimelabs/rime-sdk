@@ -44,6 +44,7 @@ class TranscriptStream:
         self._failure: RimeError | None = None
         self._timers: list[asyncio.TimerHandle] = []
         self._admission_timer: asyncio.TimerHandle | None = None
+        self._completion_timer: asyncio.TimerHandle | None = None
         self._finished = False
         self._reading = False
         self._input_done = False
@@ -105,7 +106,9 @@ class TranscriptStream:
                     await self._call.write(part)
             audio.finish()
             self._input_done = True
-            self._deadline(self._policy.completion_timeout, "Transcription completion timed out")
+            self._completion_timer = self._deadline(
+                self._policy.completion_timeout, "Transcription completion timed out"
+            )
             await self._call.finish_input()
         finally:
             if iterator is not None and hasattr(iterator, "aclose"):
@@ -154,6 +157,8 @@ class TranscriptStream:
                 done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
                 for task in done:
                     task.result()
+            if self._completion_timer is not None:
+                self._completion_timer.cancel()
             await self._queue.put(reader.result())
             self._queue.finish()
         except RimeError as error:

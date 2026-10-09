@@ -333,6 +333,45 @@ async def test_overall_deadline_runs_while_consumer_is_paused(stt_setup):
     await asyncio.wait_for(stream.cancel(), 1)
 
 
+@pytest.mark.parametrize("queue_limit", [1, 16])
+async def test_completed_transcription_survives_a_paused_consumer(
+    stt_setup, monkeypatch, queue_limit
+):
+    _, client = stt_setup
+    monkeypatch.setattr(_policy, "POLICY", replace(_policy.POLICY, queued_updates=queue_limit))
+    stream = client.stt.stream(source(), language="en")
+    final_ready = asyncio.Event()
+    put = stream._queue.put
+
+    async def observe_final(update):
+        if isinstance(update, TranscriptionFinal):
+            final_ready.set()
+        await put(update)
+
+    monkeypatch.setattr(stream._queue, "put", observe_final)
+    assert (await anext(stream)).text == "I scream"
+    await asyncio.wait_for(final_ready.wait(), 1)
+    await asyncio.sleep(_policy.POLICY.completion_timeout + 0.05)
+    updates = [update async for update in stream]
+    assert [(update.kind, update.text) for update in updates] == [
+        ("partial", "Ice cream"),
+        ("final", "Ice cream"),
+    ]
+    assert updates[-1].language == "en"
+    assert stream.request_id == "stt-request"
+
+
+async def test_overall_deadline_still_applies_to_a_completed_transcription(stt_setup):
+    _, client = stt_setup
+    stream = client.stt.stream(source(), language="en", timeout=0.4)
+    assert (await anext(stream)).kind == "partial"
+    await asyncio.wait_for(asyncio.shield(stream._worker), 1)
+    await asyncio.sleep(0.45)
+    with pytest.raises(RimeTimeoutError, match="Overall transcription deadline expired"):
+        await anext(stream)
+    await stream.cancel()
+
+
 async def test_single_reader_and_cancel_before_start(stt_setup):
     service, client = stt_setup
     service.mode = "no_acceptance"
