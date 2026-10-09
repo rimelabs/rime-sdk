@@ -25,7 +25,7 @@ type Config struct {
 	Model       string        // "coda" or "mistv3".
 	Endpoint    string        // TLS hostname with optional port. No scheme or path.
 	Timeout     time.Duration // TTS overall timeout. Zero disables it; negative values are invalid.
-	STTEndpoint string        // STT TLS hostname with optional port; defaults to stt.api.rime.ai:443.
+	STTEndpoint string        // STT TLS hostname with optional port; defaults to stt.api.rime.ai:50051.
 }
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
@@ -118,7 +118,7 @@ func NewClient(config Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	sttTarget, err := resolveEndpoint(config.STTEndpoint, "stt.api.rime.ai:443")
+	sttTarget, err := resolveEndpoint(config.STTEndpoint, "stt.api.rime.ai:50051")
 	if err != nil {
 		return nil, err
 	}

@@ -193,7 +193,7 @@ stream lifetime rules.
 | `Model` | `coda` | `coda` or `mistv3` |
 | `Endpoint` | Model endpoint | TLS hostname with optional port; no scheme or path |
 | `Timeout` | `0` | Overall TTS operation duration; zero disables it |
-| `STTEndpoint` | `stt.api.rime.ai:443` | Independent STT TLS hostname with optional port; no scheme or path |
+| `STTEndpoint` | `stt.api.rime.ai:50051` | Independent STT TLS hostname with optional port; no scheme or path |
 
 Coda uses `coda.api.rime.ai:50051` and voice `clementine`. Mist v3 uses
 `mist.api.rime.ai:50051` and voice `astra`. Both use language `en` by default.

@@ -1,6 +1,6 @@
 /** Independent resource and transport limits for recognition. Durations are seconds. */
 export const policy = {
-  target: "stt.api.rime.ai:443",
+  target: "stt.api.rime.ai:50051",
   connectionTimeout: 10,
   acceptanceTimeout: 10,
   completionTimeout: 120,
