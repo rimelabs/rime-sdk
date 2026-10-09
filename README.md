@@ -1,7 +1,7 @@
 # Rime SDK
 
-First-party Python, Node.js, and Go SDKs for Coda and Mist v3 streaming speech.
-All three accept complete text or an incremental text source and return audio chunks.
+First-party Python, Node.js, Go, and Rust SDKs for Coda and Mist v3 streaming speech.
+All four accept complete text or an incremental text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
 Python and Node.js support Prism speech-to-speech sessions through
@@ -17,6 +17,7 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
 | `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS only |
+| `rimelabs-sdk` on crates.io | [rust](rust/) | Rust 1.88+ and Tokio; TTS only |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
 [Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),
@@ -35,6 +36,8 @@ npm ci
 npm test
 cd ../go
 go test -race ./...
+cd ../rust
+cargo test --locked
 ```
 
 Set `RIME_API_KEY` in your application environment. The SDK does not load `.env` files.

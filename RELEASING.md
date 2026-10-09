@@ -242,3 +242,22 @@ release PR. A retry builds the original tagged source, not the current package c
 - [Go module publishing](https://go.dev/doc/modules/publishing)
 - [Go module tags for subdirectories](https://go.dev/ref/mod#vcs-version)
 - [GitHub repository visibility](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)
+# Rust
+
+Rust versions and changelogs are independent of the other SDKs. Release Please
+uses the Rust strategy and `rust-v` tags. Configure a crates.io trusted publisher
+for `rimelabs-sdk`, repository `rimelabs/rime-sdk`, workflow `release-please.yml`,
+and GitHub environment `crates`, restricted to `main`. The initial upload may
+require a scoped crates.io token before trusted publisher setup.
+
+Publish the initial `rime-api` Rust crate before releasing the SDK. The current
+SDK requires `rime-api` 0.3.x. If the first API publication uses a later version,
+update that dependency and rerun conformance tests before release. Once the API
+is available on crates.io, run `cargo update -p rime-api` without a local patch
+and commit the registry checksum in `rust/Cargo.lock`. Remove the bootstrap API
+checkout and Cargo overrides from CI, along with `rust/api-revision`.
+
+Release checks use `cargo test --locked` and `cargo package --locked` against
+the registry dependency. They do not use the branch CI override. Recovery can
+select an existing `rust-v` tag through the workflow's `rust_tag` input.
+

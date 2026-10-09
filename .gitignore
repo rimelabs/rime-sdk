@@ -13,3 +13,5 @@ coverage/
 /speech.wav
 /reply.wav
 /examples/typescript/*.wav
+/rust/target/
+/.rust-api/

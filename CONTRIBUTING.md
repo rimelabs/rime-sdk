@@ -132,3 +132,21 @@ uv run --no-sync pytest tests/test_plugin_rime_realtime.py -q --unit
 `--no-sync` keeps the local SDK installation for this run. No local filesystem
 path belongs in a published dependency. Publish the Prism-enabled SDK and set the
 plugin's minimum SDK version to that release before publishing the plugin.
+# Rust
+
+Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and
+`cargo test` from `rust/`. Tests use local gRPC services and the shared
+conformance cases. Keep `rust/testdata` identical to the corresponding files in
+`conformance/`. Keep the BlingFire binary identical to the Go copy.
+
+Before the first Rust API crate is published, use the sibling checkout:
+
+```sh
+cargo test --manifest-path rust/Cargo.toml --locked \
+  --config 'patch.crates-io.rime-api.path="../rime-api/rust"'
+```
+
+Run that command from the SDK repository root. Branch CI checks out the API
+commit in `rust/api-revision` and uses the same Cargo override. The package
+manifest has only a registry dependency; no local path enters the SDK release.
+

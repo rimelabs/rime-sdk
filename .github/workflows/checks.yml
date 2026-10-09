@@ -13,6 +13,7 @@ jobs:
       python: ${{ steps.paths.outputs.python }}
       typescript: ${{ steps.paths.outputs.typescript }}
       go: ${{ steps.paths.outputs.go }}
+      rust: ${{ steps.paths.outputs.rust }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,23 +27,27 @@ jobs:
           python=false
           typescript=false
           go=false
+          rust=false
           if [[ "$EVENT" == workflow_dispatch || -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
             python=true
             typescript=true
             go=true
+            rust=true
           else
             while IFS= read -r path; do
               case "$path" in
                 python/*|examples/python/*) python=true ;;
                 typescript/*|examples/typescript/*) typescript=true ;;
                 go/*) go=true ;;
-                conformance/*|docs/*|.github/*|examples/audio/*|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true ;;
+                rust/*) rust=true ;;
+                conformance/*|docs/*|.github/*|examples/audio/*|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true; rust=true ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
           fi
           echo "python=$python" >> "$GITHUB_OUTPUT"
           echo "typescript=$typescript" >> "$GITHUB_OUTPUT"
           echo "go=$go" >> "$GITHUB_OUTPUT"
+          echo "rust=$rust" >> "$GITHUB_OUTPUT"
   python:
     needs: changes
     if: needs.changes.outputs.python == 'true'
@@ -123,3 +128,40 @@ jobs:
       - run: go vet ./...
       - run: go test -race ./...
       - run: CGO_ENABLED=0 go build ./...
+  rust:
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: ['1.88.0', stable]
+    defaults:
+      run:
+        working-directory: rust
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the API source for the initial Rust release
+        id: api
+        run: echo "revision=$(cat api-revision)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: rimelabs/rime-api
+          ref: ${{ steps.api.outputs.revision }}
+          path: .rust-api
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: rustfmt, clippy
+      - name: Check shared fixtures and WASM
+        run: |
+          for fixture in sentences contract audio mulaw; do
+            cmp "../conformance/$fixture.json" "testdata/$fixture.json"
+          done
+          cmp ../go/internal/sentences/blingfire.wasm vendor/blingfire.wasm
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets --config 'patch.crates-io.rime-api.path="../.rust-api/rust"' -- -D warnings
+      - run: cargo test --locked --config 'patch.crates-io.rime-api.path="../.rust-api/rust"'
+      - run: cargo doc --locked --no-deps --config 'patch.crates-io.rime-api.path="../.rust-api/rust"'

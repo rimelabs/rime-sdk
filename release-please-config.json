@@ -9,6 +9,12 @@
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "packages": {
+    "rust": {
+      "release-type": "rust",
+      "prerelease-type": "alpha.1",
+      "component": "rust",
+      "package-name": "rimelabs-sdk"
+    },
     "go": {
       "release-type": "simple",
       "prerelease-type": "alpha.1",
