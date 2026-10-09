@@ -1,0 +1,21 @@
+go/cancellation_test.go
+  s_264b98dc6486d6::t_f11a295d61ecc8 1-47
+go/stream.go
+  s_264b98dc6486d6::t_9c616b3efb5d32 116-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c7ce1194d5752aadff8f20fe798ac7ded35e7284",
+  "prompts": {},
+  "sessions": {
+    "s_264b98dc6486d6": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11c66-c1fe-70e0-a83a-7ea699646b5f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
