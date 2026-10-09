@@ -6,17 +6,9 @@ import grpc
 from google.protobuf.message_factory import GetMessageClass
 from rime_api import text_to_speech_pb2 as proto
 
-from .._errors import (
-    RimeAudioFormatError,
-    RimeAuthenticationError,
-    RimeCancelledError,
-    RimeInputError,
-    RimePermissionError,
-    RimeResourceLimitError,
-    RimeStreamError,
-    RimeTimeoutError,
-    RimeUnavailableError,
-)
+from .._errors import RimeAudioFormatError, RimeStreamError
+from .._grpc import request_id as _request_id
+from .._grpc import rpc_error
 
 
 def make_channel(policy):
@@ -46,27 +38,6 @@ def header(voice, language):
     request.audio_parameters.audio_format = "audio/pcm"
     request.audio_parameters.sampling_rate = 24000
     return proto.StreamingSynthesisRequest(header=request)
-
-
-def rpc_error(code, request_id=None):
-    cls = {
-        grpc.StatusCode.UNAUTHENTICATED: RimeAuthenticationError,
-        grpc.StatusCode.PERMISSION_DENIED: RimePermissionError,
-        grpc.StatusCode.INVALID_ARGUMENT: RimeInputError,
-        grpc.StatusCode.RESOURCE_EXHAUSTED: RimeResourceLimitError,
-        grpc.StatusCode.UNAVAILABLE: RimeUnavailableError,
-        grpc.StatusCode.DEADLINE_EXCEEDED: RimeTimeoutError,
-        grpc.StatusCode.CANCELLED: RimeCancelledError,
-    }.get(code, RimeStreamError)
-    return cls("Rime operation failed: " + code.name, request_id=request_id)
-
-
-def _request_id(headers, trailers=(), previous=None):
-    return (
-        dict(headers or ()).get("x-request-id")
-        or previous
-        or dict(trailers or ()).get("x-request-id")
-    )
 
 
 async def discover(channel, metadata, kind, language, timeout):

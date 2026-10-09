@@ -4,6 +4,11 @@ First-party Python, Node.js, and Go SDKs for Coda and Mist v3 streaming speech.
 All three accept complete text or an incremental text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
+All three SDKs support streaming speech recognition: `client.stt.stream` in
+Python/Node.js and `client.STT.Stream` in Go. Supply a spoken language and a
+streaming audio source; updates replace the current
+transcript and source exhaustion ends the utterance.
+
 Python and Node.js support Prism speech-to-speech sessions through
 `client.realtime.connect`. Prism requires an explicit realtime endpoint.
 
@@ -16,15 +21,18 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
-| `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS only |
+| `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS and STT |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
-[Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),
-[Node.js TTS](typescript/docs/tts.md), and [Node.js Realtime](typescript/docs/realtime.md).
+[Python TTS](python/docs/tts.md), [Python STT](python/docs/stt.md), [Python Realtime](python/docs/realtime.md),
+[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), and [Go STT](go/README.md#transcribe-speech).
 Runnable scripts are in the
 [example index](examples/README.md).
 
 ## Local setup
+
+All three SDKs use versioned API packages with STT definitions. The commands
+below install those dependencies; no local schema build is required.
 
 ```sh
 cd python

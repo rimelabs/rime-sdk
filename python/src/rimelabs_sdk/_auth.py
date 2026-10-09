@@ -99,18 +99,24 @@ class Credentials:
         self._refresh_at = token.expires_at - min(30, (token.expires_at - time.time()) / 10)
         return token
 
+    def authorization(self) -> str:
+        """Direct service authentication independent of TTS exchange policy."""
+        if self._closed:
+            raise RimeAuthenticationError("Credentials are closed")
+        return "Bearer " + self._key
+
     def realtime_headers(self) -> dict[str, str]:
         """Direct API-key authentication, independent of TTS token policy."""
         if self._closed:
             raise RimeAuthenticationError("Credentials are closed")
-        return {"Authorization": "Bearer " + self._key}
+        return {"Authorization": self.authorization()}
 
     async def metadata(self):
         # TEMPORARY until Themis is ready: replace this body with the call below.
         # return await self._themis_metadata()
         if self._closed:
             raise RimeAuthenticationError("Credentials are closed")
-        return (("authorization", "Bearer " + self._key),)
+        return (("authorization", self.authorization()),)
 
     async def _themis_metadata(self):
         if self._closed:

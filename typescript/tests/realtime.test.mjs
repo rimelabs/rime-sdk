@@ -798,7 +798,7 @@ test("partial audio submission cancellation closes the session", async (t) => {
 
 const audioVectors = JSON.parse(
   readFileSync(
-    new URL("../../conformance/prism/audio.json", import.meta.url),
+    new URL("../../conformance/pcm-input.json", import.meta.url),
     "utf8",
   ),
 ).vectors;

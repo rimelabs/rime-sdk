@@ -139,7 +139,16 @@ async def test_sentence_messages_ignore_source_chunk_size(setup):
     assert messages == [["Hi!", " Dr.", " Smith agrees.", " Hello."]] * 3
 
 
-@pytest.mark.parametrize("value", CONTRACT["invalid_timeouts"] + [float("inf"), float("nan")])
+@pytest.mark.parametrize(
+    "value",
+    CONTRACT["invalid_timeouts"]
+    + [
+        float("inf"),
+        float("nan"),
+        pytest.param(10**1000, id="oversized-positive-integer"),
+        pytest.param(-(10**1000), id="oversized-negative-integer"),
+    ],
+)
 def test_invalid_timeout(value):
     with pytest.raises(RimeInputError):
         Rime(api_key="test", timeout=value)

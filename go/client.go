@@ -1,4 +1,4 @@
-// Package rime streams Coda and Mist v3 speech. Applications own playback.
+// Package rime streams speech synthesis and recognition. Applications own audio devices.
 package rime
 
 import (
@@ -21,10 +21,11 @@ import (
 
 // Config selects credentials and a deployment. Zero values select Coda and no overall timeout.
 type Config struct {
-	APIKey   string        // Defaults to RIME_API_KEY. The SDK does not read .env files.
-	Model    string        // "coda" or "mistv3".
-	Endpoint string        // TLS hostname with optional port. No scheme or path.
-	Timeout  time.Duration // Zero disables the overall timeout; negative values are invalid.
+	APIKey      string        // Defaults to RIME_API_KEY. The SDK does not read .env files.
+	Model       string        // "coda" or "mistv3".
+	Endpoint    string        // TLS hostname with optional port. No scheme or path.
+	Timeout     time.Duration // TTS overall timeout. Zero disables it; negative values are invalid.
+	STTEndpoint string        // STT TLS hostname with optional port; defaults to stt.api.rime.ai:443.
 }
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
@@ -43,12 +44,17 @@ type VoiceListOptions struct {
 
 // Client can be shared by concurrent goroutines. Close cancels all its operations.
 type Client struct {
+	STT                *STTService
 	TTS                *TTSService
 	Voices             *VoiceService
 	Languages          *LanguageService
 	mu                 sync.Mutex
 	closed             bool
 	conn               *grpc.ClientConn
+	sttConn            *grpc.ClientConn
+	sttTarget          string
+	sttDialOptions     []grpc.DialOption
+	sttLimits          transcriptionLimits
 	key, target, voice string
 	timeout            time.Duration
 	operations         map[*operation]struct{}
@@ -107,41 +113,63 @@ func NewClient(config Config) (*Client, error) {
 	if config.Timeout < 0 {
 		return nil, failure(ErrInput, "timeout must not be negative")
 	}
-	if config.Endpoint != "" {
-		invalid := failure(ErrInput, "endpoint must be a hostname with an optional port, without a scheme or path")
-		parts := strings.Split(config.Endpoint, ":")
-		if len(parts) > 2 || len(parts[0]) > 253 {
-			return nil, invalid
-		}
-		for _, label := range strings.Split(parts[0], ".") {
-			if !hostnameLabel.MatchString(label) {
-				return nil, invalid
-			}
-		}
-		port := 443
-		if len(parts) == 2 {
-			if len(parts[1]) == 0 || len(parts[1]) > 5 {
-				return nil, invalid
-			}
-			for _, char := range parts[1] {
-				if char < '0' || char > '9' {
-					return nil, invalid
-				}
-			}
-			var err error
-			port, err = strconv.Atoi(parts[1])
-			if err != nil || port < 1 || port > 65535 {
-				return nil, invalid
-			}
-		}
-		target = fmt.Sprintf("%s:%d", strings.ToLower(parts[0]), port)
+	var err error
+	target, err = resolveEndpoint(config.Endpoint, target)
+	if err != nil {
+		return nil, err
+	}
+	sttTarget, err := resolveEndpoint(config.STTEndpoint, "stt.api.rime.ai:443")
+	if err != nil {
+		return nil, err
 	}
 	c := &Client{key: key, target: target, voice: voice, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
+	c.sttTarget, c.sttLimits = sttTarget, defaultTranscriptionLimits
+	c.STT = &STTService{c}
 	c.TTS = &TTSService{c}
 	c.Voices = &VoiceService{c}
 	c.Languages = &LanguageService{c}
 	return c, nil
 }
+
+func resolveEndpoint(endpoint, fallback string) (string, error) {
+	if endpoint == "" {
+		return fallback, nil
+	}
+	invalid := failure(ErrInput, "endpoint must be a hostname with an optional port, without a scheme or path")
+	parts := strings.Split(endpoint, ":")
+	if len(parts) > 2 || len(parts[0]) > 253 {
+		return "", invalid
+	}
+	for _, label := range strings.Split(parts[0], ".") {
+		if !hostnameLabel.MatchString(label) {
+			return "", invalid
+		}
+	}
+	port := 443
+	if len(parts) == 2 {
+		if len(parts[1]) == 0 || len(parts[1]) > 5 {
+			return "", invalid
+		}
+		for _, char := range parts[1] {
+			if char < '0' || char > '9' {
+				return "", invalid
+			}
+		}
+		var err error
+		port, err = strconv.Atoi(parts[1])
+		if err != nil || port < 1 || port > 65535 {
+			return "", invalid
+		}
+	}
+	return fmt.Sprintf("%s:%d", strings.ToLower(parts[0]), port), nil
+}
+
+type rpcService uint8
+
+const (
+	synthesisService rpcService = iota
+	transcriptionService
+)
 
 func (c *Client) operation(ctx context.Context, override *time.Duration, cap time.Duration) (*operation, error) {
 	if ctx == nil {
@@ -176,24 +204,38 @@ func (c *Client) operation(ctx context.Context, override *time.Duration, cap tim
 }
 
 func (c *Client) prepare(ctx context.Context) (pb.TextToSpeechClient, context.Context, error) {
+	conn, rpcCtx, err := c.prepareService(ctx, synthesisService)
+	if err != nil {
+		return nil, rpcCtx, err
+	}
+	return pb.NewTextToSpeechClient(conn), rpcCtx, nil
+}
+
+func (c *Client) prepareService(ctx context.Context, service rpcService) (*grpc.ClientConn, context.Context, error) {
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return nil, ctx, failure(ErrCancelled, "client is closed")
 	}
-	if c.conn == nil {
-		options := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDisableRetry(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(4194304), grpc.MaxCallSendMsgSize(131072), grpc.MaxRetryRPCBufferSize(0))}
-		options = append(options, c.dialOptions...)
+	slot, target, dialOptions := &c.conn, c.target, c.dialOptions
+	connectionLimit, receiveLimit := c.limits.connection, 4194304
+	if service == transcriptionService {
+		slot, target, dialOptions = &c.sttConn, c.sttTarget, c.sttDialOptions
+		connectionLimit, receiveLimit = c.sttLimits.connection, c.sttLimits.receiveBytes
+	}
+	if *slot == nil {
+		options := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDisableRetry(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(receiveLimit), grpc.MaxCallSendMsgSize(131072), grpc.MaxRetryRPCBufferSize(0))}
+		options = append(options, dialOptions...)
 		var err error
-		c.conn, err = grpc.NewClient(c.target, options...)
+		*slot, err = grpc.NewClient(target, options...)
 		if err != nil {
 			c.mu.Unlock()
 			return nil, ctx, operationError(err, "")
 		}
 	}
-	conn, key := c.conn, c.key
+	conn, key := *slot, c.key
 	c.mu.Unlock()
-	connectCtx, cancel := context.WithTimeout(ctx, c.limits.connection)
+	connectCtx, cancel := context.WithTimeout(ctx, connectionLimit)
 	defer cancel()
 	conn.Connect()
 	for {
@@ -208,10 +250,10 @@ func (c *Client) prepare(ctx context.Context) (pb.TextToSpeechClient, context.Co
 			return nil, ctx, failure(ErrCancelled, "connection is closed")
 		}
 	}
-	return pb.NewTextToSpeechClient(conn), metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+key), nil
+	return conn, metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+key), nil
 }
 
-// Close is safe to call more than once. A blocked user TextSource must honor its context.
+// Close is safe to call more than once. Blocked user sources must honor their context.
 func (c *Client) Close() error {
 	c.mu.Lock()
 	if c.closed {
@@ -222,13 +264,17 @@ func (c *Client) Close() error {
 	for operation := range c.operations {
 		operation.cancel(failure(ErrCancelled, "client closed"))
 	}
-	conn := c.conn
+	conn, sttConn := c.conn, c.sttConn
 	c.key = ""
 	c.mu.Unlock()
+	var err error
 	if conn != nil {
-		return conn.Close()
+		err = conn.Close()
 	}
-	return nil
+	if sttConn != nil {
+		err = errors.Join(err, sttConn.Close())
+	}
+	return err
 }
 
 func requestID(headers, trailers metadata.MD) string {

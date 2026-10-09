@@ -12,7 +12,8 @@ import {
   RimeTimeoutError,
 } from "../errors.js";
 import { Deferred, Flag, Mutex, cancellation, scope } from "./async.js";
-import { formatOf, InputConverter } from "./audio.js";
+import { formatOf } from "./audio.js";
+import { InputConverter } from "../pcm.js";
 import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";

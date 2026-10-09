@@ -6,6 +6,7 @@ deployment URL and voice. Run the commands from the repository root.
 
 | Use case | Python | Node.js / TypeScript | Result |
 | --- | --- | --- | --- |
+| STT: transcribe audio | [stream.py](python/stt/stream.py) | [stream.mjs](typescript/stt/stream.mjs) | Replacement transcripts and a final result from a PCM file. |
 | TTS: save speech | [save.py](python/tts/save.py) | [save.ts](typescript/tts/save.ts) | A playable `speech.wav` file. |
 | TTS: stream and play | [play.py](python/tts/play.py) | [play.ts](typescript/tts/play.ts) | Hear incremental text; stop generation and playback. |
 | Prism: recorded speech | [recorded.py](python/realtime/recorded.py) | [recorded.ts](typescript/realtime/recorded.ts) | Send the included recording; save `reply.wav`. No audio hardware required. |
@@ -15,6 +16,13 @@ deployment URL and voice. Run the commands from the repository root.
 The live audio paths have automated device simulations and protocol tests.
 Physical microphone and speaker validation is still required before release.
 See [manual checks](#manual-checks).
+
+## Terminal STT voice loop
+
+Use the [terminal voice guide](TERMINAL_VOICE.md) to speak, inspect partial/final
+transcripts, and hear the final text through TTS in Python, JavaScript or Go.
+It uses Enter to start/end a turn and requires only a Rime API key and SoX.
+The guide includes the setup for this unreleased STT development checkout.
 
 ## Python
 
@@ -132,3 +140,24 @@ Run these on each supported OS before publishing the device examples:
 
 The server/model is required for these checks. Automated tests use controlled
 peers and simulated output clocks; they do not prove physical device behavior.
+
+## Speech recognition
+
+Prepare a headerless signed PCM16 little-endian mono 16 kHz file and choose its
+spoken language explicitly. After local setup, run:
+
+```sh
+uv run --project python examples/python/stt/stream.py utterance.pcm --language en
+npm --prefix examples/typescript run stt -- /absolute/path/utterance.pcm --language es
+```
+
+Use `--mode verbatim` to request spoken formatting. File EOF ends the utterance;
+errors fail the command without printing a successful final result. Partial
+lines are complete replacement transcripts, not fragments to concatenate.
+
+## Go STT
+
+The Go module includes [`examples/transcribe`](../go/examples/transcribe/main.go).
+From `go/`, run `go run ./examples/transcribe -language en -sample-rate 24000 audio.pcm`
+to transcribe a headerless PCM16 little-endian mono file. It prints replacement
+partials, the final transcript and request ID. See the [Go STT documentation](../go/README.md#transcribe-speech).

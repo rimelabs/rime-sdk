@@ -36,7 +36,7 @@ jobs:
                 python/*|examples/python/*) python=true ;;
                 typescript/*|examples/typescript/*) typescript=true ;;
                 go/*) go=true ;;
-                conformance/*|docs/*|.github/*|examples/audio/*|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true ;;
+                conformance/*|docs/*|.github/*|examples/audio/*|examples/TERMINAL_VOICE.md|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
           fi
@@ -116,7 +116,7 @@ jobs:
           cache-dependency-path: go/go.sum
       - name: Check shared fixtures and formatting
         run: |
-          for fixture in sentences contract audio mulaw; do
+          for fixture in sentences contract audio mulaw pcm-input stt/transcripts; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
           test -z "$(gofmt -l .)"

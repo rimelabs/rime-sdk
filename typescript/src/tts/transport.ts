@@ -1,8 +1,17 @@
+import { connect as connectGrpc, metadata } from "../grpc.js";
+export { metadata } from "../grpc.js";
+import {
+  BidiCall,
+  rpcError,
+  serializer,
+  deserializer,
+  requestId,
+  nativeError,
+} from "../grpc.js";
+export { rpcError } from "../grpc.js";
 import * as grpc from "@grpc/grpc-js";
 import {
   create,
-  fromBinary,
-  toBinary,
   type DescMessage,
   type MessageShape,
 } from "@bufbuild/protobuf";
@@ -16,25 +25,6 @@ export interface PreparedConnection {
   metadata: grpc.Metadata;
 }
 export type DiscoveryKind = "voices" | "languages";
-export function rpcError(
-  code: number,
-  requestId: string | null = null,
-): errors.RimeError {
-  const classes: Record<number, typeof errors.RimeError> = {
-    [grpc.status.UNAUTHENTICATED]: errors.RimeAuthenticationError,
-    [grpc.status.PERMISSION_DENIED]: errors.RimePermissionError,
-    [grpc.status.INVALID_ARGUMENT]: errors.RimeInputError,
-    [grpc.status.RESOURCE_EXHAUSTED]: errors.RimeResourceLimitError,
-    [grpc.status.UNAVAILABLE]: errors.RimeUnavailableError,
-    [grpc.status.DEADLINE_EXCEEDED]: errors.RimeTimeoutError,
-    [grpc.status.CANCELLED]: errors.RimeCancelledError,
-  };
-  const ErrorType = classes[code] ?? errors.RimeStreamError;
-  return new ErrorType(
-    `Rime operation failed: ${grpc.status[code] ?? "UNKNOWN"}`,
-    requestId,
-  );
-}
 export const transport = {
   makeClient: (target: string) =>
     new grpc.Client(target, grpc.credentials.createSsl(), {
@@ -43,34 +33,8 @@ export const transport = {
       "grpc.max_send_message_length": policy.sentenceBytes + 65536,
     }),
 };
-function serializer<D extends DescMessage>(desc: D) {
-  return (message: MessageShape<D>) => Buffer.from(toBinary(desc, message));
-}
-function deserializer<D extends DescMessage>(desc: D) {
-  return (data: Buffer) => fromBinary(desc, data);
-}
-export async function connect(client: grpc.Client, signal: AbortSignal) {
-  await abortable(
-    new Promise<void>((resolve, reject) =>
-      client.waitForReady(
-        Date.now() + policy.connectionTimeout * 1000,
-        (error) =>
-          error
-            ? reject(
-                new errors.RimeTimeoutError(
-                  "Connection establishment timed out",
-                ),
-              )
-            : resolve(),
-      ),
-    ),
-    signal,
-  );
-}
-export function metadata(value: string) {
-  const result = new grpc.Metadata();
-  result.set("authorization", value);
-  return result;
+export function connect(client: grpc.Client, signal: AbortSignal) {
+  return connectGrpc(client, signal, policy.connectionTimeout);
 }
 function openStream(client: grpc.Client, auth: grpc.Metadata) {
   return client.makeBidiStreamRequest<
@@ -98,29 +62,6 @@ function header(voice: string, language: string) {
 function textMessage(text: string) {
   return create(schema.StreamingSynthesisRequestSchema, {
     payload: { case: "textChunk", value: text },
-  });
-}
-
-function requestId(metadata?: grpc.Metadata): string | null {
-  return metadata?.get("x-request-id")[0]?.toString() ?? null;
-}
-
-function nativeError(error: unknown, id: string | null): errors.RimeError {
-  if (error instanceof errors.RimeError) return error;
-  if (
-    error &&
-    typeof error === "object" &&
-    "code" in error &&
-    typeof error.code === "number"
-  ) {
-    const metadata = "metadata" in error ? error.metadata : null;
-    return rpcError(
-      error.code,
-      id ?? (metadata instanceof grpc.Metadata ? requestId(metadata) : null),
-    );
-  }
-  return new errors.RimeStreamError("Rime transport failed", id, {
-    cause: error,
   });
 }
 
@@ -195,126 +136,49 @@ export async function discover(
 }
 
 export class SynthesisCall {
-  private readonly call: ReturnType<typeof openStream>;
-  private readonly metadataPromise: Promise<grpc.Metadata>;
-  private readonly statusPromise: Promise<grpc.StatusObject>;
-  private status: grpc.StatusObject | null = null;
-  private id: string | null = null;
-
-  constructor(
-    prepared: PreparedConnection,
-    private signal: AbortSignal,
-  ) {
-    this.call = openStream(prepared.client, prepared.metadata);
-    this.metadataPromise = new Promise((resolve, reject) => {
-      this.call.once("metadata", (metadata: grpc.Metadata) => {
-        this.id = requestId(metadata);
-        resolve(metadata);
-      });
-      // A trailers-only response has no metadata event.
-      this.call.once("status", () => resolve(new grpc.Metadata()));
-      this.call.once("error", reject);
-    });
-    this.metadataPromise.catch(() => {});
-    this.statusPromise = new Promise((resolve) => {
-      this.call.once("status", (status: grpc.StatusObject) => {
-        this.status = status;
-        this.id ??= requestId(status.metadata);
-        resolve(status);
-      });
-    });
-    this.call.on("error", () => {});
+  private readonly rpc: BidiCall<
+    schema.StreamingSynthesisRequest,
+    schema.SynthesisResponseStream
+  >;
+  constructor(prepared: PreparedConnection, signal: AbortSignal) {
+    this.rpc = new BidiCall(
+      openStream(prepared.client, prepared.metadata),
+      signal,
+    );
   }
-
-  get requestId(): string | null {
-    return this.id;
+  get requestId() {
+    return this.rpc.requestId;
   }
-  get done(): boolean {
-    return this.status !== null || this.call.destroyed;
+  get done() {
+    return this.rpc.done;
   }
-  cancel(): void {
-    this.call.cancel();
+  cancel() {
+    this.rpc.cancel();
   }
-
-  private error(error: unknown): errors.RimeError {
-    const failure = nativeError(error, this.id);
-    this.id ??= failure.requestId;
-    return failure;
+  start(voice: string, language: string) {
+    return this.rpc.write(header(voice, language));
   }
-
-  private async writeMessage(
-    message: schema.StreamingSynthesisRequest,
-  ): Promise<void> {
-    try {
-      this.signal.throwIfAborted();
-      if (this.status) {
-        if (this.status.code !== grpc.status.OK)
-          throw rpcError(this.status.code, this.id);
-        throw new errors.RimeStreamError(
-          "The service completed before input finished",
-          this.id,
-        );
-      }
-      await abortable(
-        new Promise<void>((resolve, reject) => {
-          this.call.write(message, (error: Error | null | undefined) =>
-            error ? reject(error) : resolve(),
-          );
-        }),
-        this.signal,
-      );
-    } catch (error) {
-      if (this.signal.aborted) throw this.signal.reason;
-      if (error instanceof errors.RimeError) throw error;
-      // A native write error can precede the final status event. Preserve the
-      // server rejection even if the reader has not consumed a response.
-      const status = await abortable(this.statusPromise, this.signal);
-      if (status.code !== grpc.status.OK) throw rpcError(status.code, this.id);
-      throw this.error(error);
-    }
+  write(sentence: string) {
+    return this.rpc.write(textMessage(sentence));
   }
-
-  async start(voice: string, language: string): Promise<void> {
-    // Writes do not depend on response metadata.
-    await this.writeMessage(header(voice, language));
+  finishInput() {
+    this.rpc.finishInput();
   }
-  async write(sentence: string): Promise<void> {
-    await this.writeMessage(textMessage(sentence));
-  }
-  finishInput(): void {
-    try {
-      this.call.end();
-    } catch (error) {
-      throw this.error(error);
-    }
-  }
-  private checkFormat(contentType: unknown): void {
+  private checkFormat(contentType: unknown) {
     if (contentType !== "audio/pcm")
       throw new errors.RimeAudioFormatError(
         "Expected raw audio/pcm from the service",
-        this.id,
+        this.requestId,
       );
   }
-
   async *audio(): AsyncGenerator<Uint8Array> {
-    try {
-      const metadata = await abortable(this.metadataPromise, this.signal);
-      const contentType = metadata.get("x-rime-audio-content-type")[0];
-      const responses: AsyncIterable<schema.SynthesisResponseStream> =
-        this.call;
-      for await (const response of responses) {
-        if (response.payload.case !== "audio") continue;
-        const audio = response.payload.value;
-        if (audio.length) this.checkFormat(contentType);
-        yield audio;
-      }
-      const status = await abortable(this.statusPromise, this.signal);
-      if (status.code !== grpc.status.OK) throw rpcError(status.code, this.id);
-      // Validate empty success only after giving a rejection its proper error.
-      this.checkFormat(contentType);
-    } catch (error) {
-      if (this.signal.aborted) throw this.signal.reason;
-      throw this.error(error);
+    const headers = await this.rpc.headers();
+    const contentType = headers.get("x-rime-audio-content-type")[0];
+    for await (const response of this.rpc.responses()) {
+      if (response.payload.case !== "audio") continue;
+      if (response.payload.value.length) this.checkFormat(contentType);
+      yield response.payload.value;
     }
+    this.checkFormat(contentType);
   }
 }
