@@ -3,7 +3,7 @@ name = "rime-sdk-examples"
 version = "0.0.0"
 requires-python = ">=3.11"
 dependencies = [
-    "rimelabs-sdk==0.1.0a9",
+    "rimelabs-sdk==0.1.0a10",
 ]
 
 [project.optional-dependencies]
