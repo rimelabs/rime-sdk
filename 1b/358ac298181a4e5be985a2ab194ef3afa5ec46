@@ -1,0 +1,21 @@
+rust/src/stream.rs
+  s_c318ad644fb4fe::t_8593f693cf3c07 103-104
+rust/README.md
+  s_c318ad644fb4fe::t_8593f693cf3c07 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1b358ac298181a4e5be985a2ab194ef3afa5ec46",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
