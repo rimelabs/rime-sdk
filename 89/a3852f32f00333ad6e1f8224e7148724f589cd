@@ -1,0 +1,33 @@
+go/client.go
+  s_a1d869d7294c6e::t_83a4e868fb5757 107,109
+go/README.md
+  s_a1d869d7294c6e::t_83a4e868fb5757 198-199
+python/tests/test_endpoints.py
+  s_a1d869d7294c6e::t_83a4e868fb5757 63-64
+typescript/docs/tts.md
+  s_a1d869d7294c6e::t_83a4e868fb5757 28-29
+python/src/rimelabs_sdk/tts/_policy.py
+  s_a1d869d7294c6e::t_83a4e868fb5757 15,41
+typescript/src/tts/policy.ts
+  s_a1d869d7294c6e::t_83a4e868fb5757 6,29
+python/docs/tts.md
+  s_a1d869d7294c6e::t_83a4e868fb5757 27-28
+typescript/tests/endpoints.test.mjs
+  s_a1d869d7294c6e::t_83a4e868fb5757 85-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89a3852f32f00333ad6e1f8224e7148724f589cd",
+  "prompts": {},
+  "sessions": {
+    "s_a1d869d7294c6e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1219a-8289-70a1-95c7-0b7ac659995a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
