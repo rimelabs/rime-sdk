@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.11](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.10...typescript-v0.1.0-alpha.11) (2026-10-09)
+
+
+### Features
+
+* add streaming STT to Python, Node.js, and Go ([#39](https://github.com/rimelabs/rime-sdk/issues/39)) ([79977ef](https://github.com/rimelabs/rime-sdk/commit/79977ef019bc474d799881e60223c6868af104d0))
+
 ## [0.1.0-alpha.10](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.9...typescript-v0.1.0-alpha.10) (2026-10-08)
 
 
