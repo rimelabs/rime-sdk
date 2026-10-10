@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/resolver/manual"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -105,10 +108,47 @@ func setupServices(t *testing.T, register func(*grpc.Server)) *Client {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Send targets straight to the in-memory dialer, without public DNS lookups.
+	c.target = "passthrough:///tts"
+	c.sttTarget = "passthrough:///stt"
 	c.dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() })}
 	c.sttDialOptions = c.dialOptions
 	t.Cleanup(func() { c.Close(); server.Stop(); listener.Close() })
 	return c
+}
+
+func TestInMemoryServicesWithoutDNS(t *testing.T) {
+	for _, service := range []string{"tts", "stt"} {
+		t.Run(service, func(t *testing.T) {
+			client, _ := setupRecognition(t, recognizeSilence)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			// Leave DNS without any addresses. In-memory RPCs must bypass it.
+			dns := manual.NewBuilderWithScheme("dns")
+			dns.BuildCallback = func(target resolver.Target, _ resolver.ClientConn, _ resolver.BuildOptions) {
+				t.Errorf("in-memory service attempted DNS resolution for %v", target.URL)
+				cancel()
+			}
+			client.dialOptions = append(client.dialOptions, grpc.WithResolvers(dns))
+			client.sttDialOptions = append(client.sttDialOptions, grpc.WithResolvers(dns))
+			if service == "tts" {
+				languages, err := client.Languages.List(ctx, DiscoveryOptions{})
+				if err != nil || !reflect.DeepEqual(languages, []string{"en", "de"}) {
+					t.Fatalf("in-memory TTS discovery: %v, %v", languages, err)
+				}
+			} else {
+				stream, err := client.STT.Stream(ctx, emptyAudio, TranscriptionOptions{Language: "en"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer stream.Close()
+				updates, err := drainTranscripts(stream)
+				if err != nil || !reflect.DeepEqual(updates, []TranscriptionUpdate{TranscriptionFinal{Language: "en"}}) {
+					t.Fatalf("in-memory transcription: %v, %v", updates, err)
+				}
+			}
+		})
+	}
 }
 
 func drain(stream *AudioStream) ([]byte, error) {
