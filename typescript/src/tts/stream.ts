@@ -22,7 +22,7 @@ export interface StreamOwner {
   checkOpen(): void;
   forget(stream: AudioStream): void;
 }
-export type TextSource = string | AsyncIterable<string>;
+export type TextSource = AsyncIterable<string>;
 export const constructionKey = Symbol("private stream constructor");
 export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private readonly controller = new AbortController();
@@ -48,7 +48,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   constructor(
     key: symbol,
     private owner: StreamOwner,
-    private source: TextSource | null,
+    private source: string | TextSource | null,
     private voice: string,
     private language: string,
     private formatValue: AudioFormat,
@@ -58,7 +58,9 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     private completeText = false,
   ) {
     if (key !== constructionKey)
-      throw new TypeError("AudioStream is returned by client.tts.stream()");
+      throw new TypeError(
+        "AudioStream is returned by client.tts.synthesize() or client.tts.stream()",
+      );
   }
   get format(): AudioFormat {
     return this.formatValue;
@@ -136,19 +138,13 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     this.call?.cancel();
   }
   private async produce() {
-    const source = this.source!;
+    const source = this.source as TextSource;
     let iterator: AsyncIterator<string> | undefined;
     const buffer = new SentenceBuffer(policy.sentenceBytes);
     let meaningful = false;
     try {
       try {
-        iterator = (
-          typeof source === "string"
-            ? (async function* () {
-                yield source;
-              })()
-            : source
-        )[Symbol.asyncIterator]();
+        iterator = source[Symbol.asyncIterator]();
       } catch (error) {
         if (this.controller.signal.aborted) throw this.controller.signal.reason;
         throw new RimeInputError("The text source failed", this.requestId, {

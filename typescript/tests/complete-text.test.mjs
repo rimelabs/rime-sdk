@@ -54,7 +54,7 @@ test(
   async (t) => {
     const { service, client } = await setup(t);
     service.mode = "partial_error";
-    const stream = client.tts.stream("Hello.", { completeText: true });
+    const stream = client.tts.synthesize("Hello.", { completeText: true });
     assert.deepEqual(Buffer.from((await stream.next()).value), service.payload);
     service.release();
     await assert.rejects(
@@ -67,7 +67,7 @@ test(
     assert.equal(service.completeCalls.length, 1);
     service.mode = "normal";
     assert.deepEqual(
-      await collect(client.tts.stream("Again.", { completeText: true })),
+      await collect(client.tts.synthesize("Again.", { completeText: true })),
       service.payload,
     );
   },
@@ -83,7 +83,7 @@ for (const afterAudio of [false, true]) {
       policy.progressTimeout = afterAudio ? 0.1 : 5;
       if (afterAudio) delayCompletion(t, service);
       else service.mode = "silence";
-      const stream = client.tts.stream("Hello.", {
+      const stream = client.tts.synthesize("Hello.", {
         completeText: true,
         timeout: null,
       });
@@ -112,7 +112,7 @@ for (const afterAudio of [false, true]) {
       const { service, client } = await setup(t);
       if (afterAudio) delayCompletion(t, service);
       else service.mode = "silence";
-      const stream = client.tts.stream("Hello.", { completeText: true });
+      const stream = client.tts.synthesize("Hello.", { completeText: true });
       if (afterAudio)
         assert.deepEqual(
           Buffer.from((await stream.next()).value),
@@ -134,8 +134,8 @@ test(
   async (t) => {
     const { service, client } = await setup(t);
     const release = delayCompletion(t, service);
-    const first = client.tts.stream("First.", { completeText: true });
-    const sibling = client.tts.stream("Sibling.", { completeText: true });
+    const first = client.tts.synthesize("First.", { completeText: true });
+    const sibling = client.tts.synthesize("Sibling.", { completeText: true });
     assert.deepEqual(Buffer.from((await first.next()).value), service.payload);
     assert.deepEqual(
       Buffer.from((await sibling.next()).value),
@@ -162,7 +162,7 @@ for (const audioFormat of [AudioFormat.PCM_24000, AudioFormat.MULAW_8000]) {
       policy.progressTimeout = 0.05;
       const samples = 3 * (policy.outputBytes + 1);
       service.payload = Buffer.alloc(samples * 2);
-      const stream = client.tts.stream("Hello.", {
+      const stream = client.tts.synthesize("Hello.", {
         completeText: true,
         audioFormat,
         timeout: null,
@@ -195,7 +195,7 @@ test(
     const { service, client } = await setup(t);
     delayCompletion(t, service);
     service.payload = Buffer.alloc(policy.outputBytes * 2);
-    const stream = client.tts.stream("Hello.", {
+    const stream = client.tts.synthesize("Hello.", {
       completeText: true,
       timeout: 0.15,
     });
@@ -220,17 +220,17 @@ for (const character of ["a", "é", "🙂"]) {
       const { service, client } = await setup(t);
       const text = character.repeat(65536 / Buffer.byteLength(character));
       assert.deepEqual(
-        await collect(client.tts.stream(text, { completeText: true })),
+        await collect(client.tts.synthesize(text, { completeText: true })),
         service.payload,
       );
       assert.equal(service.completeCalls[0].text, text);
       assert.throws(
-        () => client.tts.stream(text + "a", { completeText: true }),
+        () => client.tts.synthesize(text + "a", { completeText: true }),
         RimeInputError,
       );
       assert.equal(service.completeCalls.length, 1);
       assert.deepEqual(
-        await collect(client.tts.stream("Again.", { completeText: true })),
+        await collect(client.tts.synthesize("Again.", { completeText: true })),
         service.payload,
       );
     },
@@ -275,20 +275,22 @@ for (const completeText of [false, true]) {
             : last.spelling.slice(0, difference);
       }
       assert.deepEqual(
-        await collect(client.tts.stream(text, { completeText, customLexicon })),
+        await collect(
+          client.tts.synthesize(text, { completeText, customLexicon }),
+        ),
         service.payload,
       );
       customLexicon.at(-1).spelling += "x";
       assert.equal(size(), 131073);
       await assert.rejects(async () => {
-        for await (const _ of client.tts.stream(text, {
+        for await (const _ of client.tts.synthesize(text, {
           completeText,
           customLexicon,
         }))
           assert.fail("Oversized request produced audio");
       }, RimeResourceLimitError);
       assert.deepEqual(
-        await collect(client.tts.stream("Again.", { completeText })),
+        await collect(client.tts.synthesize("Again.", { completeText })),
         service.payload,
       );
       const accepted = service.calls.filter((messages) => messages.length);

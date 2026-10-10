@@ -1,6 +1,6 @@
 {
   "name": "@rimelabs/sdk",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.12",
   "description": "Rime streaming TTS, STT and Prism realtime SDK for Node.js",
   "license": "MIT",
   "type": "module",
@@ -29,12 +29,12 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs",
     "prepack": "npm run build",
-    "lint": "prettier --check src tests ../examples/typescript/tts ../examples/typescript/realtime ../examples/typescript/common ../examples/typescript/browser ../examples/typescript/tests ../examples/typescript/stt"
+    "lint": "prettier --check src tests examples/tts examples/realtime examples/common examples/browser examples/tests examples/stt"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.11.0",
     "@grpc/grpc-js": "^1.14.0",
-    "@rimelabs/api": "0.3.0",
+    "@rimelabs/api": "0.4.0",
     "ws": "^8.22.0"
   },
   "devDependencies": {

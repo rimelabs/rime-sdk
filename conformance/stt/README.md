@@ -1,8 +1,9 @@
 # STT conformance and qualification
 
 `transcripts.json` contains protobuf-JSON response sequences read directly by the
-Python and Node.js test suites. The Go suite reads the synchronized copy at
-`go/testdata/stt/transcripts.json`; update both files when changing these cases.
+Python and Node.js test suites. The Go and Rust suites read synchronized copies at
+`go/testdata/stt/transcripts.json` and `rust/testdata/stt/transcripts.json`;
+update all three files when changing these cases.
 CI checks that the copies are identical.
 
 Each partial is a replacement snapshot. A final requires source exhaustion,
@@ -14,7 +15,7 @@ cover arbitrary byte splits, truncated frames, independent resampler state, and
 bounded conversion/wire payloads. Native local gRPC peers cover acceptance,
 concurrent upload/download, status and request-ID propagation, bounded queues,
 deadlines, cancellation, and isolation from TTS and Prism. These tests run in the
-repository's normal Python, Node and Go suites without credentials or audio hardware.
+repository's normal Python, Node, Go, and Rust suites without credentials or audio hardware.
 
 ## Live qualification: 2026-10-07 (America/Los_Angeles)
 

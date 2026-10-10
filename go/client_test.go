@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -19,6 +20,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/resolver"
+	"google.golang.org/grpc/resolver/manual"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 )
@@ -125,10 +128,47 @@ func setupConfiguredServices(t *testing.T, config Config, register func(*grpc.Se
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Send targets straight to the in-memory dialer, without public DNS lookups.
+	c.target = "passthrough:///tts"
+	c.sttTarget = "passthrough:///stt"
 	c.dialOptions = []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) { return listener.Dial() })}
 	c.sttDialOptions = c.dialOptions
 	t.Cleanup(func() { c.Close(); server.Stop(); listener.Close() })
 	return c
+}
+
+func TestInMemoryServicesWithoutDNS(t *testing.T) {
+	for _, service := range []string{"tts", "stt"} {
+		t.Run(service, func(t *testing.T) {
+			client, _ := setupRecognition(t, recognizeSilence)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			// Leave DNS without any addresses. In-memory RPCs must bypass it.
+			dns := manual.NewBuilderWithScheme("dns")
+			dns.BuildCallback = func(target resolver.Target, _ resolver.ClientConn, _ resolver.BuildOptions) {
+				t.Errorf("in-memory service attempted DNS resolution for %v", target.URL)
+				cancel()
+			}
+			client.dialOptions = append(client.dialOptions, grpc.WithResolvers(dns))
+			client.sttDialOptions = append(client.sttDialOptions, grpc.WithResolvers(dns))
+			if service == "tts" {
+				languages, err := client.Languages.List(ctx, DiscoveryOptions{})
+				if err != nil || !reflect.DeepEqual(languages, []string{"en", "de"}) {
+					t.Fatalf("in-memory TTS discovery: %v, %v", languages, err)
+				}
+			} else {
+				stream, err := client.STT.Stream(ctx, emptyAudio, TranscriptionOptions{Language: "en"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer stream.Close()
+				updates, err := drainTranscripts(stream)
+				if err != nil || !reflect.DeepEqual(updates, []TranscriptionUpdate{TranscriptionFinal{Language: "en"}}) {
+					t.Fatalf("in-memory transcription: %v, %v", updates, err)
+				}
+			}
+		})
+	}
 }
 
 func drain(stream *AudioStream) ([]byte, error) {
@@ -146,7 +186,7 @@ func drain(stream *AudioStream) ([]byte, error) {
 }
 func mustStream(t *testing.T, c *Client, text string, options SynthesisOptions) *AudioStream {
 	t.Helper()
-	s, err := c.TTS.Stream(context.Background(), text, options)
+	s, err := c.TTS.Synthesize(context.Background(), text, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +222,7 @@ func TestIncrementalAudioBeforeInputEnd(t *testing.T) {
 	c := setupClient(t, &testService{})
 	release := make(chan struct{})
 	count := 0
-	s, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+	s, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 		count++
 		if count == 1 {
 			return "Hello. This next sentence has enough trailing context", nil
@@ -259,7 +299,7 @@ func TestServerRejectionPreservesStatusAndTrailers(t *testing.T) {
 
 func TestCancelKeepsSibling(t *testing.T) {
 	c := setupClient(t, &testService{})
-	slow, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) { <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
+	slow, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) { <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +364,7 @@ func TestSlowSourceAndConsumerAreNotServerStalls(t *testing.T) {
 	c.limits.firstAudio = 40 * time.Millisecond
 	c.limits.progress = 40 * time.Millisecond
 	n := 0
-	s, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+	s, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 		n++
 		if n == 1 {
 			return "Hello. Next sentence has sufficient trailing context", nil
@@ -423,12 +463,12 @@ func TestInvalidConfigurationAndInput(t *testing.T) {
 	}
 	c := setupClient(t, &testService{})
 	for _, input := range []string{"", " \n", "\xff"} {
-		if _, err := c.TTS.Stream(context.Background(), input, SynthesisOptions{}); err == nil {
+		if _, err := c.TTS.Synthesize(context.Background(), input, SynthesisOptions{}); err == nil {
 			t.Fatal("accepted invalid text")
 		}
 	}
 	c.Close()
-	if _, err := c.TTS.Stream(context.Background(), "Hello", SynthesisOptions{}); !errors.Is(err, ErrInput) {
+	if _, err := c.TTS.Synthesize(context.Background(), "Hello", SynthesisOptions{}); !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}
 }
@@ -447,7 +487,7 @@ func TestSourceFailuresAndSentenceLimit(t *testing.T) {
 					return " ", io.EOF
 				}
 			}
-			s, err := c.TTS.StreamSource(context.Background(), source, SynthesisOptions{})
+			s, err := c.TTS.Stream(context.Background(), source, SynthesisOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -561,7 +601,7 @@ func TestContextCancellationAndConcurrentReader(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	entered := make(chan struct{})
-	s, err := c.TTS.StreamSource(ctx, func(ctx context.Context) (string, error) { close(entered); <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
+	s, err := c.TTS.Stream(ctx, func(ctx context.Context) (string, error) { close(entered); <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

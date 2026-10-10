@@ -1,6 +1,7 @@
 # Rime SDK for Go
 
-Stream Coda and Mist v3 speech from complete text or an incremental text source.
+Use `client.TTS.Synthesize` for complete text and `client.TTS.Stream` for an
+incremental text source. Both return streaming Coda and Mist v3 audio.
 The SDK handles authentication, sentence detection, gRPC, audio conversion,
 deadlines, and cancellation. It also streams speech recognition from raw PCM audio
 to partial and final transcripts. Your application owns audio capture and playback.
@@ -43,7 +44,7 @@ func save() error {
     client, err := rime.NewClient(rime.Config{})
     if err != nil { return err }
     defer client.Close()
-    stream, err := client.TTS.Stream(context.Background(), "Hello. This is Rime.", rime.SynthesisOptions{})
+    stream, err := client.TTS.Synthesize(context.Background(), "Hello. This is Rime.", rime.SynthesisOptions{})
     if err != nil { return err }
     defer stream.Close()
     file, err := os.Create("speech.pcm")
@@ -219,7 +220,7 @@ Discovery takes at most 10 seconds, including retries.
 
 ## Incremental input
 
-Use `client.TTS.StreamSource(ctx, source, options)`. A `rime.TextSource` is:
+Use `client.TTS.Stream(ctx, source, options)`. A `rime.TextSource` is:
 
 ```go
 func(ctx context.Context) (string, error)
@@ -232,7 +233,7 @@ return both final text and `io.EOF`. Other errors stop the operation.
 The source must honor its context; see [Errors and cleanup](#errors-and-cleanup)
 for cancellation and cleanup limits.
 
-TTS streams start work when `Stream` or `StreamSource` returns, without waiting for
+TTS streams start work when `Synthesize` or `Stream` returns, without waiting for
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
 at most 9,600 bytes. Each sentence has a 65,536-byte UTF-8 limit.
 
@@ -242,7 +243,7 @@ Create a Coda client with `Config{Model: "coda"}`. Pass words or phrases and
 their space-separated X-SAMPA pronunciations:
 
 ```go
-stream, err := client.TTS.Stream(ctx, "Hello world.", rime.SynthesisOptions{
+stream, err := client.TTS.Synthesize(ctx, "Hello world.", rime.SynthesisOptions{
     Language: "en",
     CustomLexicon: []rime.PronunciationEntry{
         {Spelling: "hello", Pronunciation: `h @ . " l oU`},
@@ -264,8 +265,8 @@ for {
 }
 ```
 
-Here `output` is the file or audio sink your application owns. `Stream` and
-`StreamSource` copy the lexicon before starting work. It applies to the entire
+Here `output` is the file or audio sink your application owns. `Synthesize` and
+`Stream` copy the lexicon before starting work. It applies to the entire
 request, including incremental text; subsequent requests have their own options.
 Omit the option or pass an empty slice for default pronunciation.
 
@@ -291,7 +292,7 @@ Create the client with `Config{Model: "mistv3"}`. Enable timestamps on the strea
 consume audio through `io.EOF`, then read its result:
 
 ```go
-stream, err := client.TTS.Stream(ctx, "Hello world.", rime.SynthesisOptions{Timestamps: true})
+stream, err := client.TTS.Synthesize(ctx, "Hello world.", rime.SynthesisOptions{Timestamps: true})
 if err != nil {
     return err
 }
@@ -406,12 +407,12 @@ details and licenses in `internal/`.
 and streams audio back. The default still uses `SynthesizeStreaming` with
 incremental sentence input, including when given a string. Full-text mode accepts
 only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
-application first (Go: use `Stream`, not `StreamSource`). Server-side text splitting
+application first (Go: use `Synthesize`, not `Stream`). Server-side text splitting
 applies. Lexicon overrides, error details and request IDs, cancellation, audio
 profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
 
 ```go
-audio, err := client.TTS.Stream(ctx, "Please read this.", rime.SynthesisOptions{
+audio, err := client.TTS.Synthesize(ctx, "Please read this.", rime.SynthesisOptions{
     CompleteText: true,
     CustomLexicon: []rime.PronunciationEntry{{Spelling: "read", Pronunciation: `" r\ E d`}},
 })

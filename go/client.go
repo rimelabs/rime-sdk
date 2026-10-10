@@ -30,7 +30,7 @@ type Config struct {
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
 type SynthesisOptions struct {
-	CompleteText  bool // Send one complete string with Synthesize; audio still streams. Only valid with Stream.
+	CompleteText  bool // Send one complete string with Synthesize; audio still streams. Only valid with Synthesize.
 	Voice         string
 	Language      string
 	AudioFormat   AudioFormat

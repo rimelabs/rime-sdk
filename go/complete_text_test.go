@@ -97,10 +97,10 @@ func TestCompleteTextCancellationAndValidation(t *testing.T) {
 		return rpc.Context().Err()
 	}}
 	client := setupClient(t, service)
-	if _, err := client.TTS.StreamSource(context.Background(), func(context.Context) (string, error) { return "Hello.", nil }, SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
+	if _, err := client.TTS.Stream(context.Background(), func(context.Context) (string, error) { return "Hello.", nil }, SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}
-	if _, err := client.TTS.Stream(context.Background(), strings.Repeat("é", 32769), SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
+	if _, err := client.TTS.Synthesize(context.Background(), strings.Repeat("é", 32769), SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}
 	if service.calls.Load() != 0 {
@@ -108,7 +108,7 @@ func TestCompleteTextCancellationAndValidation(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	stream, err := client.TTS.Stream(ctx, "Hello.", SynthesisOptions{CompleteText: true})
+	stream, err := client.TTS.Synthesize(ctx, "Hello.", SynthesisOptions{CompleteText: true})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,12 +16,12 @@ from rimelabs_sdk.realtime import _client
 
 @pytest.fixture
 def examples(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[2]))
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "examples"))
     return SimpleNamespace(
-        devices=importlib.import_module("examples.python.audio_devices"),
-        voice=importlib.import_module("examples.python.realtime.voice"),
-        recorded=importlib.import_module("examples.python.realtime.recorded"),
-        save=importlib.import_module("examples.python.tts.save"),
+        devices=importlib.import_module("audio_devices"),
+        voice=importlib.import_module("realtime.voice"),
+        recorded=importlib.import_module("realtime.recorded"),
+        save=importlib.import_module("tts.save"),
     )
 
 

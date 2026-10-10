@@ -37,7 +37,7 @@ import { Rime } from "@rimelabs/sdk";
 const client = new Rime({ timeout: 60 });
 try {
   const chunks = [];
-  for await (const chunk of client.tts.stream(
+  for await (const chunk of client.tts.synthesize(
     "Your appointment is confirmed for tomorrow.",
   )) {
     chunks.push(Buffer.from(chunk));
@@ -60,10 +60,11 @@ This short example collects the audio in memory before writing the file.
 For long responses, write audio chunks as they arrive.
 
 Coda is the default model. Use `new Rime({ model: "mistv3" })` for Mist v3, or pass
-`{ voice: "your-voice" }` as the second argument to `client.tts.stream(...)` to select a voice.
+`{ voice: "your-voice" }` as the second argument to `client.tts.synthesize(...)` to select a voice.
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
-To supply text from an LLM, pass an async iterable of strings instead of a string.
-The SDK handles sentence boundaries.
+Use `client.tts.synthesize(text)` for a complete string. To supply text from an LLM,
+pass an async iterable of strings to `client.tts.stream(chunks)`. Both methods
+return streaming audio. The SDK handles sentence boundaries.
 
 ## STT quick start
 

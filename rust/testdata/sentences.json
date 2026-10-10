@@ -1,0 +1,87 @@
+[
+  {
+    "id": "title_after_exclamation",
+    "text": "Hi! Dr. Smith agrees. Hello.",
+    "sentences": ["Hi!", " Dr.", " Smith agrees.", " Hello."]
+  },
+  {
+    "id": "title_after_sentence",
+    "text": "Hello. Dr. Smith paid 3.14 dollars. This last sentence has enough trailing context.",
+    "sentences": ["Hello.", " Dr.", " Smith paid 3.14 dollars.", " This last sentence has enough trailing context."]
+  },
+  {
+    "id": "right_to_left_mark",
+    "text": "\u200fمرحبا بالعالم.",
+    "sentences": ["\u200fمرحبا بالعالم."]
+  },
+  {
+    "id": "left_to_right_mark",
+    "text": "\u200eHello world.",
+    "sentences": ["\u200eHello world."]
+  },
+  {
+    "id": "direction_marks_at_boundaries",
+    "text": "First. \u200fمرحبا بالعالم. \u200eThe final sentence has enough context.\u200f",
+    "sentences": ["First.", " \u200fمرحبا بالعالم.", " \u200eThe final sentence has enough context.\u200f"]
+  },
+  {
+    "id": "zero_width_space",
+    "text": "First. \u200bA second sentence is long enough.",
+    "sentences": ["First.", " \u200bA second sentence is long enough."]
+  },
+  {
+    "id": "byte_order_mark",
+    "text": "\ufeffHello world. Next sentence is long enough.",
+    "sentences": ["\ufeffHello world.", " Next sentence is long enough."]
+  },
+  {
+    "id": "unicode_separators",
+    "text": "\u200bHello 🚀 world. \ufeffThe next sentence has an internal\u200bseparator. Final phrase\u200b",
+    "sentences": ["\u200bHello 🚀 world.", " \ufeffThe next sentence has an internal\u200bseparator.", " Final phrase\u200b"]
+  },
+  {
+    "id": "basic",
+    "text": "Hello world. This is a long second sentence. Final phrase",
+    "sentences": [
+      "Hello world.",
+      " This is a long second sentence.",
+      " Final phrase"
+    ]
+  },
+  {
+    "id": "abbreviations",
+    "text": "Dr. Smith paid 3.14 dollars. Visit https://rime.ai/docs today. Done",
+    "sentences": [
+      "Dr. Smith paid 3.14 dollars.",
+      " Visit https://rime.ai/docs today.",
+      " Done"
+    ]
+  },
+  {
+    "id": "unicode",
+    "text": "Bonjour à tous. Привет мир! 你好世界。مرحبا بالعالم.",
+    "sentences": [
+      "Bonjour à tous.",
+      " Привет мир!",
+      " 你好世界。",
+      "مرحبا بالعالم."
+    ]
+  },
+  {
+    "id": "whitespace",
+    "text": "First sentence.\n\n  Second sentence ends here!\tLast phrase \n\t",
+    "sentences": [
+      "First sentence.",
+      "\n\n  Second sentence ends here!",
+      "\tLast phrase \n\t"
+    ]
+  },
+  {
+    "id": "emoji",
+    "text": "Hello 🚀 world. This is the next sentence. 🌍",
+    "sentences": [
+      "Hello 🚀 world.",
+      " This is the next sentence. 🌍"
+    ]
+  }
+]

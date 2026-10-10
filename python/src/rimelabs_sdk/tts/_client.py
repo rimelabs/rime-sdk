@@ -40,9 +40,9 @@ class _TTS:
     def _check_loop(self):
         self._client._check_loop()
 
-    def stream(
+    def synthesize(
         self,
-        text: str | AsyncIterable[str],
+        text: str,
         *,
         voice: str | None = None,
         language: str = "en",
@@ -52,13 +52,74 @@ class _TTS:
         complete_text: bool = False,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
+        """Synthesize complete text and return an audio stream. Do not await this call."""
         self._check_open()
+        if not isinstance(text, str):
+            raise RimeInputError("text must be a string; use stream() for an async text source")
+        if not text.strip():
+            raise RimeInputError("Text must contain non-whitespace characters")
+
+        async def source():
+            yield text
+
+        return self._stream(
+            text if complete_text else source(),
+            voice=voice,
+            language=language,
+            audio_format=audio_format,
+            timestamps=timestamps,
+            custom_lexicon=custom_lexicon,
+            complete_text=complete_text,
+            timeout=timeout,
+        )
+
+    def stream(
+        self,
+        text: AsyncIterable[str],
+        *,
+        voice: str | None = None,
+        language: str = "en",
+        audio_format: AudioFormat | None = None,
+        timestamps: bool = False,
+        custom_lexicon: Sequence[PronunciationEntry] = (),
+        complete_text: bool = False,
+        timeout: float | None | object = _policy.INHERIT,
+    ) -> AudioStream:
+        """Stream text chunks into synthesis and return an audio stream. Do not await this call."""
+        self._check_open()
+        if isinstance(text, str) or not hasattr(text, "__aiter__"):
+            raise RimeInputError(
+                "text must be an async iterable of strings; use synthesize() for a string"
+            )
+        return self._stream(
+            text,
+            voice=voice,
+            language=language,
+            audio_format=audio_format,
+            timestamps=timestamps,
+            custom_lexicon=custom_lexicon,
+            complete_text=complete_text,
+            timeout=timeout,
+        )
+
+    def _stream(
+        self,
+        text: str | AsyncIterable[str],
+        *,
+        voice: str | None,
+        language: str,
+        audio_format: AudioFormat | None,
+        timestamps: bool,
+        custom_lexicon: Sequence[PronunciationEntry],
+        complete_text: bool,
+        timeout: float | None | object,
+    ) -> AudioStream:
         lexicon = snapshot(custom_lexicon)
         if not isinstance(complete_text, bool):
             raise RimeInputError("complete_text must be a boolean")
         if complete_text:
             if not isinstance(text, str):
-                raise RimeInputError("complete_text=True requires a string, not a text source")
+                raise RimeInputError("complete_text=True requires synthesize() with a string")
             try:
                 text_bytes = len(text.encode("utf-8"))
             except UnicodeEncodeError:
@@ -69,11 +130,6 @@ class _TTS:
             raise RimeInputError("timestamps must be a boolean")
         if timestamps and self._model != "mistv3":
             raise RimeInputError("Word timestamps are supported only with model='mistv3'")
-        if isinstance(text, str):
-            if not text.strip():
-                raise RimeInputError("Text must contain non-whitespace characters")
-        elif not hasattr(text, "__aiter__"):
-            raise RimeInputError("text must be a string or an async iterable of strings")
         voice = self._policy.default_voice if voice is None else _policy.nonempty(voice, "voice")
         _policy.nonempty(language, "language")
         profile = AudioFormat.PCM_24000 if audio_format is None else audio_format

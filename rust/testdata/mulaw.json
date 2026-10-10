@@ -1,0 +1,143 @@
+{
+  "description": "ITU G.711 mu-law for signed 16-bit PCM before resampling; SHA-256 covers one output byte per input from -32768 through 32767 in ascending order.",
+  "reference": {
+    "url": "https://github.com/openitu/STL/blob/5a9febb4793df3922dffbd0ea68e040de6278de3/src/g711/g711.c",
+    "sha256": "bd95a6589fd4318abb156c747d2082b27529a0d43dd0eea2726114ce40f537a9",
+    "function": "ulaw_compress"
+  },
+  "all_inputs_sha256": "90c29de505fb68e766118303bd552a16005dcf810873698bee1d8f3b247ce28c",
+  "samples": [
+    {
+      "pcm": -32768,
+      "mulaw": 0
+    },
+    {
+      "pcm": -32636,
+      "mulaw": 0
+    },
+    {
+      "pcm": -32635,
+      "mulaw": 0
+    },
+    {
+      "pcm": -31613,
+      "mulaw": 0
+    },
+    {
+      "pcm": -31612,
+      "mulaw": 1
+    },
+    {
+      "pcm": -31611,
+      "mulaw": 1
+    },
+    {
+      "pcm": -16381,
+      "mulaw": 15
+    },
+    {
+      "pcm": -16380,
+      "mulaw": 15
+    },
+    {
+      "pcm": -16379,
+      "mulaw": 15
+    },
+    {
+      "pcm": -125,
+      "mulaw": 111
+    },
+    {
+      "pcm": -124,
+      "mulaw": 112
+    },
+    {
+      "pcm": -123,
+      "mulaw": 112
+    },
+    {
+      "pcm": -5,
+      "mulaw": 126
+    },
+    {
+      "pcm": -4,
+      "mulaw": 127
+    },
+    {
+      "pcm": -3,
+      "mulaw": 127
+    },
+    {
+      "pcm": -1,
+      "mulaw": 127
+    },
+    {
+      "pcm": 0,
+      "mulaw": 255
+    },
+    {
+      "pcm": 1,
+      "mulaw": 255
+    },
+    {
+      "pcm": 3,
+      "mulaw": 255
+    },
+    {
+      "pcm": 4,
+      "mulaw": 254
+    },
+    {
+      "pcm": 5,
+      "mulaw": 254
+    },
+    {
+      "pcm": 123,
+      "mulaw": 240
+    },
+    {
+      "pcm": 124,
+      "mulaw": 239
+    },
+    {
+      "pcm": 125,
+      "mulaw": 239
+    },
+    {
+      "pcm": 16379,
+      "mulaw": 143
+    },
+    {
+      "pcm": 16380,
+      "mulaw": 143
+    },
+    {
+      "pcm": 16381,
+      "mulaw": 143
+    },
+    {
+      "pcm": 31611,
+      "mulaw": 129
+    },
+    {
+      "pcm": 31612,
+      "mulaw": 128
+    },
+    {
+      "pcm": 31613,
+      "mulaw": 128
+    },
+    {
+      "pcm": 32635,
+      "mulaw": 128
+    },
+    {
+      "pcm": 32636,
+      "mulaw": 128
+    },
+    {
+      "pcm": 32767,
+      "mulaw": 128
+    }
+  ]
+}

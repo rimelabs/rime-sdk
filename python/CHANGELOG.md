@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.1.0-alpha.11](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.10...python-v0.1.0-alpha.11) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Use synthesize for complete text and stream for incremental text in all SDKs. Go StreamSource becomes Stream. Rust synthesis moves under Client::tts(). Both methods return streaming audio.
+
+### Features
+
+* align TTS APIs and SDK example workflows ([#49](https://github.com/rimelabs/rime-sdk/issues/49)) ([bc2be77](https://github.com/rimelabs/rime-sdk/commit/bc2be779f7a845d51850fbe068a4cf6d95eab666))
+
+
+### Bug Fixes
+
+* **deps:** bump rime-api from 0.3.0 to 0.4.0 in /python ([#55](https://github.com/rimelabs/rime-sdk/issues/55)) ([f4c1bbe](https://github.com/rimelabs/rime-sdk/commit/f4c1bbe68f0f81486f09d6857c96d89b6db6905f))
+
+## [0.1.0-alpha.10](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.9...python-v0.1.0-alpha.10) (2026-10-09)
+
+
+### Features
+
+* add streaming STT to Python, Node.js, and Go ([#39](https://github.com/rimelabs/rime-sdk/issues/39)) ([79977ef](https://github.com/rimelabs/rime-sdk/commit/79977ef019bc474d799881e60223c6868af104d0))
+
 ## [0.1.0-alpha.9](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.8...python-v0.1.0-alpha.9) (2026-10-08)
 
 

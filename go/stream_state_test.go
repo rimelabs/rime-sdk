@@ -25,7 +25,7 @@ func TestServiceCompletionBeforeSourceEnd(t *testing.T) {
 			return stream.Context().Err()
 		}
 	}})
-	s, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+	s, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 		close(sourceEntered)
 		<-ctx.Done()
 		return "", ctx.Err()

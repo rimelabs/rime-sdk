@@ -17,8 +17,8 @@ from websockets.asyncio.server import serve
 
 @pytest.fixture
 def example(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[2]))
-    return importlib.import_module("examples.python.tts.coda_ws")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "examples"))
+    return importlib.import_module("tts.coda_ws")
 
 
 async def test_audio_plays_before_next_text_and_connection_survives_turns(

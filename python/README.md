@@ -34,7 +34,7 @@ from rimelabs_sdk import Rime
 async def main():
     async with (
         Rime(timeout=60) as client,
-        client.tts.stream("Your appointment is confirmed for tomorrow.") as audio,
+        client.tts.synthesize("Your appointment is confirmed for tomorrow.") as audio,
     ):
         with wave.open("speech.wav", "wb") as wav:
             wav.setnchannels(1)
@@ -52,10 +52,11 @@ Run `uv run tts.py`, then open `speech.wav` in your audio player.
 A failed run can leave a partial file. Only a successful exit confirms completion.
 
 Coda is the default model. Use `Rime(model="mistv3")` for Mist v3, or pass
-`voice="your-voice"` to `client.tts.stream(...)` to select a voice for that model.
+`voice="your-voice"` to `client.tts.synthesize(...)` to select a voice for that model.
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
-To supply text from an LLM, pass an async iterable of strings instead of a string.
-The SDK handles sentence boundaries.
+Use `client.tts.synthesize(text)` for a complete string. To supply text from an LLM,
+pass an async iterable of strings to `client.tts.stream(chunks)`. Both methods
+return streaming audio. The SDK handles sentence boundaries.
 
 ## STT quick start
 

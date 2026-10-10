@@ -48,6 +48,9 @@ export class Rime {
   private closed = false;
   private closing: Promise<void> | null = null;
   readonly tts: {
+    /** Synthesize complete text and return streaming audio. Do not await this call. */
+    synthesize: (text: string, options?: SynthesisOptions) => AudioStream;
+    /** Supply incremental text and return streaming audio. Do not await this call. */
     stream: (text: TextSource, options?: SynthesisOptions) => AudioStream;
   };
   readonly voices: { list: (options?: VoiceListOptions) => Promise<string[]> };
@@ -81,6 +84,7 @@ export class Rime {
       this.checkOpen(),
     );
     this.tts = {
+      synthesize: (text, options) => this.ttsClient.synthesize(text, options),
       stream: (text, options) => this.ttsClient.stream(text, options),
     };
     this.voices = this.ttsClient.voices;

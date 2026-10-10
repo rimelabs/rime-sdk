@@ -17,8 +17,8 @@ stt_setup = test_stt.stt_setup
 
 @pytest.fixture
 def voice(monkeypatch):
-    monkeypatch.syspath_prepend(str(Path(__file__).parents[2]))
-    return importlib.import_module("examples.python.stt.voice")
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "examples"))
+    return importlib.import_module("stt.voice")
 
 
 @pytest.fixture

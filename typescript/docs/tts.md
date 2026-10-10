@@ -4,9 +4,16 @@ You supply text; the SDK handles sentence boundaries and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
+## Complete text
+
+Use `client.tts.synthesize(text)` for one nonblank string. It returns an audio
+stream; it does not wait for all audio to be generated. Do not await this call.
+Use the audio loop and cleanup shown in the package quick start.
+
 ## Stream incoming text
 
-An async text source can supply text as it arrives:
+Use `client.tts.stream(chunks)` for an async iterable of strings. A plain string
+belongs in `synthesize`, not `stream`. The source can supply partial sentences:
 
 ```javascript
 async function* text() {
@@ -45,8 +52,8 @@ Model defaults still apply.
 
 ### Synthesis options
 
-The `text` argument is required and accepts a nonblank string or an async text
-source. All options in `client.tts.stream(text, { ... })` are optional:
+Both methods require text input: a nonblank string for `synthesize`, or an
+async iterable of strings for `stream`. Both accept the following optional settings:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -87,7 +94,7 @@ import { Rime, RimeInputError } from "@rimelabs/sdk";
 const lexicon = [{ spelling: "hello", pronunciation: 'h @ . " l oU' }];
 const client = new Rime({ model: "coda", timeout: 60 });
 try {
-  await writeFile("speech.pcm", client.tts.stream("Hello world.", {
+  await writeFile("speech.pcm", client.tts.synthesize("Hello world.", {
     language: "en",
     customLexicon: lexicon,
   }));
@@ -102,10 +109,10 @@ try {
 ```
 
 TypeScript callers can import the `PronunciationEntry` type from `@rimelabs/sdk`.
-The SDK copies the array and entries when `tts.stream()` is called. The same
-lexicon applies to the entire request, including an async text source;
-subsequent requests have their own options. Omit the option or pass an empty
-array for default pronunciation.
+The SDK copies the array and entries when `tts.synthesize()` or `tts.stream()`
+is called. The same lexicon applies to the entire request, including an async
+text source; subsequent requests have their own options. Omit the option or
+pass an empty array for default pronunciation.
 
 The service matches whole words or phrases case-insensitively and applies the
 pronunciation after text normalization. Longest matches take precedence; the
@@ -134,7 +141,7 @@ import { Rime } from "@rimelabs/sdk";
 
 const client = new Rime({ model: "mistv3", timeout: 60 });
 try {
-  const audio = client.tts.stream("Hello world.", { timestamps: true });
+  const audio = client.tts.synthesize("Hello world.", { timestamps: true });
   await writeFile("speech.pcm", audio);
   const result = await audio.timestamps();
   if (result.status.code === 0) {
@@ -192,7 +199,7 @@ import { Rime, RimeError } from "@rimelabs/sdk";
 let client;
 try {
   client = new Rime();
-  await writeFile("speech.pcm", client.tts.stream("Hello. This is Rime."));
+  await writeFile("speech.pcm", client.tts.synthesize("Hello. This is Rime."));
 } catch (error) {
   if (error instanceof RimeError) {
     console.error(`Speech failed: ${error.message}; requestId=${error.requestId}`);
@@ -231,16 +238,17 @@ cannot force your text source to finish an unrelated promise.
 
 ## Complete text input
 
-`completeText: true` selects the `Synthesize` RPC, which sends the full input in one request
-and streams audio back. The default still uses `SynthesizeStreaming` with
-incremental sentence input, including when given a string. Full-text mode accepts
+`completeText: true` on `tts.synthesize()` selects the `Synthesize` RPC, which
+sends the full input in one request and streams audio back. The default still
+uses `SynthesizeStreaming` with incremental sentence input, including when given
+a string. Full-text mode accepts
 only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
 application first. Server-side text splitting
 applies. Lexicon overrides, error details and request IDs, cancellation, audio
 profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
 
 ```ts
-const audio = client.tts.stream("Please read this.", {
+const audio = client.tts.synthesize("Please read this.", {
   completeText: true,
   customLexicon: [{ spelling: "read", pronunciation: '" r\\ E d' }],
 });

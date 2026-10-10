@@ -41,7 +41,9 @@ class AudioStream:
         complete_text=False,
     ):
         if key is not _CONSTRUCTION_KEY:
-            raise TypeError("AudioStream is returned by client.tts.stream()")
+            raise TypeError(
+                "AudioStream is returned by client.tts.synthesize() or client.tts.stream()"
+            )
         self._client = client
         self._source = source
         self._voice = voice
@@ -155,17 +157,10 @@ class AudioStream:
         iterator = None
         meaningful = False
         try:
-            if isinstance(self._source, str):
-
-                async def one():
-                    yield self._source
-
-                iterator = one().__aiter__()
-            else:
-                try:
-                    iterator = self._source.__aiter__()
-                except Exception as error:
-                    raise RimeInputError("The text source failed") from error
+            try:
+                iterator = self._source.__aiter__()
+            except Exception as error:
+                raise RimeInputError("The text source failed") from error
             while True:
                 self._source_waiting = True
                 try:

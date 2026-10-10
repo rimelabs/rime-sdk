@@ -109,8 +109,8 @@ identities. npm provenance remains disabled under the current workflow policy.
    [PyPI](https://pypi.org/project/rimelabs-sdk/) and
    [npm](https://www.npmjs.com/package/@rimelabs/sdk).
    Test an install of the exact version in a clean project before announcing it.
-7. Review the example dependency PR for each published package. Wait for
-   **Package checks**, then merge it to update the examples.
+7. Check that the published-package example checks pass before announcing the
+   release. They install the exact released SDK outside the repository workspace.
 
 You do not need to edit package versions or create tags for routine releases.
 Go, Python, and Node.js have independent versions. One release PR can include
@@ -123,24 +123,20 @@ an appropriate change inside each affected package with a `fix:` or `feat:` comm
 Maintenance commits alone generally do not start a release. Use `fix:` or `feat:`
 for user-visible package changes, and describe breaking changes in the PR body.
 
-## Example dependency updates
+## Published example checks
 
-After a publishing job succeeds, the release workflow opens or updates a PR on
-`automation/examples-python` or `automation/examples-typescript`. Each PR updates
-the example's exact SDK version and lockfile using the published package. Python
-and TypeScript updates run independently. Failed publishing jobs do not update
-examples, and recovery runs do not downgrade existing pins or newer pending PRs.
+After Python or TypeScript publication succeeds, the release workflow runs
+**Check published SDK examples**. It copies examples from the release tag into
+a temporary directory outside the workspace, installs the exact published SDK,
+and checks Python imports or TypeScript types. Normal CI runs the example tests
+against local SDK code. The release check does not edit dependency files or open
+an update PR.
 
-The workflow checks the updated example install and starts **Package checks** on
-the PR branch. It uses the existing `GITHUB_TOKEN`; no additional secret is needed.
-Review and merge these PRs. Keep their `chore(examples):` titles so dependency
-updates do not request another SDK release.
-
-If the update fails after publication, rerun its failed job. You can also run
-**Update example SDK dependency** from the Actions tab on `main`, with the language
-and an already published version. Use the PyPI spelling for Python, such as
-`0.1.0a7`, and the npm spelling for TypeScript, such as `0.1.0-alpha.7`.
-This workflow only updates examples; it does not publish packages.
+If a registry is slow to expose a new package, the install retries for a bounded
+period. Rerun a failed job after publication, or run **Check published SDK examples**
+from Actions with the language, published version, and matching release tag.
+Use the PyPI spelling for Python and the npm spelling for TypeScript. This check
+does not publish packages.
 
 ## API dependency updates
 
@@ -177,7 +173,8 @@ fixes and features advance the alpha number.
 | Node.js package and Git tag | `0.1.0-alpha.2`, `typescript-v0.1.0-alpha.2` |
 
 Release Please uses SemVer internally. `uv version` normalizes the Python version
-and updates `uv.lock` on the release PR before CI runs. The old
+and updates `uv.lock` on the release PR before CI runs. The same step updates
+the root npm workspace lockfile after a TypeScript version change. The old
 `python-v0.1.0a1` tag remains unchanged. Future Python tags use the SemVer spelling.
 The bootstrap commit and manifest start tracking after the first published alphas.
 
@@ -197,6 +194,12 @@ after that release so later versions advance normally. Do not edit the manifest
 to request a release.
 
 ## How CI starts
+
+The **Release** workflow merges the latest `main` into an open release PR branch
+before updating metadata and starting checks. This includes test and maintenance
+commits even when Release Please leaves the release notes unchanged. If the branch
+already includes `main`, this step creates no commit. A merge conflict stops
+preparation; resolve it on the release branch, then rerun **Release** on `main`.
 
 GitHub suppresses most new workflow runs for changes made by `GITHUB_TOKEN`.
 The **Release** workflow therefore starts **Package checks** explicitly on the
@@ -242,3 +245,18 @@ release PR. A retry builds the original tagged source, not the current package c
 - [Go module publishing](https://go.dev/doc/modules/publishing)
 - [Go module tags for subdirectories](https://go.dev/ref/mod#vcs-version)
 - [GitHub repository visibility](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)
+## Rust
+
+Rust versions and changelogs are independent of the other SDKs. Release Please
+uses the Rust strategy and `rust-v` tags. Configure a crates.io trusted publisher
+for `rimelabs-sdk`, repository `rimelabs/rime-sdk`, workflow `release-please.yml`,
+and GitHub environment `crates`, restricted to `main`. The initial upload may
+require a scoped crates.io token before trusted publisher setup.
+
+The SDK requires the published `rimelabs-api` 0.3.x package. Dependabot opens
+updates for the registry dependency; review and test them before release.
+
+Release checks use `cargo test --locked` and `cargo package --locked` against
+the registry dependency. Recovery can
+select an existing `rust-v` tag through the workflow's `rust_tag` input.
+

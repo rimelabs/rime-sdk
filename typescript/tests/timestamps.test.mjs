@@ -100,7 +100,7 @@ for (const code of [1, 3, 4, 8, 12, 14]) {
   test(`alignment failure keeps successful audio / ${code}`, () =>
     setup(async (service, client) => {
       service.finalResponses = [trailer(code)];
-      const stream = client.tts.stream("Hello.", { timestamps: true });
+      const stream = client.tts.synthesize("Hello.", { timestamps: true });
       assert.deepEqual(await collect(stream), service.payload);
       assert.deepEqual(await stream.timestamps(), {
         status: { code, message: "alignment unavailable" },
@@ -159,7 +159,7 @@ for (const [name, responses] of [
   test(`bad timestamp result does not fail audio / ${name}`, () =>
     setup(async (service, client) => {
       service.finalResponses = responses;
-      const stream = client.tts.stream("Hello.", { timestamps: true });
+      const stream = client.tts.synthesize("Hello.", { timestamps: true });
       const audio = await collect(stream);
       assert.deepEqual(
         audio.subarray(0, service.payload.length),
@@ -179,7 +179,7 @@ test("timestamps opt-in and model validation", () =>
     const coda = new Rime({ apiKey: "test-key" });
     try {
       assert.throws(
-        () => coda.tts.stream("Hello.", { timestamps: true }),
+        () => coda.tts.synthesize("Hello.", { timestamps: true }),
         /mistv3/,
       );
       assert.equal(service.calls.length, 0);
@@ -188,11 +188,11 @@ test("timestamps opt-in and model validation", () =>
     }
     for (const timestamps of [1, null, "true"])
       assert.throws(
-        () => client.tts.stream("Hello.", { timestamps }),
+        () => client.tts.synthesize("Hello.", { timestamps }),
         /boolean/,
       );
     for (const options of [{}, { timestamps: false }]) {
-      const stream = client.tts.stream("Hello.", options);
+      const stream = client.tts.synthesize("Hello.", options);
       await collect(stream);
       assert.equal(service.calls.at(-1)[0].payload.value.timestamps, undefined);
       await assert.rejects(stream.timestamps(), /Enable/);
@@ -207,7 +207,7 @@ test("audio arrives before timestamps; early access never waits", () =>
     });
     service.beforeFinalResponses = () => gate;
     service.finalResponses = [trailer(0, words)];
-    const stream = client.tts.stream("Hello.", {
+    const stream = client.tts.synthesize("Hello.", {
       timestamps: true,
       timeout: 2,
     });
@@ -235,7 +235,7 @@ for (const mode of ["stream", "client", "before start"]) {
         release = resolve;
       });
       service.beforeFinalResponses = () => gate;
-      const stream = client.tts.stream("Hello.", { timestamps: true });
+      const stream = client.tts.synthesize("Hello.", { timestamps: true });
       try {
         if (mode !== "before start") await stream.next();
         if (mode === "client") await client.close();
@@ -254,7 +254,7 @@ test("deadline fails audio and timestamp access", () =>
       release = resolve;
     });
     service.beforeFinalResponses = () => gate;
-    const stream = client.tts.stream("Hello.", {
+    const stream = client.tts.synthesize("Hello.", {
       timestamps: true,
       timeout: 0.1,
     });
@@ -271,7 +271,7 @@ for (const completeText of [false, true]) {
     setup(async (service, client) => {
       service.mode = "error_after_trailer";
       service.finalResponses = [trailer(0, words)];
-      const stream = client.tts.stream("Hello.", {
+      const stream = client.tts.synthesize("Hello.", {
         timestamps: true,
         completeText,
       });
@@ -284,7 +284,7 @@ for (const audioFormat of [AudioFormat.PCM_24000, AudioFormat.MULAW_8000]) {
   test(`full-text synthesis keeps timestamp completion and audio profiles / ${audioFormat.encoding}`, () =>
     setup(async (service, client) => {
       service.finalResponses = [trailer(0, words)];
-      const stream = client.tts.stream("Twenty two.", {
+      const stream = client.tts.synthesize("Twenty two.", {
         completeText: true,
         timestamps: true,
         audioFormat,

@@ -25,7 +25,7 @@ async def collect(stream):
 async def test_full_text_is_one_request_with_lexicon_snapshot(setup):
     service, client = setup
     entries = [PronunciationEntry("read", '" r\\ E d')]
-    stream = client.tts.stream(
+    stream = client.tts.synthesize(
         "Hello. Please read the pages.", complete_text=True, custom_lexicon=entries
     )
     entries.clear()
@@ -47,12 +47,12 @@ async def test_full_text_pronunciation_rejection_and_recovery(setup, mode):
     service.rejection_message = 'custom-lexicon entry "hello": no-primary-stress'
     service.release.set()
     with pytest.raises(RimeInputError, match="no-primary-stress") as caught:
-        async for _ in client.tts.stream("Hello.", complete_text=True):
+        async for _ in client.tts.synthesize("Hello.", complete_text=True):
             pytest.fail("Unexpected audio")
     assert caught.value.request_id
     assert len(service.complete_calls) == 1
     service.mode = "normal"
-    assert b"".join([part async for part in client.tts.stream("Hello.", complete_text=True)])
+    assert b"".join([part async for part in client.tts.synthesize("Hello.", complete_text=True)])
 
 
 async def test_full_text_cancellation_and_input_validation(setup):
@@ -63,10 +63,12 @@ async def test_full_text_cancellation_and_input_validation(setup):
 
     for text, flag in [(source(), True), ("é" * 32769, True), ("Hello.", "yes")]:
         with pytest.raises(RimeInputError):
-            client.tts.stream(text, complete_text=flag)
+            client.tts.synthesize(text, complete_text=flag)
+    with pytest.raises(RimeInputError, match="requires synthesize"):
+        client.tts.stream(source(), complete_text=True)
     assert not service.calls
     service.mode = "silence"
-    stream = client.tts.stream("Hello.", complete_text=True)
+    stream = client.tts.synthesize("Hello.", complete_text=True)
     reading = asyncio.create_task(anext(stream))
     await asyncio.wait_for(service.headers_sent.wait(), 1)
     await stream.cancel()
@@ -78,7 +80,7 @@ async def test_full_text_cancellation_and_input_validation(setup):
 async def test_full_text_rejects_non_utf8_before_network(setup, codepoint):
     service, client = setup
     with pytest.raises(RimeInputError, match="valid UTF-8") as caught:
-        client.tts.stream(f"Hello {chr(codepoint)}.", complete_text=True)
+        client.tts.synthesize(f"Hello {chr(codepoint)}.", complete_text=True)
     assert caught.value.request_id is None
     assert not client.tts._streams
     assert client.tts._channel is None
@@ -99,7 +101,7 @@ async def test_full_text_timestamps_share_audio_completion_contract(setup):
         )
     ]
     async with Rime(api_key="test-key", model="mistv3", endpoint=service.target) as client:
-        stream = client.tts.stream("Hello.", complete_text=True, timestamps=True)
+        stream = client.tts.synthesize("Hello.", complete_text=True, timestamps=True)
         with pytest.raises(RimeInputError, match="Consume all audio"):
             await stream.timestamps()
         assert b"".join([part async for part in stream]) == service.payload
@@ -111,7 +113,7 @@ async def test_full_text_timestamps_share_audio_completion_contract(setup):
 async def test_full_text_partial_failure_is_not_completion_or_retried(setup):
     service, client = setup
     service.mode = "partial_error"
-    async with client.tts.stream("Hello.", complete_text=True) as stream:
+    async with client.tts.synthesize("Hello.", complete_text=True) as stream:
         assert await asyncio.wait_for(anext(stream), 1) == service.payload
         service.release.set()
         with pytest.raises(RimeUnavailableError, match="test disconnect") as caught:
@@ -119,7 +121,7 @@ async def test_full_text_partial_failure_is_not_completion_or_retried(setup):
         assert caught.value.request_id == stream.request_id == "test-request"
     assert len(service.complete_calls) == 1
     service.mode = "normal"
-    assert await collect(client.tts.stream("Again.", complete_text=True)) == service.payload
+    assert await collect(client.tts.synthesize("Again.", complete_text=True)) == service.payload
 
 
 @pytest.mark.parametrize("after_audio", [False, True])
@@ -131,7 +133,7 @@ async def test_full_text_stall_without_overall_deadline_cancels_rpc(setup, after
         first_audio_timeout=5 if after_audio else 0.1,
         progress_timeout=0.1 if after_audio else 5,
     )
-    async with client.tts.stream("Hello.", complete_text=True, timeout=None) as stream:
+    async with client.tts.synthesize("Hello.", complete_text=True, timeout=None) as stream:
         if after_audio:
             assert await asyncio.wait_for(anext(stream), 1) == service.payload
         with pytest.raises(RimeTimeoutError, match="stopped making progress") as caught:
@@ -144,8 +146,8 @@ async def test_full_text_stall_without_overall_deadline_cancels_rpc(setup, after
 async def test_full_text_cancellation_keeps_an_active_sibling(setup):
     service, client = setup
     service.mode = "delayed_trailer"
-    first = client.tts.stream("First.", complete_text=True)
-    sibling = client.tts.stream("Sibling.", complete_text=True)
+    first = client.tts.synthesize("First.", complete_text=True)
+    sibling = client.tts.synthesize("Sibling.", complete_text=True)
     assert await asyncio.wait_for(anext(first), 1) == service.payload
     assert await asyncio.wait_for(anext(sibling), 1) == service.payload
     pending = asyncio.create_task(anext(first))
@@ -163,7 +165,7 @@ async def test_full_text_cancellation_keeps_an_active_sibling(setup):
 async def test_full_text_client_close_wakes_pending_reader(setup, after_audio):
     service, client = setup
     service.mode = "delayed_trailer" if after_audio else "silence"
-    stream = client.tts.stream("Hello.", complete_text=True)
+    stream = client.tts.synthesize("Hello.", complete_text=True)
     if after_audio:
         assert await asyncio.wait_for(anext(stream), 1) == service.payload
     pending = asyncio.create_task(anext(stream))
@@ -183,7 +185,7 @@ async def test_full_text_slow_consumer_preserves_bounded_audio(setup, profile):
     service.mode = "delayed_trailer"
     samples = 3 * (client.tts._policy.output_bytes + 1)
     service.payload = b"\0\0" * samples
-    async with client.tts.stream(
+    async with client.tts.synthesize(
         "Hello.", complete_text=True, audio_format=profile, timeout=None
     ) as stream:
         chunks = [await asyncio.wait_for(anext(stream), 1)]
@@ -204,7 +206,7 @@ async def test_full_text_overall_deadline_applies_while_consumer_is_paused(setup
     service, client = setup
     service.mode = "delayed_trailer"
     service.payload *= 100
-    async with client.tts.stream("Hello.", complete_text=True, timeout=0.15) as stream:
+    async with client.tts.synthesize("Hello.", complete_text=True, timeout=0.15) as stream:
         assert await asyncio.wait_for(anext(stream), 1)
         await asyncio.sleep(0.25)
         with pytest.raises(RimeTimeoutError, match="Overall synthesis deadline"):

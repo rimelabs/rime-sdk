@@ -45,7 +45,7 @@ for (const incremental of [false, true]) {
           yield "Hello. ";
           yield "Hello again.";
         }
-        const stream = client.tts.stream(
+        const stream = client.tts[incremental ? "stream" : "synthesize"](
           incremental ? text() : "Hello. Hello again.",
           { customLexicon: entries, audioFormat },
         );
@@ -66,7 +66,7 @@ for (const incremental of [false, true]) {
           expected,
         );
         assert.deepEqual(
-          await collect(client.tts.stream("Hello.")),
+          await collect(client.tts.synthesize("Hello.")),
           service.payload,
         );
         assert.deepEqual(service.calls[1][0].payload.value.customLexicon, []);
@@ -87,7 +87,7 @@ for (const entries of [
   test(`bad lexicon shape fails before network / ${JSON.stringify(entries)}`, () =>
     setup(async (service, client) => {
       assert.throws(
-        () => client.tts.stream("Hello.", { customLexicon: entries }),
+        () => client.tts.synthesize("Hello.", { customLexicon: entries }),
         RimeInputError,
       );
       assert.equal(service.calls.length, 0);
@@ -114,7 +114,7 @@ for (const completeText of [false, true]) {
           };
           assert.throws(
             () =>
-              client.tts.stream("Hello.", {
+              client.tts.synthesize("Hello.", {
                 completeText,
                 customLexicon: [entry],
               }),
@@ -125,7 +125,7 @@ for (const completeText of [false, true]) {
       }
       assert.throws(
         () =>
-          client.tts.stream("Hello.", {
+          client.tts.synthesize("Hello.", {
             completeText,
             customLexicon: [{ spelling: "\ud800", pronunciation: "\udc00" }],
           }),
@@ -143,7 +143,10 @@ for (const completeText of [false, true]) {
         { spelling: "\ud7ff\ue000", pronunciation: "\ud7ff\ue000" },
       ];
       await collect(
-        client.tts.stream("Hello.", { completeText, customLexicon: entries }),
+        client.tts.synthesize("Hello.", {
+          completeText,
+          customLexicon: entries,
+        }),
       );
       const request = completeText
         ? service.completeCalls[0]
@@ -227,7 +230,7 @@ for (const details of [undefined, "", "   "]) {
 test("complete text uses Synthesize with the exact text and a lexicon snapshot", () =>
   setup(async (service, client) => {
     const entries = [{ spelling: "read", pronunciation: '" r\\ E d' }];
-    const stream = client.tts.stream("Hello. Please read the pages.", {
+    const stream = client.tts.synthesize("Hello. Please read the pages.", {
       completeText: true,
       customLexicon: entries,
     });
@@ -254,7 +257,7 @@ for (const mode of ["error_before_audio", "no_audio_error"]) {
         'custom-lexicon entry "hello": no-primary-stress';
       service.trailingMetadata = { "x-request-id": "rejected-request" };
       await assert.rejects(
-        collect(client.tts.stream("Hello.", { completeText: true })),
+        collect(client.tts.synthesize("Hello.", { completeText: true })),
         (error) => {
           assert.ok(error instanceof RimeInputError);
           assert.match(error.message, /no-primary-stress/);
@@ -265,7 +268,7 @@ for (const mode of ["error_before_audio", "no_audio_error"]) {
       assert.equal(service.completeCalls.length, 1);
       service.mode = "normal";
       assert.deepEqual(
-        await collect(client.tts.stream("Hello.", { completeText: true })),
+        await collect(client.tts.synthesize("Hello.", { completeText: true })),
         service.payload,
       );
     }));
@@ -283,13 +286,17 @@ test("complete text rejects sources and oversize text; cancellation stops a pend
       ["Hello.", null],
     ]) {
       assert.throws(
-        () => client.tts.stream(text, { completeText }),
+        () => client.tts.synthesize(text, { completeText }),
         RimeInputError,
       );
     }
+    assert.throws(
+      () => client.tts.stream(source, { completeText: true }),
+      /requires synthesize/,
+    );
     assert.equal(service.calls.length, 0);
     service.mode = "silence";
-    const stream = client.tts.stream("Hello.", { completeText: true });
+    const stream = client.tts.synthesize("Hello.", { completeText: true });
     const rejected = assert.rejects(collect(stream), {
       name: "RimeCancelledError",
     });

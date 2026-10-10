@@ -75,7 +75,7 @@ async def test_timestamps_preserve_audio_and_synthesis_offsets(mist, profile):
 async def test_alignment_failure_keeps_successful_audio(mist, code):
     service, client = mist
     service.final_responses = [trailer(code)]
-    stream = client.tts.stream("Hello.", timestamps=True)
+    stream = client.tts.synthesize("Hello.", timestamps=True)
     assert await collect(stream) == service.payload
     result = await stream.timestamps()
     assert result.status == TimestampStatus(code, "alignment unavailable")
@@ -100,7 +100,7 @@ async def test_alignment_failure_keeps_successful_audio(mist, code):
 async def test_bad_timestamp_result_does_not_fail_audio(mist, responses):
     service, client = mist
     service.final_responses = responses
-    stream = client.tts.stream("Hello.", timestamps=True)
+    stream = client.tts.synthesize("Hello.", timestamps=True)
     assert (await collect(stream)).startswith(service.payload)
     with pytest.raises(RimeStreamError) as caught:
         await stream.timestamps()
@@ -110,14 +110,14 @@ async def test_bad_timestamp_result_does_not_fail_audio(mist, responses):
 async def test_opt_in_and_model_validation(setup):
     service, coda = setup
     with pytest.raises(RimeInputError, match="mistv3"):
-        coda.tts.stream("Hello.", timestamps=True)
+        coda.tts.synthesize("Hello.", timestamps=True)
     assert service.calls == []
     async with Rime(api_key="test-key", model="mistv3", endpoint=service.target) as client:
         for invalid in [1, None, "true"]:
             with pytest.raises(RimeInputError, match="boolean"):
-                client.tts.stream("Hello.", timestamps=invalid)
+                client.tts.synthesize("Hello.", timestamps=invalid)
         for options in [{}, {"timestamps": False}]:
-            stream = client.tts.stream("Hello.", **options)
+            stream = client.tts.synthesize("Hello.", **options)
             await collect(stream)
             assert not service.calls[-1][0].header.HasField("timestamps")
             with pytest.raises(RimeInputError, match="Enable"):
@@ -128,7 +128,7 @@ async def test_audio_arrives_before_timestamps_and_early_access_never_waits(mist
     service, client = mist
     service.mode = "delayed_trailer"
     service.final_responses = [trailer(spans=WORDS)]
-    async with client.tts.stream("Hello.", timestamps=True) as stream:
+    async with client.tts.synthesize("Hello.", timestamps=True) as stream:
         with pytest.raises(RimeInputError, match="Consume"):
             await stream.timestamps()
         assert await asyncio.wait_for(anext(stream), 1) == service.payload
@@ -143,7 +143,7 @@ async def test_audio_arrives_before_timestamps_and_early_access_never_waits(mist
 async def test_cancelled_timestamps_fail_promptly(mist, mode):
     service, client = mist
     service.mode = "delayed_trailer"
-    stream = client.tts.stream("Hello.", timestamps=True)
+    stream = client.tts.synthesize("Hello.", timestamps=True)
     if mode != "before_start":
         await anext(stream)
     if mode == "client":
@@ -157,7 +157,7 @@ async def test_cancelled_timestamps_fail_promptly(mist, mode):
 async def test_deadline_fails_audio_and_timestamp_access(mist):
     service, client = mist
     service.mode = "delayed_trailer"
-    stream = client.tts.stream("Hello.", timestamps=True, timeout=0.1)
+    stream = client.tts.synthesize("Hello.", timestamps=True, timeout=0.1)
     with pytest.raises(RimeTimeoutError):
         await collect(stream)
     with pytest.raises(RimeTimeoutError):
@@ -169,7 +169,7 @@ async def test_final_rpc_failure_overrides_a_timestamp_trailer(mist, complete_te
     service, client = mist
     service.mode = "error_after_trailer"
     service.final_responses = [trailer(spans=WORDS)]
-    stream = client.tts.stream("Hello.", timestamps=True, complete_text=complete_text)
+    stream = client.tts.synthesize("Hello.", timestamps=True, complete_text=complete_text)
     with pytest.raises(RimeUnavailableError):
         await collect(stream)
     with pytest.raises(RimeUnavailableError):

@@ -28,7 +28,7 @@ func TestCompleteTextUTF8BoundaryAndRecovery(t *testing.T) {
 			if got := <-requests; got != text {
 				t.Fatal("complete text was changed")
 			}
-			if _, err := client.TTS.Stream(context.Background(), text+"a", SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
+			if _, err := client.TTS.Synthesize(context.Background(), text+"a", SynthesisOptions{CompleteText: true}); !errors.Is(err, ErrInput) {
 				t.Fatal(err)
 			}
 			if service.calls.Load() != 1 {

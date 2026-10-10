@@ -1,0 +1,7 @@
+{
+ "chunk_sizes": [1,2,7,17,1024],
+ "invalid_timeouts": [0,-1,"30",true],
+ "profiles": {"PCM_24000":{"encoding":"pcm_s16le","sample_rate":24000,"channels":1},"MULAW_8000":{"encoding":"mulaw","sample_rate":8000,"channels":1}},
+ "grpc_errors": {"UNAUTHENTICATED":"RimeAuthenticationError","PERMISSION_DENIED":"RimePermissionError","INVALID_ARGUMENT":"RimeInputError","RESOURCE_EXHAUSTED":"RimeResourceLimitError","UNAVAILABLE":"RimeUnavailableError","DEADLINE_EXCEEDED":"RimeTimeoutError","CANCELLED":"RimeCancelledError","INTERNAL":"RimeStreamError"},
+ "lifecycle": ["incremental_audio_before_input_end","partial_audio_then_error","cancel_keeps_sibling","overall_timeout_while_paused","no_synthesis_replay"]
+}

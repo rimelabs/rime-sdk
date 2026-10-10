@@ -32,7 +32,7 @@ try {
 }
 ```
 
-The runnable [example](../../examples/typescript/stt/stream.mjs) reads a PCM file
+The runnable [example](../examples/stt/stream.mjs) reads a PCM file
 without loading it all into memory. Use Node.js 22 or later; browsers are not supported.
 Open files inside the async generator so file errors are reported through the
 SDK and resources are opened only after the service accepts the utterance.

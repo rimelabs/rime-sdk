@@ -1,6 +1,6 @@
 [project]
 name = "rimelabs-sdk"
-version = "0.1.0a9"
+version = "0.1.0a11"
 description = "Async Rime speech SDK"
 readme = "README.md"
 license = "MIT AND Apache-2.0"
@@ -8,7 +8,7 @@ license-files = ["LICENSE", "LICENSE-PRISM", "NOTICE-PRISM"]
 requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.74,<2",
-    "rime-api==0.3.0",
+    "rime-api==0.4.0",
     "livekit-blingfire==1.1.0",
     "httpx>=0.28,<1",
     "websockets>=15,<17",
@@ -40,3 +40,9 @@ target-version = "py311"
 [tool.mypy]
 ignore_missing_imports = true
 check_untyped_defs = true
+
+[tool.uv.workspace]
+members = ["examples"]
+
+[tool.uv.sources]
+rimelabs-sdk = { workspace = true }

@@ -134,7 +134,7 @@ async def test_sentence_messages_ignore_source_chunk_size(setup):
             for offset in range(0, len(text), size):
                 yield text[offset : offset + size]
 
-        await collect(client.tts.stream(text if size is None else source()))
+        await collect(client.tts.synthesize(text) if size is None else client.tts.stream(source()))
     messages = [[m.text_chunk for m in call[1:]] for call in service.calls]
     assert messages == [["Hi!", " Dr.", " Smith agrees.", " Hello."]] * 3
 
@@ -163,7 +163,7 @@ def test_public_boundary_and_credentials(monkeypatch):
     client = Rime()
     assert not hasattr(client.tts, "session")
     assert not hasattr(client.tts, "stream_sentences")
-    stream = client.tts.stream("Hello.")
+    stream = client.tts.synthesize("Hello.")
     assert not hasattr(stream, "result")
     assert not hasattr(stream, "metadata")
     with pytest.raises(AttributeError):
@@ -171,9 +171,29 @@ def test_public_boundary_and_credentials(monkeypatch):
     with pytest.raises(RimeInputError):
         Rime(api_key="test", model="mist")
     with pytest.raises(RimeInputError):
-        client.tts.stream("  ")
+        client.tts.synthesize("  ")
     with pytest.raises(RimeAudioFormatError):
-        client.tts.stream("Hi", audio_format="wav")
+        client.tts.synthesize("Hi", audio_format="wav")
+
+
+async def test_synthesis_methods_validate_input_shape(setup):
+    service, client = setup
+
+    async def source():
+        yield "Hello."
+
+    for invalid in ["Hello.", "", ["Hello."], None, 123]:
+        with pytest.raises(RimeInputError, match="async iterable"):
+            client.tts.stream(invalid)
+    chunks = source()
+    try:
+        for invalid in [chunks, ["Hello."], None, 123]:
+            with pytest.raises(RimeInputError, match="must be a string"):
+                client.tts.synthesize(invalid)
+    finally:
+        await chunks.aclose()
+    assert not service.calls
+    assert not client.tts._streams
 
 
 def test_error_conformance():
@@ -217,7 +237,7 @@ def test_audio_profiles_and_chunk_invariance(profile):
 
 async def test_complete_and_incremental_shared_rpc(setup):
     service, client = setup
-    async with client.tts.stream("Hello. Final phrase") as audio:
+    async with client.tts.synthesize("Hello. Final phrase") as audio:
         assert audio.format is AudioFormat.PCM_24000
         assert await collect(audio) == service.payload * 2
         assert audio.request_id == "test-request"
@@ -248,7 +268,7 @@ async def test_incremental_audio_before_input_end(setup):
 async def test_partial_audio_then_error(setup):
     service, client = setup
     service.mode = "partial_error"
-    async with client.tts.stream("Hello. The next sentence is waiting.") as audio:
+    async with client.tts.synthesize("Hello. The next sentence is waiting.") as audio:
         assert await anext(audio)
         service.release.set()
         with pytest.raises(RimeUnavailableError):
@@ -259,8 +279,8 @@ async def test_partial_audio_then_error(setup):
 async def test_cancel_keeps_sibling(setup):
     service, client = setup
     service.mode = "burst"
-    a = client.tts.stream("Hello.")
-    b = client.tts.stream("Sibling.")
+    a = client.tts.synthesize("Hello.")
+    b = client.tts.synthesize("Sibling.")
     assert await anext(a)
     await asyncio.wait_for(a.cancel(), 1)
     with pytest.raises(RimeCancelledError):
@@ -273,7 +293,7 @@ async def test_cancel_keeps_sibling(setup):
 async def test_overall_timeout_while_paused(setup):
     service, client = setup
     service.mode = "burst"
-    async with client.tts.stream("Hello.", timeout=0.08) as audio:
+    async with client.tts.synthesize("Hello.", timeout=0.08) as audio:
         assert await anext(audio)
         await asyncio.sleep(0.12)
         with pytest.raises(RimeTimeoutError):
@@ -284,26 +304,26 @@ async def test_overall_timeout_while_paused(setup):
 
 async def test_lazy_cancel_and_close(setup):
     service, client = setup
-    audio = client.tts.stream("Hello.", timeout=0.01)
+    audio = client.tts.synthesize("Hello.", timeout=0.01)
     await asyncio.sleep(0.03)
     assert not service.calls
     await audio.cancel()
     await audio.cancel()
     with pytest.raises(RimeCancelledError):
         await anext(audio)
-    pending = client.tts.stream("Later.")
+    pending = client.tts.synthesize("Later.")
     await client.close()
     await client.close()
     with pytest.raises(RimeCancelledError):
         await anext(pending)
     with pytest.raises(RimeInputError):
-        client.tts.stream("No.")
+        client.tts.synthesize("No.")
 
 
 async def test_no_synthesis_replay(setup):
     service, client = setup
     service.mode = "error_before_audio"
-    async with client.tts.stream("Hello.") as audio:
+    async with client.tts.synthesize("Hello.") as audio:
         with pytest.raises(RimeUnavailableError):
             await collect(audio)
     assert len(service.calls) == 1
@@ -326,9 +346,9 @@ async def test_invalid_state_from_source_is_an_input_error(setup):
 async def test_format_and_sample_alignment(setup):
     service, client = setup
     service.mode = "odd_chunks"
-    assert await collect(client.tts.stream("Hello.")) == service.payload
+    assert await collect(client.tts.synthesize("Hello.")) == service.payload
     service.mode = "wrong_format"
-    async with client.tts.stream("Hi.") as stream:
+    async with client.tts.synthesize("Hi.") as stream:
         with pytest.raises(RimeAudioFormatError):
             await collect(stream)
 
@@ -455,8 +475,8 @@ async def test_cancel_during_shared_refresh(setup, monkeypatch):
         return _auth.Token("token", time.time() + 3600, policy.audience)
 
     monkeypatch.setattr(_auth, "exchange_key", exchange)
-    a = client.tts.stream("A.")
-    b = client.tts.stream("B.")
+    a = client.tts.synthesize("A.")
+    b = client.tts.synthesize("B.")
     async with a, b:
         await started.wait()
         await a.cancel()
@@ -484,12 +504,12 @@ async def test_timeout_inheritance_and_explicit_disablement(setup):
     service, _ = setup
     service.mode = "burst"
     async with Rime(api_key="test", timeout=0.03) as client:
-        async with client.tts.stream("Hi.") as a:
+        async with client.tts.synthesize("Hi.") as a:
             await anext(a)
             await asyncio.sleep(0.06)
             with pytest.raises(RimeTimeoutError):
                 await anext(a)
-        async with client.tts.stream("Hi.", timeout=None) as b:
+        async with client.tts.synthesize("Hi.", timeout=None) as b:
             await anext(b)
             await asyncio.sleep(0.06)
             assert await anext(b)
@@ -497,9 +517,9 @@ async def test_timeout_inheritance_and_explicit_disablement(setup):
 
 async def test_large_complete_input_and_unsplittable_sentence(setup):
     _, client = setup
-    async with client.tts.stream("A short sentence. " * 4000) as audio:
+    async with client.tts.synthesize("A short sentence. " * 4000) as audio:
         assert await anext(audio)
-    async with client.tts.stream("x" * 70000) as audio:
+    async with client.tts.synthesize("x" * 70000) as audio:
         with pytest.raises(RimeResourceLimitError):
             await collect(audio)
 
@@ -527,7 +547,7 @@ def test_sentence_limit_still_rejects_oversized_spans(text):
 
 async def test_concurrent_operations_have_no_fixed_cap(setup):
     _, client = setup
-    results = await asyncio.gather(*(collect(client.tts.stream("Hello.")) for _ in range(20)))
+    results = await asyncio.gather(*(collect(client.tts.synthesize("Hello.")) for _ in range(20)))
     assert all(results)
     assert not client.tts._streams
 
@@ -558,7 +578,7 @@ async def test_failed_operation_releases_state(setup):
     service.mode = "error_before_audio"
     async with Rime(api_key="test") as client:
         with pytest.raises(RimeUnavailableError):
-            await collect(client.tts.stream("Hello."))
+            await collect(client.tts.synthesize("Hello."))
         await asyncio.sleep(0.01)
         assert not client.tts._streams
 
@@ -567,7 +587,7 @@ async def test_client_shutdown_stops_paused_output(setup):
     service, _ = setup
     service.mode = "burst"
     client = Rime(api_key="test")
-    audio = client.tts.stream("Hello.")
+    audio = client.tts.synthesize("Hello.")
     await anext(audio)
     await asyncio.sleep(0.03)
     await client.close()
@@ -575,7 +595,7 @@ async def test_client_shutdown_stops_paused_output(setup):
     with pytest.raises(RimeCancelledError):
         await anext(audio)
     with pytest.raises(RimeInputError):
-        client.tts.stream("Later.")
+        client.tts.synthesize("Later.")
 
 
 @pytest.mark.parametrize("profile", list(AudioFormat))
@@ -586,7 +606,7 @@ async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     # Mu-law emits one byte per three PCM samples. Exceed the queue in both formats.
     samples = 3 * (client.tts._policy.output_bytes + 1)
     service.payload = b"\x00\x00" * samples
-    async with client.tts.stream("Hello.", audio_format=profile) as audio:
+    async with client.tts.synthesize("Hello.", audio_format=profile) as audio:
         chunks = [part async for part in audio]
     assert all(0 < len(part) <= client.tts._policy.output_chunk_bytes for part in chunks)
     expected = (
@@ -600,7 +620,7 @@ async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
 async def test_overall_timeout_after_producer_completion(setup, queued):
     service, client = setup
     service.payload = b"\x00\x00" * (client.tts._policy.output_chunk_bytes if queued else 1)
-    async with client.tts.stream("Hello.", timeout=0.1) as audio:
+    async with client.tts.synthesize("Hello.", timeout=0.1) as audio:
         assert await anext(audio)
         # Wait for production to finish without observing iterator completion.
         await asyncio.wait_for(asyncio.shield(audio._worker), 1)
@@ -615,7 +635,7 @@ async def test_slow_consumer_does_not_trigger_stall_timeout(setup):
     # Keep the RPC open while a large response waits for output capacity.
     service.mode = "partial_error"
     service.payload = b"\x00\x00" * client.tts._policy.output_bytes
-    async with client.tts.stream("Hello.") as audio:
+    async with client.tts.synthesize("Hello.") as audio:
         assert await anext(audio)
         await asyncio.sleep(0.08)
         assert await anext(audio)
@@ -626,7 +646,7 @@ async def test_incomplete_final_pcm_sample(setup):
     service.payload = b"x"
     async with Rime(api_key="test") as client:
         with pytest.raises(RimeAudioFormatError):
-            async with client.tts.stream("Hello.") as audio:
+            async with client.tts.synthesize("Hello.") as audio:
                 await collect(audio)
 
 
@@ -646,7 +666,7 @@ async def test_server_error_without_audio_metadata(setup, location, status, erro
     service.response_metadata = (("x-request-id", "header-id"),) if location != "trailers" else ()
     service.trailing_metadata = (("x-request-id", "trailer-id"),) if location != "headers" else ()
     expected_id = "trailer-id" if location == "trailers" else "header-id"
-    async with client.tts.stream("Hello.", timeout=1) as audio:
+    async with client.tts.synthesize("Hello.", timeout=1) as audio:
         result = asyncio.create_task(collect(audio))
         await service.headers_sent.wait()
         # Missing format metadata must not mask a later server rejection.
@@ -665,7 +685,7 @@ async def test_missing_audio_metadata_cannot_succeed(setup, mode):
     service, client = setup
     service.mode = mode
     service.response_metadata = (("x-request-id", "header-id"),)
-    async with client.tts.stream("Hello.", timeout=1) as audio:
+    async with client.tts.synthesize("Hello.", timeout=1) as audio:
         with pytest.raises(RimeAudioFormatError):
             await anext(audio)
     assert len(service.calls) == 1

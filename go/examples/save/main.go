@@ -45,7 +45,7 @@ func run() error {
 	options := rime.SynthesisOptions{AudioFormat: profile}
 	if *streaming {
 		runes := []rune(*text)
-		audio, err = client.TTS.StreamSource(ctx, func(ctx context.Context) (string, error) {
+		audio, err = client.TTS.Stream(ctx, func(ctx context.Context) (string, error) {
 			if len(runes) == 0 {
 				return "", io.EOF
 			}
@@ -60,7 +60,7 @@ func run() error {
 			return fragment, nil
 		}, options)
 	} else {
-		audio, err = client.TTS.Stream(ctx, *text, options)
+		audio, err = client.TTS.Synthesize(ctx, *text, options)
 	}
 	if err != nil {
 		return err

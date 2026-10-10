@@ -1,0 +1,90 @@
+name: Check published SDK examples
+on:
+  workflow_call:
+    inputs:
+      language:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      ref:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      language:
+        description: Example language
+        type: choice
+        options: [python, typescript]
+        required: true
+      version:
+        description: Already published SDK version
+        type: string
+        required: true
+      ref:
+        description: Release tag containing these examples
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      EXAMPLE_LANGUAGE: ${{ inputs.language }}
+      SDK_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        if: inputs.language == 'typescript'
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - name: Copy examples outside the workspace
+        run: |
+          case "$EXAMPLE_LANGUAGE" in python|typescript) ;; *) exit 1 ;; esac
+          isolated=$(mktemp -d "$RUNNER_TEMP/rime-examples.XXXXXX")
+          git archive HEAD "$EXAMPLE_LANGUAGE/examples" | tar -x -C "$isolated"
+          echo "EXAMPLE_PROJECT=$isolated/$EXAMPLE_LANGUAGE/examples" >> "$GITHUB_ENV"
+      - name: Check the published Python package
+        if: inputs.language == 'python'
+        run: |
+          cd "$EXAMPLE_PROJECT"
+          for attempt in {1..10}; do
+            if uv add --refresh --default-index https://pypi.org/simple "rimelabs-sdk==$SDK_VERSION"; then break; fi
+            if [[ "$attempt" == 10 ]]; then exit 1; fi
+            sleep 15
+          done
+          uv run --locked python -c 'import audio_devices, tts.save, tts.play, tts.stream, stt.stream, stt.voice, realtime.recorded, realtime.voice_tools, realtime.typed_turn'
+          uv run --locked python - <<'PY'
+          import asyncio
+          from rimelabs_sdk import Rime
+
+          async def check():
+              async with Rime(api_key="install-check") as client:
+                  assert callable(client.tts.synthesize)
+                  assert callable(client.tts.stream)
+
+          asyncio.run(check())
+          PY
+          uv run --locked python -m compileall -q tts stt realtime
+      - name: Check the published TypeScript package
+        if: inputs.language == 'typescript'
+        run: |
+          cd "$EXAMPLE_PROJECT"
+          for attempt in {1..10}; do
+            if npm install --save-exact --prefer-online --ignore-scripts --no-audit --no-fund "@rimelabs/sdk@$SDK_VERSION" --registry=https://registry.npmjs.org/ --@rimelabs:registry=https://registry.npmjs.org/; then break; fi
+            if [[ "$attempt" == 10 ]]; then exit 1; fi
+            sleep 15
+          done
+          npm run check
+          node --input-type=module -e 'import { Rime } from "@rimelabs/sdk"; const client = new Rime({ apiKey: "install-check" }); if (typeof client.tts.synthesize !== "function" || typeof client.tts.stream !== "function") throw new Error("Missing TTS methods"); await client.close();'

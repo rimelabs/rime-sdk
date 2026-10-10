@@ -64,8 +64,9 @@ type AudioStream struct {
 	streamError         error
 }
 
-// Stream starts synthesis of complete text. Use StreamSource for incremental input.
-func (t *TTSService) Stream(ctx context.Context, text string, options SynthesisOptions) (*AudioStream, error) {
+// Synthesize starts synthesis of complete text and returns an audio stream.
+// Use Stream for incremental text input.
+func (t *TTSService) Synthesize(ctx context.Context, text string, options SynthesisOptions) (*AudioStream, error) {
 	if strings.TrimSpace(text) == "" || !utf8.ValidString(text) {
 		return nil, failure(ErrInput, "text must be nonblank UTF-8")
 	}
@@ -76,7 +77,7 @@ func (t *TTSService) Stream(ctx context.Context, text string, options SynthesisO
 		return t.stream(ctx, nil, text, options)
 	}
 	first := true
-	return t.StreamSource(ctx, func(context.Context) (string, error) {
+	return t.Stream(ctx, func(context.Context) (string, error) {
 		if first {
 			first = false
 			return text, nil
@@ -85,10 +86,11 @@ func (t *TTSService) Stream(ctx context.Context, text string, options SynthesisO
 	}, options)
 }
 
-// StreamSource starts work immediately. The source may supply partial sentences.
-func (t *TTSService) StreamSource(ctx context.Context, source TextSource, options SynthesisOptions) (*AudioStream, error) {
+// Stream accepts incremental text and returns an audio stream.
+// It starts work immediately. The source may supply partial sentences.
+func (t *TTSService) Stream(ctx context.Context, source TextSource, options SynthesisOptions) (*AudioStream, error) {
 	if options.CompleteText {
-		return nil, failure(ErrInput, "CompleteText requires Stream with a string, not StreamSource")
+		return nil, failure(ErrInput, "CompleteText requires Synthesize with a string, not Stream")
 	}
 	return t.stream(ctx, source, "", options)
 }

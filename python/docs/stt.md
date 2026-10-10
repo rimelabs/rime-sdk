@@ -37,7 +37,7 @@ async def transcribe():
 
 Run `asyncio.run(transcribe())` from a script. File reads run off the event loop
 using `asyncio.to_thread`, as in the runnable
-[example](../../examples/python/stt/stream.py).
+[example](../examples/stt/stream.py).
 
 ## Options
 

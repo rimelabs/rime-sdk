@@ -30,7 +30,7 @@ func TestLexiconSnapshotAndRequestIsolation(t *testing.T) {
 				var err error
 				if incremental {
 					parts := []string{"Hello. ", "Hello again."}
-					stream, err = client.TTS.StreamSource(context.Background(), func(context.Context) (string, error) {
+					stream, err = client.TTS.Stream(context.Background(), func(context.Context) (string, error) {
 						if len(parts) == 0 {
 							return "", io.EOF
 						}
@@ -39,7 +39,7 @@ func TestLexiconSnapshotAndRequestIsolation(t *testing.T) {
 						return part, nil
 					}, options)
 				} else {
-					stream, err = client.TTS.Stream(context.Background(), "Hello. Hello again.", options)
+					stream, err = client.TTS.Synthesize(context.Background(), "Hello. Hello again.", options)
 				}
 				if err != nil {
 					t.Fatal(err)
@@ -74,7 +74,7 @@ func TestLexiconInvalidUTF8BeforeNetwork(t *testing.T) {
 	service := &testService{}
 	client := setupClient(t, service)
 	for _, entry := range []PronunciationEntry{{"\xff", "h"}, {"hello", "\xff"}} {
-		_, err := client.TTS.Stream(context.Background(), "Hello.", SynthesisOptions{CustomLexicon: []PronunciationEntry{entry}})
+		_, err := client.TTS.Synthesize(context.Background(), "Hello.", SynthesisOptions{CustomLexicon: []PronunciationEntry{entry}})
 		if !errors.Is(err, ErrInput) || service.calls.Load() != 0 {
 			t.Fatalf("%v", err)
 		}
@@ -110,7 +110,7 @@ func TestPronunciationRejectionPreservesMessageAndRequestID(t *testing.T) {
 					},
 				}
 				client := setupClient(t, service)
-				stream, err := client.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+				stream, err := client.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 					<-ctx.Done()
 					return "", context.Cause(ctx)
 				}, SynthesisOptions{CustomLexicon: []PronunciationEntry{{"hello", "h @ . l oU"}}})

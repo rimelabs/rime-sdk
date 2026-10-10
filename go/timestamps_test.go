@@ -87,7 +87,7 @@ func TestTimestampsPreserveAudioAndSynthesisOffsets(t *testing.T) {
 			service := timestampService([]*pb.SynthesisResponseStream{wordTrailer(codes.OK, timestampWords()...)}, nil, nil)
 			client := timestampClient(t, service)
 			parts := []string{"First. ", "Twenty two."}
-			stream, err := client.TTS.StreamSource(context.Background(), func(context.Context) (string, error) {
+			stream, err := client.TTS.Stream(context.Background(), func(context.Context) (string, error) {
 				if len(parts) == 0 {
 					return "", io.EOF
 				}
@@ -179,7 +179,7 @@ func TestTimestampOptInAndModelValidation(t *testing.T) {
 		return nil
 	}}
 	coda := setupClient(t, service)
-	_, err := coda.TTS.Stream(context.Background(), "Hello.", SynthesisOptions{Timestamps: true})
+	_, err := coda.TTS.Synthesize(context.Background(), "Hello.", SynthesisOptions{Timestamps: true})
 	if !errors.Is(err, ErrInput) || service.calls.Load() != 0 {
 		t.Fatalf("%v", err)
 	}
@@ -222,7 +222,7 @@ func TestCancelledTimestamps(t *testing.T) {
 			client := timestampClient(t, timestampService(nil, make(chan struct{}), nil))
 			ctx, cancel := context.WithCancelCause(context.Background())
 			defer cancel(context.Canceled)
-			stream, err := client.TTS.Stream(ctx, "Hello.", SynthesisOptions{Timestamps: true})
+			stream, err := client.TTS.Synthesize(ctx, "Hello.", SynthesisOptions{Timestamps: true})
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -16,6 +16,10 @@ on:
         description: 'Recovery only: existing Go release tag to verify'
         type: string
         default: ''
+      rust_tag:
+        description: 'Recovery only: existing Rust release tag to publish'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,7 +30,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag
+    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag && !inputs.rust_tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,6 +41,7 @@ jobs:
       python_tag: ${{ steps.release.outputs['python--tag_name'] }}
       typescript_tag: ${{ steps.release.outputs['typescript--tag_name'] }}
       go_tag: ${{ steps.release.outputs['go--tag_name'] }}
+      rust_tag: ${{ steps.release.outputs['rust--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
@@ -58,6 +63,28 @@ jobs:
               pr.labels.some(label => label.name === 'autorelease: pending')
             );
             if (pr) core.setOutput('branch', pr.head.ref);
+      # Release Please can leave the branch unchanged when release notes are unchanged.
+      - name: Update release branch from main
+        if: steps.pr.outputs.branch != ''
+        uses: actions/github-script@v7
+        env:
+          RELEASE_BRANCH: ${{ steps.pr.outputs.branch }}
+        with:
+          script: |
+            try {
+              await github.rest.repos.merge({
+                ...context.repo,
+                base: process.env.RELEASE_BRANCH,
+                head: 'main',
+                commit_message: 'chore: update release branch from main',
+              });
+            } catch (error) {
+              if (error.status === 409) {
+                core.setFailed(`Merge conflict: update ${process.env.RELEASE_BRANCH} from main manually, then rerun this workflow.`);
+                return;
+              }
+              throw error;
+            }
       - uses: actions/checkout@v4
         if: steps.pr.outputs.branch != ''
         with:
@@ -66,16 +93,21 @@ jobs:
         if: steps.pr.outputs.branch != ''
         with:
           python-version: '3.12'
-      - name: Normalize Python version and update its lockfile
+      - uses: actions/setup-node@v4
+        if: steps.pr.outputs.branch != ''
+        with:
+          node-version: '22'
+      - name: Update release metadata and workspace lockfiles
         if: steps.pr.outputs.branch != ''
         run: |
           version=$(uv version --project python --short)
           uv version --project python --no-sync "$version"
-          git add python/pyproject.toml python/uv.lock
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git add python/pyproject.toml python/uv.lock package-lock.json
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'chore: update Python release metadata'
+            git commit -m 'chore: update release metadata'
             git push
           fi
       - name: Run checks on the release PR branch
@@ -135,8 +167,8 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'version={version}\n')
           PY
-      - run: uv run ruff check src tests ../examples/python
-      - run: uv run ruff format --check src tests ../examples/python
+      - run: uv run ruff check src tests examples
+      - run: uv run ruff format --check src tests examples
       - run: uv run mypy src
       - run: uv run pytest
       - run: uv build
@@ -171,7 +203,7 @@ jobs:
           node-version: '22'
           registry-url: https://registry.npmjs.org
       - run: npm install --global npm@11.18.0
-      - run: npm ci
+      - run: npm --prefix .. ci
       - name: Verify release version and alpha policy
         id: version
         run: |
@@ -188,9 +220,9 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm test
-      - run: npm pack
+      - run: npm pack --workspace @rimelabs/sdk
       - name: Publish package
-        run: npm publish --access public --tag latest
+        run: npm publish --workspace @rimelabs/sdk --access public --tag latest
 
   go:
     timeout-minutes: 15
@@ -234,26 +266,69 @@ jobs:
       - name: Download and build the published Go module
         run: bash tools/check-public-release.sh "$RELEASE_TAG"
 
-  update-python-examples:
-    needs: python
+  rust:
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.rust_tag != '' || inputs.rust_tag != '')
+    runs-on: ubuntu-latest
+    environment: crates
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.rust_tag || inputs.rust_tag }}
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v6
+      - name: Verify Rust release version
+        run: |
+          uv run --no-project python - <<'PY'
+          import json, os, pathlib, re, tomllib
+          version = tomllib.loads(pathlib.Path('Cargo.toml').read_text())['package']['version']
+          manifest = json.loads(pathlib.Path('../.release-please-manifest.json').read_text())
+          assert version == manifest['rust']
+          assert os.environ['RELEASE_TAG'] == 'rust-v' + version
+          assert re.fullmatch(r'\d+\.\d+\.\d+-alpha\.\d+', version)
+          PY
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo package --locked
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish Rust SDK
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --locked
+
+  check-python-examples:
+    needs: [prepare, python]
     if: ${{ !cancelled() && needs.python.result == 'success' }}
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
-    uses: ./.github/workflows/update-examples.yml
+      contents: read
+    uses: ./.github/workflows/check-published-examples.yml
     with:
       language: python
       version: ${{ needs.python.outputs.version }}
+      ref: ${{ needs.prepare.outputs.python_tag || inputs.python_tag }}
 
-  update-typescript-examples:
-    needs: typescript
+  check-typescript-examples:
+    needs: [prepare, typescript]
     if: ${{ !cancelled() && needs.typescript.result == 'success' }}
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
-    uses: ./.github/workflows/update-examples.yml
+      contents: read
+    uses: ./.github/workflows/check-published-examples.yml
     with:
       language: typescript
       version: ${{ needs.typescript.outputs.version }}
+      ref: ${{ needs.prepare.outputs.typescript_tag || inputs.typescript_tag }}

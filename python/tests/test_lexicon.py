@@ -24,7 +24,8 @@ async def test_lexicon_is_snapshotted_once_per_stream(setup, incremental, profil
         yield "Hello. "
         yield "Hello again."
 
-    stream = client.tts.stream(
+    synthesize = client.tts.stream if incremental else client.tts.synthesize
+    stream = synthesize(
         text() if incremental else "Hello. Hello again.",
         custom_lexicon=entries,
         audio_format=profile,
@@ -45,7 +46,7 @@ async def test_lexicon_is_snapshotted_once_per_stream(setup, incremental, profil
         (entry.spelling, entry.pronunciation) for entry in messages[0].header.custom_lexicon
     ] == expected
     # Options never become client state or leak into the next request.
-    async with client.tts.stream("Hello.") as plain:
+    async with client.tts.synthesize("Hello.") as plain:
         assert b"".join([part async for part in plain]) == service.payload
     assert not service.calls[1][0].header.custom_lexicon
 
@@ -65,7 +66,7 @@ async def test_lexicon_is_snapshotted_once_per_stream(setup, incremental, profil
 async def test_bad_lexicon_shape_fails_before_network(setup, entries):
     service, client = setup
     with pytest.raises(RimeInputError):
-        client.tts.stream("Hello.", custom_lexicon=entries)
+        client.tts.synthesize("Hello.", custom_lexicon=entries)
     assert not service.calls
 
 
@@ -77,7 +78,7 @@ async def test_non_utf8_lexicon_fields_fail_before_network(setup, complete_text,
     fields = {"spelling": "hello", "pronunciation": 'h @ . " l oU'}
     fields[field] = f"bad{chr(codepoint)}"
     with pytest.raises(RimeInputError, match="valid UTF-8") as caught:
-        client.tts.stream(
+        client.tts.synthesize(
             "Hello.",
             complete_text=complete_text,
             custom_lexicon=[PronunciationEntry(**fields)],
@@ -94,7 +95,7 @@ async def test_valid_unicode_lexicon_fields_reach_service_unchanged(setup, compl
     service, client = setup
     # Encoding validation must preserve Unicode and leave linguistic checks to the service.
     entry = PronunciationEntry("cafe\u0301 \U0001f642", "é \U0001f642")
-    stream = client.tts.stream("Hello.", complete_text=complete_text, custom_lexicon=[entry])
+    stream = client.tts.synthesize("Hello.", complete_text=complete_text, custom_lexicon=[entry])
     assert b"".join([part async for part in stream]) == service.payload
     request = service.complete_calls[0] if complete_text else service.calls[0][0].header
     assert request.custom_lexicon[0].spelling == entry.spelling

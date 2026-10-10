@@ -4,9 +4,16 @@ You supply text; the SDK handles sentence boundaries and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
+## Complete text
+
+Use `client.tts.synthesize(text)` for one nonblank string. It returns an audio
+stream; it does not wait for all audio to be generated. Do not await this call.
+Use the audio loop and cleanup shown in the package quick start.
+
 ## Stream incoming text
 
-An async text source can supply text as it arrives:
+Use `client.tts.stream(chunks)` for an async iterable of strings. A plain string
+belongs in `synthesize`, not `stream`. The source can supply partial sentences:
 
 ```python
 async def text():
@@ -43,8 +50,8 @@ and path. TLS is required; the default port is `443`. Model defaults still apply
 
 ### Synthesis options
 
-The `text` argument is required and accepts a nonblank string or an async text
-source. All options in `client.tts.stream(text, ...)` are optional:
+Both methods require text input: a nonblank string for `synthesize`, or an
+async iterable of strings for `stream`. Both accept the following optional settings:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
@@ -88,7 +95,7 @@ async def main():
     lexicon = [PronunciationEntry(spelling="hello", pronunciation='h @ . " l oU')]
     async with Rime(model="coda", timeout=60) as client:
         try:
-            async with client.tts.stream(
+            async with client.tts.synthesize(
                 "Hello world.", language="en", custom_lexicon=lexicon
             ) as audio:
                 with Path("speech.pcm").open("wb") as output:
@@ -103,9 +110,10 @@ asyncio.run(main())
 ```
 
 `PronunciationEntry` is immutable and exported from `rimelabs_sdk`. The SDK
-snapshots the sequence when `tts.stream()` is called. The same lexicon applies
-to the entire request, including an async text source; subsequent requests have
-their own options. Omit the option or pass an empty sequence for default pronunciation.
+snapshots the sequence when `tts.synthesize()` or `tts.stream()` is called.
+The same lexicon applies to the entire request, including an async text source;
+subsequent requests have their own options. Omit the option or pass an empty
+sequence for default pronunciation.
 
 The service matches whole words or phrases case-insensitively and applies the
 pronunciation after text normalization. Longest matches take precedence; the
@@ -137,7 +145,7 @@ from rimelabs_sdk import Rime
 
 async def main():
     async with Rime(model="mistv3", timeout=60) as client:
-        async with client.tts.stream("Hello world.", timestamps=True) as audio:
+        async with client.tts.synthesize("Hello world.", timestamps=True) as audio:
             with Path("speech.pcm").open("wb") as output:
                 async for chunk in audio:
                     output.write(chunk)
@@ -226,16 +234,17 @@ Python task cancellation remains `asyncio.CancelledError`.
 
 ## Complete text input
 
-`complete_text=True` selects the `Synthesize` RPC, which sends the full input in one request
-and streams audio back. The default still uses `SynthesizeStreaming` with
-incremental sentence input, including when given a string. Full-text mode accepts
+`complete_text=True` on `tts.synthesize()` selects the `Synthesize` RPC, which
+sends the full input in one request and streams audio back. The default still
+uses `SynthesizeStreaming` with incremental sentence input, including when given
+a string. Full-text mode accepts
 only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
 application first. Server-side text splitting
 applies. Lexicon overrides, error details and request IDs, cancellation, audio
 profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
 
 ```python
-async with client.tts.stream(
+async with client.tts.synthesize(
     "Please read this.", complete_text=True,
     custom_lexicon=[PronunciationEntry("read", '" r\\ E d')],
 ) as audio:
