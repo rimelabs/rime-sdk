@@ -1,0 +1,21 @@
+.github/workflows/checks.yml
+  s_88d2a439fbab05::t_81407abd0f34fd 78-79
+RELEASING.md
+  s_88d2a439fbab05::t_386f52e13de323 143-148,158-159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5fca7812bb3f43e39d70958d68b2805c559c8c7c",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
