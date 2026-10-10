@@ -1,0 +1,35 @@
+rust/Cargo.toml
+  s_c318ad644fb4fe::t_5207257b57fc39 13
+.github/workflows/checks.yml
+  s_c318ad644fb4fe::t_a75e5fd3a3c02b 165-167
+CONTRIBUTING.md
+  s_c318ad644fb4fe::t_723ee6e0c2a91f 146
+RELEASING.md
+  s_c318ad644fb4fe::t_fc854058542bec 253-254,256
+rust/Cargo.lock
+  s_c318ad644fb4fe::t_d7e00c50d2e621 971,990
+rust/api-revision
+  s_c318ad644fb4fe::t_d527a4369840d0 1
+rust/src/client.rs
+  s_c318ad644fb4fe::t_3cf426e3203b97 3
+rust/src/stream.rs
+  s_c318ad644fb4fe::t_10baa101fcb139 11
+rust/src/tests.rs
+  s_c318ad644fb4fe::t_112d2a09d03e34 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d51c1814127bc2da1e2c7e0cd14827860b389eb1",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
