@@ -1,0 +1,21 @@
+.github/workflows/checks.yml
+  s_c318ad644fb4fe::t_72bf051d559e56 156-159
+rust/Cargo.lock
+  s_c318ad644fb4fe::t_b9c85645417871 973-974
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d36c84fde36920113d739ec19d2ac845de37b8b",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
