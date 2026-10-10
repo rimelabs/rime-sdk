@@ -1,0 +1,109 @@
+python/tests/test_endpoints.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 83
+typescript/tests/sdk.test.mjs
+  s_88d2a439fbab05::t_8f2c1d284b5478 173,175,241,273,285,290,295,303,313,322,326,493,498,510,529-530,679,685,695,716,732,747,757,783,826
+  s_88d2a439fbab05::t_f66ef1ab1b1766 179-200
+  s_88d2a439fbab05::t_30805f4b2676fb 149-153
+go/stream_state_test.go
+  s_88d2a439fbab05::t_8f2c1d284b5478 28
+go/stream.go
+  s_88d2a439fbab05::t_8f2c1d284b5478 62-64,69,78-80
+python/tests/test_stt.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 510
+typescript/tests/fixtures/tts.ts
+  s_88d2a439fbab05::t_f66ef1ab1b1766 1-18
+rust/examples/save.rs
+  s_88d2a439fbab05::t_30805f4b2676fb 10-12
+examples/typescript/stt/voice.mjs
+  s_88d2a439fbab05::t_8f2c1d284b5478 141
+typescript/tests/tts-types.test.mjs
+  s_88d2a439fbab05::t_f66ef1ab1b1766 1-8,12-23
+  s_88d2a439fbab05::t_30805f4b2676fb 9-11
+rust/src/lib.rs
+  s_88d2a439fbab05::t_8f2c1d284b5478 17
+rust/src/client.rs
+  s_88d2a439fbab05::t_30805f4b2676fb 340,485,493-494,528-530,534-536
+  s_88d2a439fbab05::t_8f2c1d284b5478 311-316,318,332,344,346-358
+rust/README.md
+  s_88d2a439fbab05::t_15f7482468d1d8 38-58
+  s_88d2a439fbab05::t_8f2c1d284b5478 25,59
+python/src/rimelabs_sdk/tts/_client.py
+  s_88d2a439fbab05::t_30805f4b2676fb 76-78
+  s_88d2a439fbab05::t_4792f339611d94 41-63,66,73,75
+examples/python/tts/save.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 13
+README.md
+  s_88d2a439fbab05::t_15f7482468d1d8 4-5,34-46
+  s_88d2a439fbab05::t_7b371ef7236bd8 47
+.github/workflows/checks.yml
+  s_88d2a439fbab05::t_4b932ccd52512f 99-102
+typescript/tests/stt.test.mjs
+  s_88d2a439fbab05::t_8f2c1d284b5478 552
+typescript/src/tts/client.ts
+  s_88d2a439fbab05::t_30805f4b2676fb 76-81,86-90
+  s_88d2a439fbab05::t_4792f339611d94 67-75,82-83,92
+examples/python/stt/voice.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 92
+typescript/README.md
+  s_88d2a439fbab05::t_8f2c1d284b5478 40
+  s_88d2a439fbab05::t_15f7482468d1d8 63,65-67
+typescript/src/client.ts
+  s_88d2a439fbab05::t_aa2bbe93c8c03b 51-53,87
+go/examples/save/main.go
+  s_88d2a439fbab05::t_8f2c1d284b5478 48,63
+go/client_test.go
+  s_88d2a439fbab05::t_8f2c1d284b5478 129,165,242,307,406,411,430,544
+python/src/rimelabs_sdk/tts/_stream.py
+  s_88d2a439fbab05::t_4792f339611d94 129-132
+  s_88d2a439fbab05::t_30805f4b2676fb 31-33
+typescript/src/tts/stream.ts
+  s_88d2a439fbab05::t_30805f4b2676fb 56-58
+  s_88d2a439fbab05::t_4792f339611d94 23,128
+go/examples/voice/main.go
+  s_88d2a439fbab05::t_8f2c1d284b5478 167
+go/README.md
+  s_88d2a439fbab05::t_8f2c1d284b5478 47,221
+  s_88d2a439fbab05::t_15f7482468d1d8 3-4,234
+python/README.md
+  s_88d2a439fbab05::t_15f7482468d1d8 55,57-59
+  s_88d2a439fbab05::t_8f2c1d284b5478 37
+python/tests/test_sdk.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 137,166,174,176,240,271,282-283,296,307,314,320,326,349,351,478-479,507,512,520,522,550,581,590,598,609,623,638,649,669,688
+  s_88d2a439fbab05::t_aa2bbe93c8c03b 179-196
+  s_88d2a439fbab05::t_8edd79302c96df 177-178
+typescript/docs/tts.md
+  s_88d2a439fbab05::t_8f370d93d44e25 56
+  s_88d2a439fbab05::t_8f2c1d284b5478 107
+  s_88d2a439fbab05::t_15f7482468d1d8 7-12,15-16,55
+typescript/tests/endpoints.test.mjs
+  s_88d2a439fbab05::t_8f2c1d284b5478 126
+CONTRIBUTING.md
+  s_88d2a439fbab05::t_8f370d93d44e25 58-60,68-69
+  s_88d2a439fbab05::t_15f7482468d1d8 56-57,102,107-108
+python/docs/tts.md
+  s_88d2a439fbab05::t_15f7482468d1d8 7-12,15-16,53
+  s_88d2a439fbab05::t_8f370d93d44e25 54
+rust/src/tests.rs
+  s_88d2a439fbab05::t_4b932ccd52512f 510-512,526-537
+  s_88d2a439fbab05::t_30805f4b2676fb 265,294-295,317,334-335,347,361-362,378,397,412-413,430,449-450,490,545,565-566,579-580,629
+examples/typescript/tts/save.ts
+  s_88d2a439fbab05::t_8f2c1d284b5478 7
+python/tests/test_realtime.py
+  s_88d2a439fbab05::t_8f2c1d284b5478 164
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2e0ee101c7b6845612fb042716ae907e24525e97",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
