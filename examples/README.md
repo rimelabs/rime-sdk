@@ -141,6 +141,12 @@ Run these on each supported OS before publishing the device examples:
 The server/model is required for these checks. Automated tests use controlled
 peers and simulated output clocks; they do not prove physical device behavior.
 
+## Rust TTS
+
+Run `cargo run --manifest-path rust/Cargo.toml --example save` from the repository
+root with `RIME_API_KEY` set. It saves raw PCM16 mono 24 kHz audio to `speech.pcm`.
+
+
 ## Speech recognition
 
 Prepare a headerless signed PCM16 little-endian mono 16 kHz file and choose its

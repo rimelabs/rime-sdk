@@ -13,6 +13,15 @@ python = tomllib.loads((root / "python/pyproject.toml").read_text())["project"]
 lock = tomllib.loads((root / "python/uv.lock").read_text())
 node = json.loads((root / "typescript/package.json").read_text())
 node_lock = json.loads((root / "typescript/package-lock.json").read_text())
+rust = tomllib.loads((root / "rust/Cargo.toml").read_text())["package"]
+rust_lock = tomllib.loads((root / "rust/Cargo.lock").read_text())
+assert rust["version"] == manifest["rust"], "Rust manifest mismatch"
+assert (
+    next(
+        package for package in rust_lock["package"] if package["name"] == rust["name"]
+    )["version"]
+    == rust["version"]
+), "Rust lockfile mismatch"
 
 assert Version(python["version"]) == Version(manifest["python"]), (
     "Python manifest mismatch"

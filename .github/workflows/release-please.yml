@@ -16,6 +16,10 @@ on:
         description: 'Recovery only: existing Go release tag to verify'
         type: string
         default: ''
+      rust_tag:
+        description: 'Recovery only: existing Rust release tag to publish'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,7 +30,7 @@ concurrency:
 
 jobs:
   prepare:
-    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag
+    if: github.ref == 'refs/heads/main' && !inputs.python_tag && !inputs.typescript_tag && !inputs.go_tag && !inputs.rust_tag
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -37,6 +41,7 @@ jobs:
       python_tag: ${{ steps.release.outputs['python--tag_name'] }}
       typescript_tag: ${{ steps.release.outputs['typescript--tag_name'] }}
       go_tag: ${{ steps.release.outputs['go--tag_name'] }}
+      rust_tag: ${{ steps.release.outputs['rust--tag_name'] }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
@@ -233,6 +238,51 @@ jobs:
       - run: CGO_ENABLED=0 go build ./...
       - name: Download and build the published Go module
         run: bash tools/check-public-release.sh "$RELEASE_TAG"
+
+  rust:
+    needs: prepare
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' &&
+      (needs.prepare.outputs.rust_tag != '' || inputs.rust_tag != '')
+    runs-on: ubuntu-latest
+    environment: crates
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.rust_tag || inputs.rust_tag }}
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v6
+      - name: Verify Rust release version
+        run: |
+          uv run --no-project python - <<'PY'
+          import json, os, pathlib, re, tomllib
+          version = tomllib.loads(pathlib.Path('Cargo.toml').read_text())['package']['version']
+          manifest = json.loads(pathlib.Path('../.release-please-manifest.json').read_text())
+          assert version == manifest['rust']
+          assert os.environ['RELEASE_TAG'] == 'rust-v' + version
+          assert re.fullmatch(r'\d+\.\d+\.\d+-alpha\.\d+', version)
+          PY
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo package --locked
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - name: Publish Rust SDK
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        run: cargo publish --locked
 
   update-python-examples:
     needs: python

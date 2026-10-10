@@ -183,3 +183,14 @@ uv run --no-sync pytest tests/test_plugin_rime_realtime.py -q --unit
 `--no-sync` keeps the local SDK installation for this run. No local filesystem
 path belongs in a published dependency. Publish the Prism-enabled SDK and set the
 plugin's minimum SDK version to that release before publishing the plugin.
+## Rust
+
+Run `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`,
+`cargo test --locked`, and `cargo package --locked` from `rust/`.
+Tests use local gRPC services and the shared
+conformance cases. Keep `rust/testdata` identical to the corresponding files in
+`conformance/`. Keep the BlingFire binary identical to the Go copy.
+
+Local checks, CI, and releases use the published `rimelabs-api` dependency
+from crates.io. No sibling API checkout or Cargo override is required.
+
