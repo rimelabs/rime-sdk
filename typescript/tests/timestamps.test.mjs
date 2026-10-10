@@ -266,14 +266,19 @@ test("deadline fails audio and timestamp access", () =>
     }
   }));
 
-test("final RPC failure overrides a timestamp trailer", () =>
-  setup(async (service, client) => {
-    service.mode = "error_after_trailer";
-    service.finalResponses = [trailer(0, words)];
-    const stream = client.tts.stream("Hello.", { timestamps: true });
-    await assert.rejects(collect(stream), RimeUnavailableError);
-    await assert.rejects(stream.timestamps(), RimeUnavailableError);
-  }));
+for (const completeText of [false, true]) {
+  test(`final RPC failure overrides a timestamp trailer / completeText=${completeText}`, () =>
+    setup(async (service, client) => {
+      service.mode = "error_after_trailer";
+      service.finalResponses = [trailer(0, words)];
+      const stream = client.tts.stream("Hello.", {
+        timestamps: true,
+        completeText,
+      });
+      await assert.rejects(collect(stream), RimeUnavailableError);
+      await assert.rejects(stream.timestamps(), RimeUnavailableError);
+    }));
+}
 
 for (const audioFormat of [AudioFormat.PCM_24000, AudioFormat.MULAW_8000]) {
   test(`full-text synthesis keeps timestamp completion and audio profiles / ${audioFormat.encoding}`, () =>

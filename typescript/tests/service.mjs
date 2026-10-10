@@ -22,6 +22,9 @@ export class FakeService {
   release = () => {};
   constructor() {
     this.server = new grpc.Server();
+    this.cancelled = new Promise((resolve) => {
+      this.markCancelled = resolve;
+    });
     this.headersSent = new Promise((resolve) => {
       this.markHeadersSent = resolve;
     });
@@ -54,6 +57,8 @@ export class FakeService {
       };
     }
     handlers.synthesize = (call) => {
+      call.on("cancelled", () => this.markCancelled());
+      call.on("error", () => {});
       this.completeCalls.push(call.request);
       this.calls.push([call.request]);
       this.metadata.push(call.metadata);
@@ -61,16 +66,20 @@ export class FakeService {
         call.emit("error", this.rejection());
         return;
       }
-      call.sendMetadata(this.makeMetadata(this.responseMetadata));
+      if (this.mode === "empty_no_headers") {
+        call.end();
+        return;
+      }
+      const metadata = this.makeMetadata(this.responseMetadata);
+      if (this.mode === "wrong_format")
+        metadata.set("x-rime-audio-content-type", "audio/wav");
+      call.sendMetadata(metadata);
       this.markHeadersSent();
       const send = () => {
-        call.write(
-          create(schema.SynthesisResponseStreamSchema, {
-            payload: { case: "audio", value: this.payload },
-          }),
-        );
-        for (const response of this.finalResponses) call.write(response);
-        call.end();
+        if (this.mode !== "empty_audio") this.sendAudio(call);
+        if (this.mode === "partial_error")
+          this.release = () => call.emit("error", this.rejection());
+        else void this.finish(call);
       };
       if (this.mode === "silence") this.release = send;
       else if (this.mode === "no_audio_error")
@@ -78,6 +87,7 @@ export class FakeService {
       else send();
     };
     handlers.synthesizeStreaming = (call) => {
+      call.on("cancelled", () => this.markCancelled());
       this.calls.push([]);
       const messages = this.calls.at(-1);
       this.metadata.push(call.metadata);
@@ -107,26 +117,7 @@ export class FakeService {
           this.markHeadersSent();
         }
         if (["no_audio_error", "empty_audio"].includes(this.mode)) return;
-        const send = () => {
-          if (this.mode === "odd_chunks") {
-            call.write(
-              create(schema.SynthesisResponseStreamSchema, {
-                payload: { case: "audio", value: this.payload.subarray(0, 1) },
-              }),
-            );
-            call.write(
-              create(schema.SynthesisResponseStreamSchema, {
-                payload: { case: "audio", value: this.payload.subarray(1) },
-              }),
-            );
-          } else
-            for (let i = 0; i < (this.mode === "burst" ? 100 : 1); i++)
-              call.write(
-                create(schema.SynthesisResponseStreamSchema, {
-                  payload: { case: "audio", value: this.payload },
-                }),
-              );
-        };
+        const send = () => this.sendAudio(call);
         if (this.mode === "silence") {
           this.release = send;
           return;
@@ -141,16 +132,7 @@ export class FakeService {
               }),
             );
       });
-      call.on("end", async () => {
-        if (this.beforeFinalResponses) await this.beforeFinalResponses();
-        for (const response of this.finalResponses) call.write(response);
-        if (this.mode === "error_after_trailer") {
-          call.emit("error", this.rejection());
-          return;
-        }
-        if (!["partial_error", "silence", "no_audio_error"].includes(this.mode))
-          call.end(this.makeMetadata(this.trailingMetadata));
-      });
+      call.on("end", () => this.finish(call));
       call.on("error", () => {});
     };
     handlers.getSupportedLanguages = (call, callback) => {
@@ -208,6 +190,29 @@ export class FakeService {
   }
   close() {
     this.server.forceShutdown();
+  }
+  sendAudio(call) {
+    const chunks =
+      this.mode === "odd_chunks"
+        ? [this.payload.subarray(0, 1), this.payload.subarray(1)]
+        : Array(this.mode === "burst" ? 100 : 1).fill(this.payload);
+    for (const value of chunks)
+      call.write(
+        create(schema.SynthesisResponseStreamSchema, {
+          payload: { case: "audio", value },
+        }),
+      );
+  }
+  async finish(call) {
+    if (this.beforeFinalResponses) await this.beforeFinalResponses();
+    if (call.cancelled) return;
+    for (const response of this.finalResponses) call.write(response);
+    if (this.mode === "error_after_trailer") {
+      call.emit("error", this.rejection());
+      return;
+    }
+    if (!["partial_error", "silence", "no_audio_error"].includes(this.mode))
+      call.end(this.makeMetadata(this.trailingMetadata));
   }
   makeMetadata(values) {
     const metadata = new grpc.Metadata();

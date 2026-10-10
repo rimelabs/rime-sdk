@@ -18,6 +18,7 @@ class FakeService:
         self.trailing_metadata = ()
         self.final_responses = []
         self.headers_sent = asyncio.Event()
+        self.cancelled = asyncio.Event()
         self.calls = []
         self.complete_calls = []
         self.metadata = []
@@ -30,6 +31,13 @@ class FakeService:
         self.payload = b"\x01\x00" * 2400
 
     async def streaming(self, requests, context):
+        handler = asyncio.current_task()
+
+        def finished(context):
+            if context.cancelled() or handler.cancelling():
+                self.cancelled.set()
+
+        context.add_done_callback(finished)
         messages = []
         self.calls.append(messages)
         self.metadata.append(dict(context.invocation_metadata()))

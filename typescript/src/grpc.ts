@@ -155,9 +155,28 @@ export class BidiCall<Input, Output> extends ResponseCall<Output> {
       }
       await abortable(
         new Promise<void>((resolve, reject) => {
-          this.duplex.write(message, (error: Error | null | undefined) =>
-            error ? reject(error) : resolve(),
-          );
+          const finish = (error?: unknown) => {
+            this.duplex.removeListener("status", onStatus);
+            if (error) reject(error);
+            else resolve();
+          };
+          // A rejected native write can emit final status without invoking its
+          // callback (for example, when exceeding the send-message limit).
+          const onStatus = (status: grpc.StatusObject) =>
+            finish(
+              status.code === grpc.status.OK
+                ? new errors.RimeStreamError(
+                    "The service completed before input finished",
+                    this.id,
+                  )
+                : rpcError(status.code, this.id, status.details),
+            );
+          this.duplex.once("status", onStatus);
+          try {
+            this.duplex.write(message, finish);
+          } catch (error) {
+            finish(error);
+          }
         }),
         this.signal,
       );

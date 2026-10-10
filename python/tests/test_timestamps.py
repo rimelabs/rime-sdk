@@ -164,11 +164,12 @@ async def test_deadline_fails_audio_and_timestamp_access(mist):
         await stream.timestamps()
 
 
-async def test_final_rpc_failure_overrides_a_timestamp_trailer(mist):
+@pytest.mark.parametrize("complete_text", [False, True])
+async def test_final_rpc_failure_overrides_a_timestamp_trailer(mist, complete_text):
     service, client = mist
     service.mode = "error_after_trailer"
     service.final_responses = [trailer(spans=WORDS)]
-    stream = client.tts.stream("Hello.", timestamps=True)
+    stream = client.tts.stream("Hello.", timestamps=True, complete_text=complete_text)
     with pytest.raises(RimeUnavailableError):
         await collect(stream)
     with pytest.raises(RimeUnavailableError):

@@ -6,10 +6,12 @@ import grpc
 from google.protobuf.message_factory import GetMessageClass
 from rime_api import text_to_speech_pb2 as proto
 
-from .._errors import RimeAudioFormatError, RimeStreamError
+from .._errors import RimeAudioFormatError, RimeResourceLimitError, RimeStreamError
 from .._grpc import request_id as _request_id
 from .._grpc import rpc_error
 from ._timestamps import TimestampTrailer
+
+_MAX_SEND_BYTES = 131072
 
 
 def make_channel(policy):
@@ -19,7 +21,7 @@ def make_channel(policy):
         options=[
             ("grpc.enable_retries", 0),
             ("grpc.max_receive_message_length", policy.receive_bytes),
-            ("grpc.max_send_message_length", policy.sentence_bytes + 65536),
+            ("grpc.max_send_message_length", _MAX_SEND_BYTES),
         ],
     )
 
@@ -115,6 +117,12 @@ class SynthesisCall:
 
     async def _write(self, message):
         assert self._call is not None
+        # grpc.aio can report an oversized streaming write as INTERNAL instead
+        # of RESOURCE_EXHAUSTED. Keep the same limit and classify it locally.
+        if message.ByteSize() > _MAX_SEND_BYTES:
+            raise RimeResourceLimitError(
+                "Synthesis request exceeds the supported byte limit", request_id=self.request_id
+            )
         try:
             await self._call.write(message)
         except grpc.aio.AioRpcError as error:
