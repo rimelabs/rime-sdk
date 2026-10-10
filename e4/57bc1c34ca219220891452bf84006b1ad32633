@@ -1,0 +1,22 @@
+rust/Cargo.toml
+  s_c318ad644fb4fe::t_c6af3b887fbb8c 22
+  s_c318ad644fb4fe::t_3d463cef012690 21
+rust/Cargo.lock
+  s_c318ad644fb4fe::t_4f1b1512543c01 1621,1623,1634,1636,1643,1645,1652,1654,1661,1663,1672,1674
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e457bc1c34ca219220891452bf84006b1ad32633",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
