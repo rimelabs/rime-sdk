@@ -1,0 +1,209 @@
+README.md
+  s_c318ad644fb4fe::t_1c0b9166401533 7-11,24,28-29,35-37,60
+.github/workflows/checks.yml
+  s_c318ad644fb4fe::t_1c0b9166401533 43,124
+CONTRIBUTING.md
+  s_c318ad644fb4fe::t_1c0b9166401533 8,16,19,31-55,64-76,130-144,153,157-160,186,188-190,194-195
+examples/README.md
+  s_c318ad644fb4fe::t_1c0b9166401533 9,20-26,143-144,149-169
+RELEASING.md
+  s_c318ad644fb4fe::t_1c0b9166401533 245,253-254,257
+.release-please-manifest.json
+  s_c318ad644fb4fe::t_1c0b9166401533 3-5
+conformance/prism/README.md
+  s_c318ad644fb4fe::t_57b6a774f90735 32-34
+conformance/stt/README.md
+  s_c318ad644fb4fe::t_fec97f07207bd7 1-65
+conformance/stt/transcripts.json
+  s_c318ad644fb4fe::t_9b32014d7e64c6 1-563
+examples/TERMINAL_VOICE.md
+  s_c318ad644fb4fe::t_af2412da92147f 1-157
+examples/python/stt/stream.py
+  s_c318ad644fb4fe::t_30067d1a6bcbdd 1-36
+examples/python/stt/voice.py
+  s_c318ad644fb4fe::t_45badd5b1c8b82 1-203
+examples/typescript/package.json
+  s_c318ad644fb4fe::t_19af90c9bb4bf3 15-17
+examples/typescript/stt/stream.mjs
+  s_c318ad644fb4fe::t_71e133d9a30f35 1-47
+examples/typescript/stt/voice.mjs
+  s_c318ad644fb4fe::t_be9673a7aa8a15 1-282
+go/CHANGELOG.md
+  s_c318ad644fb4fe::t_69b6eeb8b5f1d0 3-14
+go/README.md
+  s_c318ad644fb4fe::t_5cba72e865a1ba 5-6,65-187,195-196,209,230-231,233,259,263-266,287,289
+go/client.go
+  s_c318ad644fb4fe::t_d1703b47e13144 1,24-28,47,54-57,116-123,126-127,134-173,207-214,220-228,230,236,238,253,256,267,270,272-275,277
+go/client_test.go
+  s_c318ad644fb4fe::t_c29a743ae97276 94-98,102,109
+go/examples/transcribe/main.go
+  s_c318ad644fb4fe::t_9e24f444b2a104 1-93
+go/examples/voice/main.go
+  s_c318ad644fb4fe::t_b2fd67d16d3efd 1-357
+go/examples/voice/main_test.go
+  s_c318ad644fb4fe::t_ecf1c2d624eb85 1-184
+go/pcm.go
+  s_c318ad644fb4fe::t_664bbdea1dee37 1-78
+go/pcm_test.go
+  s_c318ad644fb4fe::t_6d2f0ee09bcf18 1-137
+go/testdata/pcm-input.json
+  s_c318ad644fb4fe::t_1eee1e4f180005 1-53
+go/testdata/stt/transcripts.json
+  s_c318ad644fb4fe::t_edbc246114b27c 1-563
+go/transcript_protocol.go
+  s_c318ad644fb4fe::t_5e386045dd36d1 1-74
+go/transcript_protocol_test.go
+  s_c318ad644fb4fe::t_6e57ef70b2cd9f 1-77
+go/transcript_queue.go
+  s_c318ad644fb4fe::t_61b536d8a3571a 1-88
+go/transcript_queue_test.go
+  s_c318ad644fb4fe::t_05512047919e27 1-97
+go/transcription.go
+  s_c318ad644fb4fe::t_bce0f133976f7d 1-117
+go/transcription_stream.go
+  s_c318ad644fb4fe::t_d8e7552d62e418 1-274
+go/transcription_test.go
+  s_c318ad644fb4fe::t_cfc24ff0a6d8d9 1-679
+go/version.txt
+  s_c318ad644fb4fe::t_18b33dc12ab661 1
+python/CHANGELOG.md
+  s_c318ad644fb4fe::t_aa35ffc5d10e48 3-9
+python/README.md
+  s_c318ad644fb4fe::t_536765f57886c5 3-5,60-79
+python/docs/stt.md
+  s_c318ad644fb4fe::t_37a52f1d26dfd9 1-105
+python/pyproject.toml
+  s_c318ad644fb4fe::t_eb43dbf3705db9 3
+python/src/rimelabs_sdk/__init__.py
+  s_c318ad644fb4fe::t_996466dc8e897a 14,21,33-37,39-46
+python/src/rimelabs_sdk/_auth.py
+  s_c318ad644fb4fe::t_c5bef56fa08c8d 102-107,112,119
+python/src/rimelabs_sdk/_client.py
+  s_c318ad644fb4fe::t_3f1f8c102e4768 1,12,17,26,38,57,59-62
+python/src/rimelabs_sdk/_grpc.py
+  s_c318ad644fb4fe::t_4bc59ce5c98b17 1-35
+python/src/rimelabs_sdk/_pcm.py
+  s_c318ad644fb4fe::t_f094d0ae76ed89 1-56
+python/src/rimelabs_sdk/_validation.py
+  s_c318ad644fb4fe::t_9c8efaadd99bdb 1-45
+python/src/rimelabs_sdk/realtime/_session.py
+  s_c318ad644fb4fe::t_ed6525b9e841bd 31,93,471,473-478,495,619
+python/src/rimelabs_sdk/realtime/_types.py
+  s_c318ad644fb4fe::t_3a9dea6d37ed27 10
+python/src/rimelabs_sdk/stt/__init__.py
+  s_c318ad644fb4fe::t_ba27e25520e7f2 1-12
+python/src/rimelabs_sdk/stt/_audio.py
+  s_c318ad644fb4fe::t_46c9cbce447310 1-47
+python/src/rimelabs_sdk/stt/_client.py
+  s_c318ad644fb4fe::t_12fad7efcb903e 1-95
+python/src/rimelabs_sdk/stt/_policy.py
+  s_c318ad644fb4fe::t_5c00f2645c538c 1-26
+python/src/rimelabs_sdk/stt/_protocol.py
+  s_c318ad644fb4fe::t_60bd3e4e4eeb96 1-56
+python/src/rimelabs_sdk/stt/_queue.py
+  s_c318ad644fb4fe::t_b53c27fc9c89c4 1-44
+python/src/rimelabs_sdk/stt/_stream.py
+  s_c318ad644fb4fe::t_9279a63880104c 1-239
+python/src/rimelabs_sdk/stt/_transport.py
+  s_c318ad644fb4fe::t_091eeaa9eb127a 1-111
+python/src/rimelabs_sdk/stt/_types.py
+  s_c318ad644fb4fe::t_b45cb59cf33d4e 1-39
+python/src/rimelabs_sdk/tts/_policy.py
+  s_c318ad644fb4fe::t_98d9070e42cd49 6-8,47-48
+python/src/rimelabs_sdk/tts/_transport.py
+  s_c318ad644fb4fe::t_e0ea44ea621699 9-11
+python/tests/stt_service.py
+  s_c318ad644fb4fe::t_9937d69a6e5546 1-132
+python/tests/test_realtime.py
+  s_c318ad644fb4fe::t_a47d555f8cc6fe 234,238,1284-1310
+python/tests/test_sdk.py
+  s_c318ad644fb4fe::t_f68b2a845d6483 142-151
+python/tests/test_stt.py
+  s_c318ad644fb4fe::t_dbfe7f1be27f2d 1-584
+python/tests/test_stt_audio.py
+  s_c318ad644fb4fe::t_2358c0c2ce2642 1-151
+python/tests/test_terminal_voice.py
+  s_c318ad644fb4fe::t_4d6fb77195301b 1-254
+python/uv.lock
+  s_c318ad644fb4fe::t_49e70eff00a560 706
+typescript/CHANGELOG.md
+  s_c318ad644fb4fe::t_3222b46c6cafc7 3-9
+typescript/README.md
+  s_c318ad644fb4fe::t_1bee76f45c62c4 3-5,68-95
+typescript/docs/stt.md
+  s_c318ad644fb4fe::t_ec42bab8fe8ce7 1-103
+typescript/package-lock.json
+  s_c318ad644fb4fe::t_3f43d06d9497d9 3,9
+typescript/package.json
+  s_c318ad644fb4fe::t_d01a6f4b7252d3 3-4,32
+typescript/src/auth.ts
+  s_c318ad644fb4fe::t_c2705810cc04c4 107,112-114,121
+typescript/src/cancellation.ts
+  s_c318ad644fb4fe::t_6d84b775bd67bd 24-60
+typescript/src/client.ts
+  s_c318ad644fb4fe::t_0274cdc6701945 1-3,30-31,37-43,68-73,98-108
+typescript/src/grpc.ts
+  s_c318ad644fb4fe::t_542785e1d0b503 1-190
+typescript/src/index.ts
+  s_c318ad644fb4fe::t_e13386315a5ebf 13-22
+typescript/src/pcm.ts
+  s_c318ad644fb4fe::t_5391b1add1fc32 1-78
+typescript/src/realtime/async.ts
+  s_c318ad644fb4fe::t_1a1002bbf15b8e 1
+typescript/src/realtime/audio.ts
+  s_c318ad644fb4fe::t_08ad2dc091c8f6 2,6
+typescript/src/realtime/session.ts
+  s_c318ad644fb4fe::t_4b1c4334061a9a 15-16
+typescript/src/realtime/types.ts
+  s_c318ad644fb4fe::t_a6860c4dbd4740 1-2
+typescript/src/stt/audio.ts
+  s_c318ad644fb4fe::t_ca583cd327521d 1-54
+typescript/src/stt/client.ts
+  s_c318ad644fb4fe::t_a4724f92532caa 1-81
+typescript/src/stt/policy.ts
+  s_c318ad644fb4fe::t_e8bd6c2b597cf7 1-11
+typescript/src/stt/protocol.ts
+  s_c318ad644fb4fe::t_e4aa8c124f38fa 1-84
+typescript/src/stt/queue.ts
+  s_c318ad644fb4fe::t_6c657129ccc3f0 1-40
+typescript/src/stt/stream.ts
+  s_c318ad644fb4fe::t_99b3b691225fec 1-261
+typescript/src/stt/transport.ts
+  s_c318ad644fb4fe::t_aee61891473794 1-72
+typescript/src/stt/types.ts
+  s_c318ad644fb4fe::t_1ee982ecd983a9 1-39
+typescript/src/tts/policy.ts
+  s_c318ad644fb4fe::t_c37d7af0a6ec6b 1-2,36,38
+typescript/src/tts/transport.ts
+  s_c318ad644fb4fe::t_fcd50ad94a8ff3 1-11,36-37,139-147,149-150,152-153,155-156,158-159,161-162,164-165,167,171,175-180,182
+typescript/src/validation.ts
+  s_c318ad644fb4fe::t_b37e2b75bb60eb 1-42
+typescript/tests/fixtures/stt.ts
+  s_c318ad644fb4fe::t_f0f71e9bfe6fbe 1-42
+typescript/tests/realtime.test.mjs
+  s_c318ad644fb4fe::t_a0a2b90832d020 801
+typescript/tests/stt-audio.test.mjs
+  s_c318ad644fb4fe::t_a47a3326dfc822 1-194
+typescript/tests/stt-service.mjs
+  s_c318ad644fb4fe::t_89811be68acb44 1-134
+typescript/tests/stt.test.mjs
+  s_c318ad644fb4fe::t_7a0f4841deb127 1-646
+typescript/tests/terminal-voice.test.mjs
+  s_c318ad644fb4fe::t_a5a5f452781a17 1-349
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "187a586c3bf33a39bde584650abf94fdc8678ecf",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
