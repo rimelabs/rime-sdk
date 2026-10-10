@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.4](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.3...rust-v0.1.0-alpha.4) (2026-10-10)
+
+
+### Features
+
+* **rust:** add streaming speech recognition ([#58](https://github.com/rimelabs/rime-sdk/issues/58)) ([cccc66c](https://github.com/rimelabs/rime-sdk/commit/cccc66cd4555405b816275ccd8b0768f45bc1780))
+
 ## [0.1.0-alpha.3](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.2...rust-v0.1.0-alpha.3) (2026-10-10)
 
 
