@@ -1,6 +1,6 @@
 [project]
 name = "rimelabs-sdk"
-version = "0.1.0-alpha.11"
+version = "0.1.0a11"
 description = "Async Rime speech SDK"
 readme = "README.md"
 license = "MIT AND Apache-2.0"
