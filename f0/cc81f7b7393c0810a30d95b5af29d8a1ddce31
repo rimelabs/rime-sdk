@@ -1,0 +1,19 @@
+.github/workflows/checks.yml
+  s_c318ad644fb4fe::t_cb58b4778eeae7 136,158-160
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0cc81f7b7393c0810a30d95b5af29d8a1ddce31",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
