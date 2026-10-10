@@ -1,3 +1,5 @@
+import type { PCMFormat } from "../pcm.js";
+export type { PCMFormat } from "../pcm.js";
 import { RimeError, RimeTimeoutError } from "../errors.js";
 
 export type JsonValue =
@@ -32,12 +34,6 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
 export interface ReplyOptions extends RealtimeOperationOptions {
   readonly instruction?: string | null;
   readonly toolCall?: ToolCallRef | null;
-}
-/** Omitted fields mean 16 kHz, mono, signed little-endian PCM16. */
-export interface PCMFormat {
-  readonly sampleRate?: 8000 | 16000 | 24000 | 48000;
-  readonly channels?: 1 | 2;
-  readonly encoding?: "pcm_s16le";
 }
 export interface AudioChunk {
   readonly data: Uint8Array;

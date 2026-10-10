@@ -28,6 +28,7 @@ from .._errors import (
     RimeStreamError,
     RimeTimeoutError,
 )
+from .._pcm import InputConverter
 from . import _protocol as p
 from . import _types as t
 
@@ -89,8 +90,7 @@ class RealtimeSession:
         self._responses: OrderedDict[str, _Response] = OrderedDict()
         self._latest: str | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
-        self._audio_format: t.PCMFormat | None = None
-        self._resample_state: Any = None
+        self._input_converter: InputConverter | None = None
         self._reader = asyncio.create_task(self._read(), name="rime:realtime-reader")
         self._close_task: asyncio.Task[None] | None = None
 
@@ -464,24 +464,18 @@ class RealtimeSession:
         Format changes reset the resampler. Cancellation after submission starts
         closes the session because some of the chunk may already be buffered.
         """
-        import audioop
-
         async with self._audio_lock:
             self._check()
             if len(chunk.data) > 192000:
                 raise RimeAudioFormatError("Send audio in chunks of at most 192000 bytes")
-            previous_format, previous_state = self._audio_format, self._resample_state
+            previous = self._input_converter
             submitted = asyncio.Event()
-            if chunk.format != self._audio_format:
-                self._resample_state = None
-                self._audio_format = chunk.format
-            data = chunk.data
-            if chunk.format.channels == 2:
-                data = audioop.tomono(data, 2, 0.5, 0.5)
-            if chunk.format.sample_rate != 16000:
-                data, self._resample_state = audioop.ratecv(
-                    data, 2, 1, chunk.format.sample_rate, 16000, self._resample_state
-                )
+            self._input_converter = (
+                previous.clone()
+                if previous is not None and previous.format == chunk.format
+                else InputConverter(chunk.format)
+            )
+            data = self._input_converter.process(chunk.data)
             # 40 ms per wire append; no unbounded queue of encoded microphone data.
             try:
                 for offset in range(0, len(data), 1280):
@@ -498,7 +492,7 @@ class RealtimeSession:
                         RimeStreamError("Realtime audio submission cancelled; outcome unknown")
                     )
                 else:
-                    self._audio_format, self._resample_state = previous_format, previous_state
+                    self._input_converter = previous
                 raise
 
     async def report_playback(self, report: t.PlaybackReport) -> None:
@@ -622,7 +616,7 @@ class RealtimeSession:
         if isinstance(payload, p.AudioCleared):
             for key, pending in self._pending.items():
                 if pending.request.kind == "input_audio_buffer.clear":
-                    self._resample_state = None
+                    self._input_converter = None
                     self._settle(key, payload)
                     break
             return

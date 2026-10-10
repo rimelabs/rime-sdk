@@ -4,6 +4,11 @@ First-party Python, Node.js, Go, and Rust SDKs for Coda and Mist v3 streaming sp
 All four accept complete text or an incremental text source and return audio chunks.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
+Python, Node.js, and Go support streaming speech recognition: `client.stt.stream` in
+Python/Node.js and `client.STT.Stream` in Go. Supply a spoken language and a
+streaming audio source; updates replace the current
+transcript and source exhaustion ends the utterance.
+
 Python and Node.js support Prism speech-to-speech sessions through
 `client.realtime.connect`. Prism requires an explicit realtime endpoint.
 
@@ -16,16 +21,19 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
-| `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS only |
+| `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS and STT |
 | `rimelabs-sdk` on crates.io | [rust](rust/) | Rust 1.88+ and Tokio; TTS only |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
-[Python TTS](python/docs/tts.md), [Python Realtime](python/docs/realtime.md),
-[Node.js TTS](typescript/docs/tts.md), and [Node.js Realtime](typescript/docs/realtime.md).
+[Python TTS](python/docs/tts.md), [Python STT](python/docs/stt.md), [Python Realtime](python/docs/realtime.md),
+[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), and [Go STT](go/README.md#transcribe-speech).
 Runnable scripts are in the
 [example index](examples/README.md).
 
 ## Local setup
+
+All three SDKs use versioned API packages with STT definitions. The commands
+below install those dependencies; no local schema build is required.
 
 ```sh
 cd python
@@ -49,7 +57,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package checks and build com
 - Each language owns its dependencies, tests, version, changelog, and release job.
 - [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
 - Canonical schemas remain in `rimelabs/rime`. The public `rime-api` repository
-  generates and releases the Python, TypeScript, and Go protocol packages.
+  generates and releases the Python, TypeScript, Go, and Rust protocol packages.
 - Each SDK consumes a versioned API package. Dependabot checks for API releases
   daily and opens dependency PRs. CI and review precede each SDK release.
 - Go includes BlingFire WASM and requires no C toolchain. See [Go setup](go/README.md).

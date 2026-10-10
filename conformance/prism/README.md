@@ -29,9 +29,9 @@ The implementations cover Python 3.11 and later and Node.js 22 and later.
 TypeScript uses camelCase fields, plain data objects, and `AbortSignal` for
 cancellation. Its tests use a local WebSocket server and the same pinned schema.
 
-Audio conversion vectors in `audio.json` were generated with Python's
-`audioop.tomono` and `audioop.ratecv`. Node tests compare all supported input
-formats against these samples, both in one chunk and across chunk boundaries.
+Audio conversion vectors in `../pcm-input.json` were generated with Python's
+`audioop.tomono` and `audioop.ratecv`. Python and Node tests compare Prism and STT
+input preparation against these samples, in one chunk and across chunk boundaries.
 
 Shared incoming-message cases in `protocol.json` exercise both decoders. They
 check the fields the SDK uses, while preserving unknown events, extra fields,

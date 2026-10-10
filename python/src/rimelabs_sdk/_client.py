@@ -1,4 +1,4 @@
-"""Shared credentials and lifetime for TTS and realtime conversations."""
+"""Shared credentials and lifetime for synthesis, recognition, and realtime conversations."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ from typing import Self
 from ._auth import Credentials
 from ._errors import RimeAuthenticationError, RimeInputError
 from .realtime import Realtime
+from .stt._client import STT
 from .tts._client import _TTS, _Languages, _Voices
 
 
 class Rime:
-    """Async TTS, voice discovery, and Prism realtime conversations."""
+    """Async TTS, streaming recognition, voice discovery, and realtime conversations."""
 
     def __init__(
         self,
@@ -22,6 +23,7 @@ class Rime:
         model: str = "coda",
         endpoint: str | None = None,
         timeout: float | None = None,
+        stt_endpoint: str | None = None,
     ):
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():
@@ -33,6 +35,7 @@ class Rime:
         self.tts = _TTS(self, model=model, endpoint=endpoint, timeout=timeout)
         self._credentials = Credentials(key, self.tts._policy)
         self.realtime = Realtime(self)
+        self.stt = STT(self, stt_endpoint)
         self.voices = _Voices(self.tts)
         self.languages = _Languages(self.tts)
 
@@ -51,9 +54,12 @@ class Rime:
             await self.realtime._close()
         finally:
             try:
-                await self.tts._close()
+                await self.stt._close()
             finally:
-                await self._credentials.close()
+                try:
+                    await self.tts._close()
+                finally:
+                    await self._credentials.close()
 
     async def close(self) -> None:
         self._check_loop()

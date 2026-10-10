@@ -10,3 +10,13 @@ export { AudioFormat } from "./tts/audio.js";
 export * from "./errors.js";
 export { RealtimeSession } from "./realtime/session.js";
 export * from "./realtime/types.js";
+
+export { TranscriptStream } from "./stt/stream.js";
+export type {
+  AudioSource,
+  TranscriptionOptions,
+  TranscriptionMode,
+  TranscriptionPartial,
+  TranscriptionFinal,
+  TranscriptionUpdate,
+} from "./stt/types.js";

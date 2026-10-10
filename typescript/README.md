@@ -1,7 +1,8 @@
 # Rime SDK for Node.js
 
-Generate speech with TTS, or send speech to Prism and receive a spoken reply.
-Both APIs use the `Rime` client. Your application handles audio capture and playback.
+Generate speech with TTS, transcribe audio with STT, or send speech to Prism
+and receive a spoken reply. All use the `Rime` client. Your application handles
+audio capture and playback.
 
 ## Install
 
@@ -63,6 +64,34 @@ Coda is the default model. Use `new Rime({ model: "mistv3" })` for Mist v3, or p
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
 To supply text from an LLM, pass an async iterable of strings instead of a string.
 The SDK handles sentence boundaries.
+
+## STT quick start
+
+Stream one utterance of headerless signed PCM16 little-endian audio. Specify the
+spoken language; exhaust the audio source when the utterance ends. Each update
+replaces the complete current transcript.
+
+```javascript
+import { createReadStream } from "node:fs";
+import { Rime } from "@rimelabs/sdk";
+
+async function* audioChunks() {
+  yield* createReadStream("utterance.pcm");
+}
+
+const client = new Rime();
+try {
+  const transcript = client.stt.stream(audioChunks(), {
+    language: "en",
+  });
+  for await (const update of transcript) console.log(update.kind, update.text);
+} finally {
+  await client.close();
+}
+```
+
+Input defaults to 16 kHz mono. The [STT guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/stt.md)
+covers other PCM formats, written/verbatim output, recognition hints and cancellation.
 
 ## Prism: send recorded speech
 
