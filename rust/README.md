@@ -1,22 +1,35 @@
 # Rime SDK for Rust
 
 Asynchronous text-to-speech for Coda and Mist v3. Requires Rust 1.88 or later
-and a Tokio runtime. Realtime Prism support is not included.
+and a Tokio runtime with I/O and time enabled. Realtime Prism support is not
+included.
+
+Add these dependencies to your `Cargo.toml`:
+
+```toml
+[dependencies]
+rimelabs-sdk = "0.1.0-alpha.1"
+futures-util = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
+```
+
+Set `RIME_API_KEY`, then use this example in `src/main.rs`:
 
 ```rust,no_run
 use futures_util::StreamExt;
 use rimelabs_sdk::{Client, SynthesisOptions};
 
-# async fn example() -> Result<(), Box<dyn std::error::Error>> {
-let client = Client::builder().build()?; // Reads RIME_API_KEY.
-let mut audio = client.synthesize("Hello.", SynthesisOptions::default())?;
-while let Some(chunk) = audio.next().await {
-    let pcm_bytes = chunk?;
-    // Send raw PCM16 little-endian mono 24 kHz bytes to your audio sink.
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::builder().build()?; // Reads RIME_API_KEY.
+    let mut audio = client.synthesize("Hello.", SynthesisOptions::default())?;
+    while let Some(chunk) = audio.next().await {
+        let pcm_bytes = chunk?;
+        // Send raw PCM16 little-endian mono 24 kHz bytes to your audio sink.
+    }
+    client.close().await;
+    Ok(())
 }
-client.close().await;
-# Ok(())
-# }
 ```
 
 The SDK does not read `.env` files. Explicit credentials use `.api_key(...)`.

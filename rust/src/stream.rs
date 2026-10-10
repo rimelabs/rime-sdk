@@ -175,12 +175,15 @@ where
     let operation_id = request_id.clone();
     let format = options.format;
     let progress = Arc::new(Mutex::new(Progress::new()));
-    let tracker = client.tasks.clone();
+    // Construct the timer before spawning so disabled runtime time support
+    // cannot panic in a worker after an AudioStream has been returned.
+    let interval = tokio::time::interval(Duration::from_millis(20));
+    let tracker = client.clone();
     let deadline = timeout.map(|timeout| Instant::now() + timeout);
     let worker = tracker.spawn(async move {
         let blocking_tasks = TaskTracker::new();
         let run = std::panic::AssertUnwindSafe(run(client.clone(), source, sender.clone(), progress.clone(), operation_id.clone(), format, voice, language, blocking_tasks.clone())).catch_unwind();
-        let monitor = monitor(client, progress, sender);
+        let monitor = monitor(client, progress, sender, interval);
         let timeout = async {
             match deadline { Some(deadline) => tokio::time::sleep_until(deadline).await, None => std::future::pending().await }
         };
@@ -198,7 +201,7 @@ where
         status_sender.send_replace(Some(result));
         blocking_tasks.close();
         blocking_tasks.wait().await;
-    });
+    })?;
     Ok(AudioStream {
         receiver,
         status: WatchStream::new(status_receiver),
@@ -215,8 +218,8 @@ async fn monitor(
     client: Arc<Inner>,
     progress: Arc<Mutex<Progress>>,
     sender: mpsc::Sender<Bytes>,
+    mut interval: tokio::time::Interval,
 ) -> Error {
-    let mut interval = tokio::time::interval(Duration::from_millis(20));
     loop {
         interval.tick().await;
         let mut state = progress.lock().expect("progress mutex poisoned");

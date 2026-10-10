@@ -452,48 +452,34 @@ async fn source_error_and_blank_input_stop_the_stream() {
 async fn grpc_errors_match_shared_contract() {
     let fixture: serde_json::Value =
         serde_json::from_str(include_str!("../testdata/contract.json")).unwrap();
-    for (name, code, kind) in [
-        (
-            "UNAUTHENTICATED",
-            tonic::Code::Unauthenticated,
-            ErrorKind::Authentication,
-        ),
-        (
-            "PERMISSION_DENIED",
-            tonic::Code::PermissionDenied,
-            ErrorKind::Permission,
-        ),
-        (
-            "INVALID_ARGUMENT",
-            tonic::Code::InvalidArgument,
-            ErrorKind::Input,
-        ),
-        (
-            "RESOURCE_EXHAUSTED",
-            tonic::Code::ResourceExhausted,
-            ErrorKind::ResourceLimit,
-        ),
-        (
-            "UNAVAILABLE",
-            tonic::Code::Unavailable,
-            ErrorKind::Unavailable,
-        ),
-        (
-            "DEADLINE_EXCEEDED",
-            tonic::Code::DeadlineExceeded,
-            ErrorKind::Timeout,
-        ),
-        ("CANCELLED", tonic::Code::Cancelled, ErrorKind::Cancelled),
-        ("INTERNAL", tonic::Code::Internal, ErrorKind::Stream),
+    for (name, code) in [
+        ("UNAUTHENTICATED", tonic::Code::Unauthenticated),
+        ("PERMISSION_DENIED", tonic::Code::PermissionDenied),
+        ("INVALID_ARGUMENT", tonic::Code::InvalidArgument),
+        ("RESOURCE_EXHAUSTED", tonic::Code::ResourceExhausted),
+        ("UNAVAILABLE", tonic::Code::Unavailable),
+        ("DEADLINE_EXCEEDED", tonic::Code::DeadlineExceeded),
+        ("CANCELLED", tonic::Code::Cancelled),
+        ("INTERNAL", tonic::Code::Internal),
     ] {
-        assert!(fixture["grpc_errors"][name].is_string());
+        let kind = match fixture["grpc_errors"][name].as_str() {
+            Some("RimeAuthenticationError") => ErrorKind::Authentication,
+            Some("RimePermissionError") => ErrorKind::Permission,
+            Some("RimeInputError") => ErrorKind::Input,
+            Some("RimeResourceLimitError") => ErrorKind::ResourceLimit,
+            Some("RimeUnavailableError") => ErrorKind::Unavailable,
+            Some("RimeTimeoutError") => ErrorKind::Timeout,
+            Some("RimeCancelledError") => ErrorKind::Cancelled,
+            Some("RimeStreamError") => ErrorKind::Stream,
+            value => panic!("unsupported shared error class for {name}: {value:?}"),
+        };
         let harness = Harness::new(Mode::Reject(code)).await;
         let mut audio = harness
             .client
             .synthesize("Hello.", SynthesisOptions::default())
             .unwrap();
         let error = next(&mut audio).await.unwrap().unwrap_err();
-        assert_eq!(error.kind(), kind);
+        assert_eq!(error.kind(), kind, "shared error class for {name}");
         assert_eq!(error.request_id(), Some("rejected-request"));
         assert_eq!(harness.service.calls.load(Ordering::SeqCst), 1);
     }

@@ -4,7 +4,12 @@ use rimelabs_api::{
     text_to_speech_client::TextToSpeechClient, GetSupportedLanguagesRequest,
     GetSupportedSpeakersRequest,
 };
-use std::{fmt, sync::Arc, time::Duration};
+use std::{
+    fmt,
+    future::Future,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::sync::OnceCell;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tonic::{
@@ -112,7 +117,8 @@ impl ClientBuilder {
         self.timeout = Some(timeout);
         self
     }
-    /// Validate configuration and create a client. Use operations inside Tokio.
+    /// Validate configuration and create a client.
+    /// Use operations inside a Tokio runtime with I/O and time enabled.
     pub fn build(self) -> Result<Client, Error> {
         validate_timeout(self.timeout)?;
         let key = self
@@ -151,6 +157,7 @@ impl ClientBuilder {
                 channel: OnceCell::new(),
                 cancellation,
                 tasks: TaskTracker::new(),
+                admission: Mutex::new(()),
                 first_audio_timeout: Duration::from_secs(30),
                 progress_timeout: Duration::from_secs(60),
             }),
@@ -207,6 +214,12 @@ pub(crate) fn validate_timeout(timeout: Option<Duration>) -> Result<(), Error> {
     Ok(())
 }
 
+fn require_runtime() -> Result<(), Error> {
+    tokio::runtime::Handle::try_current()
+        .map(|_| ())
+        .map_err(|_| Error::new(ErrorKind::Input, "operations require a Tokio runtime"))
+}
+
 struct ClientLifetime(CancellationToken);
 impl Drop for ClientLifetime {
     fn drop(&mut self) {
@@ -239,7 +252,8 @@ pub(crate) struct Inner {
     pub(crate) timeout: Option<Duration>,
     channel: OnceCell<Channel>,
     pub(crate) cancellation: CancellationToken,
-    pub(crate) tasks: TaskTracker,
+    tasks: TaskTracker,
+    admission: Mutex<()>,
     pub(crate) first_audio_timeout: Duration,
     pub(crate) progress_timeout: Duration,
 }
@@ -250,6 +264,24 @@ enum DiscoveryRequest {
 }
 
 impl Inner {
+    pub(crate) fn spawn<F>(&self, future: F) -> Result<tokio::task::JoinHandle<F::Output>, Error>
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        let _admission = self.admission.lock().expect("admission mutex poisoned");
+        if self.cancellation.is_cancelled() {
+            return Err(Error::new(ErrorKind::Cancelled, "client is closed"));
+        }
+        Ok(self.tasks.spawn(future))
+    }
+
+    fn close(&self) {
+        let _admission = self.admission.lock().expect("admission mutex poisoned");
+        self.cancellation.cancel();
+        self.tasks.close();
+    }
+
     pub(crate) async fn stub(&self) -> Result<TextToSpeechClient<Channel>, Error> {
         let channel = self
             .channel
@@ -283,6 +315,9 @@ impl Client {
     }
 
     /// Start synthesis of complete text. Returns immediately; consume errors from the stream.
+    ///
+    /// # Panics
+    /// Panics if the current Tokio runtime does not have time enabled.
     pub fn synthesize(
         &self,
         text: impl Into<String>,
@@ -297,6 +332,9 @@ impl Client {
 
     /// Start synthesis from incremental text. The source must yield without blocking Tokio.
     /// Dropping the audio stream cancels the source and the RPC.
+    ///
+    /// # Panics
+    /// Panics if the current Tokio runtime does not have time enabled.
     pub fn synthesize_stream<S>(
         &self,
         source: S,
@@ -306,16 +344,14 @@ impl Client {
         S: Stream<Item = Result<String, Error>> + Send + 'static,
     {
         self.ensure_open()?;
-        if tokio::runtime::Handle::try_current().is_err() {
-            return Err(Error::new(
-                ErrorKind::Input,
-                "synthesis requires a Tokio runtime",
-            ));
-        }
+        require_runtime()?;
         crate::stream::start(self.inner.clone(), source, options)
     }
 
     /// List voices, optionally for one language. Uses a maximum ten-second budget.
+    ///
+    /// # Panics
+    /// Panics if the current Tokio runtime does not have time enabled.
     pub async fn voices(&self, language: Option<&str>) -> Result<Vec<String>, Error> {
         if language.is_some_and(|value| value.trim().is_empty()) {
             return Err(Error::new(ErrorKind::Input, "language must not be blank"));
@@ -327,12 +363,16 @@ impl Client {
     }
 
     /// List supported languages. Uses a maximum ten-second budget.
+    ///
+    /// # Panics
+    /// Panics if the current Tokio runtime does not have time enabled.
     pub async fn languages(&self) -> Result<Vec<String>, Error> {
         self.discover(DiscoveryRequest::Languages).await
     }
 
     async fn discover(&self, request: DiscoveryRequest) -> Result<Vec<String>, Error> {
         self.ensure_open()?;
+        require_runtime()?;
         let budget = self
             .inner
             .timeout
@@ -381,8 +421,116 @@ impl Client {
 
     /// Cancel all operations on this client and its clones, then wait for stream workers.
     pub async fn close(&self) {
-        self.inner.cancellation.cancel();
-        self.inner.tasks.close();
+        self.inner.close();
         self.inner.tasks.wait().await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures_util::FutureExt;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct Dropped(Arc<AtomicBool>);
+
+    impl Drop for Dropped {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn client() -> Client {
+        Client::builder().api_key("test-key").build().unwrap()
+    }
+
+    #[tokio::test]
+    async fn close_rejects_worker_after_an_earlier_open_check() {
+        let client = client();
+        // Force the overlap: admission was checked before close drained the tracker,
+        // but stream construction has not yet registered its worker.
+        client.ensure_open().unwrap();
+        client.close().await;
+        let dropped = Arc::new(AtomicBool::new(false));
+        let guard = Dropped(dropped.clone());
+        let source = futures_util::stream::once(async move {
+            let _guard = guard;
+            std::future::pending::<Result<String, Error>>().await
+        });
+        let error = crate::stream::start(client.inner.clone(), source, SynthesisOptions::default())
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Cancelled);
+        assert!(client.inner.tasks.is_empty());
+        assert!(
+            dropped.load(Ordering::SeqCst),
+            "source must be dropped before return"
+        );
+    }
+
+    #[test]
+    fn operations_without_a_runtime_return_input_errors() {
+        let client = client();
+        assert_eq!(
+            client
+                .synthesize("Hello.", SynthesisOptions::default())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::Input
+        );
+        assert_eq!(
+            client
+                .synthesize_stream(futures_util::stream::empty(), SynthesisOptions::default())
+                .unwrap_err()
+                .kind(),
+            ErrorKind::Input
+        );
+        assert_eq!(
+            client
+                .languages()
+                .now_or_never()
+                .unwrap()
+                .unwrap_err()
+                .kind(),
+            ErrorKind::Input
+        );
+        assert_eq!(
+            client
+                .voices(None)
+                .now_or_never()
+                .unwrap()
+                .unwrap_err()
+                .kind(),
+            ErrorKind::Input
+        );
+    }
+
+    #[test]
+    fn disabled_time_panics_before_starting_work() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_io()
+            .build()
+            .unwrap();
+        let client = client();
+        runtime.block_on(async {
+            assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                client.synthesize("Hello.", SynthesisOptions::default())
+            }))
+            .is_err());
+            assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                client.synthesize_stream(futures_util::stream::empty(), SynthesisOptions::default())
+            }))
+            .is_err());
+            assert!(std::panic::AssertUnwindSafe(client.languages())
+                .catch_unwind()
+                .await
+                .is_err());
+            assert!(std::panic::AssertUnwindSafe(client.voices(None))
+                .catch_unwind()
+                .await
+                .is_err());
+            assert!(client.inner.tasks.is_empty());
+            assert!(!client.inner.channel.initialized());
+            client.close().await;
+        });
     }
 }
