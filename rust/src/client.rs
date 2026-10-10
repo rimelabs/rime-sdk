@@ -1,6 +1,6 @@
 use crate::{AudioFormat, AudioStream, Error, ErrorKind};
 use futures_core::Stream;
-use rime_api::{
+use rimelabs_api::{
     text_to_speech_client::TextToSpeechClient, GetSupportedLanguagesRequest,
     GetSupportedSpeakersRequest,
 };

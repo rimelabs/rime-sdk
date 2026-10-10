@@ -143,7 +143,7 @@ Before the first Rust API crate is published, use the sibling checkout:
 
 ```sh
 cargo test --manifest-path rust/Cargo.toml --locked \
-  --config 'patch.crates-io.rime-api.path="../rime-api/rust"'
+  --config 'patch.crates-io.rimelabs-api.path="../rime-api/rust"'
 ```
 
 Run that command from the SDK repository root. Branch CI checks out the API

@@ -162,6 +162,6 @@ jobs:
           done
           cmp ../go/internal/sentences/blingfire.wasm vendor/blingfire.wasm
       - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets --config 'patch.crates-io.rime-api.path="../.rust-api/rust"' -- -D warnings
-      - run: cargo test --locked --config 'patch.crates-io.rime-api.path="../.rust-api/rust"'
-      - run: cargo doc --locked --no-deps --config 'patch.crates-io.rime-api.path="../.rust-api/rust"'
+      - run: cargo clippy --locked --all-targets --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"' -- -D warnings
+      - run: cargo test --locked --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"'
+      - run: cargo doc --locked --no-deps --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"'

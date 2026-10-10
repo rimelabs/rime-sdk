@@ -250,10 +250,10 @@ for `rimelabs-sdk`, repository `rimelabs/rime-sdk`, workflow `release-please.yml
 and GitHub environment `crates`, restricted to `main`. The initial upload may
 require a scoped crates.io token before trusted publisher setup.
 
-Publish the initial `rime-api` Rust crate before releasing the SDK. The current
-SDK requires `rime-api` 0.3.x. If the first API publication uses a later version,
+Publish the initial `rimelabs-api` Rust crate before releasing the SDK. The current
+SDK requires `rimelabs-api` 0.3.x. If the first API publication uses a later version,
 update that dependency and rerun conformance tests before release. Once the API
-is available on crates.io, run `cargo update -p rime-api` without a local patch
+is available on crates.io, run `cargo update -p rimelabs-api` without a local patch
 and commit the registry checksum in `rust/Cargo.lock`. Remove the bootstrap API
 checkout and Cargo overrides from CI, along with `rust/api-revision`.
 

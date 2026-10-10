@@ -3,7 +3,7 @@
 use crate::*;
 use futures_core::Stream;
 use futures_util::StreamExt;
-use rime_api::{
+use rimelabs_api::{
     self as protocol,
     text_to_speech_server::{TextToSpeech, TextToSpeechServer},
 };

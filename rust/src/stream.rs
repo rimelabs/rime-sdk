@@ -8,7 +8,7 @@ use crate::{
 use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::{FutureExt, StreamExt, TryFutureExt};
-use rime_api::{
+use rimelabs_api::{
     streaming_synthesis_request::Payload, synthesis_response_stream, AudioParameters,
     StreamingSynthesisRequest, SynthesisRequest,
 };
