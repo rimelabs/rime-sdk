@@ -11,7 +11,7 @@ from test_realtime import Peer
 
 from rimelabs_sdk.realtime import _client
 
-EXAMPLES = Path(__file__).parents[2] / "examples/python"
+EXAMPLES = Path(__file__).parents[1] / "examples"
 
 
 def load_example(path):

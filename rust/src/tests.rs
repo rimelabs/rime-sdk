@@ -262,6 +262,7 @@ async fn complete_text_and_delayed_headers() {
         let harness = Harness::new(mode).await;
         let mut audio = harness
             .client
+            .tts()
             .synthesize(
                 "Hello. This last sentence has enough trailing context.",
                 SynthesisOptions::default(),
@@ -290,7 +291,8 @@ async fn incremental_audio_arrives_before_input_end_and_pauses_do_not_timeout() 
     let (sender, receiver) = mpsc::channel(1);
     let mut audio = harness
         .client
-        .synthesize_stream(ReceiverStream::new(receiver), SynthesisOptions::default())
+        .tts()
+        .stream(ReceiverStream::new(receiver), SynthesisOptions::default())
         .unwrap();
     sender
         .send(Ok(
@@ -312,6 +314,7 @@ async fn partial_audio_then_error_preserves_status_and_never_replays() {
     let harness = Harness::new(Mode::PartialError).await;
     let mut audio = harness
         .client
+        .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .unwrap();
     next(&mut audio).await.unwrap().unwrap();
@@ -328,7 +331,8 @@ async fn cancelling_one_stream_keeps_sibling() {
     let harness = Harness::new(Mode::Echo).await;
     let mut first = harness
         .client
-        .synthesize_stream(
+        .tts()
+        .stream(
             futures_util::stream::pending::<Result<String, Error>>(),
             SynthesisOptions::default(),
         )
@@ -340,6 +344,7 @@ async fn cancelling_one_stream_keeps_sibling() {
     );
     let mut sibling = harness
         .client
+        .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .unwrap();
     while let Some(chunk) = next(&mut sibling).await {
@@ -353,7 +358,8 @@ async fn overall_timeout_applies_while_input_is_paused() {
     let harness = Harness::new(Mode::Echo).await;
     let mut audio = harness
         .client
-        .synthesize_stream(
+        .tts()
+        .stream(
             futures_util::stream::pending::<Result<String, Error>>(),
             SynthesisOptions::default().timeout(Some(Duration::from_millis(100))),
         )
@@ -369,6 +375,7 @@ async fn overall_timeout_discards_buffered_audio_when_consumer_is_paused() {
     let harness = Harness::new(Mode::Flood).await;
     let mut audio = harness
         .client
+        .tts()
         .synthesize(
             "Hello.",
             SynthesisOptions::default().timeout(Some(Duration::from_secs(2))),
@@ -387,6 +394,7 @@ async fn stalled_output_times_out() {
     let harness = Harness::new(Mode::Hold).await;
     let mut audio = harness
         .client
+        .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .unwrap();
     next(&mut audio).await.unwrap().unwrap();
@@ -401,7 +409,8 @@ async fn early_completion_is_not_success() {
     let harness = Harness::new(Mode::EarlyEnd).await;
     let mut audio = harness
         .client
-        .synthesize_stream(
+        .tts()
+        .stream(
             futures_util::stream::pending::<Result<String, Error>>(),
             SynthesisOptions::default(),
         )
@@ -418,6 +427,7 @@ async fn bad_audio_is_rejected() {
         let harness = Harness::new(mode).await;
         let mut audio = harness
             .client
+            .tts()
             .synthesize("Hello.", SynthesisOptions::default())
             .unwrap();
         assert_eq!(
@@ -436,7 +446,8 @@ async fn source_error_and_blank_input_stop_the_stream() {
     ] {
         let mut audio = harness
             .client
-            .synthesize_stream(
+            .tts()
+            .stream(
                 futures_util::stream::iter([input]),
                 SynthesisOptions::default(),
             )
@@ -476,6 +487,7 @@ async fn grpc_errors_match_shared_contract() {
         let harness = Harness::new(Mode::Reject(code)).await;
         let mut audio = harness
             .client
+            .tts()
             .synthesize("Hello.", SynthesisOptions::default())
             .unwrap();
         let error = next(&mut audio).await.unwrap().unwrap_err();
@@ -495,8 +507,9 @@ async fn discovery_retries_and_client_close_cancels_all_clones() {
         ["clementine"]
     );
     let clone = harness.client.clone();
-    let mut audio = clone
-        .synthesize_stream(
+    let tts = clone.tts();
+    let mut audio = tts
+        .stream(
             futures_util::stream::pending::<Result<String, Error>>(),
             SynthesisOptions::default(),
         )
@@ -510,6 +523,18 @@ async fn discovery_retries_and_client_close_cancels_all_clones() {
         clone.languages().await.unwrap_err().kind(),
         ErrorKind::Cancelled
     );
+    assert_eq!(
+        tts.synthesize("Hello.", SynthesisOptions::default())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Cancelled
+    );
+    assert_eq!(
+        tts.stream(futures_util::stream::empty(), SynthesisOptions::default())
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Cancelled
+    );
 }
 
 #[tokio::test]
@@ -517,6 +542,7 @@ async fn drop_audio_releases_rpc() {
     let harness = Harness::new(Mode::Hold).await;
     let mut audio = harness
         .client
+        .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .unwrap();
     next(&mut audio).await.unwrap().unwrap();
@@ -536,7 +562,8 @@ async fn source_panic_becomes_a_terminal_error() {
         });
     let mut audio = harness
         .client
-        .synthesize_stream(source, SynthesisOptions::default())
+        .tts()
+        .stream(source, SynthesisOptions::default())
         .unwrap();
     assert_eq!(
         next(&mut audio).await.unwrap().unwrap_err().kind(),
@@ -549,7 +576,8 @@ async fn source_panic_becomes_a_terminal_error() {
 async fn dropping_last_client_cancels_streams() {
     let client = Client::builder().api_key("test-key").build().unwrap();
     let mut audio = client
-        .synthesize_stream(
+        .tts()
+        .stream(
             futures_util::stream::pending::<Result<String, Error>>(),
             SynthesisOptions::default(),
         )
@@ -598,6 +626,7 @@ fn configuration_is_typed_validated_and_credentials_are_redacted() {
     assert_eq!(client.inner.model.voice(), "astra");
     assert!(!format!("{client:?}").contains("secret"));
     assert!(client
+        .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .is_err());
 }

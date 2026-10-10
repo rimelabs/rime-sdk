@@ -507,7 +507,7 @@ async def test_cancelling_stt_preserves_tts_and_realtime(setup, stt_setup, monke
         recognition = client.stt.stream(source(), language="en")
         assert (await anext(recognition)).kind == "partial"
         await recognition.cancel()
-        async with client.tts.stream("Hello.") as speech:
+        async with client.tts.synthesize("Hello.") as speech:
             assert b"".join([chunk async for chunk in speech]) == tts_service.payload
         response = await accepted_turn(realtime, peer)
         peer.ended(response.response_id)

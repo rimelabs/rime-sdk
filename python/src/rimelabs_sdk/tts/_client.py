@@ -38,21 +38,44 @@ class _TTS:
     def _check_loop(self):
         self._client._check_loop()
 
-    def stream(
+    def synthesize(
         self,
-        text: str | AsyncIterable[str],
+        text: str,
         *,
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
+        """Synthesize complete text and return an audio stream. Do not await this call."""
         self._check_open()
-        if isinstance(text, str):
-            if not text.strip():
-                raise RimeInputError("Text must contain non-whitespace characters")
-        elif not hasattr(text, "__aiter__"):
-            raise RimeInputError("text must be a string or an async iterable of strings")
+        if not isinstance(text, str):
+            raise RimeInputError("text must be a string; use stream() for an async text source")
+        if not text.strip():
+            raise RimeInputError("Text must contain non-whitespace characters")
+
+        async def source():
+            yield text
+
+        return self.stream(
+            source(), voice=voice, language=language, audio_format=audio_format, timeout=timeout
+        )
+
+    def stream(
+        self,
+        text: AsyncIterable[str],
+        *,
+        voice: str | None = None,
+        language: str = "en",
+        audio_format: AudioFormat | None = None,
+        timeout: float | None | object = _policy.INHERIT,
+    ) -> AudioStream:
+        """Stream text chunks into synthesis and return an audio stream. Do not await this call."""
+        self._check_open()
+        if isinstance(text, str) or not hasattr(text, "__aiter__"):
+            raise RimeInputError(
+                "text must be an async iterable of strings; use synthesize() for a string"
+            )
         voice = self._policy.default_voice if voice is None else _policy.nonempty(voice, "voice")
         _policy.nonempty(language, "language")
         profile = AudioFormat.PCM_24000 if audio_format is None else audio_format

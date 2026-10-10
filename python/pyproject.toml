@@ -40,3 +40,9 @@ target-version = "py311"
 [tool.mypy]
 ignore_missing_imports = true
 check_untyped_defs = true
+
+[tool.uv.workspace]
+members = ["examples"]
+
+[tool.uv.sources]
+rimelabs-sdk = { workspace = true }

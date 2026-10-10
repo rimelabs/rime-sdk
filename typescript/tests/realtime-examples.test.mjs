@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { Peer } from "./realtime-peer.mjs";
 
 const exec = promisify(execFile);
-const scripts = new URL("../../examples/typescript/realtime/", import.meta.url);
+const scripts = new URL("../examples/realtime/", import.meta.url);
 
 async function run(t, file, respond, source) {
   // Node resolves the unchanged @rimelabs/sdk import through package self-reference.

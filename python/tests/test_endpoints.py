@@ -80,7 +80,7 @@ async def test_clients_route_speech_and_discovery_independently(
             monkeypatch.setattr(_auth.Credentials, "metadata", _auth.Credentials._themis_metadata)
 
         async def use(client, service, voice):
-            async with client.tts.stream("Hello.") as audio:
+            async with client.tts.synthesize("Hello.") as audio:
                 result = b"".join([chunk async for chunk in audio])
             assert service.calls[0][0].header.speaker == voice
             assert service.calls[0][0].header.audio_parameters.sampling_rate == 24000

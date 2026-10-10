@@ -6,9 +6,7 @@ test("published Realtime declarations support typed consumers", () => {
   execFileSync(
     process.execPath,
     [
-      fileURLToPath(
-        new URL("../node_modules/typescript/bin/tsc", import.meta.url),
-      ),
+      fileURLToPath(import.meta.resolve("typescript/bin/tsc")),
       "--strict",
       "--noEmit",
       "--skipLibCheck",

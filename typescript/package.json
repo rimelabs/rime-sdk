@@ -29,7 +29,7 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test tests/*.test.mjs",
     "prepack": "npm run build",
-    "lint": "prettier --check src tests ../examples/typescript/tts ../examples/typescript/realtime ../examples/typescript/common ../examples/typescript/browser ../examples/typescript/tests ../examples/typescript/stt"
+    "lint": "prettier --check src tests examples/tts examples/realtime examples/common examples/browser examples/tests examples/stt"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.11.0",

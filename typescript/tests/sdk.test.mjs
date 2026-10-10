@@ -146,7 +146,11 @@ test("sentence messages ignore source chunk size", () =>
         for (let offset = 0; offset < text.length; offset += size)
           yield text.slice(offset, offset + size);
       }
-      await collect(client.tts.stream(size === null ? text : source()));
+      await collect(
+        size === null
+          ? client.tts.synthesize(text)
+          : client.tts.stream(source()),
+      );
     }
     const messages = service.calls.map((call) =>
       call.slice(1).map((m) => m.payload.value),
@@ -166,12 +170,34 @@ test("public validation", () => {
   );
   const client = new Rime({ apiKey: "test" });
   assert.equal(client.tts.session, undefined);
-  assert.throws(() => client.tts.stream(""), RimeInputError);
+  assert.throws(() => client.tts.synthesize(""), RimeInputError);
   assert.throws(
-    () => client.tts.stream("Hi", { audioFormat: "wav" }),
+    () => client.tts.synthesize("Hi", { audioFormat: "wav" }),
     RimeAudioFormatError,
   );
 });
+test("synthesis methods validate input shape", () =>
+  setup(async (service, client) => {
+    async function* source() {
+      yield "Hello.";
+    }
+    for (const invalid of ["Hello.", "", ["Hello."], null, 123])
+      assert.throws(() => client.tts.stream(invalid), {
+        name: "RimeInputError",
+        message: /async iterable/,
+      });
+    const chunks = source();
+    try {
+      for (const invalid of [chunks, ["Hello."], null, 123])
+        assert.throws(() => client.tts.synthesize(invalid), {
+          name: "RimeInputError",
+          message: /must be a string/,
+        });
+    } finally {
+      await chunks.return();
+    }
+    assert.equal(service.calls.length, 0);
+  }));
 test("error conformance", () => {
   for (const [status, name] of Object.entries(contract.grpc_errors)) {
     const error = rpcError(grpc.status[status], "id");
@@ -212,7 +238,7 @@ for (const [name, expected] of Object.entries(contract.profiles))
   });
 test("complete input uses streaming RPC", () =>
   setup(async (service, client) => {
-    const audio = client.tts.stream("Hello. Final phrase");
+    const audio = client.tts.synthesize("Hello. Final phrase");
     assert.equal(audio.format, AudioFormat.PCM_24000);
     assert.deepEqual(
       await collect(audio),
@@ -244,7 +270,7 @@ test("incremental_audio_before_input_end", () =>
 test("partial_audio_then_error", () =>
   setup(async (service, client) => {
     service.mode = "partial_error";
-    const audio = client.tts.stream(
+    const audio = client.tts.synthesize(
       "First sentence. The next sentence is waiting.",
     );
     assert.equal((await audio.next()).done, false);
@@ -256,17 +282,17 @@ test("partial_audio_then_error", () =>
 test("cancel_keeps_sibling", () =>
   setup(async (service, client) => {
     service.mode = "burst";
-    const first = client.tts.stream("Hello.");
+    const first = client.tts.synthesize("Hello.");
     assert.equal((await first.next()).done, false);
     await first.cancel();
     await assert.rejects(() => first.next(), RimeCancelledError);
     service.mode = "normal";
-    assert.ok((await collect(client.tts.stream("Sibling."))).length);
+    assert.ok((await collect(client.tts.synthesize("Sibling."))).length);
   }));
 test("overall_timeout_while_paused", () =>
   setup(async (service, client) => {
     service.mode = "burst";
-    const audio = client.tts.stream("Hello.", { timeout: 0.08 });
+    const audio = client.tts.synthesize("Hello.", { timeout: 0.08 });
     assert.equal((await audio.next()).done, false);
     await sleep(130);
     await assert.rejects(() => audio.next(), RimeTimeoutError);
@@ -274,7 +300,7 @@ test("overall_timeout_while_paused", () =>
   }));
 test("lazy startup and cancellation before start", () =>
   setup(async (service, client) => {
-    const audio = client.tts.stream("Hi.", { timeout: 0.01 });
+    const audio = client.tts.synthesize("Hi.", { timeout: 0.01 });
     await sleep(30);
     assert.equal(service.calls.length, 0);
     await audio.cancel();
@@ -284,7 +310,7 @@ test("lazy startup and cancellation before start", () =>
 test("no_synthesis_replay", () =>
   setup(async (service, client) => {
     service.mode = "error_before_audio";
-    const audio = client.tts.stream("Hello.");
+    const audio = client.tts.synthesize("Hello.");
     await assert.rejects(() => collect(audio), RimeUnavailableError);
     await audio.cancel();
     assert.equal(service.calls.length, 1);
@@ -293,11 +319,11 @@ test("format validation and odd chunk alignment", () =>
   setup(async (service, client) => {
     service.mode = "odd_chunks";
     assert.deepEqual(
-      await collect(client.tts.stream("Hello.")),
+      await collect(client.tts.synthesize("Hello.")),
       service.payload,
     );
     service.mode = "wrong_format";
-    const audio = client.tts.stream("Hello.");
+    const audio = client.tts.synthesize("Hello.");
     await assert.rejects(() => collect(audio), RimeAudioFormatError);
     await audio.cancel();
   }));
@@ -464,12 +490,12 @@ test("timeout inheritance and explicit disablement", () =>
     service.mode = "burst";
     const inheritedClient = new Rime({ apiKey: "test", timeout: 0.03 });
     try {
-      const a = inheritedClient.tts.stream("Hi.");
+      const a = inheritedClient.tts.synthesize("Hi.");
       await a.next();
       await sleep(60);
       await assert.rejects(() => a.next(), RimeTimeoutError);
       await a.cancel();
-      const b = inheritedClient.tts.stream("Hello.", { timeout: null });
+      const b = inheritedClient.tts.synthesize("Hello.", { timeout: null });
       await b.next();
       await sleep(60);
       assert.equal((await b.next()).done, false);
@@ -481,7 +507,7 @@ test("timeout inheritance and explicit disablement", () =>
 test("early loop exit cancels and readonly format", () =>
   setup(async (service, client) => {
     service.mode = "burst";
-    const audio = client.tts.stream("Hello.");
+    const audio = client.tts.synthesize("Hello.");
     assert.throws(() => {
       audio.format = AudioFormat.MULAW_8000;
     }, TypeError);
@@ -500,8 +526,8 @@ test("cancel during shared refresh", () =>
         audience: policy.audience,
       };
     };
-    const a = client.tts.stream("A."),
-      b = client.tts.stream("B.");
+    const a = client.tts.synthesize("A."),
+      b = client.tts.synthesize("B.");
     const first = a.next();
     const check = assert.rejects(() => first, RimeCancelledError);
     const second = collect(b);
@@ -650,13 +676,13 @@ test("sentence limit still rejects oversized spans", async () => {
 test("client shutdown stops paused output", async () => {
   await setup(async (service, client) => {
     service.mode = "burst";
-    const audio = client.tts.stream("Hello.");
+    const audio = client.tts.synthesize("Hello.");
     await audio.next();
     await sleep(30);
     await client.close();
     assert.equal(client.ttsClient.streams.size, 0);
     await assert.rejects(audio.next(), RimeCancelledError);
-    assert.throws(() => client.tts.stream("Later."), RimeInputError);
+    assert.throws(() => client.tts.synthesize("Later."), RimeInputError);
   });
 });
 
@@ -666,7 +692,7 @@ for (const profile of [AudioFormat.PCM_24000, AudioFormat.MULAW_8000]) {
       const samples = policy.outputBytes + 1;
       service.payload = Buffer.alloc(samples * 2);
       const chunks = [];
-      for await (const part of client.tts.stream("Hello.", {
+      for await (const part of client.tts.synthesize("Hello.", {
         audioFormat: profile,
       }))
         chunks.push(part);
@@ -687,7 +713,7 @@ for (const queued of [false, true]) {
   test(`overall timeout after producer completion / queued=${queued}`, () =>
     setup(async (service, client) => {
       service.payload = Buffer.alloc(queued ? policy.outputChunkBytes * 2 : 2);
-      const audio = client.tts.stream("Hello.", { timeout: 0.1 });
+      const audio = client.tts.synthesize("Hello.", { timeout: 0.1 });
       await audio.next();
       // Production has ended, but the consumer has not observed completion.
       await audio.worker;
@@ -703,7 +729,7 @@ test("slow consumer does not trigger stall timeout", () =>
     // Keep the RPC open while a large response waits for output capacity.
     service.mode = "partial_error";
     service.payload = Buffer.alloc(policy.outputBytes * 2);
-    const audio = client.tts.stream("Hello.");
+    const audio = client.tts.synthesize("Hello.");
     try {
       assert.ok((await audio.next()).value.length);
       await sleep(80);
@@ -718,7 +744,7 @@ test("incomplete final PCM sample fails", async () => {
   await setup(async (service, client) => {
     service.payload = Buffer.from([1]);
     await assert.rejects(
-      collect(client.tts.stream("Hello.")),
+      collect(client.tts.synthesize("Hello.")),
       RimeAudioFormatError,
     );
   });
@@ -728,7 +754,7 @@ for (const queued of [true, false]) {
   test(`cancellation after queue read with queued audio=${queued}`, () =>
     setup(async (service, client) => {
       service.payload = Buffer.alloc(queued ? policy.outputChunkBytes * 2 : 2);
-      const audio = client.tts.stream("Hello.");
+      const audio = client.tts.synthesize("Hello.");
       await audio.next();
       await audio.worker;
       const pending = audio.next();
@@ -754,7 +780,7 @@ for (const location of ["headers", "trailers", "both"]) {
         service.trailingMetadata =
           location === "headers" ? {} : { "x-request-id": "trailer-id" };
         const expectedId = location === "trailers" ? "trailer-id" : "header-id";
-        const audio = client.tts.stream("Hello.", { timeout: 1 });
+        const audio = client.tts.synthesize("Hello.", { timeout: 1 });
         const result = collect(audio);
         // Attach the error check before the server can reject the request.
         const checked = assert.rejects(
@@ -797,7 +823,7 @@ for (const mode of ["normal", "empty_audio", "empty_no_headers"]) {
     setup(async (service, client) => {
       service.mode = mode;
       service.responseMetadata = { "x-request-id": "header-id" };
-      const audio = client.tts.stream("Hello.", { timeout: 1 });
+      const audio = client.tts.synthesize("Hello.", { timeout: 1 });
       await assert.rejects(audio.next(), RimeAudioFormatError);
     }));
 }

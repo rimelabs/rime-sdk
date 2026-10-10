@@ -417,9 +417,7 @@ test("STT declaration types narrow partial and final results", async () => {
   execFileSync(
     process.execPath,
     [
-      fileURLToPath(
-        new URL("../node_modules/typescript/bin/tsc", import.meta.url),
-      ),
+      fileURLToPath(import.meta.resolve("typescript/bin/tsc")),
       "--strict",
       "--noEmit",
       "--skipLibCheck",
@@ -549,7 +547,7 @@ test("cancelling STT preserves TTS and Prism; owner close cancels all", async (t
   assert.equal((await stream.next()).value.kind, "partial");
   await stream.cancel();
   const audio = [];
-  for await (const chunk of client.tts.stream("Hello.")) audio.push(chunk);
+  for await (const chunk of client.tts.synthesize("Hello.")) audio.push(chunk);
   assert.deepEqual(Buffer.concat(audio), ttsService.payload);
   peer.emit("prsm.typed_input.ready");
   const reply = watch(session.sendText("hello")),
@@ -617,7 +615,7 @@ test("the documented STT file example prints a final and request ID", async (t) 
   await writeFile(path, Buffer.alloc(3200));
   const logs = [];
   t.mock.method(console, "log", (line) => logs.push(line));
-  const example = await import("../../examples/typescript/stt/stream.mjs");
+  const example = await import("../examples/stt/stream.mjs");
   await example.main(path, "en", "written", client);
   assert.ok(logs.includes("final: Ice cream"));
   assert.ok(logs.includes("request_id: stt-request"));
@@ -633,7 +631,7 @@ for (const mode of ["normal", "no_acceptance"])
     const { join } = await import("node:path");
     const directory = await mkdtemp(join(tmpdir(), "sdk-stt-missing-"));
     t.after(() => rm(directory, { recursive: true, force: true }));
-    const example = await import("../../examples/typescript/stt/stream.mjs");
+    const example = await import("../examples/stt/stream.mjs");
     await assert.rejects(
       example.main(join(directory, "missing.pcm"), "en", "written", client),
       (error) =>

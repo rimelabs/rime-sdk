@@ -71,16 +71,21 @@ jobs:
         if: steps.pr.outputs.branch != ''
         with:
           python-version: '3.12'
-      - name: Normalize Python version and update its lockfile
+      - uses: actions/setup-node@v4
+        if: steps.pr.outputs.branch != ''
+        with:
+          node-version: '22'
+      - name: Update release metadata and workspace lockfiles
         if: steps.pr.outputs.branch != ''
         run: |
           version=$(uv version --project python --short)
           uv version --project python --no-sync "$version"
-          git add python/pyproject.toml python/uv.lock
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git add python/pyproject.toml python/uv.lock package-lock.json
           if ! git diff --cached --quiet; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git commit -m 'chore: update Python release metadata'
+            git commit -m 'chore: update release metadata'
             git push
           fi
       - name: Run checks on the release PR branch
@@ -140,8 +145,8 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'version={version}\n')
           PY
-      - run: uv run ruff check src tests ../examples/python
-      - run: uv run ruff format --check src tests ../examples/python
+      - run: uv run ruff check src tests examples
+      - run: uv run ruff format --check src tests examples
       - run: uv run mypy src
       - run: uv run pytest
       - run: uv build
@@ -176,7 +181,7 @@ jobs:
           node-version: '22'
           registry-url: https://registry.npmjs.org
       - run: npm install --global npm@11.18.0
-      - run: npm ci
+      - run: npm --prefix .. ci
       - name: Verify release version and alpha policy
         id: version
         run: |
@@ -193,9 +198,9 @@ jobs:
       - run: npm run check
       - run: npm run lint
       - run: npm test
-      - run: npm pack
+      - run: npm pack --workspace @rimelabs/sdk
       - name: Publish package
-        run: npm publish --access public --tag latest
+        run: npm publish --workspace @rimelabs/sdk --access public --tag latest
 
   go:
     timeout-minutes: 15
@@ -284,26 +289,24 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
         run: cargo publish --locked
 
-  update-python-examples:
-    needs: python
+  check-python-examples:
+    needs: [prepare, python]
     if: ${{ !cancelled() && needs.python.result == 'success' }}
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
-    uses: ./.github/workflows/update-examples.yml
+      contents: read
+    uses: ./.github/workflows/check-published-examples.yml
     with:
       language: python
       version: ${{ needs.python.outputs.version }}
+      ref: ${{ needs.prepare.outputs.python_tag || inputs.python_tag }}
 
-  update-typescript-examples:
-    needs: typescript
+  check-typescript-examples:
+    needs: [prepare, typescript]
     if: ${{ !cancelled() && needs.typescript.result == 'success' }}
     permissions:
-      contents: write
-      pull-requests: write
-      actions: write
-    uses: ./.github/workflows/update-examples.yml
+      contents: read
+    uses: ./.github/workflows/check-published-examples.yml
     with:
       language: typescript
       version: ${{ needs.typescript.outputs.version }}
+      ref: ${{ needs.prepare.outputs.typescript_tag || inputs.typescript_tag }}

@@ -64,14 +64,32 @@ export class TTS {
     await connect(this.client, signal);
     return { client: this.client, metadata: metadata(auth) };
   }
+  /** Synthesize complete text and return an audio stream. Do not await this call. */
+  synthesize(text: string, options: SynthesisOptions = {}) {
+    this.checkOpen();
+    if (typeof text !== "string")
+      throw new RimeInputError(
+        "text must be a string; use stream() for an async text source",
+      );
+    if (!text.trim())
+      throw new RimeInputError("Text must contain non-whitespace characters");
+    return this.stream(
+      (async function* () {
+        yield text;
+      })(),
+      options,
+    );
+  }
+  /** Stream text chunks into synthesis and return an audio stream. Do not await this call. */
   stream(text: TextSource, options: SynthesisOptions = {}) {
     this.checkOpen();
-    if (typeof text === "string") {
-      if (!text.trim())
-        throw new RimeInputError("Text must contain non-whitespace characters");
-    } else if (!text || typeof text[Symbol.asyncIterator] !== "function")
+    if (
+      typeof text === "string" ||
+      !text ||
+      typeof text[Symbol.asyncIterator] !== "function"
+    )
       throw new RimeInputError(
-        "text must be a string or an async iterable of strings",
+        "text must be an async iterable of strings; use synthesize() for a string",
       );
     const voice =
       options.voice === undefined || options.voice === null

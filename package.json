@@ -1,0 +1,9 @@
+{
+  "name": "rime-sdk-workspace",
+  "private": true,
+  "packageManager": "npm@11.18.0",
+  "workspaces": [
+    "typescript",
+    "typescript/examples"
+  ]
+}

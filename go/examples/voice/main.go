@@ -164,7 +164,7 @@ func (input *capture) close() {
 
 func speak(ctx context.Context, client *rime.Client, text string, settings options) error {
 	budget := 60 * time.Second
-	audio, err := client.TTS.Stream(ctx, text, rime.SynthesisOptions{Language: settings.language, Voice: settings.voice, Timeout: &budget})
+	audio, err := client.TTS.Synthesize(ctx, text, rime.SynthesisOptions{Language: settings.language, Voice: settings.voice, Timeout: &budget})
 	if err != nil {
 		return err
 	}

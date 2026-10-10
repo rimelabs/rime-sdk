@@ -161,7 +161,7 @@ async def test_client_close_stops_tts_and_realtime(setup, monkeypatch):
         assert source_closed.is_set()
         assert peer.closed
         with pytest.raises(RimeInputError, match="closed"):
-            client.tts.stream("After close.")
+            client.tts.synthesize("After close.")
         with pytest.raises(RimeInputError, match="closed"):
             await client.voices.list()
         with pytest.raises(RimeInputError, match="closed"):

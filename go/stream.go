@@ -59,13 +59,14 @@ type AudioStream struct {
 	finishOnce   sync.Once
 }
 
-// Stream starts synthesis of complete text. Use StreamSource for incremental input.
-func (t *TTSService) Stream(ctx context.Context, text string, options SynthesisOptions) (*AudioStream, error) {
+// Synthesize starts synthesis of complete text and returns an audio stream.
+// Use Stream for incremental text input.
+func (t *TTSService) Synthesize(ctx context.Context, text string, options SynthesisOptions) (*AudioStream, error) {
 	if strings.TrimSpace(text) == "" || !utf8.ValidString(text) {
 		return nil, failure(ErrInput, "text must be nonblank UTF-8")
 	}
 	first := true
-	return t.StreamSource(ctx, func(context.Context) (string, error) {
+	return t.Stream(ctx, func(context.Context) (string, error) {
 		if first {
 			first = false
 			return text, nil
@@ -74,8 +75,9 @@ func (t *TTSService) Stream(ctx context.Context, text string, options SynthesisO
 	}, options)
 }
 
-// StreamSource starts work immediately. The source may supply partial sentences.
-func (t *TTSService) StreamSource(ctx context.Context, source TextSource, options SynthesisOptions) (*AudioStream, error) {
+// Stream accepts incremental text and returns an audio stream.
+// It starts work immediately. The source may supply partial sentences.
+func (t *TTSService) Stream(ctx context.Context, source TextSource, options SynthesisOptions) (*AudioStream, error) {
 	if source == nil {
 		return nil, failure(ErrInput, "text source must not be nil")
 	}

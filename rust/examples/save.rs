@@ -7,7 +7,9 @@ use tokio::io::AsyncWriteExt;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder().build()?;
     let mut file = tokio::fs::File::create("speech.pcm").await?;
-    let mut audio = client.synthesize("Hello from Rust.", SynthesisOptions::default())?;
+    let mut audio = client
+        .tts()
+        .synthesize("Hello from Rust.", SynthesisOptions::default())?;
     while let Some(chunk) = audio.next().await {
         file.write_all(&chunk?).await?;
     }

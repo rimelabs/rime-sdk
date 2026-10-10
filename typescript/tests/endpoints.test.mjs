@@ -123,7 +123,7 @@ for (const themis of [false, true])
           });
           async function use(client, service, voice) {
             const chunks = [];
-            for await (const chunk of client.tts.stream("Hello."))
+            for await (const chunk of client.tts.synthesize("Hello."))
               chunks.push(chunk);
             assert.equal(service.calls[0][0].payload.value.speaker, voice);
             assert.equal(

@@ -1,0 +1,29 @@
+{
+  "name": "rime-sdk-examples",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "tts": "node tts/stream.mjs",
+    "prism": "node realtime/typed-turn.mjs",
+    "prism:tools": "node realtime/tools.mjs",
+    "tts:save": "tsx tts/save.ts",
+    "tts:play": "tsx tts/play.ts",
+    "prism:recorded": "tsx realtime/recorded.ts",
+    "prism:voice": "tsx realtime/voice.ts",
+    "prism:voice-tools": "tsx realtime/voice-tools.ts",
+    "check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.mjs",
+    "stt": "node stt/stream.mjs",
+    "stt:voice": "node stt/voice.mjs"
+  },
+  "dependencies": {
+    "@rimelabs/sdk": ">=0.1.0-alpha.11",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
