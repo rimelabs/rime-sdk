@@ -970,6 +970,8 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 [[package]]
 name = "rimelabs-api"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdf8523fc14f2683a873dd5ca17b8fd184a421a557d56ec4dcff189a9fff00e1"
 dependencies = [
  "pbjson",
  "pbjson-types",

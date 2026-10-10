@@ -142,15 +142,6 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - name: Select the API source for the initial Rust release
-        id: api
-        run: echo "revision=$(cat api-revision)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v4
-        with:
-          repository: rimelabs/rime-api
-          ref: ${{ steps.api.outputs.revision }}
-          path: .rust-api
-          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
@@ -162,6 +153,7 @@ jobs:
           done
           cmp ../go/internal/sentences/blingfire.wasm vendor/blingfire.wasm
       - run: cargo fmt --check
-      - run: cargo clippy --locked --all-targets --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"' -- -D warnings
-      - run: cargo test --locked --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"'
-      - run: cargo doc --locked --no-deps --config 'patch.crates-io.rimelabs-api.path="../.rust-api/rust"'
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo doc --locked --no-deps
+      - run: cargo package --locked
