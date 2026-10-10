@@ -1,0 +1,24 @@
+.github/scripts/tests/test_release_branch.py
+  s_88d2a439fbab05::t_27b4572fdc6c67 17-19,26-27
+  s_88d2a439fbab05::t_aa301753809c13 1-16,20-25,28-76
+RELEASING.md
+  s_88d2a439fbab05::t_bb06024f6ddc1f 198-203
+.github/workflows/release-please.yml
+  s_88d2a439fbab05::t_aa301753809c13 66-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8f38d75fc11b03668e39c2a86b2cdf1aecf7cfda",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
