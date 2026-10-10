@@ -1,9 +1,11 @@
 //! Streaming speech recognition for one caller-ended utterance.
 mod audio;
 mod protocol;
+mod queue;
 mod stream;
 #[cfg(test)]
 mod tests;
+mod transport;
 
 use crate::{client::validate_timeout, Client, Error};
 pub use audio::PcmFormat;
