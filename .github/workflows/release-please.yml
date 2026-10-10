@@ -63,6 +63,28 @@ jobs:
               pr.labels.some(label => label.name === 'autorelease: pending')
             );
             if (pr) core.setOutput('branch', pr.head.ref);
+      # Release Please can leave the branch unchanged when release notes are unchanged.
+      - name: Update release branch from main
+        if: steps.pr.outputs.branch != ''
+        uses: actions/github-script@v7
+        env:
+          RELEASE_BRANCH: ${{ steps.pr.outputs.branch }}
+        with:
+          script: |
+            try {
+              await github.rest.repos.merge({
+                ...context.repo,
+                base: process.env.RELEASE_BRANCH,
+                head: 'main',
+                commit_message: 'chore: update release branch from main',
+              });
+            } catch (error) {
+              if (error.status === 409) {
+                core.setFailed(`Merge conflict: update ${process.env.RELEASE_BRANCH} from main manually, then rerun this workflow.`);
+                return;
+              }
+              throw error;
+            }
       - uses: actions/checkout@v4
         if: steps.pr.outputs.branch != ''
         with:
