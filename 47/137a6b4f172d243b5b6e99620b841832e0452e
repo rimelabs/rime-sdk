@@ -1,0 +1,24 @@
+go/client_test.go
+  s_88d2a439fbab05::t_dd7c09eefd571c 23-24,120-123,126-128,131-134,138-151
+  s_88d2a439fbab05::t_8736a3e616363f 11
+  s_88d2a439fbab05::t_025c778f9dbc8f 124-125,130,135-137
+  s_88d2a439fbab05::t_896b59d82c1a1c 129
+  s_88d2a439fbab05::t_8961673386b94a 111-113
+  s_88d2a439fbab05::t_4154abe176a289 152-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "47137a6b4f172d243b5b6e99620b841832e0452e",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
