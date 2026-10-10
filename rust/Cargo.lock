@@ -983,7 +983,7 @@ dependencies = [
 
 [[package]]
 name = "rimelabs-sdk"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 dependencies = [
  "bytes",
  "futures-core",
