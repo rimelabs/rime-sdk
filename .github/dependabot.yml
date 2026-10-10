@@ -4,6 +4,10 @@ updates:
     directory: /rust
     schedule:
       interval: daily
+    cooldown:
+      default-days: 3
+      exclude:
+        - rimelabs-api
     commit-message:
       prefix: fix
       include: scope
