@@ -25,9 +25,10 @@ times in seconds. Timestamps are delivered after generation, not incrementally.
 
 Coda supports request-wide pronunciation overrides through `custom_lexicon`
 (Python), `customLexicon` (Node.js), or `CustomLexicon` (Go). Each entry contains
-`spelling` and a space-separated X-SAMPA `pronunciation`. Invalid entries raise
-an input error with the service's explanation and request ID. See the TTS guides
-below for examples and supported languages.
+`spelling` and a space-separated X-SAMPA `pronunciation`. Service-rejected entries
+raise an input error with the service's explanation and request ID. Malformed
+entry types and invalid Unicode fail locally, without a service response or
+request ID. See the TTS guides below for examples and supported languages.
 
 | Package | Location | Runtime |
 | --- | --- | --- |

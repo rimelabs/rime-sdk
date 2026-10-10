@@ -116,8 +116,9 @@ Coda accepts custom pronunciations in German, English, Spanish, French,
 Italian, and Portuguese, with up to 500 entries per request. The service validates
 supported languages and pronunciation rules. Mist rejects nonempty lexicons.
 
-Malformed option types throw locally. The service rejects unsupported models
-or languages, oversized lexicons, and ill-formed entries with `RimeInputError`
+Malformed option types and invalid Unicode in lexicon fields throw locally.
+The service rejects unsupported models or languages, oversized lexicons, and
+ill-formed entries with `RimeInputError`
 before producing audio. Catch it around consuming the stream. Its `message`
 preserves the offending spelling and checks such as `no-primary-stress` or
 `unknown-phone`, and `requestId` identifies the request. The whole request fails;

@@ -94,6 +94,70 @@ for (const entries of [
     }));
 }
 
+for (const completeText of [false, true]) {
+  test(`ill-formed lexicon Unicode fails before network / completeText=${completeText}`, () =>
+    setup(async (service, client) => {
+      for (const field of ["spelling", "pronunciation"]) {
+        for (const value of [
+          "\ud800",
+          "\udfff",
+          "before\ud800after",
+          "before\udfffafter",
+          "\ud800\ud800",
+          "\udfff\udfff",
+          "\udfff\ud800",
+        ]) {
+          const entry = {
+            spelling: "hello",
+            pronunciation: "h",
+            [field]: value,
+          };
+          assert.throws(
+            () =>
+              client.tts.stream("Hello.", {
+                completeText,
+                customLexicon: [entry],
+              }),
+            RimeInputError,
+            `${field}: ${JSON.stringify(value)}`,
+          );
+        }
+      }
+      assert.throws(
+        () =>
+          client.tts.stream("Hello.", {
+            completeText,
+            customLexicon: [{ spelling: "\ud800", pronunciation: "\udc00" }],
+          }),
+        RimeInputError,
+      );
+      assert.equal(service.calls.length, 0);
+      assert.equal(service.completeCalls.length, 0);
+    }));
+
+  test(`well-formed lexicon Unicode reaches the service unchanged / completeText=${completeText}`, () =>
+    setup(async (service, client) => {
+      const entries = [
+        { spelling: "cafe\u0301 \u{1f600}", pronunciation: "h \u{1f600}" },
+        { spelling: "\ufffd", pronunciation: "\ufffd" },
+        { spelling: "\ud7ff\ue000", pronunciation: "\ud7ff\ue000" },
+      ];
+      await collect(
+        client.tts.stream("Hello.", { completeText, customLexicon: entries }),
+      );
+      const request = completeText
+        ? service.completeCalls[0]
+        : service.calls[0][0].payload.value;
+      assert.deepEqual(
+        request.customLexicon.map(({ spelling, pronunciation }) => ({
+          spelling,
+          pronunciation,
+        })),
+        entries,
+      );
+    }));
+}
+
 const rejections = [
   'custom-lexicon entry "hello": "h @ . l oU" is not well-formed (no-primary-stress)',
   'custom-lexicon entry "hello": "q" is not well-formed (unknown-phone); custom-lexicon entry "": "h" is not well-formed (empty-spelling)',

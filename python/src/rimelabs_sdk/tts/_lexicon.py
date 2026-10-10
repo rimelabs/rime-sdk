@@ -23,4 +23,9 @@ def snapshot(entries: Sequence[PronunciationEntry]) -> tuple[PronunciationEntry,
             raise RimeInputError("custom_lexicon must contain PronunciationEntry values")
         if not isinstance(entry.spelling, str) or not isinstance(entry.pronunciation, str):
             raise RimeInputError("Lexicon spelling and pronunciation must be strings")
+        try:
+            entry.spelling.encode("utf-8")
+            entry.pronunciation.encode("utf-8")
+        except UnicodeEncodeError:
+            raise RimeInputError("Lexicon spelling and pronunciation must be valid UTF-8") from None
     return result

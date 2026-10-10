@@ -69,6 +69,38 @@ async def test_bad_lexicon_shape_fails_before_network(setup, entries):
     assert not service.calls
 
 
+@pytest.mark.parametrize("complete_text", [False, True])
+@pytest.mark.parametrize("field", ["spelling", "pronunciation"])
+@pytest.mark.parametrize("codepoint", [0xD800, 0xDFFF])
+async def test_non_utf8_lexicon_fields_fail_before_network(setup, complete_text, field, codepoint):
+    service, client = setup
+    fields = {"spelling": "hello", "pronunciation": 'h @ . " l oU'}
+    fields[field] = f"bad{chr(codepoint)}"
+    with pytest.raises(RimeInputError, match="valid UTF-8") as caught:
+        client.tts.stream(
+            "Hello.",
+            complete_text=complete_text,
+            custom_lexicon=[PronunciationEntry(**fields)],
+        )
+    assert caught.value.request_id is None
+    assert not client.tts._streams
+    assert client.tts._channel is None
+    assert not service.calls
+    assert not service.complete_calls
+
+
+@pytest.mark.parametrize("complete_text", [False, True])
+async def test_valid_unicode_lexicon_fields_reach_service_unchanged(setup, complete_text):
+    service, client = setup
+    # Encoding validation must preserve Unicode and leave linguistic checks to the service.
+    entry = PronunciationEntry("cafe\u0301 \U0001f642", "é \U0001f642")
+    stream = client.tts.stream("Hello.", complete_text=complete_text, custom_lexicon=[entry])
+    assert b"".join([part async for part in stream]) == service.payload
+    request = service.complete_calls[0] if complete_text else service.calls[0][0].header
+    assert request.custom_lexicon[0].spelling == entry.spelling
+    assert request.custom_lexicon[0].pronunciation == entry.pronunciation
+
+
 REJECTIONS = [
     'custom-lexicon entry "hello": "h @ . l oU" is not well-formed (no-primary-stress)',
     'custom-lexicon entry "hello": "q" is not well-formed (unknown-phone); custom-lexicon entry "": "h" is not well-formed (empty-spelling)',

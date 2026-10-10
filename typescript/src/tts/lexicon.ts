@@ -6,6 +6,9 @@ export interface PronunciationEntry {
   readonly pronunciation: string;
 }
 
+// Unicode mode treats valid surrogate pairs as one code point outside this range.
+const unpairedSurrogate = /[\uD800-\uDFFF]/u;
+
 /** Copy request options now; model and linguistic validation belong to the service. */
 export function snapshot(
   entries: readonly PronunciationEntry[] = [],
@@ -25,6 +28,13 @@ export function snapshot(
       )
         throw new RimeInputError(
           "Lexicon entries must have string spelling and pronunciation fields",
+        );
+      if (
+        unpairedSurrogate.test(entry.spelling) ||
+        unpairedSurrogate.test(entry.pronunciation)
+      )
+        throw new RimeInputError(
+          "Lexicon spelling and pronunciation must contain valid Unicode",
         );
       return Object.freeze({
         spelling: entry.spelling,

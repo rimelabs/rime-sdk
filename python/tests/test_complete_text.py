@@ -74,6 +74,18 @@ async def test_full_text_cancellation_and_input_validation(setup):
         await reading
 
 
+@pytest.mark.parametrize("codepoint", [0xD800, 0xDFFF])
+async def test_full_text_rejects_non_utf8_before_network(setup, codepoint):
+    service, client = setup
+    with pytest.raises(RimeInputError, match="valid UTF-8") as caught:
+        client.tts.stream(f"Hello {chr(codepoint)}.", complete_text=True)
+    assert caught.value.request_id is None
+    assert not client.tts._streams
+    assert client.tts._channel is None
+    assert not service.calls
+    assert not service.complete_calls
+
+
 async def test_full_text_timestamps_share_audio_completion_contract(setup):
     service, _ = setup
     service.final_responses = [

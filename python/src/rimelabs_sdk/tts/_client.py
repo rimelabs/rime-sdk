@@ -59,7 +59,11 @@ class _TTS:
         if complete_text:
             if not isinstance(text, str):
                 raise RimeInputError("complete_text=True requires a string, not a text source")
-            if len(text.encode("utf-8")) > self._policy.sentence_bytes:
+            try:
+                text_bytes = len(text.encode("utf-8"))
+            except UnicodeEncodeError:
+                raise RimeInputError("Complete text must be valid UTF-8") from None
+            if text_bytes > self._policy.sentence_bytes:
                 raise RimeInputError("Complete text must be at most 65536 UTF-8 bytes")
         if not isinstance(timestamps, bool):
             raise RimeInputError("timestamps must be a boolean")
