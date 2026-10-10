@@ -8,7 +8,7 @@ pub enum ErrorKind {
     Authentication,
     /// Credentials lack permission.
     Permission,
-    /// Invalid configuration or text input.
+    /// Invalid configuration or source input.
     Input,
     /// A server or local resource limit was exceeded.
     ResourceLimit,
@@ -16,7 +16,7 @@ pub enum ErrorKind {
     Unavailable,
     /// An operation or progress deadline expired.
     Timeout,
-    /// The client or audio stream was cancelled.
+    /// The client or stream was cancelled.
     Cancelled,
     /// Audio does not match the required PCM format.
     AudioFormat,
@@ -34,9 +34,9 @@ pub struct Error {
 }
 
 impl Error {
-    /// Report a failure from an application-provided text source.
+    /// Report a failure from an application-provided text or audio source.
     pub fn input(source: impl StdError + Send + Sync + 'static) -> Self {
-        Self::new(ErrorKind::Input, "text source failed").caused_by(source)
+        Self::new(ErrorKind::Input, "input source failed").caused_by(source)
     }
 
     pub(crate) fn new(kind: ErrorKind, message: &'static str) -> Self {

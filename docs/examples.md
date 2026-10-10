@@ -11,7 +11,7 @@ key. Prism also needs a deployment URL and voice.
 | --- | --- | --- | --- | --- |
 | TTS: save speech | [save.py](../python/examples/tts/save.py) | [save.ts](../typescript/examples/tts/save.ts) | [save](../go/examples/save/main.go) | [save.rs](../rust/examples/save.rs) |
 | TTS: play streamed text | [play.py](../python/examples/tts/play.py) | [play.ts](../typescript/examples/tts/play.ts) | | |
-| STT: transcribe audio | [stream.py](../python/examples/stt/stream.py) | [stream.mjs](../typescript/examples/stt/stream.mjs) | [transcribe](../go/examples/transcribe/main.go) | |
+| STT: transcribe audio | [stream.py](../python/examples/stt/stream.py) | [stream.mjs](../typescript/examples/stt/stream.mjs) | [transcribe](../go/examples/transcribe/main.go) | [transcribe.rs](../rust/examples/transcribe.rs) |
 | STT: terminal voice loop | [voice.py](../python/examples/stt/voice.py) | [voice.mjs](../typescript/examples/stt/voice.mjs) | [voice](../go/examples/voice/main.go) | |
 | Prism: recorded speech | [recorded.py](../python/examples/realtime/recorded.py) | [recorded.ts](../typescript/examples/realtime/recorded.ts) | | |
 | Prism: voice conversation | [voice.py](../python/examples/realtime/voice.py) | [voice.ts](../typescript/examples/realtime/voice.ts) | | |
@@ -159,6 +159,12 @@ Run `go -C go run ./examples/save` with `RIME_API_KEY` set. See
 Run `cargo run --manifest-path rust/Cargo.toml --example save` from the repository
 root with `RIME_API_KEY` set. It saves raw PCM16 mono 24 kHz audio to `speech.pcm`.
 
+## Rust STT
+
+Run `cargo run --manifest-path rust/Cargo.toml --example transcribe -- utterance.pcm en`
+with `RIME_API_KEY` set. Input must be headerless PCM16 mono 16 kHz. The example
+prints replacement partials, the final text, and the request ID. See
+[the Rust STT guide](../rust/README.md#transcribe-speech) for other input formats.
 
 ## Speech recognition
 
