@@ -195,6 +195,12 @@ to request a release.
 
 ## How CI starts
 
+The **Release** workflow merges the latest `main` into an open release PR branch
+before updating metadata and starting checks. This includes test and maintenance
+commits even when Release Please leaves the release notes unchanged. If the branch
+already includes `main`, this step creates no commit. A merge conflict stops
+preparation; resolve it on the release branch, then rerun **Release** on `main`.
+
 GitHub suppresses most new workflow runs for changes made by `GITHUB_TOKEN`.
 The **Release** workflow therefore starts **Package checks** explicitly on the
 release PR branch after the Python metadata update. This uses `workflow_dispatch`,
