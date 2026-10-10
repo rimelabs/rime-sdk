@@ -31,8 +31,8 @@ Select Mist v3 with `Rime(model="mistv3")`. Mist v1 and v2 are not supported.
 
 | Model | Standard endpoint | Default voice |
 | --- | --- | --- |
-| `coda` | `coda.api.rime.ai:443` | `clementine` |
-| `mistv3` | `mist.api.rime.ai:443` | `astra` |
+| `coda` | `coda.api.rime.ai:50051` | `clementine` |
+| `mistv3` | `mist.api.rime.ai:50051` | `astra` |
 
 ### Client options
 

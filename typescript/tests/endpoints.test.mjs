@@ -82,8 +82,8 @@ for (const themis of [false, true])
           mist.supportedSpeakers = ["astra"];
           custom.supportedSpeakers = ["customer-voice"];
           const routes = {
-            "coda.api.rime.ai:443": standard.target,
-            "mist.api.rime.ai:443": mist.target,
+            "coda.api.rime.ai:50051": standard.target,
+            "mist.api.rime.ai:50051": mist.target,
             [`customer.example:${endpoint.includes(":") ? 8443 : 443}`]:
               custom.target,
           };

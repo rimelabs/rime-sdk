@@ -9,7 +9,7 @@ from .._validation import endpoint_address
 class Policy:
     """Transport and memory bounds; timeout values are durations in seconds."""
 
-    target: str = "stt.api.rime.ai:443"
+    target: str = "stt.api.rime.ai:50051"
     connection_timeout: float = 10
     acceptance_timeout: float = 10
     completion_timeout: float = 120

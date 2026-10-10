@@ -27,7 +27,7 @@ export interface RimeOptions {
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
-  /** Recognition hostname and optional port; defaults to stt.api.rime.ai:443. */
+  /** Recognition hostname and optional port; defaults to stt.api.rime.ai:50051. */
   sttEndpoint?: string | null;
 }
 

@@ -60,8 +60,8 @@ async def test_clients_route_speech_and_discovery_independently(
         custom.supported_speakers = ["customer-voice"]
         port = 8443 if ":" in endpoint else 443
         routes = {
-            "coda.api.rime.ai:443": standard.target,
-            "mist.api.rime.ai:443": mist.target,
+            "coda.api.rime.ai:50051": standard.target,
+            "mist.api.rime.ai:50051": mist.target,
             f"customer.example:{port}": custom.target,
         }
 
