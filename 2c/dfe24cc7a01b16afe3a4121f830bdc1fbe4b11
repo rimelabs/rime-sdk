@@ -1,0 +1,19 @@
+rust/src/client.rs
+  s_c318ad644fb4fe::t_0dfc25b34bcb95 247-251,323-326,331,334,344-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2cdfe24cc7a01b16afe3a4121f830bdc1fbe4b11",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
