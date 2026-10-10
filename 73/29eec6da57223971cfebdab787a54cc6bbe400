@@ -1,0 +1,25 @@
+rust/src/stt/mod.rs
+  s_6eace835538c82::t_91f612e9ab2f07 4,8
+rust/src/stt/queue.rs
+  s_6eace835538c82::t_7320e0c9a201dd 1-127
+rust/src/stt/stream.rs
+  s_6eace835538c82::t_ba9549c8aa26a2 1-2,5,9,13,21,40,83-86,88,103,124,127
+rust/src/stt/transport.rs
+  s_6eace835538c82::t_314fee057ce536 1-153
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7329eec6da57223971cfebdab787a54cc6bbe400",
+  "prompts": {},
+  "sessions": {
+    "s_6eace835538c82": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12723-1a41-7d00-b896-31fad3fdd58f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
