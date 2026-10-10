@@ -1,0 +1,27 @@
+rust/src/stt/tests/audio.rs
+  s_6eace835538c82::t_21daf6ce6ef5aa 1-55
+rust/src/stt/tests/lifecycle.rs
+  s_6eace835538c82::t_e2809a4ad61e29 1-219
+rust/src/stt/tests/mod.rs
+  s_6eace835538c82::t_9f0e283c45f534 1-8,11
+rust/src/stt/tests/protocol.rs
+  s_6eace835538c82::t_1dda2edca2cf60 1-63
+rust/src/stt/tests/transport.rs
+  s_6eace835538c82::t_1a7af74d0b6bee 1-254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "71a865e37c6f8e25a66b2374752462ba64bc738e",
+  "prompts": {},
+  "sessions": {
+    "s_6eace835538c82": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12723-1a41-7d00-b896-31fad3fdd58f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
