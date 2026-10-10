@@ -118,12 +118,9 @@ impl Converter {
             return Ok(data);
         }
         let mut output = Vec::with_capacity(data.len() / 6 + 11);
-        for sample in data.chunks_exact(2) {
+        for sample in data.as_chunks::<2>().0 {
             self.input_samples += 1;
-            self.sample(
-                i16::from_le_bytes([sample[0], sample[1]]) as f64,
-                &mut output,
-            );
+            self.sample(i16::from_le_bytes(*sample) as f64, &mut output);
         }
         if final_chunk {
             while self.emitted < self.input_samples.div_ceil(3) {
