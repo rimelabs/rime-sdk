@@ -75,8 +75,8 @@ jobs:
       - run: uv run pytest
       - name: Check release automation
         run: |
-          uv run ruff check ../.github/scripts/tests
-          uv run ruff format --check ../.github/scripts/tests
+          uv run ruff check --config pyproject.toml ../.github/scripts/update-api-dependencies.py ../.github/scripts/tests
+          uv run ruff format --check --config pyproject.toml ../.github/scripts/update-api-dependencies.py ../.github/scripts/tests
           uv run pytest ../.github/scripts/tests
       - run: uv build
   typescript:

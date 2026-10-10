@@ -140,12 +140,41 @@ does not publish packages.
 
 ## API dependency updates
 
-The SDK uses published `rime-api` and `@rimelabs/api` packages.
-[Dependabot](.github/dependabot.yml) checks for new versions each weekday after
-its config reaches `main`. It opens separate Python and Node.js update PRs and
-updates each package's exact dependency version and lockfile. The config limits
-version updates to these two dependencies. Both API packages are excluded from
-the cooldown, so a new release is eligible at the next check.
+After `rime-api` completes publication to all registries and verifies the Go
+module, it starts [Update API dependencies](.github/workflows/update-api-dependencies.yml)
+on this repository's `main` branch. The workflow updates the Python, TypeScript,
+Go, and Rust dependencies and their lockfiles in one PR per API version. It
+starts **Package checks** on the PR branch, including on a repeated request.
+It does not merge the PR or publish the SDK.
+
+Merge this workflow before enabling the sender in `rime-api`. In `rime-api`,
+set the Actions secret `RIME_SDK_UPDATE_TOKEN` to a fine-grained token with
+access to only `rimelabs/rime-sdk` and **Actions: Read and write** permission.
+No SDK contents or pull request write permission is needed for that token.
+The SDK workflow uses its own `GITHUB_TOKEN` to write the branch and open the
+PR. Keep **Allow GitHub Actions to create and approve pull requests** enabled
+in this repository. The workflow does not approve PRs.
+
+To recover a missed request, run the workflow on `main` with the published
+stable API version, without a `v` prefix:
+
+```sh
+gh workflow run update-api-dependencies.yml --repo rimelabs/rime-sdk \
+  --ref main --field version=0.4.0
+```
+
+The workflow requires a completed, stable GitHub API release. Package managers
+retry temporary registry failures. Repeated requests update the same version
+branch. Requests for versions already installed in all four SDKs make no
+changes. An older request never downgrades an installed API dependency.
+An update that needs a newer Go toolchain fails for review instead of silently
+changing the SDK's minimum Go version.
+
+[Dependabot](.github/dependabot.yml) remains a scheduled fallback. It checks
+each weekday and can open separate API update PRs. All four API packages are
+excluded from its cooldown. Python and npm checks allow only the API package;
+Go and Rust checks also cover other dependencies. Close a separate Dependabot
+PR if the coordinated update PR already includes it.
 
 To check immediately, open **Insights > Dependency graph > Dependabot** in GitHub.
 For each package manager, open **Recent update jobs** and select **Check for updates**.
@@ -155,8 +184,8 @@ Review each update and wait for **Package checks** to pass. Keep the generated
 affected SDK package in a release PR. Review and merge that release PR to publish.
 An API release does not publish an SDK release on its own.
 
-Copybara does not manage these dependency versions. Dependabot reads the package
-registries, so no change to the API release workflow is needed.
+Copybara does not manage these dependency versions. The release notification
+selects the version; each package manager resolves it from its public registry.
 
 ## Alpha versions
 

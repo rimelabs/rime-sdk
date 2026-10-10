@@ -1,0 +1,89 @@
+name: Update API dependencies
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published stable rime-api version, such as 0.4.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-api-dependencies
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    env:
+      API_VERSION: ${{ inputs.version }}
+      GOTOOLCHAIN: local
+    steps:
+      - name: Verify the completed API release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = process.env.API_VERSION;
+            if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version)) {
+              throw new Error('Expected a stable API version such as 0.4.0');
+            }
+            const { data: release } = await github.rest.repos.getReleaseByTag({
+              owner: 'rimelabs', repo: 'rime-api', tag: `v${version}`,
+            });
+            if (release.draft || release.prerelease) {
+              throw new Error('The API release must be published and stable');
+            }
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - run: npm install --global npm@11.18.0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - name: Update manifests and lockfiles
+        run: uv run --no-project python .github/scripts/update-api-dependencies.py "$API_VERSION"
+      - name: Open or update the dependency PR
+        id: pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: automation/api-${{ inputs.version }}
+          base: main
+          title: 'fix(deps): update API packages to ${{ inputs.version }}'
+          commit-message: 'fix(deps): update API packages to ${{ inputs.version }}'
+          body: |
+            Update the Python, TypeScript, Go, and Rust API dependencies and lockfiles
+            to [rime-api v${{ inputs.version }}](https://github.com/rimelabs/rime-api/releases/tag/v${{ inputs.version }}).
+
+            Review the package checks before merging. This PR does not publish the SDK.
+          add-paths: |
+            python/pyproject.toml
+            python/uv.lock
+            typescript/package.json
+            package-lock.json
+            go/go.mod
+            go/go.sum
+            rust/Cargo.toml
+            rust/Cargo.lock
+      - name: Run package checks on the dependency PR
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_BRANCH: automation/api-${{ inputs.version }}
+        run: gh workflow run checks.yml --repo "$GITHUB_REPOSITORY" --ref "$UPDATE_BRANCH"
