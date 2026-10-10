@@ -244,6 +244,11 @@ pub(crate) struct Inner {
     pub(crate) progress_timeout: Duration,
 }
 
+enum DiscoveryRequest {
+    Voices { language: Option<String> },
+    Languages,
+}
+
 impl Inner {
     pub(crate) async fn stub(&self) -> Result<TextToSpeechClient<Channel>, Error> {
         let channel = self
@@ -315,15 +320,18 @@ impl Client {
         if language.is_some_and(|value| value.trim().is_empty()) {
             return Err(Error::new(ErrorKind::Input, "language must not be blank"));
         }
-        self.discover(Some(language.map(str::to_owned))).await
+        self.discover(DiscoveryRequest::Voices {
+            language: language.map(str::to_owned),
+        })
+        .await
     }
 
     /// List supported languages. Uses a maximum ten-second budget.
     pub async fn languages(&self) -> Result<Vec<String>, Error> {
-        self.discover(None).await
+        self.discover(DiscoveryRequest::Languages).await
     }
 
-    async fn discover(&self, language: Option<Option<String>>) -> Result<Vec<String>, Error> {
+    async fn discover(&self, request: DiscoveryRequest) -> Result<Vec<String>, Error> {
         self.ensure_open()?;
         let budget = self
             .inner
@@ -333,18 +341,19 @@ impl Client {
         let operation = async {
             let mut stub = self.inner.stub().await?;
             for attempt in 0..3 {
-                let result = if let Some(language) = &language {
-                    stub.get_supported_speakers(self.inner.request(GetSupportedSpeakersRequest {
-                        language: language.clone(),
-                    }))
-                    .await
-                    .map(|response| response.into_inner().speakers)
-                } else {
-                    stub.get_supported_languages(
-                        self.inner.request(GetSupportedLanguagesRequest {}),
-                    )
-                    .await
-                    .map(|response| response.into_inner().languages)
+                let result = match &request {
+                    DiscoveryRequest::Voices { language } => stub
+                        .get_supported_speakers(self.inner.request(GetSupportedSpeakersRequest {
+                            language: language.clone(),
+                        }))
+                        .await
+                        .map(|response| response.into_inner().speakers),
+                    DiscoveryRequest::Languages => stub
+                        .get_supported_languages(
+                            self.inner.request(GetSupportedLanguagesRequest {}),
+                        )
+                        .await
+                        .map(|response| response.into_inner().languages),
                 };
                 match result {
                     Ok(values) => return Ok(values),
