@@ -25,8 +25,6 @@ fn detector_error(error: impl std::fmt::Display) -> Error {
 
 impl Detector {
     fn new() -> Result<Self, Error> {
-        #[cfg(test)]
-        eprintln!("[DEBUG-win-detector] compile");
         static COMPILED: OnceLock<Result<(Engine, Arc<Module>), Error>> = OnceLock::new();
         let (engine, module) = COMPILED
             .get_or_init(|| {
@@ -39,8 +37,6 @@ impl Detector {
             })
             .as_ref()
             .map_err(Clone::clone)?;
-        #[cfg(test)]
-        eprintln!("[DEBUG-win-detector] link");
         let mut linker = Linker::<Host>::new(engine);
         wasmi_wasi::add_to_linker(&mut linker, |host| &mut host.wasi).map_err(detector_error)?;
         linker
@@ -57,8 +53,6 @@ impl Detector {
         );
         store.limiter(|host| &mut host.limits);
         store.set_fuel(FUEL).map_err(detector_error)?;
-        #[cfg(test)]
-        eprintln!("[DEBUG-win-detector] instantiate");
         let instance = linker
             .instantiate_and_start(&mut store, module)
             .map_err(detector_error)?;
