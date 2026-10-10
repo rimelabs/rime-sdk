@@ -1,0 +1,32 @@
+.github/scripts/update-api-dependencies.py
+  s_88d2a439fbab05::t_b3fa599d81bcd4 1-41,47-48,54-62,66-68,72-77,91-92,106-112
+  s_88d2a439fbab05::t_b7501eea8fe8cd 42-46,49-53,63-65,69-71,78-90,93-105
+  s_88d2a439fbab05::t_1792578be76138 113-114
+.github/workflows/checks.yml
+  s_88d2a439fbab05::t_e86ae73b060e62 78-79
+.github/dependabot.yml
+  s_88d2a439fbab05::t_b3fa599d81bcd4 7-10
+.github/scripts/tests/test_api_dependencies.py
+  s_88d2a439fbab05::t_f744338660406d 1-103
+  s_88d2a439fbab05::t_9ae579fe8a2d88 104-110
+RELEASING.md
+  s_88d2a439fbab05::t_f744338660406d 143-177,187-188
+.github/workflows/update-api-dependencies.yml
+  s_88d2a439fbab05::t_b3fa599d81bcd4 1-89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a22b0389a26b541d474883d83d632d53b0c4db32",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
