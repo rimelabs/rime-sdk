@@ -5,8 +5,8 @@ All four use `synthesize` for complete text and `stream` for incremental text in
 Both methods return streaming audio. Go uses `Synthesize` and `Stream`.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
-Python, Node.js, and Go support streaming speech recognition: `client.stt.stream` in
-Python/Node.js and `client.STT.Stream` in Go. Supply a spoken language and a
+All four SDKs support streaming speech recognition: `client.stt.stream` in
+Python/Node.js, `client.STT.Stream` in Go, and `client.stt().stream` in Rust. Supply a spoken language and a
 streaming audio source; updates replace the current
 transcript and source exhaustion ends the utterance.
 
@@ -23,11 +23,11 @@ streaming and discovery methods. Mist v1 and v2 are not supported.
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |
 | `@rimelabs/sdk` | [typescript](typescript/) | Node.js 22+; ESM |
 | `github.com/rimelabs/rime-sdk/go` | [go](go/) | Go 1.24+; TTS and STT |
-| `rimelabs-sdk` on crates.io | [rust](rust/) | Rust 1.88+ and Tokio; TTS only |
+| `rimelabs-sdk` on crates.io | [rust](rust/) | Rust 1.88+ and Tokio; TTS and STT |
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
 [Python TTS](python/docs/tts.md), [Python STT](python/docs/stt.md), [Python Realtime](python/docs/realtime.md),
-[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), and [Go STT](go/README.md#transcribe-speech).
+[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), [Go STT](go/README.md#transcribe-speech), and [Rust STT](rust/README.md#transcribe-speech).
 Runnable scripts are in the
 [example index](docs/examples.md).
 
@@ -47,7 +47,7 @@ points have no compatibility aliases. STT and realtime methods retain their name
 
 ## Local setup
 
-All three SDKs use versioned API packages with STT definitions. The commands
+All four SDKs use versioned API packages with STT definitions. The commands
 below install those dependencies; no local schema build is required.
 
 ```sh

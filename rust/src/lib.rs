@@ -1,4 +1,4 @@
-//! Asynchronous Coda and Mist v3 text-to-speech with bounded audio buffering.
+//! Asynchronous speech recognition and Coda and Mist v3 text-to-speech.
 //!
 //! Use [`Client::builder`] to configure credentials. The SDK uses the caller's
 //! Tokio runtime with I/O and time enabled. Audio is raw mono PCM16 at 24 kHz
@@ -12,11 +12,15 @@ mod client;
 mod error;
 mod sentences;
 mod stream;
+pub mod stt;
 
 pub use audio::AudioFormat;
 pub use client::{Client, ClientBuilder, Model, SynthesisOptions, Tts};
 pub use error::{Error, ErrorKind};
 pub use stream::AudioStream;
+pub use stt::{
+    PcmFormat, Stt, TranscriptStream, TranscriptionMode, TranscriptionOptions, TranscriptionUpdate,
+};
 
 #[cfg(test)]
 mod tests;

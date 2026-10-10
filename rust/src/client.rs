@@ -1,8 +1,8 @@
 use crate::{AudioFormat, AudioStream, Error, ErrorKind};
 use futures_core::Stream;
 use rimelabs_api::{
-    text_to_speech_client::TextToSpeechClient, GetSupportedLanguagesRequest,
-    GetSupportedSpeakersRequest,
+    speech_to_text_client::SpeechToTextClient, text_to_speech_client::TextToSpeechClient,
+    GetSupportedLanguagesRequest, GetSupportedSpeakersRequest,
 };
 use std::{
     fmt,
@@ -82,6 +82,7 @@ pub struct ClientBuilder {
     key: Option<String>,
     model: Model,
     endpoint: Option<String>,
+    stt_endpoint: Option<String>,
     timeout: Option<Duration>,
 }
 
@@ -91,6 +92,7 @@ impl fmt::Debug for ClientBuilder {
             .debug_struct("ClientBuilder")
             .field("model", &self.model)
             .field("endpoint", &self.endpoint)
+            .field("stt_endpoint", &self.stt_endpoint)
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
@@ -112,7 +114,12 @@ impl ClientBuilder {
         self.endpoint = Some(endpoint.into());
         self
     }
-    /// Set an overall request timeout. The default is no overall timeout.
+    /// Override the STT TLS hostname and optional port. Defaults to `stt.api.rime.ai:443`.
+    pub fn stt_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.stt_endpoint = Some(endpoint.into());
+        self
+    }
+    /// Set an overall TTS request timeout. The default is no overall timeout.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
@@ -147,10 +154,25 @@ impl ClientBuilder {
             })?
             .connect_timeout(Duration::from_secs(10));
         let cancellation = CancellationToken::new();
+        let stt_target = self
+            .stt_endpoint
+            .as_deref()
+            .unwrap_or("stt.api.rime.ai:443");
+        validate_endpoint(stt_target)?;
+        let stt_endpoint = Endpoint::from_shared(format!("https://{stt_target}"))
+            .map_err(|error| Error::new(ErrorKind::Input, "invalid STT endpoint").caused_by(error))?
+            .tls_config(ClientTlsConfig::new().with_native_roots())
+            .map_err(|error| {
+                Error::new(ErrorKind::Input, "invalid STT TLS configuration").caused_by(error)
+            })?
+            .connect_timeout(Duration::from_secs(10));
         Ok(Client {
             lifetime: Arc::new(ClientLifetime(cancellation.clone())),
             inner: Arc::new(Inner {
                 endpoint,
+                stt_endpoint,
+                stt_channel: OnceCell::new(),
+                stt_limits: crate::stt::Limits::default(),
                 authorization,
                 model: self.model,
                 timeout: self.timeout,
@@ -214,7 +236,7 @@ pub(crate) fn validate_timeout(timeout: Option<Duration>) -> Result<(), Error> {
     Ok(())
 }
 
-fn require_runtime() -> Result<(), Error> {
+pub(crate) fn require_runtime() -> Result<(), Error> {
     tokio::runtime::Handle::try_current()
         .map(|_| ())
         .map_err(|_| Error::new(ErrorKind::Input, "operations require a Tokio runtime"))
@@ -247,6 +269,9 @@ impl fmt::Debug for Client {
 
 pub(crate) struct Inner {
     pub(crate) endpoint: Endpoint,
+    pub(crate) stt_endpoint: Endpoint,
+    stt_channel: OnceCell<Channel>,
+    pub(crate) stt_limits: crate::stt::Limits,
     authorization: MetadataValue<Ascii>,
     pub(crate) model: Model,
     pub(crate) timeout: Option<Duration>,
@@ -264,6 +289,23 @@ enum DiscoveryRequest {
 }
 
 impl Inner {
+    pub(crate) async fn stt_stub(&self) -> Result<SpeechToTextClient<Channel>, Error> {
+        let channel = self
+            .stt_channel
+            .get_or_try_init(|| async {
+                tokio::time::timeout(Duration::from_secs(10), self.stt_endpoint.connect())
+                    .await
+                    .map_err(|_| Error::new(ErrorKind::Timeout, "STT connection timed out"))?
+                    .map_err(|error| {
+                        Error::new(ErrorKind::Unavailable, "could not connect to STT service")
+                            .caused_by(error)
+                    })
+            })
+            .await?;
+        Ok(SpeechToTextClient::new(channel.clone())
+            .max_decoding_message_size(262_144)
+            .max_encoding_message_size(131_072))
+    }
     pub(crate) fn spawn<F>(&self, future: F) -> Result<tokio::task::JoinHandle<F::Output>, Error>
     where
         F: Future + Send + 'static,
@@ -358,6 +400,11 @@ impl Client {
         Tts { client: self }
     }
 
+    /// Access streaming speech recognition. TTS model and timeout defaults do not apply.
+    pub fn stt(&self) -> crate::Stt<'_> {
+        crate::Stt { client: self }
+    }
+
     /// List voices, optionally for one language. Uses a maximum ten-second budget.
     ///
     /// # Panics
@@ -422,7 +469,7 @@ impl Client {
         }
     }
 
-    fn ensure_open(&self) -> Result<(), Error> {
+    pub(crate) fn ensure_open(&self) -> Result<(), Error> {
         if self.inner.cancellation.is_cancelled() {
             return Err(Error::new(ErrorKind::Cancelled, "client is closed"));
         }

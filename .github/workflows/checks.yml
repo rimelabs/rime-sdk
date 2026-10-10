@@ -156,7 +156,7 @@ jobs:
           components: rustfmt, clippy
       - name: Check shared fixtures and WASM
         run: |
-          for fixture in sentences contract audio mulaw; do
+          for fixture in sentences contract audio mulaw pcm-input stt/transcripts; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
           cmp ../go/internal/sentences/blingfire.wasm vendor/blingfire.wasm
