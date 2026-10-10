@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.6](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.5...go/v0.1.0-alpha.6) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Use synthesize for complete text and stream for incremental text in all SDKs. Go StreamSource becomes Stream. Rust synthesis moves under Client::tts(). Both methods return streaming audio.
+
+### Features
+
+* align TTS APIs and SDK example workflows ([#49](https://github.com/rimelabs/rime-sdk/issues/49)) ([bc2be77](https://github.com/rimelabs/rime-sdk/commit/bc2be779f7a845d51850fbe068a4cf6d95eab666))
+
+
+### Bug Fixes
+
+* **deps:** bump github.com/rimelabs/rime-api/go in /go ([#53](https://github.com/rimelabs/rime-sdk/issues/53)) ([866f2c6](https://github.com/rimelabs/rime-sdk/commit/866f2c66c43fb42fa049697de6f8ba60537c9480))
+
 ## [0.1.0-alpha.5](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.4...go/v0.1.0-alpha.5) (2026-10-09)
 
 

@@ -1,6 +1,6 @@
 {
-  "rust": "0.1.0-alpha.2",
-  "go": "0.1.0-alpha.5",
-  "python": "0.1.0-alpha.10",
-  "typescript": "0.1.0-alpha.11"
+  "rust": "0.1.0-alpha.3",
+  "go": "0.1.0-alpha.6",
+  "python": "0.1.0-alpha.11",
+  "typescript": "0.1.0-alpha.12"
 }

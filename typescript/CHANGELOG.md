@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.12](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.11...typescript-v0.1.0-alpha.12) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* Use synthesize for complete text and stream for incremental text in all SDKs. Go StreamSource becomes Stream. Rust synthesis moves under Client::tts(). Both methods return streaming audio.
+
+### Features
+
+* align TTS APIs and SDK example workflows ([#49](https://github.com/rimelabs/rime-sdk/issues/49)) ([bc2be77](https://github.com/rimelabs/rime-sdk/commit/bc2be779f7a845d51850fbe068a4cf6d95eab666))
+
+
+### Bug Fixes
+
+* **deps:** bump @rimelabs/api from 0.3.0 to 0.4.0 ([#54](https://github.com/rimelabs/rime-sdk/issues/54)) ([bc89e38](https://github.com/rimelabs/rime-sdk/commit/bc89e384a6555ed8bd31b94f62c1647662543769))
+
 ## [0.1.0-alpha.11](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.10...typescript-v0.1.0-alpha.11) (2026-10-09)
 
 
