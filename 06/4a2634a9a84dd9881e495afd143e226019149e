@@ -1,0 +1,21 @@
+.github/workflows/checks.yml
+  s_c318ad644fb4fe::t_ff0924ab9a9cf3 160-162,165-168
+rust/src/sentences.rs
+  s_c318ad644fb4fe::t_ff0924ab9a9cf3 28-29,42-43,60-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "064a2634a9a84dd9881e495afd143e226019149e",
+  "prompts": {},
+  "sessions": {
+    "s_c318ad644fb4fe": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11f1e-7c66-7572-b92a-1de34cac6a12",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
