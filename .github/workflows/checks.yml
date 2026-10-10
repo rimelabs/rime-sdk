@@ -157,7 +157,8 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Diagnose Windows sentence detection
         if: runner.os == 'Windows'
-        run: cargo test --locked sentences:: -- --test-threads=1 --nocapture
+        run: |
+          cargo test --locked sentences:: -- --test-threads=1 --nocapture
       - run: cargo test --locked
       - run: cargo doc --locked --no-deps
       - run: cargo package --locked
