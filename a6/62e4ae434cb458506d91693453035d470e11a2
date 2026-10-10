@@ -1,0 +1,117 @@
+typescript/tests/realtime-examples.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 11
+python/tests/test_voice_examples.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 19,21-24
+python/examples/realtime/voice_tools.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-25
+typescript/examples/realtime/recorded.ts
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-76
+python/tests/test_terminal_voice.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 20-21
+typescript/examples/README.md
+  s_88d2a439fbab05::t_87fc605a227d75 1-31
+python/pyproject.toml
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 43-48
+python/examples/realtime/voice.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-159
+.github/workflows/checks.yml
+  s_88d2a439fbab05::t_33ff3675d17eae 103-104
+  s_88d2a439fbab05::t_333882e44f857c 39-40,44,68-70,72-73,78-79,98-101,105-106
+  s_88d2a439fbab05::t_20dd25f61dbd87 110
+python/tests/test_examples.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 14
+python/examples/tts/play.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-35
+typescript/examples/tests/tools.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-138
+python/examples/README.md
+  s_88d2a439fbab05::t_87fc605a227d75 1-28
+.github/dependabot.yml
+  s_88d2a439fbab05::t_333882e44f857c 35
+.github/workflows/check-published-examples.yml
+  s_88d2a439fbab05::t_9ff51711b3bd7e 68-70,72-78
+  s_88d2a439fbab05::t_3277c10f0ec9b0 1,11-13,25-28,31,34,42-43,52,54-59,61-67,79-90
+python/examples/audio_devices.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-174
+package.json
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-9
+typescript/examples/tests/audio.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-140
+python/examples/pyproject.toml
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-17
+README.md
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 32
+  s_88d2a439fbab05::t_ba5d378ea303bb 57,59,68
+python/examples/realtime/typed_turn.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-54
+typescript/docs/stt.md
+  s_88d2a439fbab05::t_2865773e0b04e3 35
+python/examples/tts/stream.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-25
+RELEASING.md
+  s_88d2a439fbab05::t_ba5d378ea303bb 112-113,126,128-133,135-139,176-177
+typescript/tests/terminal-voice.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 18
+CONTRIBUTING.md
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 102
+  s_88d2a439fbab05::t_ba5d378ea303bb 68-72,79-80,92,99,103-106,109-111,113,155
+  s_88d2a439fbab05::t_20dd25f61dbd87 96
+python/examples/realtime/recorded.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-78
+python/examples/realtime/tools.py
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-88
+.github/scripts/check-release-versions.py
+  s_88d2a439fbab05::t_333882e44f857c 15,34-35
+.gitignore
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 15
+  s_88d2a439fbab05::t_2865773e0b04e3 16
+docs/examples.md
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-2,22-28,30-31,33-35,38-41,43-48,50-61,64,66-74,77-78,81-107,109-113,116-130,134-151,157-182
+  s_88d2a439fbab05::t_ba5d378ea303bb 3-21,29,32,36-37,42,49,62-63,65,75-76,79-80,108,114-115,131-133,152-156,183-207
+  s_88d2a439fbab05::t_20dd25f61dbd87 208-209
+python/docs/stt.md
+  s_88d2a439fbab05::t_2865773e0b04e3 40
+docs/terminal-voice.md
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-24,26-57,59-61,63-104,106-124,126-132,134-136,139-154
+  s_88d2a439fbab05::t_ba5d378ea303bb 25,58,62,105,125,133,137-138
+.github/workflows/release-please.yml
+  s_88d2a439fbab05::t_333882e44f857c 74-78,83-84,88,148-149,184,292-293,296-297,301,303-304,307-308,312
+  s_88d2a439fbab05::t_20dd25f61dbd87 201,203
+typescript/examples/tests/realtime.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-232
+typescript/examples/tts/stream.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-20
+.npmrc
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1
+typescript/examples/package.json
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 1-29
+typescript/package.json
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 32
+typescript/tests/stt.test.mjs
+  s_88d2a439fbab05::t_5e4f69d7ee1cdf 618,634
+  s_88d2a439fbab05::t_82903c6c3f4b1d 420
+package-lock.json
+  s_88d2a439fbab05::t_b4ad9b1f84dd98 2,7-11,14-16,569-570,573-575,591-607,721-744,778-784,797-812,845-858,971-986,1013-1047
+python/uv.lock
+  s_88d2a439fbab05::t_4bb9b18f1835a9 2,10-15,167-264,688-696,817-836,1040-1055
+typescript/tests/realtime-types.test.mjs
+  s_88d2a439fbab05::t_96da2b77c299fe 9
+typescript/tests/tts-types.test.mjs
+  s_88d2a439fbab05::t_5761189a71aa67 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a662e4ae434cb458506d91693453035d470e11a2",
+  "prompts": {},
+  "sessions": {
+    "s_88d2a439fbab05": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a123e8-d517-7bb3-9d83-b8751f97ceb7",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
