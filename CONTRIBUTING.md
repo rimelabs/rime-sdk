@@ -53,11 +53,11 @@ credentials. [Live qualification](conformance/stt/README.md) uses the configured
 API key and production TLS endpoints; fake-server tests alone do not demonstrate
 deployed compatibility.
 
-Public imports and `client.tts.stream(...)` remain unchanged.
-Both packages expose `client.realtime.connect(...)`. Moving implementation files
-does not change these interfaces or the top-level voice and language discovery
-methods. Tests that use private dependency seams import them from the feature
-directories.
+TTS uses `client.tts.synthesize(text)` for complete strings and
+`client.tts.stream(chunks)` for async text sources. Both return streaming audio.
+Both packages expose `client.realtime.connect(...)`. Voice and language discovery
+remain on the top-level client. Tests that use private dependency seams import
+them from the feature directories.
 
 ## Python
 
@@ -65,8 +65,8 @@ All three SDKs consume the published, versioned API packages pinned in their
 manifests and lockfiles. Those packages contain the STT definitions, so normal
 clean installs can run the full suites without a local schema build.
 
-The examples normally pin a published SDK release. Before an STT-enabled release,
-run the Python STT example with the SDK development environment:
+The examples normally pin a published SDK release. To test the local SDK,
+run Python examples with the SDK development environment:
 `uv run --no-sync --project python python examples/python/stt/stream.py audio.pcm --language en`.
 For Node, build and pack this checkout, then install that tarball into
 `examples/typescript` with `--no-save --package-lock=false`. Keep the published
@@ -99,11 +99,13 @@ npm test
 npm pack
 ```
 
-Check the published-package examples from the repository root:
+Check the examples against a packed local SDK from the repository root:
 
 ```sh
 uv sync --project examples/python --locked
 npm --prefix examples/typescript ci
+(cd typescript && npm pack --pack-destination ../examples/typescript)
+npm --prefix examples/typescript install --no-save --package-lock=false ./examples/typescript/rimelabs-sdk-*.tgz
 npm --prefix examples/typescript run check
 npm --prefix examples/typescript test
 ```

@@ -14,7 +14,7 @@ mod sentences;
 mod stream;
 
 pub use audio::AudioFormat;
-pub use client::{Client, ClientBuilder, Model, SynthesisOptions};
+pub use client::{Client, ClientBuilder, Model, SynthesisOptions, Tts};
 pub use error::{Error, ErrorKind};
 pub use stream::AudioStream;
 

@@ -89,7 +89,7 @@ async def synthesize(client, text, language, voice, output_path=None):
         stdout=asyncio.subprocess.DEVNULL,
     )
     try:
-        async with client.tts.stream(text, language=language, voice=voice, timeout=60) as audio:
+        async with client.tts.synthesize(text, language=language, voice=voice, timeout=60) as audio:
             async for chunk in audio:
                 process.stdin.write(chunk)
                 await process.stdin.drain()

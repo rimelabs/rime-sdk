@@ -96,6 +96,10 @@ jobs:
           cache-dependency-path: typescript/package-lock.json
       - run: npm ci
       - run: npm --prefix ../examples/typescript ci
+      - name: Install the local SDK in examples
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          npm --prefix ../examples/typescript install --no-save --package-lock=false "$RUNNER_TEMP"/rimelabs-sdk-*.tgz
       - run: npm --prefix ../examples/typescript run check
       - run: npm --prefix ../examples/typescript test
       - run: npm run check

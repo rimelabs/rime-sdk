@@ -138,7 +138,7 @@ export async function speak(client, text, options, signal) {
       ["-q", ...pcmOptions(24000), "-", output ? resolve(output) : "-d"],
       false,
     );
-    audio = client.tts.stream(text, {
+    audio = client.tts.synthesize(text, {
       language: options.language,
       voice: options.voice,
       timeout: 60,

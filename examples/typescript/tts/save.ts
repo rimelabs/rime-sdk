@@ -4,7 +4,7 @@ import { WavWriter } from "../common/wav.js";
 const client = new Rime({ timeout: 60 });
 const output = new WavWriter("speech.wav");
 try {
-  const audio = client.tts.stream(
+  const audio = client.tts.synthesize(
     "Your appointment is confirmed for tomorrow at ten in the morning.",
   );
   for await (const chunk of audio) output.write(chunk);

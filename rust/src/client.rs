@@ -308,12 +308,14 @@ impl Inner {
     }
 }
 
-impl Client {
-    /// Start configuring a client.
-    pub fn builder() -> ClientBuilder {
-        ClientBuilder::default()
-    }
+/// Text-to-speech operations backed by a shared client.
+///
+/// The service borrows the client. Returned audio streams do not borrow this view.
+pub struct Tts<'a> {
+    client: &'a Client,
+}
 
+impl Tts<'_> {
     /// Start synthesis of complete text. Returns immediately; consume errors from the stream.
     ///
     /// # Panics
@@ -327,7 +329,7 @@ impl Client {
         if text.trim().is_empty() {
             return Err(Error::new(ErrorKind::Input, "text must not be blank"));
         }
-        self.synthesize_stream(futures_util::stream::once(async { Ok(text) }), options)
+        self.stream(futures_util::stream::once(async { Ok(text) }), options)
     }
 
     /// Start synthesis from incremental text. The source must yield without blocking Tokio.
@@ -335,17 +337,25 @@ impl Client {
     ///
     /// # Panics
     /// Panics if the current Tokio runtime does not have time enabled.
-    pub fn synthesize_stream<S>(
-        &self,
-        source: S,
-        options: SynthesisOptions,
-    ) -> Result<AudioStream, Error>
+    pub fn stream<S>(&self, source: S, options: SynthesisOptions) -> Result<AudioStream, Error>
     where
         S: Stream<Item = Result<String, Error>> + Send + 'static,
     {
-        self.ensure_open()?;
+        self.client.ensure_open()?;
         require_runtime()?;
-        crate::stream::start(self.inner.clone(), source, options)
+        crate::stream::start(self.client.inner.clone(), source, options)
+    }
+}
+
+impl Client {
+    /// Start configuring a client.
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::default()
+    }
+
+    /// Access text-to-speech operations. Both methods return streaming audio.
+    pub fn tts(&self) -> Tts<'_> {
+        Tts { client: self }
     }
 
     /// List voices, optionally for one language. Uses a maximum ten-second budget.
@@ -472,6 +482,7 @@ mod tests {
         let client = client();
         assert_eq!(
             client
+                .tts()
                 .synthesize("Hello.", SynthesisOptions::default())
                 .unwrap_err()
                 .kind(),
@@ -479,7 +490,8 @@ mod tests {
         );
         assert_eq!(
             client
-                .synthesize_stream(futures_util::stream::empty(), SynthesisOptions::default())
+                .tts()
+                .stream(futures_util::stream::empty(), SynthesisOptions::default())
                 .unwrap_err()
                 .kind(),
             ErrorKind::Input
@@ -513,11 +525,15 @@ mod tests {
         let client = client();
         runtime.block_on(async {
             assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                client.synthesize("Hello.", SynthesisOptions::default())
+                client
+                    .tts()
+                    .synthesize("Hello.", SynthesisOptions::default())
             }))
             .is_err());
             assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                client.synthesize_stream(futures_util::stream::empty(), SynthesisOptions::default())
+                client
+                    .tts()
+                    .stream(futures_util::stream::empty(), SynthesisOptions::default())
             }))
             .is_err());
             assert!(std::panic::AssertUnwindSafe(client.languages())

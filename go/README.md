@@ -1,6 +1,7 @@
 # Rime SDK for Go
 
-Stream Coda and Mist v3 speech from complete text or an incremental text source.
+Use `client.TTS.Synthesize` for complete text and `client.TTS.Stream` for an
+incremental text source. Both return streaming Coda and Mist v3 audio.
 The SDK handles authentication, sentence detection, gRPC, audio conversion,
 deadlines, and cancellation. It also streams speech recognition from raw PCM audio
 to partial and final transcripts. Your application owns audio capture and playback.
@@ -43,7 +44,7 @@ func save() error {
     client, err := rime.NewClient(rime.Config{})
     if err != nil { return err }
     defer client.Close()
-    stream, err := client.TTS.Stream(context.Background(), "Hello. This is Rime.", rime.SynthesisOptions{})
+    stream, err := client.TTS.Synthesize(context.Background(), "Hello. This is Rime.", rime.SynthesisOptions{})
     if err != nil { return err }
     defer stream.Close()
     file, err := os.Create("speech.pcm")
@@ -217,7 +218,7 @@ Discovery takes at most 10 seconds, including retries.
 
 ## Incremental input
 
-Use `client.TTS.StreamSource(ctx, source, options)`. A `rime.TextSource` is:
+Use `client.TTS.Stream(ctx, source, options)`. A `rime.TextSource` is:
 
 ```go
 func(ctx context.Context) (string, error)
@@ -230,7 +231,7 @@ return both final text and `io.EOF`. Other errors stop the operation.
 The source must honor its context; see [Errors and cleanup](#errors-and-cleanup)
 for cancellation and cleanup limits.
 
-TTS streams start work when `Stream` or `StreamSource` returns, without waiting for
+TTS streams start work when `Synthesize` or `Stream` returns, without waiting for
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
 at most 9,600 bytes. Each sentence has a 65,536-byte UTF-8 limit.
 

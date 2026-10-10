@@ -549,7 +549,7 @@ test("cancelling STT preserves TTS and Prism; owner close cancels all", async (t
   assert.equal((await stream.next()).value.kind, "partial");
   await stream.cancel();
   const audio = [];
-  for await (const chunk of client.tts.stream("Hello.")) audio.push(chunk);
+  for await (const chunk of client.tts.synthesize("Hello.")) audio.push(chunk);
   assert.deepEqual(Buffer.concat(audio), ttsService.payload);
   peer.emit("prsm.typed_input.ready");
   const reply = watch(session.sendText("hello")),

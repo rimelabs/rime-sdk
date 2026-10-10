@@ -126,7 +126,7 @@ func drain(stream *AudioStream) ([]byte, error) {
 }
 func mustStream(t *testing.T, c *Client, text string, options SynthesisOptions) *AudioStream {
 	t.Helper()
-	s, err := c.TTS.Stream(context.Background(), text, options)
+	s, err := c.TTS.Synthesize(context.Background(), text, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestIncrementalAudioBeforeInputEnd(t *testing.T) {
 	c := setupClient(t, &testService{})
 	release := make(chan struct{})
 	count := 0
-	s, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+	s, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 		count++
 		if count == 1 {
 			return "Hello. This next sentence has enough trailing context", nil
@@ -239,7 +239,7 @@ func TestServerRejectionPreservesStatusAndTrailers(t *testing.T) {
 
 func TestCancelKeepsSibling(t *testing.T) {
 	c := setupClient(t, &testService{})
-	slow, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) { <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
+	slow, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) { <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestSlowSourceAndConsumerAreNotServerStalls(t *testing.T) {
 	c.limits.firstAudio = 40 * time.Millisecond
 	c.limits.progress = 40 * time.Millisecond
 	n := 0
-	s, err := c.TTS.StreamSource(context.Background(), func(ctx context.Context) (string, error) {
+	s, err := c.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 		n++
 		if n == 1 {
 			return "Hello. Next sentence has sufficient trailing context", nil
@@ -403,12 +403,12 @@ func TestInvalidConfigurationAndInput(t *testing.T) {
 	}
 	c := setupClient(t, &testService{})
 	for _, input := range []string{"", " \n", "\xff"} {
-		if _, err := c.TTS.Stream(context.Background(), input, SynthesisOptions{}); err == nil {
+		if _, err := c.TTS.Synthesize(context.Background(), input, SynthesisOptions{}); err == nil {
 			t.Fatal("accepted invalid text")
 		}
 	}
 	c.Close()
-	if _, err := c.TTS.Stream(context.Background(), "Hello", SynthesisOptions{}); !errors.Is(err, ErrInput) {
+	if _, err := c.TTS.Synthesize(context.Background(), "Hello", SynthesisOptions{}); !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}
 }
@@ -427,7 +427,7 @@ func TestSourceFailuresAndSentenceLimit(t *testing.T) {
 					return " ", io.EOF
 				}
 			}
-			s, err := c.TTS.StreamSource(context.Background(), source, SynthesisOptions{})
+			s, err := c.TTS.Stream(context.Background(), source, SynthesisOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -541,7 +541,7 @@ func TestContextCancellationAndConcurrentReader(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	entered := make(chan struct{})
-	s, err := c.TTS.StreamSource(ctx, func(ctx context.Context) (string, error) { close(entered); <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
+	s, err := c.TTS.Stream(ctx, func(ctx context.Context) (string, error) { close(entered); <-ctx.Done(); return "", ctx.Err() }, SynthesisOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

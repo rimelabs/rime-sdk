@@ -10,7 +10,7 @@ from rimelabs_sdk import Rime
 async def main(output=Path("speech.wav")):
     async with (
         Rime(timeout=60) as client,
-        client.tts.stream(
+        client.tts.synthesize(
             "Your appointment is confirmed for tomorrow at ten in the morning."
         ) as audio,
     ):

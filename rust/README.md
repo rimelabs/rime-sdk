@@ -22,7 +22,7 @@ use rimelabs_sdk::{Client, SynthesisOptions};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::builder().build()?; // Reads RIME_API_KEY.
-    let mut audio = client.synthesize("Hello.", SynthesisOptions::default())?;
+    let mut audio = client.tts().synthesize("Hello.", SynthesisOptions::default())?;
     while let Some(chunk) = audio.next().await {
         let pcm_bytes = chunk?;
         // Send raw PCM16 little-endian mono 24 kHz bytes to your audio sink.
@@ -35,7 +35,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 The SDK does not read `.env` files. Explicit credentials use `.api_key(...)`.
 Use `.model(Model::MistV3)` to select Mist v3. Coda is the default.
 
-`synthesize_stream` accepts a `Send + 'static` stream of `Result<String, Error>`.
+Use `client.tts().synthesize(text, options)` for complete text. Use
+`client.tts().stream(source, options)` for incremental text. Both return an
+`AudioStream` immediately; do not await these method calls. Read audio chunks
+as they arrive. The TTS view shares the client's configuration and shutdown.
+
+For example, replace the synthesis call above with:
+
+```rust,no_run
+# use rimelabs_sdk::{Client, SynthesisOptions};
+# async fn example(client: &Client) -> Result<(), rimelabs_sdk::Error> {
+let text = futures_util::stream::iter([
+    Ok("Hello. ".to_owned()),
+    Ok("This text arrives in chunks.".to_owned()),
+]);
+let mut audio = client.tts().stream(text, SynthesisOptions::default())?;
+// Consume audio with the same loop as above.
+# audio.close().await;
+# Ok(())
+# }
+```
+
+`client.tts().stream` accepts a `Send + 'static` stream of `Result<String, Error>`.
 It preserves source text while detecting sentences. Input errors cancel the
 request. Audio can arrive before input ends. Successful completion requires
 reading the audio stream to its end; earlier chunks can precede a later error.
