@@ -198,7 +198,9 @@ stream lifetime rules.
 Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
 `mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.
 
-`SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, and `Timeout`.
+`SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, `Timeout`,
+`CustomLexicon` (default nil, requires Coda), and `Timestamps`
+(default `false`, supported only with `Model: "mistv3"`).
 Empty voice and language values select defaults. Audio formats are `PCM24000`
 and `MULAW8000`. Both are raw mono audio. `MULAW8000` contains G.711 mu-law at
 8 kHz. The SDK converts the service's PCM locally. Chunks contain complete frames.
@@ -234,6 +236,110 @@ TTS streams start work when `Stream` or `StreamSource` returns, without waiting 
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
 at most 9,600 bytes. Each sentence has a 65,536-byte UTF-8 limit.
 
+## Custom pronunciations (Coda)
+
+Create a Coda client with `Config{Model: "coda"}`. Pass words or phrases and
+their space-separated X-SAMPA pronunciations:
+
+```go
+stream, err := client.TTS.Stream(ctx, "Hello world.", rime.SynthesisOptions{
+    Language: "en",
+    CustomLexicon: []rime.PronunciationEntry{
+        {Spelling: "hello", Pronunciation: `h @ . " l oU`},
+    },
+})
+if err != nil { return err }
+defer stream.Close()
+for {
+    chunk, err := stream.Recv()
+    if err == io.EOF { break }
+    if err != nil {
+        var detail *rime.Error
+        if errors.Is(err, rime.ErrInput) && errors.As(err, &detail) {
+            fmt.Println(detail.Message, "request ID:", detail.RequestID)
+        }
+        return err
+    }
+    if _, err := output.Write(chunk); err != nil { return err }
+}
+```
+
+Here `output` is the file or audio sink your application owns. `Stream` and
+`StreamSource` copy the lexicon before starting work. It applies to the entire
+request, including incremental text; subsequent requests have their own options.
+Omit the option or pass an empty slice for default pronunciation.
+
+The service matches whole words or phrases case-insensitively and applies the
+pronunciation after text normalization. Longest matches take precedence; the
+last entry for a repeated spelling wins. Inline `pronounce(...)` directives are
+not supported.
+
+Coda accepts custom pronunciations in German, English, Spanish, French,
+Italian, and Portuguese, with up to 500 entries per request. The service validates
+supported languages and pronunciation rules. Mist rejects nonempty lexicons.
+
+Invalid UTF-8 fails locally. The service rejects unsupported models or languages,
+oversized lexicons, and ill-formed entries with `ErrInput` before producing audio.
+Check errors from `Recv`, as well as stream creation. `*rime.Error.Message`
+preserves the offending spelling and checks such as `no-primary-stress` or
+`unknown-phone`, and `RequestID` identifies the request. The whole request fails;
+entries are never silently skipped or repaired.
+
+## Word timestamps (Mist v3)
+
+Create the client with `Config{Model: "mistv3"}`. Enable timestamps on the stream,
+consume audio through `io.EOF`, then read its result:
+
+```go
+stream, err := client.TTS.Stream(ctx, "Hello world.", rime.SynthesisOptions{Timestamps: true})
+if err != nil {
+    return err
+}
+defer stream.Close()
+for {
+    chunk, err := stream.Recv()
+    if err == io.EOF {
+        break
+    }
+    if err != nil {
+        return err
+    }
+    if _, err := output.Write(chunk); err != nil {
+        return err
+    }
+}
+result, err := stream.Timestamps()
+if err != nil {
+    return err
+}
+if result.Status.Code == codes.OK {
+    for _, word := range result.Spans {
+        fmt.Println(word.Text, word.Start, word.End)
+    }
+} else {
+    fmt.Println("Timestamps unavailable:", result.Status.Code, result.Status.Message)
+}
+```
+
+Here `output` is your audio writer; `codes` is `google.golang.org/grpc/codes`.
+`TimestampResult.Spans` contains `WordTimestamp` values with `Text` and
+`Start`/`End` as `float64` seconds from the beginning of the entire synthesis.
+Offsets continue across incremental input sentences and stay the same for
+`PCM24000` and `MULAW8000`. Words reflect normalized spoken text: a number may
+become several words. Timings come from the model, without SDK estimation.
+
+Timestamps arrive once, after generation finishes; they are not incremental
+events for live interruption handling. `Timestamps()` never consumes audio or
+waits: calling before `Recv` returns `io.EOF`, or without enabling timestamps,
+returns `ErrInput`. Results remain available after a successfully consumed
+stream or its client is closed. Each call returns independently owned spans.
+
+`TimestampStatus` carries a gRPC `Code` and a `Message`. Non-OK alignment statuses
+have no spans and do not fail successful audio. Missing or malformed timestamp
+responses return `ErrStream` only when reading timestamps. Synthesis errors or
+cancellation also prevent reading a successful result. Enabling timestamps with
+Coda returns `ErrInput` before any request is sent.
+
 ## Discovery
 
 ```go
@@ -249,7 +355,9 @@ Discovery retries `UNAVAILABLE` up to twice within the same deadline.
 Use `errors.Is(err, rime.ErrTimeout)` to check a category. Categories are
 `ErrAuthentication`, `ErrPermission`, `ErrInput`, `ErrResourceLimit`,
 `ErrUnavailable`, `ErrTimeout`, `ErrAudioFormat`, `ErrCancelled`, and `ErrStream`.
-Use `errors.As` with `*rime.Error` to read `RequestID` and the original `Cause`.
+Use `errors.As` with `*rime.Error` to read `Message`, `RequestID`, and the original `Cause`.
+Service errors retain their diagnostic message when provided. Use the error
+category for programmatic handling; message wording may change.
 Caller context errors remain available through error unwrapping.
 
 Partial audio can precede an error. Output is complete only after `Recv` returns
@@ -291,3 +399,21 @@ CI and review are required before the SDK is released.
 
 The embedded BlingFire binary includes its source
 details and licenses in `internal/`.
+
+## Complete text input
+
+`CompleteText: true` selects the `Synthesize` RPC, which sends the full input in one request
+and streams audio back. The default still uses `SynthesizeStreaming` with
+incremental sentence input, including when given a string. Full-text mode accepts
+only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
+application first (Go: use `Stream`, not `StreamSource`). Server-side text splitting
+applies. Lexicon overrides, error details and request IDs, cancellation, audio
+profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
+
+```go
+audio, err := client.TTS.Stream(ctx, "Please read this.", rime.SynthesisOptions{
+    CompleteText: true,
+    CustomLexicon: []rime.PronunciationEntry{{Spelling: "read", Pronunciation: `" r\ E d`}},
+})
+// Handle err, defer audio.Close(), then receive PCM chunks until io.EOF.
+```

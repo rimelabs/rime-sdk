@@ -49,7 +49,7 @@ class TranscriptionCall:
         self.request_id = request_id(
             error.initial_metadata(), error.trailing_metadata(), self.request_id
         )
-        return rpc_error(error.code(), self.request_id)
+        return rpc_error(error.code(), self.request_id, error.details())
 
     async def _status(self):
         code = await self._call.code()
@@ -59,7 +59,7 @@ class TranscriptionCall:
             self.request_id,
         )
         if code != grpc.StatusCode.OK:
-            raise rpc_error(code, self.request_id)
+            raise rpc_error(code, self.request_id, await self._call.details())
 
     async def _write(self, message):
         try:

@@ -30,10 +30,13 @@ type Config struct {
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
 type SynthesisOptions struct {
-	Voice       string
-	Language    string
-	AudioFormat AudioFormat
-	Timeout     *time.Duration
+	CompleteText  bool // Send one complete string with Synthesize; audio still streams. Only valid with Stream.
+	Voice         string
+	Language      string
+	AudioFormat   AudioFormat
+	Timeout       *time.Duration
+	Timestamps    bool                 // Request final word timestamps; supported only with Model="mistv3".
+	CustomLexicon []PronunciationEntry // Request-wide overrides; copied when the stream is created.
 }
 
 type DiscoveryOptions struct{ Timeout *time.Duration }
@@ -56,6 +59,7 @@ type Client struct {
 	sttDialOptions     []grpc.DialOption
 	sttLimits          transcriptionLimits
 	key, target, voice string
+	model              string
 	timeout            time.Duration
 	operations         map[*operation]struct{}
 	dialOptions        []grpc.DialOption // Private seam for tests with local services.
@@ -122,7 +126,7 @@ func NewClient(config Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{key: key, target: target, voice: voice, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
+	c := &Client{key: key, target: target, voice: voice, model: model, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
 	c.sttTarget, c.sttLimits = sttTarget, defaultTranscriptionLimits
 	c.STT = &STTService{c}
 	c.TTS = &TTSService{c}

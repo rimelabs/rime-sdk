@@ -6,11 +6,21 @@ import pytest
 from fake_service import FakeService
 
 from rimelabs_sdk import Rime, _auth
-from rimelabs_sdk.tts import _policy, _transport
+from rimelabs_sdk.tts import _policy
 
 
 @pytest.fixture
-async def setup(monkeypatch):
+def local_tts_transport(monkeypatch):
+    # Retain the production channel options, including message-size limits.
+    monkeypatch.setattr(
+        grpc.aio,
+        "secure_channel",
+        lambda target, credentials, **kwargs: grpc.aio.insecure_channel(target, **kwargs),
+    )
+
+
+@pytest.fixture
+async def setup(monkeypatch, local_tts_transport):
     # Keep exercising the retained Themis path while direct auth is temporary.
     monkeypatch.setattr(_auth.Credentials, "metadata", _auth.Credentials._themis_metadata)
     async with FakeService() as service:
@@ -18,9 +28,6 @@ async def setup(monkeypatch):
             _policy.POLICY, target=service.target, first_audio_timeout=0.2, progress_timeout=0.2
         )
         monkeypatch.setattr(_policy, "POLICY", policy)
-        monkeypatch.setattr(
-            _transport, "make_channel", lambda p: grpc.aio.insecure_channel(p.target)
-        )
 
         async def exchange(key, policy):
             return _auth.Token("test-token", time.time() + 3600, policy.audience)

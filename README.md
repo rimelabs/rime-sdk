@@ -17,6 +17,19 @@ Coda is the default TTS model. Select `mistv3` to use Mist v3:
 The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
 
+Mist v3 also supports opt-in word timestamps: pass `timestamps=True` in Python,
+`{ timestamps: true }` in Node.js, or `SynthesisOptions{Timestamps: true}` in Go.
+After fully consuming audio, use `await stream.timestamps()` (Python/Node.js) or
+`stream.Timestamps()` (Go). The final result includes status and word start/end
+times in seconds. Timestamps are delivered after generation, not incrementally.
+
+Coda supports request-wide pronunciation overrides through `custom_lexicon`
+(Python), `customLexicon` (Node.js), or `CustomLexicon` (Go). Each entry contains
+`spelling` and a space-separated X-SAMPA `pronunciation`. Service-rejected entries
+raise an input error with the service's explanation and request ID. Malformed
+entry types and invalid Unicode fail locally, without a service response or
+request ID. See the TTS guides below for examples and supported languages.
+
 | Package | Location | Runtime |
 | --- | --- | --- |
 | `rimelabs-sdk` | [python](python/) | Python 3.11+ |

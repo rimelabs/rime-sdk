@@ -25,12 +25,22 @@ import (
 
 type testService struct {
 	pb.UnimplementedTextToSpeechServer
-	synthesis   func(grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error
-	discovery   func(context.Context) error
-	calls       atomic.Int32
-	discoveries atomic.Int32
-	mu          sync.Mutex
-	texts       []string
+	completeSynthesis func(*pb.SynthesisRequest, grpc.ServerStreamingServer[pb.SynthesisResponseStream]) error
+	header            func(*pb.SynthesisRequest) error
+	synthesis         func(grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error
+	discovery         func(context.Context) error
+	calls             atomic.Int32
+	discoveries       atomic.Int32
+	mu                sync.Mutex
+	texts             []string
+}
+
+func (s *testService) Synthesize(request *pb.SynthesisRequest, stream grpc.ServerStreamingServer[pb.SynthesisResponseStream]) error {
+	s.calls.Add(1)
+	if s.completeSynthesis == nil {
+		return status.Error(codes.Unimplemented, "unexpected Synthesize")
+	}
+	return s.completeSynthesis(request, stream)
 }
 
 func (s *testService) SynthesizeStreaming(stream grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error {
@@ -45,6 +55,11 @@ func (s *testService) SynthesizeStreaming(stream grpc.BidiStreamingServer[pb.Str
 	}
 	if first.GetHeader() == nil || first.GetHeader().GetAudioParameters().GetSamplingRate() != 24000 {
 		return status.Error(codes.InvalidArgument, "bad header")
+	}
+	if s.header != nil {
+		if err := s.header(first.GetHeader()); err != nil {
+			return err
+		}
 	}
 	if s.synthesis != nil {
 		return s.synthesis(stream)
@@ -97,11 +112,16 @@ func setupClient(t *testing.T, service *testService) *Client {
 
 func setupServices(t *testing.T, register func(*grpc.Server)) *Client {
 	t.Helper()
+	return setupConfiguredServices(t, Config{APIKey: "test-key"}, register)
+}
+
+func setupConfiguredServices(t *testing.T, config Config, register func(*grpc.Server)) *Client {
+	t.Helper()
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer()
 	register(server)
 	go func() { _ = server.Serve(listener) }()
-	c, err := NewClient(Config{APIKey: "test-key"})
+	c, err := NewClient(config)
 	if err != nil {
 		t.Fatal(err)
 	}
