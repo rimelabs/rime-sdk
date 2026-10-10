@@ -19,7 +19,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
 # Wasmi 2.0 crashes during BlingFire initialization on Windows.
-wasmi = { version = "1.1", default-features = false, features = ["std"] }
+wasmi = { version = "2.0", default-features = false, features = ["std"] }
 wasmi_wasi = "1.1"
 
 [dev-dependencies]
