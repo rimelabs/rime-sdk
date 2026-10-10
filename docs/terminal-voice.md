@@ -22,7 +22,7 @@ locally. No LiveKit/Pipecat adapter, browser, VAD or LLM provider is involved.
 ## Run this development checkout
 
 Run one example at a time from the SDK repository root. These commands use the
-local STT implementation; the examples' published SDK pins do not yet include it.
+local SDK through the workspace setup below.
 Keep `RIME_API_KEY` set in the environment. The scripts do not load `.env` files.
 
 All three languages use the [SoX CLI](https://formulae.brew.sh/formula/sox) for
@@ -55,14 +55,14 @@ select the MacBook microphone as input and retry; built-in speakers also avoid
 the Bluetooth handoff. See [Apple's explanation of Bluetooth audio modes](https://support.apple.com/en-us/102217).
 
 Prepare the development environment and local Node SDK link using the
-[fresh-checkout setup](#set-up-a-fresh-checkout-before-publication), then run:
+[fresh-checkout setup](#set-up-a-fresh-checkout), then run:
 
 ```sh
 # Python
-uv run --no-sync --project python python examples/python/stt/voice.py --language en
+uv run --project python/examples --locked python python/examples/stt/voice.py --language en
 
 # JavaScript
-npm --prefix examples/typescript run stt:voice -- --language en
+npm --prefix typescript/examples run stt:voice -- --language en
 
 # Go (GOWORK=off avoids inheriting a surrounding repository's Go workspace)
 GOWORK=off go -C go run ./examples/voice --language en
@@ -102,18 +102,18 @@ These commands use the included speech fixture and save the response. They
 exercise production STT and TTS without opening a microphone or speaker:
 
 ```sh
-uv run --no-sync --project python python examples/python/stt/voice.py \
-  --language en --input examples/audio/france.wav --output /tmp/rime-python-reply.wav
+uv run --project python/examples --locked python python/examples/stt/voice.py \
+  --language en --input fixtures/audio/france.wav --output /tmp/rime-python-reply.wav
 
-node examples/typescript/stt/voice.mjs \
-  --language en --input examples/audio/france.wav --output /tmp/rime-js-reply.wav
+node typescript/examples/stt/voice.mjs \
+  --language en --input fixtures/audio/france.wav --output /tmp/rime-js-reply.wav
 
 GOWORK=off go -C go run ./examples/voice \
-  --language en --input ../examples/audio/france.wav --output /tmp/rime-go-reply.wav
+  --language en --input ../fixtures/audio/france.wav --output /tmp/rime-go-reply.wav
 ```
 
 Paths are relative to each command's working directory. `go -C go` changes that
-directory to `go/`; npm scripts run from `examples/typescript`, so use absolute
+directory to `go/`; npm scripts run from `typescript/examples`, so use absolute
 file paths with `npm run`. SoX converts input files to mono PCM16 at 16 kHz; SDK
 TTS output is mono PCM16 at 24 kHz. Raw PCM files need format metadata and should
 be converted to WAV before using `--input`.
@@ -122,7 +122,7 @@ Only successful completion confirms the saved reply; an error may leave a partia
 file. Interactive recognition has a 120-second overall limit per utterance. TTS
 has a 60-second limit, and device playback is bounded as well.
 
-## Set up a fresh checkout before publication
+## Set up a fresh checkout
 
 Install the locked development dependencies, build Node's SDK, and link it into
 the examples. The API dependencies include STT definitions; no local schema
@@ -130,15 +130,12 @@ build is required.
 
 ```sh
 uv sync --project python --locked --dev
-npm --prefix typescript ci
+npm ci
 npm --prefix typescript run build
-npm --prefix examples/typescript ci
-npm --prefix examples/typescript install --no-save --package-lock=false "$PWD/typescript"
 ```
 
-This leaves published dependency pins and lockfiles unchanged. Go downloads its
-versioned API dependency through the normal module build. The examples exercise
-the STT implementation in this checkout.
+Go downloads its versioned API dependency through the normal module build. All
+three languages use this checkout. Rebuild the TypeScript SDK after source changes.
 
 ## Validation of this implementation
 

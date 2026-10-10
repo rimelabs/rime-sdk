@@ -18,7 +18,7 @@ test("WAV header preserves PCM and the included fixture is valid speech input", 
   assert.deepEqual(readSpeech(path), Buffer.from([1, 0, 2, 0]));
   assert.equal((await readFile(path)).readUInt32LE(4), 40);
   const fixture = readSpeech(
-    new URL("../../audio/france.wav", import.meta.url),
+    new URL("../../../fixtures/audio/france.wav", import.meta.url),
   );
   assert.ok(fixture.length > 16000 && fixture.some((byte) => byte !== 0));
 });

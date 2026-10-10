@@ -1,4 +1,4 @@
-"""Run: uv run --project python examples/python/realtime/tools.py"""
+"""Run: uv run --project python python/examples/realtime/tools.py"""
 
 import asyncio
 import json

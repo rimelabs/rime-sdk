@@ -1,4 +1,4 @@
-"""Run: uv run --project python examples/python/realtime/typed_turn.py"""
+"""Run: uv run --project python python/examples/realtime/typed_turn.py"""
 
 import asyncio
 import os

@@ -12,7 +12,7 @@ config = json.loads((root / "release-please-config.json").read_text())
 python = tomllib.loads((root / "python/pyproject.toml").read_text())["project"]
 lock = tomllib.loads((root / "python/uv.lock").read_text())
 node = json.loads((root / "typescript/package.json").read_text())
-node_lock = json.loads((root / "typescript/package-lock.json").read_text())
+node_lock = json.loads((root / "package-lock.json").read_text())
 rust = tomllib.loads((root / "rust/Cargo.toml").read_text())["package"]
 rust_lock = tomllib.loads((root / "rust/Cargo.lock").read_text())
 assert rust["version"] == manifest["rust"], "Rust manifest mismatch"
@@ -31,9 +31,8 @@ locked_python = next(
 )
 assert locked_python["version"] == python["version"], "Python lockfile mismatch"
 assert node["version"] == manifest["typescript"], "Node.js manifest mismatch"
-assert node_lock["version"] == node["version"], "Node.js lockfile mismatch"
-assert node_lock["packages"][""]["version"] == node["version"], (
-    "Node.js root lock mismatch"
+assert node_lock["packages"]["typescript"]["version"] == node["version"], (
+    "Node.js workspace lock mismatch"
 )
 
 assert (root / "go/version.txt").read_text().strip() == manifest["go"], (

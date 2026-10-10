@@ -65,22 +65,19 @@ All three SDKs consume the published, versioned API packages pinned in their
 manifests and lockfiles. Those packages contain the STT definitions, so normal
 clean installs can run the full suites without a local schema build.
 
-The examples normally pin a published SDK release. To test the local SDK,
-run Python examples with the SDK development environment:
-`uv run --no-sync --project python python examples/python/stt/stream.py audio.pcm --language en`.
-For Node, build and pack this checkout, then install that tarball into
-`examples/typescript` with `--no-save --package-lock=false`. Keep the published
-example pins and lockfiles unchanged until release automation advances them.
-STT example tests inject the development client so they also work with the
-examples' normal published dependency installed.
+Every SDK has an `examples/` directory. Examples use the local SDK by default.
+Python uses a uv workspace under `python/`; TypeScript and its examples are npm
+workspace members declared at the repository root. Go and Rust examples belong
+to their SDK module or crate. See [the example index](docs/examples.md) for run
+commands and instructions for using published packages outside this repository.
 
 Use Python 3.11 or later and `uv`:
 
 ```sh
 cd python
 uv sync --locked --dev
-uv run ruff check src tests ../examples/python
-uv run ruff format --check src tests ../examples/python
+uv run ruff check src tests examples
+uv run ruff format --check src tests examples
 uv run mypy src
 uv run pytest
 uv build
@@ -91,31 +88,29 @@ uv build
 Install Node.js 22 or later, then run:
 
 ```sh
-cd typescript
 npm ci
+cd typescript
 npm run check
 npm run lint
 npm test
-npm pack
+npm pack --workspace @rimelabs/sdk
 ```
 
-Check the examples against a packed local SDK from the repository root:
+Check examples from the repository root:
 
 ```sh
-uv sync --project examples/python --locked
-npm --prefix examples/typescript ci
-(cd typescript && npm pack --pack-destination ../examples/typescript)
-npm --prefix examples/typescript install --no-save --package-lock=false ./examples/typescript/rimelabs-sdk-*.tgz
-npm --prefix examples/typescript run check
-npm --prefix examples/typescript test
+uv sync --project python/examples --locked
+npm ci
+npm --prefix typescript run build
+npm run check --workspace rime-sdk-examples
+npm test --workspace rime-sdk-examples
 ```
 
-Python example tests run with the SDK's pytest suite. Node.js example tests
-use the shared controlled Prism peer, so install the TypeScript SDK's development
-dependencies before running them. Neither suite opens audio devices. Device
-release checks are listed in `examples/README.md`.
+Python example tests run with the SDK's pytest suite. TypeScript example tests
+use the shared controlled Prism peer. Neither suite opens audio devices. Device
+release checks are listed in [the example guide](docs/examples.md).
 
-For changes to example release automation, run
+For changes to release automation, run
 `uv run --project python pytest .github/scripts/tests` from the repository root.
 
 ## Go
@@ -157,7 +152,7 @@ and option tables consistent while preserving their different API conventions.
 
 Each package README contains installation and quick starts. Detailed API guides
 live in `python/docs/` and `typescript/docs/`; Go documents both APIs in
-`go/README.md`. Examples are grouped by language and API under `examples/`.
+`go/README.md`. Examples live under each SDK directory. The shared index is `docs/examples.md`.
 Use absolute repository URLs in package READMEs so guide links work on PyPI and
 npm. The Python source distribution and npm package include their guides.
 

@@ -15,7 +15,7 @@ import { transport as recognitionTransport } from "../dist/stt/transport.js";
 import { transport as synthesisTransport } from "../dist/tts/transport.js";
 import { RecognitionService } from "./stt-service.mjs";
 import { FakeService } from "./service.mjs";
-import * as voice from "../../examples/typescript/stt/voice.mjs";
+import * as voice from "../examples/stt/voice.mjs";
 
 async function setup(t, deviceMode = "normal", platform = "darwin") {
   const directory = mkdtempSync(join(tmpdir(), "rime-terminal-test-"));

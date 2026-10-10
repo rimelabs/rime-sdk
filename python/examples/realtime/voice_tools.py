@@ -2,8 +2,8 @@
 
 import json
 
-from examples.python.realtime.tools import LOOKUP_ORDER
-from examples.python.realtime.voice import cli
+from realtime.tools import LOOKUP_ORDER
+from realtime.voice import cli
 
 
 async def lookup_order(call):

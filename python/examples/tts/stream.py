@@ -1,4 +1,4 @@
-"""Run: uv run --project python examples/python/tts/stream.py"""
+"""Run: uv run --project python python/examples/tts/stream.py"""
 
 import asyncio
 from pathlib import Path

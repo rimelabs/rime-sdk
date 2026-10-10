@@ -9,7 +9,7 @@ from pathlib import Path
 from rimelabs_sdk import Rime
 from rimelabs_sdk import realtime as r
 
-FIXTURE = Path(__file__).resolve().parents[2] / "audio/france.wav"
+FIXTURE = Path(__file__).resolve().parents[3] / "fixtures/audio/france.wav"
 
 
 async def main(source=FIXTURE, output=Path("reply.wav")):

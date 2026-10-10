@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Rime } from "@rimelabs/sdk";
-import { Peer } from "../../../typescript/tests/realtime-peer.mjs";
+import { Peer } from "../../tests/realtime-peer.mjs";
 import { BrowserAudio } from "../common/browser-audio.ts";
 import { converse } from "../realtime/conversation.ts";
 
@@ -41,9 +41,7 @@ test("recorded example sends audio and creates a playable reply without devices"
     process.execPath,
     [
       "--import",
-      fileURLToPath(
-        new URL("../node_modules/tsx/dist/loader.mjs", import.meta.url),
-      ),
+      import.meta.resolve("tsx"),
       fileURLToPath(new URL("../realtime/recorded.ts", import.meta.url)),
     ],
     {

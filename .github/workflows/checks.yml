@@ -36,12 +36,12 @@ jobs:
           else
             while IFS= read -r path; do
               case "$path" in
-                python/*|examples/python/*) python=true ;;
-                typescript/*|examples/typescript/*) typescript=true ;;
+                python/*) python=true ;;
+                typescript/*|package.json|package-lock.json|.npmrc) typescript=true ;;
                 go/internal/sentences/blingfire.wasm) go=true; rust=true ;;
                 go/*) go=true ;;
                 rust/*) rust=true ;;
-                conformance/*|docs/*|.github/*|examples/audio/*|examples/TERMINAL_VOICE.md|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true; rust=true ;;
+                conformance/*|docs/*|.github/*|fixtures/audio/*|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true; rust=true ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
           fi
@@ -65,16 +65,18 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --dev
-      - run: uv sync --project ../examples/python --locked
+      - run: uv sync --project examples --locked
+      - name: Verify examples use the local SDK
+        run: uv run --project examples --locked python -c 'from pathlib import Path; import rimelabs_sdk; assert Path(rimelabs_sdk.__file__).resolve() == Path("src/rimelabs_sdk/__init__.py").resolve()'
       - run: uv run python ../.github/scripts/check-release-versions.py
-      - run: uv run ruff check src tests ../examples/python
-      - run: uv run ruff format --check src tests ../examples/python
+      - run: uv run ruff check src tests examples
+      - run: uv run ruff format --check src tests examples
       - run: uv run mypy src
       - run: uv run pytest
       - name: Check release automation
         run: |
-          uv run ruff check ../.github/scripts/update-example-dependency.py ../.github/scripts/tests
-          uv run ruff format --check ../.github/scripts/update-example-dependency.py ../.github/scripts/tests
+          uv run ruff check ../.github/scripts/tests
+          uv run ruff format --check ../.github/scripts/tests
           uv run pytest ../.github/scripts/tests
       - run: uv build
   typescript:
@@ -93,19 +95,19 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-          cache-dependency-path: typescript/package-lock.json
-      - run: npm ci
-      - run: npm --prefix ../examples/typescript ci
-      - name: Install the local SDK in examples
+          cache-dependency-path: package-lock.json
+      - run: npm --prefix .. ci
+      - run: npm run build
+      - name: Verify examples use the local SDK
         run: |
-          npm pack --pack-destination "$RUNNER_TEMP"
-          npm --prefix ../examples/typescript install --no-save --package-lock=false "$RUNNER_TEMP"/rimelabs-sdk-*.tgz
-      - run: npm --prefix ../examples/typescript run check
-      - run: npm --prefix ../examples/typescript test
+          cd examples
+          node --input-type=module -e 'import assert from "node:assert/strict"; assert.equal(import.meta.resolve("@rimelabs/sdk"), new URL("../dist/index.js", import.meta.url).href);'
+      - run: npm run check --workspace rime-sdk-examples
+      - run: npm test --workspace rime-sdk-examples
       - run: npm run check
       - run: npm run lint
       - run: npm test
-      - run: npm pack
+      - run: npm pack --workspace @rimelabs/sdk
   go:
     needs: changes
     if: needs.changes.outputs.go == 'true'

@@ -2,7 +2,7 @@
 
 import asyncio
 
-from examples.python.audio_devices import Speaker
+from audio_devices import Speaker
 
 from rimelabs_sdk import Rime
 

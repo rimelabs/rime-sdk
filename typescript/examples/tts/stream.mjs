@@ -1,4 +1,4 @@
-// From the repository root: npm --prefix examples/typescript run tts
+// From the repository root: npm --prefix typescript/examples run tts
 import { writeFile } from "node:fs/promises";
 import { Rime } from "@rimelabs/sdk";
 

@@ -12,6 +12,7 @@ coverage/
 *.pcm
 /speech.wav
 /reply.wav
-/examples/typescript/*.wav
+/typescript/examples/*.wav
+/python/examples/*.wav
 /rust/target/
 /.rust-api/

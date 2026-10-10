@@ -10,7 +10,8 @@ const { values } = parseArgs({
   },
 });
 const data = readSpeech(
-  values.input ?? new URL("../../audio/france.wav", import.meta.url),
+  values.input ??
+    new URL("../../../fixtures/audio/france.wav", import.meta.url),
 );
 const endpoint = process.env.PRISM_URL;
 if (!endpoint)

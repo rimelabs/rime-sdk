@@ -16,7 +16,7 @@ def sounddevice():
         import sounddevice as sd
     except (ImportError, OSError) as error:
         raise RuntimeError(
-            "Install the examples audio extra and PortAudio; see examples/README.md"
+            "Install the examples audio extra and PortAudio; see docs/examples.md"
         ) from error
     return sd
 

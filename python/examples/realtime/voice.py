@@ -5,7 +5,7 @@ import asyncio
 import os
 from dataclasses import dataclass, field
 
-from examples.python.audio_devices import Microphone, Playback, Speaker, sounddevice
+from audio_devices import Microphone, Playback, Speaker, sounddevice
 
 from rimelabs_sdk import Rime, RimeInputError
 from rimelabs_sdk import realtime as r

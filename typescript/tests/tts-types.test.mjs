@@ -6,9 +6,7 @@ test("published TTS declarations distinguish complete and incremental text", () 
   execFileSync(
     process.execPath,
     [
-      fileURLToPath(
-        new URL("../node_modules/typescript/bin/tsc", import.meta.url),
-      ),
+      fileURLToPath(import.meta.resolve("typescript/bin/tsc")),
       "--strict",
       "--noEmit",
       "--skipLibCheck",
