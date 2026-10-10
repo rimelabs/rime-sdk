@@ -20,7 +20,7 @@ tokio-util = { version = "0.7", features = ["rt"] }
 tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
 # Wasmi 2.0 crashes during BlingFire initialization on Windows.
 wasmi = { version = "1.1", default-features = false, features = ["std"] }
-wasmi_wasi = "1.1"
+wasmi_wasi = "2.0"
 
 [dev-dependencies]
 tonic = { version = "0.14", default-features = false, features = ["router"] }
