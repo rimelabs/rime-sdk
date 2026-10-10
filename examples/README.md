@@ -1,7 +1,7 @@
 # SDK examples
 
 Start with a WAV file, then try a live conversation. Most examples use the
-published SDK packages; the terminal and cascaded agents use this checkout.
+published SDK packages; the terminal STT examples use this checkout.
 They require a Rime API key; Prism also requires a
 deployment URL and voice. Run the commands from the repository root.
 
@@ -19,10 +19,6 @@ Physical microphone and speaker validation is still required before release.
 See [manual checks](#manual-checks).
 
 ## Terminal STT voice loop
-
-For a conversation with an LLM, use the [cascaded voice agent guide](agent/README.md).
-It includes Python, TypeScript, and Go versions using Rime STT/TTS and OpenAI,
-plus manual checks for Mist v3 timestamps, Coda custom lexicons, and useful errors.
 
 Use the [terminal voice guide](TERMINAL_VOICE.md) to speak, inspect partial/final
 transcripts, and hear the final text through TTS in Python, JavaScript or Go.
@@ -96,8 +92,7 @@ quality and live playback for delivery gaps, and repeat samples because model
 generation can vary between requests.
 
 It uses the [Coda JSON WebSocket protocol](https://rimelabs-docs-coda-websocket-reference.mintlify.site/api-reference/coda/websockets)
-and needs no LLM key. The existing cascaded agent waits for a complete LLM reply;
-use this tester to exercise incremental text input independently.
+to exercise incremental text input and streaming audio output.
 
 ## Python
 

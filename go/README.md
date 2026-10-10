@@ -199,7 +199,7 @@ Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
 `mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.
 
 `SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, `Timeout`,
-`CustomLexicon` (default nil, requires Coda v2), and `Timestamps`
+`CustomLexicon` (default nil, requires Coda), and `Timestamps`
 (default `false`, supported only with `Model: "mistv3"`).
 Empty voice and language values select defaults. Audio formats are `PCM24000`
 and `MULAW8000`. Both are raw mono audio. `MULAW8000` contains G.711 mu-law at
@@ -236,7 +236,7 @@ TTS streams start work when `Stream` or `StreamSource` returns, without waiting 
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
 at most 9,600 bytes. Each sentence has a 65,536-byte UTF-8 limit.
 
-## Custom pronunciations (Coda v2)
+## Custom pronunciations (Coda)
 
 Create a Coda client with `Config{Model: "coda"}`. Pass words or phrases and
 their space-separated X-SAMPA pronunciations:
@@ -274,11 +274,9 @@ pronunciation after text normalization. Longest matches take precedence; the
 last entry for a repeated spelling wins. Inline `pronounce(...)` directives are
 not supported.
 
-Coda v2 accepts custom pronunciations in German, English, Spanish, French,
-Italian, and Portuguese, with up to 500 entries per request. The selected
-deployment validates these capabilities and the pronunciation rules. Older
-Coda deployments and Mist reject nonempty lexicons. `Model: "coda"` selects the
-Coda endpoint; it does not pin a model version.
+Coda accepts custom pronunciations in German, English, Spanish, French,
+Italian, and Portuguese, with up to 500 entries per request. The service validates
+supported languages and pronunciation rules. Mist rejects nonempty lexicons.
 
 Invalid UTF-8 fails locally. The service rejects unsupported models or languages,
 oversized lexicons, and ill-formed entries with `ErrInput` before producing audio.

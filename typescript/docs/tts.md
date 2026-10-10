@@ -54,7 +54,7 @@ source. All options in `client.tts.stream(text, { ... })` are optional:
 | `language` | `"en"` | Language code |
 | `audioFormat` | `AudioFormat.PCM_24000` | Output profile, imported from `@rimelabs/sdk` |
 | `timestamps` | `false` | Request final word timestamps; requires `model: "mistv3"` |
-| `customLexicon` | `[]` | Array of pronunciation overrides for this request; requires Coda v2 |
+| `customLexicon` | `[]` | Array of pronunciation overrides for this request; requires Coda |
 | `timeout` | Client setting | Seconds; pass `null` to disable the overall deadline |
 
 ### Audio formats
@@ -76,7 +76,7 @@ connection and progress limits active. Discovery allows at most 10 seconds;
 a shorter supplied timeout takes precedence. Omit an operation's `timeout` or
 pass `undefined` to inherit the client setting.
 
-## Custom pronunciations (Coda v2)
+## Custom pronunciations (Coda)
 
 Pass words or phrases and their space-separated X-SAMPA pronunciations:
 
@@ -112,11 +112,9 @@ pronunciation after text normalization. Longest matches take precedence; the
 last entry for a repeated spelling wins. Inline `pronounce(...)` directives are
 not supported.
 
-Coda v2 accepts custom pronunciations in German, English, Spanish, French,
-Italian, and Portuguese, with up to 500 entries per request. The selected
-deployment validates these capabilities and the pronunciation rules. Older
-Coda deployments and Mist reject nonempty lexicons. `model: "coda"` selects the
-Coda endpoint; it does not pin a model version.
+Coda accepts custom pronunciations in German, English, Spanish, French,
+Italian, and Portuguese, with up to 500 entries per request. The service validates
+supported languages and pronunciation rules. Mist rejects nonempty lexicons.
 
 Malformed option types throw locally. The service rejects unsupported models
 or languages, oversized lexicons, and ill-formed entries with `RimeInputError`

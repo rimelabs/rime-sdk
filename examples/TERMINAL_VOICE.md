@@ -11,10 +11,8 @@ flowchart TD
     E --> F[Speaker]
 ```
 
-This is the first stage of a cascaded voice agent. It speaks back what STT heard,
-so recognition errors stay visible. It needs only `RIME_API_KEY`. For an LLM-backed
-conversation, use the [cascaded voice agents](agent/README.md). Those examples
-also expose Mist v3 timestamps and Coda pronunciation controls for manual testing.
+The example speaks back what STT heard, so recognition errors stay visible.
+It needs only `RIME_API_KEY`.
 
 The SDK calls Rime's remote services. The terminal, microphone and speaker run
 locally. No LiveKit/Pipecat adapter, browser, VAD or LLM provider is involved.

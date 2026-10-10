@@ -23,7 +23,7 @@ After fully consuming audio, use `await stream.timestamps()` (Python/Node.js) or
 `stream.Timestamps()` (Go). The final result includes status and word start/end
 times in seconds. Timestamps are delivered after generation, not incrementally.
 
-Coda v2 supports request-wide pronunciation overrides through `custom_lexicon`
+Coda supports request-wide pronunciation overrides through `custom_lexicon`
 (Python), `customLexicon` (Node.js), or `CustomLexicon` (Go). Each entry contains
 `spelling` and a space-separated X-SAMPA `pronunciation`. Invalid entries raise
 an input error with the service's explanation and request ID. See the TTS guides
@@ -40,8 +40,6 @@ Use the package READMEs for installation and quick starts. Detailed guides cover
 [Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), and [Go STT](go/README.md#transcribe-speech).
 Runnable scripts are in the
 [example index](examples/README.md).
-For local Rime STT → OpenAI → Rime TTS conversations and manual timestamp and
-pronunciation checks, use the [cascaded voice agents](examples/agent/README.md).
 
 ## Local setup
 

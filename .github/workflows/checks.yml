@@ -36,7 +36,7 @@ jobs:
                 python/*|examples/python/*) python=true ;;
                 typescript/*|examples/typescript/*) typescript=true ;;
                 go/*) go=true ;;
-                conformance/*|docs/*|.github/*|examples/audio/*|examples/agent/*|examples/TERMINAL_VOICE.md|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true ;;
+                conformance/*|docs/*|.github/*|examples/audio/*|examples/TERMINAL_VOICE.md|examples/README.md|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true ;;
               esac
             done < <(git diff --name-only "$BASE" HEAD)
           fi
@@ -92,8 +92,6 @@ jobs:
       - run: npm --prefix ../examples/typescript ci
       - run: npm --prefix ../examples/typescript run check
       - run: npm --prefix ../examples/typescript test
-      - run: npm --prefix ../examples/typescript run check:agent
-      - run: npm --prefix ../examples/typescript run test:agent
       - run: npm run check
       - run: npm run lint
       - run: npm test
