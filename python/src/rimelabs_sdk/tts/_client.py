@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterable
+from collections.abc import AsyncIterable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import grpc
@@ -17,6 +17,7 @@ from .._errors import (
 )
 from . import _policy, _transport
 from ._audio import AudioFormat
+from ._lexicon import PronunciationEntry, snapshot
 from ._stream import _CONSTRUCTION_KEY, AudioStream
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 class _TTS:
     def __init__(self, client: Rime, *, model: str, endpoint: str | None, timeout: float | None):
         self._client = client
+        self._model = model
         self._timeout = _policy.timeout(timeout)
         self._policy = _policy.resolve(model, endpoint)
         self._channel: grpc.aio.Channel | None = None
@@ -45,6 +47,9 @@ class _TTS:
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
+        timestamps: bool = False,
+        custom_lexicon: Sequence[PronunciationEntry] = (),
+        complete_text: bool = False,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Synthesize complete text and return an audio stream. Do not await this call."""
@@ -57,8 +62,15 @@ class _TTS:
         async def source():
             yield text
 
-        return self.stream(
-            source(), voice=voice, language=language, audio_format=audio_format, timeout=timeout
+        return self._stream(
+            text if complete_text else source(),
+            voice=voice,
+            language=language,
+            audio_format=audio_format,
+            timestamps=timestamps,
+            custom_lexicon=custom_lexicon,
+            complete_text=complete_text,
+            timeout=timeout,
         )
 
     def stream(
@@ -68,6 +80,9 @@ class _TTS:
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
+        timestamps: bool = False,
+        custom_lexicon: Sequence[PronunciationEntry] = (),
+        complete_text: bool = False,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Stream text chunks into synthesis and return an audio stream. Do not await this call."""
@@ -76,6 +91,45 @@ class _TTS:
             raise RimeInputError(
                 "text must be an async iterable of strings; use synthesize() for a string"
             )
+        return self._stream(
+            text,
+            voice=voice,
+            language=language,
+            audio_format=audio_format,
+            timestamps=timestamps,
+            custom_lexicon=custom_lexicon,
+            complete_text=complete_text,
+            timeout=timeout,
+        )
+
+    def _stream(
+        self,
+        text: str | AsyncIterable[str],
+        *,
+        voice: str | None,
+        language: str,
+        audio_format: AudioFormat | None,
+        timestamps: bool,
+        custom_lexicon: Sequence[PronunciationEntry],
+        complete_text: bool,
+        timeout: float | None | object,
+    ) -> AudioStream:
+        lexicon = snapshot(custom_lexicon)
+        if not isinstance(complete_text, bool):
+            raise RimeInputError("complete_text must be a boolean")
+        if complete_text:
+            if not isinstance(text, str):
+                raise RimeInputError("complete_text=True requires synthesize() with a string")
+            try:
+                text_bytes = len(text.encode("utf-8"))
+            except UnicodeEncodeError:
+                raise RimeInputError("Complete text must be valid UTF-8") from None
+            if text_bytes > self._policy.sentence_bytes:
+                raise RimeInputError("Complete text must be at most 65536 UTF-8 bytes")
+        if not isinstance(timestamps, bool):
+            raise RimeInputError("timestamps must be a boolean")
+        if timestamps and self._model != "mistv3":
+            raise RimeInputError("Word timestamps are supported only with model='mistv3'")
         voice = self._policy.default_voice if voice is None else _policy.nonempty(voice, "voice")
         _policy.nonempty(language, "language")
         profile = AudioFormat.PCM_24000 if audio_format is None else audio_format
@@ -89,6 +143,9 @@ class _TTS:
             language,
             profile,
             _policy.timeout(timeout, self._timeout),
+            timestamps,
+            lexicon,
+            complete_text,
         )
         self._streams.add(stream)
         return stream

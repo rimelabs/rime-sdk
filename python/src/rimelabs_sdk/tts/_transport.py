@@ -6,9 +6,12 @@ import grpc
 from google.protobuf.message_factory import GetMessageClass
 from rime_api import text_to_speech_pb2 as proto
 
-from .._errors import RimeAudioFormatError, RimeStreamError
+from .._errors import RimeAudioFormatError, RimeResourceLimitError, RimeStreamError
 from .._grpc import request_id as _request_id
 from .._grpc import rpc_error
+from ._timestamps import TimestampTrailer
+
+_MAX_SEND_BYTES = 131072
 
 
 def make_channel(policy):
@@ -18,14 +21,20 @@ def make_channel(policy):
         options=[
             ("grpc.enable_retries", 0),
             ("grpc.max_receive_message_length", policy.receive_bytes),
-            ("grpc.max_send_message_length", policy.sentence_bytes + 65536),
+            ("grpc.max_send_message_length", _MAX_SEND_BYTES),
         ],
     )
 
 
 def bind(channel, name):
     descriptor = proto.DESCRIPTOR.services_by_name["TextToSpeech"].methods_by_name[name]
-    factory = channel.stream_stream if descriptor.client_streaming else channel.unary_unary
+    factory = (
+        channel.stream_stream
+        if descriptor.client_streaming
+        else channel.unary_stream
+        if descriptor.server_streaming
+        else channel.unary_unary
+    )
     return factory(
         "/rime.TextToSpeech/" + name,
         request_serializer=GetMessageClass(descriptor.input_type).SerializeToString,
@@ -33,10 +42,16 @@ def bind(channel, name):
     )
 
 
-def header(voice, language):
+def header(voice, language, timestamps=False, custom_lexicon=()):
     request = proto.SynthesisRequest(speaker=voice, language=language)
     request.audio_parameters.audio_format = "audio/pcm"
     request.audio_parameters.sampling_rate = 24000
+    if timestamps:
+        request.timestamps.enable = True
+    request.custom_lexicon.extend(
+        proto.PronunciationEntry(spelling=entry.spelling, pronunciation=entry.pronunciation)
+        for entry in custom_lexicon
+    )
     return proto.StreamingSynthesisRequest(header=request)
 
 
@@ -56,7 +71,9 @@ async def discover(channel, metadata, kind, language, timeout):
         response = await bind(channel, name)(request, metadata=metadata, timeout=timeout)
     except grpc.aio.AioRpcError as error:
         raise rpc_error(
-            error.code(), _request_id(error.initial_metadata(), error.trailing_metadata())
+            error.code(),
+            _request_id(error.initial_metadata(), error.trailing_metadata()),
+            error.details(),
         ) from None
     return list(response.speakers if kind == "voices" else response.languages)
 
@@ -64,23 +81,31 @@ async def discover(channel, metadata, kind, language, timeout):
 class SynthesisCall:
     """One TTS RPC. Audio exhaustion means successful wire completion only."""
 
-    def __init__(self, channel, metadata):
-        self._call = bind(channel, "SynthesizeStreaming")(metadata=metadata)
+    def __init__(self, channel, metadata, complete_text=False):
+        self._channel, self._metadata = channel, metadata
+        self._complete_text = complete_text
+        self._call = (
+            None if complete_text else bind(channel, "SynthesizeStreaming")(metadata=metadata)
+        )
         self.request_id = None
+        self._timestamps_requested = False
+        self._timestamps = TimestampTrailer()
 
     def done(self):
-        return self._call.done()
+        return self._call is not None and self._call.done()
 
     def cancel(self):
-        self._call.cancel()
+        if self._call is not None:
+            self._call.cancel()
 
     def _error(self, error):
         self.request_id = _request_id(
             error.initial_metadata(), error.trailing_metadata(), self.request_id
         )
-        return rpc_error(error.code(), self.request_id)
+        return rpc_error(error.code(), self.request_id, error.details())
 
     async def _check_status(self):
+        assert self._call is not None
         code = await self._call.code()
         self.request_id = _request_id(
             await self._call.initial_metadata(),
@@ -88,9 +113,16 @@ class SynthesisCall:
             self.request_id,
         )
         if code != grpc.StatusCode.OK:
-            raise rpc_error(code, self.request_id)
+            raise rpc_error(code, self.request_id, await self._call.details())
 
     async def _write(self, message):
+        assert self._call is not None
+        # grpc.aio can report an oversized streaming write as INTERNAL instead
+        # of RESOURCE_EXHAUSTED. Keep the same limit and classify it locally.
+        if message.ByteSize() > _MAX_SEND_BYTES:
+            raise RimeResourceLimitError(
+                "Synthesis request exceeds the supported byte limit", request_id=self.request_id
+            )
         try:
             await self._call.write(message)
         except grpc.aio.AioRpcError as error:
@@ -105,20 +137,31 @@ class SynthesisCall:
                 "The service completed before input finished", request_id=self.request_id
             ) from None
 
-    async def start(self, voice, language):
+    async def start(self, voice, language, timestamps=False, custom_lexicon=(), text=None):
         # Do not wait for response metadata before allowing text writes.
-        await self._write(header(voice, language))
+        self._timestamps_requested = timestamps
+        message = header(voice, language, timestamps, custom_lexicon)
+        if self._complete_text:
+            message.header.text = text
+            self._call = bind(self._channel, "Synthesize")(message.header, metadata=self._metadata)
+        else:
+            await self._write(message)
+
+    def timestamp_result(self):
+        return self._timestamps.result(self.request_id)
 
     async def write(self, sentence):
         await self._write(proto.StreamingSynthesisRequest(text_chunk=sentence))
 
     async def finish_input(self):
+        assert self._call is not None
         try:
             await self._call.done_writing()
         except grpc.aio.AioRpcError as error:
             raise self._error(error) from None
 
     async def audio(self):
+        assert self._call is not None
         try:
             metadata = dict(await self._call.initial_metadata())
             self.request_id = _request_id(metadata) or self.request_id
@@ -127,8 +170,13 @@ class SynthesisCall:
                 message = await self._call.read()
                 if message is grpc.aio.EOF:
                     break
-                if message.WhichOneof("payload") != "audio":
+                payload = message.WhichOneof("payload")
+                if payload == "trailer" and self._timestamps_requested:
+                    self._timestamps.accept(message.trailer)
+                if payload != "audio":
                     continue
+                if self._timestamps.seen:
+                    self._timestamps.invalid = True
                 if message.audio:
                     self._check_format(content_type)
                 yield message.audio

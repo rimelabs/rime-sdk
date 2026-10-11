@@ -3,6 +3,7 @@ export { timeout } from "../validation.js";
 import { RimeInputError } from "../errors.js";
 const codaHostname = "coda.api.rime.ai";
 export const policy = {
+  model: "coda",
   target: `${codaHostname}:443`,
   audience: codaHostname,
   defaultVoice: "clementine",
@@ -23,7 +24,7 @@ export function resolve(
   model: string,
   endpoint?: string | null,
 ): Readonly<typeof policy> {
-  const deployment = { ...policy };
+  const deployment = { ...policy, model };
   if (model === "mistv3") {
     const hostname = "mist.api.rime.ai";
     deployment.target = `${hostname}:443`;

@@ -2,6 +2,7 @@ import { connect as connectGrpc, metadata } from "../grpc.js";
 export { metadata } from "../grpc.js";
 import {
   BidiCall,
+  ResponseCall,
   rpcError,
   serializer,
   deserializer,
@@ -19,6 +20,8 @@ import * as schema from "@rimelabs/api";
 import { policy } from "./policy.js";
 import { abortable } from "../cancellation.js";
 import * as errors from "../errors.js";
+import { TimestampTrailer } from "./timestamps.js";
+import type { PronunciationEntry } from "./lexicon.js";
 export type Connection = grpc.Client;
 export interface PreparedConnection {
   client: Connection;
@@ -47,7 +50,12 @@ function openStream(client: grpc.Client, auth: grpc.Metadata) {
     auth,
   );
 }
-function header(voice: string, language: string) {
+function header(
+  voice: string,
+  language: string,
+  timestamps: boolean,
+  customLexicon: readonly PronunciationEntry[],
+) {
   return create(schema.StreamingSynthesisRequestSchema, {
     payload: {
       case: "header",
@@ -55,6 +63,8 @@ function header(voice: string, language: string) {
         speaker: voice,
         language,
         audioParameters: { audioFormat: "audio/pcm", samplingRate: 24000 },
+        timestamps: timestamps ? { enable: true } : undefined,
+        customLexicon: [...customLexicon],
       }),
     },
   });
@@ -136,33 +146,68 @@ export async function discover(
 }
 
 export class SynthesisCall {
-  private readonly rpc: BidiCall<
+  private timestampsRequested = false;
+  private readonly timestampTrailer = new TimestampTrailer();
+  private rpc!: ResponseCall<schema.SynthesisResponseStream>;
+  private input?: BidiCall<
     schema.StreamingSynthesisRequest,
     schema.SynthesisResponseStream
   >;
-  constructor(prepared: PreparedConnection, signal: AbortSignal) {
-    this.rpc = new BidiCall(
-      openStream(prepared.client, prepared.metadata),
-      signal,
-    );
+  constructor(
+    private prepared: PreparedConnection,
+    private signal: AbortSignal,
+    private completeText = false,
+  ) {
+    if (!completeText) {
+      this.input = new BidiCall(
+        openStream(prepared.client, prepared.metadata),
+        signal,
+      );
+      this.rpc = this.input;
+    }
   }
   get requestId() {
-    return this.rpc.requestId;
+    return this.rpc?.requestId ?? null;
   }
   get done() {
-    return this.rpc.done;
+    return this.rpc?.done ?? false;
   }
   cancel() {
-    this.rpc.cancel();
+    this.rpc?.cancel();
   }
-  start(voice: string, language: string) {
-    return this.rpc.write(header(voice, language));
+  start(
+    voice: string,
+    language: string,
+    timestamps = false,
+    customLexicon: readonly PronunciationEntry[] = [],
+    text?: string,
+  ) {
+    this.timestampsRequested = timestamps;
+    const message = header(voice, language, timestamps, customLexicon);
+    if (this.completeText && message.payload.case === "header") {
+      message.payload.value.text = text!;
+      this.rpc = new ResponseCall(
+        this.prepared.client.makeServerStreamRequest(
+          "/rime.TextToSpeech/Synthesize",
+          serializer(schema.SynthesisRequestSchema),
+          deserializer(schema.SynthesisResponseStreamSchema),
+          message.payload.value,
+          this.prepared.metadata,
+        ),
+        this.signal,
+      );
+      return Promise.resolve();
+    }
+    return this.input!.write(message);
+  }
+  timestampResult() {
+    return this.timestampTrailer.result(this.requestId);
   }
   write(sentence: string) {
-    return this.rpc.write(textMessage(sentence));
+    return this.input!.write(textMessage(sentence));
   }
   finishInput() {
-    this.rpc.finishInput();
+    this.input!.finishInput();
   }
   private checkFormat(contentType: unknown) {
     if (contentType !== "audio/pcm")
@@ -175,7 +220,10 @@ export class SynthesisCall {
     const headers = await this.rpc.headers();
     const contentType = headers.get("x-rime-audio-content-type")[0];
     for await (const response of this.rpc.responses()) {
+      if (response.payload.case === "trailer" && this.timestampsRequested)
+        this.timestampTrailer.accept(response.payload.value);
       if (response.payload.case !== "audio") continue;
+      if (this.timestampTrailer.seen) this.timestampTrailer.invalid = true;
       if (response.payload.value.length) this.checkFormat(contentType);
       yield response.payload.value;
     }

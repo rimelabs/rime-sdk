@@ -10,6 +10,7 @@ class FakeService:
     def __init__(self):
         self.mode = "normal"
         self.rejection_status = grpc.StatusCode.UNAVAILABLE
+        self.rejection_message = None
         self.response_metadata = (
             ("x-rime-audio-content-type", "audio/pcm"),
             ("x-request-id", "test-request"),
@@ -17,7 +18,9 @@ class FakeService:
         self.trailing_metadata = ()
         self.final_responses = []
         self.headers_sent = asyncio.Event()
+        self.cancelled = asyncio.Event()
         self.calls = []
+        self.complete_calls = []
         self.metadata = []
         self.active = 0
         self.release = asyncio.Event()
@@ -28,6 +31,13 @@ class FakeService:
         self.payload = b"\x01\x00" * 2400
 
     async def streaming(self, requests, context):
+        handler = asyncio.current_task()
+
+        def finished(context):
+            if context.cancelled() or handler.cancelling():
+                self.cancelled.set()
+
+        context.add_done_callback(finished)
         messages = []
         self.calls.append(messages)
         self.metadata.append(dict(context.invocation_metadata()))
@@ -38,7 +48,9 @@ class FakeService:
             assert first.WhichOneof("payload") == "header"
             if self.mode == "error_before_audio":
                 context.set_trailing_metadata((("x-request-id", "rejected-request"),))
-                await context.abort(self.rejection_status, "test admission failure")
+                await context.abort(
+                    self.rejection_status, self.rejection_message or "test admission failure"
+                )
             metadata = dict(self.response_metadata)
             if self.mode == "wrong_format":
                 metadata["x-rime-audio-content-type"] = "audio/wav"
@@ -48,7 +60,9 @@ class FakeService:
             context.set_trailing_metadata(self.trailing_metadata)
             if self.mode == "no_audio_error":
                 await self.release.wait()
-                await context.abort(self.rejection_status, "test rejection after headers")
+                await context.abort(
+                    self.rejection_status, self.rejection_message or "test rejection after headers"
+                )
             async for message in requests:
                 messages.append(message)
                 if self.mode == "headers_after_text" and len(messages) == 2:
@@ -69,17 +83,26 @@ class FakeService:
                 if self.mode == "partial_error":
                     await self.release.wait()
                     await context.abort(grpc.StatusCode.UNAVAILABLE, "test disconnect")
+            if self.mode == "delayed_trailer":
+                await self.release.wait()
             for response in self.final_responses:
                 yield response
+            if self.mode == "error_after_trailer":
+                await context.abort(self.rejection_status, "test failure after trailer")
             if self.mode == "hang_after_input":
                 await self.release.wait()
         finally:
             self.active -= 1
 
     async def synthesize(self, message, context):
-        self.calls.append([message])
-        await context.send_initial_metadata((("x-rime-audio-content-type", "audio/pcm"),))
-        yield proto.SynthesisResponseStream(audio=self.payload)
+        self.complete_calls.append(message)
+
+        async def requests():
+            yield proto.StreamingSynthesisRequest(header=message)
+            yield proto.StreamingSynthesisRequest(text_chunk=message.text)
+
+        async for response in self.streaming(requests(), context):
+            yield response
 
     async def languages(self, message, context):
         self.discovery_calls += 1
@@ -106,7 +129,9 @@ class FakeService:
     async def discovery_error(self, context):
         await context.send_initial_metadata(self.response_metadata)
         context.set_trailing_metadata(self.trailing_metadata)
-        await context.abort(self.rejection_status, "test discovery rejection")
+        await context.abort(
+            self.rejection_status, self.rejection_message or "test discovery rejection"
+        )
 
     async def __aenter__(self):
         self.server = grpc.aio.server()

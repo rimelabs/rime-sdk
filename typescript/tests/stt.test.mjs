@@ -159,7 +159,10 @@ for (const [mode, ErrorType] of [
         for await (const update of stream) updates.push(update);
       },
       (error) =>
-        error instanceof ErrorType && error.requestId === "stt-request",
+        error instanceof ErrorType &&
+        error.requestId === "stt-request" &&
+        (mode !== "done_then_error" ||
+          error.message === "deliberate rejection"),
     );
     await stream.cancel();
     assert.ok(updates.every((update) => update.kind !== "final"));
@@ -184,12 +187,32 @@ for (const [status, ErrorType] of [
     await assert.rejects(
       stream.next(),
       (error) =>
-        error instanceof ErrorType && error.requestId === "stt-rejected",
+        error instanceof ErrorType &&
+        error.requestId === "stt-rejected" &&
+        error.message === "deliberate rejection",
     );
     assert.equal(stream.requestId, "stt-rejected");
     assert.equal(service.calls[0][0].payload.value.language, "und");
     await stream.cancel();
   });
+
+test("failure after partials preserves service diagnostics", async (t) => {
+  const { service, client } = await setup(t);
+  service.mode = "partial_error";
+  const stream = client.stt.stream(source(), { language: "en" });
+  assert.equal((await stream.next()).value.kind, "partial");
+  service.release();
+  await assert.rejects(
+    async () => {
+      for await (const update of stream) assert.notEqual(update.kind, "final");
+    },
+    (error) =>
+      error instanceof sdk.RimeUnavailableError &&
+      error.message === "deliberate rejection" &&
+      error.requestId === "stt-request",
+  );
+  assert.equal(service.calls.length, 1);
+});
 
 test("silence completes with an empty transcript", async (t) => {
   const { service, client } = await setup(t);

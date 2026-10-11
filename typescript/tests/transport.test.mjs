@@ -1,18 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
 import * as grpc from "@grpc/grpc-js";
 import { create } from "@bufbuild/protobuf";
 import * as schema from "@rimelabs/api";
 import { SynthesisCall, discover } from "../dist/tts/transport.js";
+import { BidiCall } from "../dist/grpc.js";
 import {
   RimeAudioFormatError,
   RimeAuthenticationError,
+  RimeInputError,
   RimePermissionError,
+  RimeResourceLimitError,
+  RimeStreamError,
   RimeTimeoutError,
   RimeUnavailableError,
 } from "../dist/errors.js";
 import { FakeService } from "./service.mjs";
+
+for (const [code, ErrorType] of [
+  [grpc.status.RESOURCE_EXHAUSTED, RimeResourceLimitError],
+  [grpc.status.OK, RimeStreamError],
+]) {
+  test(
+    `final status settles a write whose callback never fires / ${code}`,
+    { timeout: 1000 },
+    async () => {
+      const native = new EventEmitter();
+      native.write = () => true;
+      const call = new BidiCall(native, new AbortController().signal);
+      const pending = assert.rejects(
+        call.write({}),
+        (error) =>
+          error instanceof ErrorType &&
+          error.requestId === "write-request" &&
+          (code === grpc.status.OK || error.message === "request too large"),
+      );
+      const metadata = new grpc.Metadata();
+      metadata.set("x-request-id", "write-request");
+      native.emit("status", { code, details: "request too large", metadata });
+      await pending;
+      assert.equal(native.listenerCount("status"), 0);
+    },
+  );
+}
+
+test("successful writes do not retain a final-status listener per message", async () => {
+  const native = new EventEmitter();
+  native.write = (_, callback) => callback();
+  const call = new BidiCall(native, new AbortController().signal);
+  const listeners = native.listenerCount("status");
+  for (let i = 0; i < 20; i++) await call.write({});
+  assert.equal(native.listenerCount("status"), listeners);
+});
 
 async function setup(fn) {
   const server = await new FakeService().start();
@@ -43,6 +84,7 @@ for (const [status, errorType] of [
   [grpc.status.UNAVAILABLE, RimeUnavailableError],
   [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
   [grpc.status.PERMISSION_DENIED, RimePermissionError],
+  [grpc.status.INVALID_ARGUMENT, RimeInputError],
 ]) {
   test(`write after rejection without reader / ${status}`, () =>
     setup(async (server, prepared, signal) => {
@@ -57,6 +99,7 @@ for (const [status, errorType] of [
           call.write("Hello."),
           (error) =>
             error instanceof errorType &&
+            error.message === "test service rejection" &&
             error.requestId === "rejected-request",
         );
         assert.equal(call.requestId, "rejected-request");
@@ -129,6 +172,20 @@ test("discovery transport does not retry", () =>
       RimeUnavailableError,
     );
     assert.equal(server.discoveryCalls, 1);
+  }));
+
+test("discovery preserves service message", () =>
+  setup(async (server, prepared, signal) => {
+    server.mode = "discovery_error";
+    server.rejectionStatus = grpc.status.INVALID_ARGUMENT;
+    server.rejectionMessage = 'unsupported language "xx"';
+    await assert.rejects(
+      discover(prepared, "voices", "xx", signal),
+      (error) =>
+        error instanceof RimeInputError &&
+        error.message === server.rejectionMessage &&
+        error.requestId === "test-request",
+    );
   }));
 
 for (const [name, payload] of [

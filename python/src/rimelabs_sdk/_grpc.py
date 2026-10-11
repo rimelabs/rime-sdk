@@ -14,7 +14,7 @@ from ._errors import (
 )
 
 
-def rpc_error(code, request_id=None):
+def rpc_error(code, request_id=None, details=None):
     cls = {
         grpc.StatusCode.UNAUTHENTICATED: RimeAuthenticationError,
         grpc.StatusCode.PERMISSION_DENIED: RimePermissionError,
@@ -24,7 +24,12 @@ def rpc_error(code, request_id=None):
         grpc.StatusCode.DEADLINE_EXCEEDED: RimeTimeoutError,
         grpc.StatusCode.CANCELLED: RimeCancelledError,
     }.get(code, RimeStreamError)
-    return cls("Rime operation failed: " + code.name, request_id=request_id)
+    message = (
+        details
+        if isinstance(details, str) and details.strip()
+        else "Rime operation failed: " + code.name
+    )
+    return cls(message, request_id=request_id)
 
 
 def request_id(headers, trailers=(), previous=None):

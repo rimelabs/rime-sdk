@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -73,5 +74,9 @@ func operationError(err error, id string) *Error {
 			kind = ErrCancelled
 		}
 	}
-	return &Error{Kind: kind, Message: "operation failed", RequestID: id, Cause: err}
+	message := "operation failed"
+	if serviceStatus, ok := status.FromError(err); ok && strings.TrimSpace(serviceStatus.Message()) != "" {
+		message = serviceStatus.Message()
+	}
+	return &Error{Kind: kind, Message: message, RequestID: id, Cause: err}
 }

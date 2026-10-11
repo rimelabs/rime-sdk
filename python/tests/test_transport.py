@@ -10,6 +10,7 @@ from rime_api import text_to_speech_pb2 as proto
 from rimelabs_sdk import (
     RimeAudioFormatError,
     RimeAuthenticationError,
+    RimeInputError,
     RimePermissionError,
     RimeUnavailableError,
 )
@@ -28,6 +29,7 @@ async def connection():
         (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError),
         (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError),
         (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
+        (grpc.StatusCode.INVALID_ARGUMENT, RimeInputError),
     ],
 )
 async def test_write_after_rejection_without_reader(connection, status, error_type):
@@ -43,6 +45,7 @@ async def test_write_after_rejection_without_reader(connection, status, error_ty
         with pytest.raises(error_type) as caught:
             await call.write("Hello.")
         assert caught.value.request_id == "rejected-request"
+        assert str(caught.value) == "test admission failure"
         assert call.request_id == "rejected-request"
         assert len(server.calls) == 1
     finally:
@@ -96,6 +99,17 @@ async def test_discovery_transport_does_not_retry(connection):
     with pytest.raises(RimeUnavailableError):
         await discover(channel, (), "languages", None, 1)
     assert server.discovery_calls == 1
+
+
+async def test_discovery_preserves_service_message(connection):
+    server, channel = connection
+    server.mode = "discovery_error"
+    server.rejection_status = grpc.StatusCode.INVALID_ARGUMENT
+    server.rejection_message = 'unsupported language "xx"'
+    with pytest.raises(RimeInputError) as caught:
+        await discover(channel, (), "voices", "xx", 1)
+    assert str(caught.value) == server.rejection_message
+    assert caught.value.request_id == "test-request"
 
 
 @pytest.mark.parametrize(

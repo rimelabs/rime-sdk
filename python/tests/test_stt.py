@@ -160,6 +160,8 @@ async def test_incomplete_transports_never_publish_a_final(stt_setup, mode, expe
                 updates.append(update)
     assert all(update.kind != "final" for update in updates)
     assert caught.value.request_id == "stt-request"
+    if mode == "done_then_error":
+        assert str(caught.value) == "deliberate status failure after done"
     assert len(service.calls) == 1
 
 
@@ -201,9 +203,25 @@ async def test_rejection_keeps_status_and_trailing_request_id(stt_setup, status,
         async with stream:
             await anext(stream)
     assert caught.value.request_id == stream.request_id == "stt-rejected"
+    assert str(caught.value) == "deliberate rejection"
     assert service.calls[0][0].config.language == "und"
     await asyncio.wait_for(service.completed.wait(), 1)
     assert service.cancelled.is_set() == (status == grpc.StatusCode.CANCELLED)
+
+
+async def test_failure_after_partials_preserves_service_diagnostics(stt_setup):
+    service, client = stt_setup
+    service.mode = "partial_error"
+    async with client.stt.stream(source(), language="en") as stream:
+        assert (await anext(stream)).kind == "partial"
+        service.release.set()
+        with pytest.raises(
+            RimeUnavailableError, match="^deliberate error after partials$"
+        ) as caught:
+            async for update in stream:
+                assert update.kind != "final"
+        assert caught.value.request_id == stream.request_id == "stt-request"
+    assert len(service.calls) == 1
 
 
 @pytest.mark.parametrize("language", ["", " \t\n"])

@@ -13,12 +13,15 @@ from ._errors import (
 )
 from ._pcm import PCMFormat
 from .tts._audio import AudioFormat
+from .tts._lexicon import PronunciationEntry
 from .tts._stream import AudioStream
+from .tts._timestamps import TimestampResult, TimestampStatus, WordTimestamp
 
 __all__ = [
     "AudioFormat",
     "AudioStream",
     "PCMFormat",
+    "PronunciationEntry",
     "Rime",
     "RimeAudioFormatError",
     "RimeAuthenticationError",
@@ -30,11 +33,14 @@ __all__ = [
     "RimeStreamError",
     "RimeTimeoutError",
     "RimeUnavailableError",
+    "TimestampResult",
+    "TimestampStatus",
     "TranscriptStream",
     "TranscriptionFinal",
     "TranscriptionMode",
     "TranscriptionPartial",
     "TranscriptionUpdate",
+    "WordTimestamp",
 ]
 
 from .stt import (

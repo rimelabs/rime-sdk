@@ -12,6 +12,7 @@ import (
 
 	pb "github.com/rimelabs/rime-api/go"
 	"github.com/rimelabs/rime-sdk/go/internal/sentences"
+	"google.golang.org/grpc"
 )
 
 // TextSource returns the next UTF-8 fragment or io.EOF. It must honor cancellation.
@@ -45,18 +46,22 @@ const (
 // AudioStream permits one concurrent Recv call. Close cancels unfinished work.
 // Audio is complete only when Recv returns io.EOF. Earlier audio can precede an error.
 type AudioStream struct {
-	op           *operation
-	queue        *audioQueue
-	format       AudioFormat
-	reading      atomic.Bool
-	mu           sync.Mutex
-	id           string
-	lastProgress time.Time
-	input        inputState
-	output       outputState
-	done         chan struct{}
-	workersDone  chan struct{}
-	finishOnce   sync.Once
+	op                  *operation
+	queue               *audioQueue
+	format              AudioFormat
+	reading             atomic.Bool
+	mu                  sync.Mutex
+	id                  string
+	lastProgress        time.Time
+	input               inputState
+	output              outputState
+	done                chan struct{}
+	workersDone         chan struct{}
+	finishOnce          sync.Once
+	timestampsRequested bool
+	timestampTrailer    timestampTrailer
+	completed           bool
+	streamError         error
 }
 
 // Synthesize starts synthesis of complete text and returns an audio stream.
@@ -64,6 +69,12 @@ type AudioStream struct {
 func (t *TTSService) Synthesize(ctx context.Context, text string, options SynthesisOptions) (*AudioStream, error) {
 	if strings.TrimSpace(text) == "" || !utf8.ValidString(text) {
 		return nil, failure(ErrInput, "text must be nonblank UTF-8")
+	}
+	if options.CompleteText && len(text) > 65536 {
+		return nil, failure(ErrInput, "complete text must be at most 65536 UTF-8 bytes")
+	}
+	if options.CompleteText {
+		return t.stream(ctx, nil, text, options)
 	}
 	first := true
 	return t.Stream(ctx, func(context.Context) (string, error) {
@@ -78,7 +89,21 @@ func (t *TTSService) Synthesize(ctx context.Context, text string, options Synthe
 // Stream accepts incremental text and returns an audio stream.
 // It starts work immediately. The source may supply partial sentences.
 func (t *TTSService) Stream(ctx context.Context, source TextSource, options SynthesisOptions) (*AudioStream, error) {
-	if source == nil {
+	if options.CompleteText {
+		return nil, failure(ErrInput, "CompleteText requires Synthesize with a string, not Stream")
+	}
+	return t.stream(ctx, source, "", options)
+}
+
+func (t *TTSService) stream(ctx context.Context, source TextSource, text string, options SynthesisOptions) (*AudioStream, error) {
+	lexicon, err := snapshotLexicon(options.CustomLexicon)
+	if err != nil {
+		return nil, err
+	}
+	if options.Timestamps && t.client.model != "mistv3" {
+		return nil, failure(ErrInput, "word timestamps are supported only with Model=mistv3")
+	}
+	if source == nil && !options.CompleteText {
 		return nil, failure(ErrInput, "text source must not be nil")
 	}
 	if options.AudioFormat > MULAW8000 {
@@ -99,8 +124,9 @@ func (t *TTSService) Stream(ctx context.Context, source TextSource, options Synt
 		return nil, err
 	}
 	s := &AudioStream{op: o, queue: newAudioQueue(), format: options.AudioFormat, lastProgress: time.Now(), done: make(chan struct{}), workersDone: make(chan struct{})}
+	s.timestampsRequested = options.Timestamps
 	go s.watch()
-	go s.run(source, voice, language)
+	go s.run(source, text, voice, language, lexicon)
 	return s, nil
 }
 
@@ -121,6 +147,11 @@ func (s *AudioStream) fail(err error) {
 		err = cause
 	}
 	mapped := operationError(err, s.RequestID())
+	s.mu.Lock()
+	if s.streamError == nil && !s.completed {
+		s.streamError = mapped
+	}
+	s.mu.Unlock()
 	s.queue.fail(mapped)
 	s.op.cancel(mapped)
 }
@@ -136,6 +167,10 @@ func (s *AudioStream) Recv() ([]byte, error) {
 		if err != io.EOF {
 			s.fail(err)
 			err = operationError(err, s.RequestID())
+		} else {
+			s.mu.Lock()
+			s.completed = true
+			s.mu.Unlock()
 		}
 		s.complete()
 	}
@@ -186,11 +221,37 @@ func (s *AudioStream) watch() {
 	}
 }
 
-func (s *AudioStream) run(source TextSource, voice, language string) {
+func (s *AudioStream) run(source TextSource, text, voice, language string, lexicon []PronunciationEntry) {
 	defer close(s.workersDone)
 	stub, ctx, err := s.op.client.prepare(s.op.ctx)
 	if err != nil {
 		s.fail(err)
+		return
+	}
+	format, rate := "audio/pcm", int32(24000)
+	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}}}
+	if s.timestampsRequested {
+		header.GetHeader().Timestamps = &pb.TimestampOptions{Enable: true}
+	}
+	for _, entry := range lexicon {
+		header.GetHeader().CustomLexicon = append(header.GetHeader().CustomLexicon, &pb.PronunciationEntry{Spelling: entry.Spelling, Pronunciation: entry.Pronunciation})
+	}
+	if source == nil {
+		header.GetHeader().Text = text
+		s.mu.Lock()
+		s.input = inputFinished
+		s.output = outputAwaitingFirstAudio
+		s.lastProgress = time.Now()
+		s.mu.Unlock()
+		call, err := stub.Synthesize(ctx, header.GetHeader())
+		if err == nil {
+			err = s.receive(call)
+		}
+		if err != nil {
+			s.fail(err)
+		} else {
+			s.queue.finish()
+		}
 		return
 	}
 	call, err := stub.SynthesizeStreaming(ctx)
@@ -198,8 +259,6 @@ func (s *AudioStream) run(source TextSource, voice, language string) {
 		s.fail(err)
 		return
 	}
-	format, rate := "audio/pcm", int32(24000)
-	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}}}
 	// Receive concurrently with sending the header. Some services send headers only after text.
 	result := make(chan error, 2)
 	go func() { result <- s.receive(call) }()
@@ -299,7 +358,7 @@ func sentenceError(err error) error {
 	return err
 }
 
-func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) error {
+func (s *AudioStream) receive(call grpc.ServerStreamingClient[pb.SynthesisResponseStream]) error {
 	headers, err := call.Header()
 	s.setID(requestID(headers, nil))
 	if err != nil {
@@ -330,6 +389,18 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 				return err
 			}
 			return s.queue.put(s.op.ctx, last)
+		}
+		if s.timestampsRequested {
+			s.mu.Lock()
+			switch payload := response.Payload.(type) {
+			case *pb.SynthesisResponseStream_Trailer:
+				s.timestampTrailer.accept(payload.Trailer)
+			case *pb.SynthesisResponseStream_Audio:
+				if s.timestampTrailer.seen {
+					s.timestampTrailer.invalid = true
+				}
+			}
+			s.mu.Unlock()
 		}
 		data := response.GetAudio()
 		if len(data) == 0 {

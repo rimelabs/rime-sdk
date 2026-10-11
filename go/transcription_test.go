@@ -227,6 +227,9 @@ func TestTranscriptionStatusAndNoReplay(t *testing.T) {
 			if len(updates) != 0 || !errors.As(err, &sdkError) || sdkError.RequestID != "rejected" || sdkError.Kind != operationError(status.Error(code, ""), "").Kind {
 				t.Fatalf("%v %+v", updates, err)
 			}
+			if sdkError.Message != "rejected" {
+				t.Fatalf("lost service diagnostic: %q", sdkError.Message)
+			}
 			if service.calls.Load() != 1 {
 				t.Fatal("recognition replayed")
 			}
@@ -608,6 +611,9 @@ func TestTranscriptionPartialThenFailurePreservesRequestID(t *testing.T) {
 	var sdkError *Error
 	if len(updates) != 0 || !errors.Is(err, ErrUnavailable) || !errors.As(err, &sdkError) || sdkError.RequestID != "partial-request" || service.calls.Load() != 1 {
 		t.Fatalf("%v %v", updates, err)
+	}
+	if sdkError.Message != "failure after partial" {
+		t.Fatalf("lost service diagnostic: %q", sdkError.Message)
 	}
 }
 
