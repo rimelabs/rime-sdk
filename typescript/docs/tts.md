@@ -1,12 +1,11 @@
 # TTS for Node.js
 
-You supply text; the SDK forwards it to the engine and streams audio back.
-The engine accumulates fragments into sentences before normalization and synthesis.
-Both input methods request engine accumulation. Text is sent in order with its
-whitespace preserved, using bounded messages without waiting for punctuation.
-When the source ends, the SDK closes input so the engine can synthesize the final
-text, including a phrase without terminal punctuation. A source pause leaves
-input open; short unfinished text may wait for more input.
+Send text as it becomes available; Rime automatically combines fragments into
+sentences for speech. Ending the text stream flushes any remaining text, even
+without final punctuation. Pausing the stream may delay speech for an unfinished
+sentence.
+
+The SDK sends text in order with its whitespace preserved and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
@@ -29,8 +28,8 @@ async function* text() {
 ```
 
 Use `client.tts.stream(text())` with the same file write and cleanup.
-The engine handles sentence boundaries. Do not await `tts.stream()`; the first
-iterator read starts work. The quick start collects chunks before writing a WAV file.
+Do not await `tts.stream()`; the first iterator read starts work. The quick start
+collects chunks before writing a WAV file.
 
 ## Configuration
 

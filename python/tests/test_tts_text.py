@@ -1,4 +1,4 @@
-"""The engine owns sentence boundaries; the SDK preserves and transports text."""
+"""The SDK preserves source text; Rime handles sentence accumulation automatically."""
 
 import asyncio
 import json
@@ -52,7 +52,7 @@ async def test_fragment_sent_before_next_input_and_final_audio_drained(setup):
         yield "The value is 1."
         # Receiving this fragment must not depend on a following sentence.
         await asyncio.wait_for(service.received.wait(), 2)
-        # Engine buffering during a source pause is not an output stall.
+        # Waiting for more input during a source pause is not an output stall.
         await asyncio.sleep(0.3)
         yield "7"
         yield " "

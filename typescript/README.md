@@ -64,7 +64,8 @@ Coda is the default model. Use `new Rime({ model: "mistv3" })` for Mist v3, or p
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
 Use `client.tts.synthesize(text)` for a complete string. To supply text from an LLM,
 pass an async iterable of strings to `client.tts.stream(chunks)`. Both methods
-return streaming audio. The engine handles sentence boundaries.
+return streaming audio. Rime automatically combines text fragments into
+sentences for speech.
 
 ## STT quick start
 

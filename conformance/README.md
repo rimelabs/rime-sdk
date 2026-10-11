@@ -4,8 +4,8 @@ Python and TypeScript test runners read these files directly. Go and Rust use
 copies in `go/testdata/` and `rust/testdata/` so exported packages can run their
 tests. CI checks that the copies match. Changes here run all four language jobs.
 
-- `text-input.json` gives source text that must reach the engine unchanged,
-  including original whitespace. Sentence boundaries are owned by the engine.
+- `text-input.json` gives source text that the SDK must send unchanged,
+  including original whitespace. Rime handles sentence accumulation automatically.
 - `contract.json` gives chunk sizes, invalid timeouts, audio profiles, gRPC error
   mappings, and required lifecycle scenarios.
 - `audio.json` gives exact PCM and mu-law bytes for a deterministic sample signal.

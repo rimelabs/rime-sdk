@@ -55,12 +55,11 @@ deployed compatibility.
 
 TTS uses `client.tts.synthesize(text)` for complete strings and
 `client.tts.stream(chunks)` for async text sources. Both return streaming audio.
-Every TTS header selects
-`SPLIT_STRATEGY_ACCUMULATE_SENTENCE`; the engine owns sentence detection and
-normalization. The SDK preserves source text, uses bounded Unicode-safe wire
-chunks, and half-closes when input ends. Successful writes and audio reads count
-as progress; source and consumer pauses suspend the internal stall timer.
-An overall timeout still applies throughout.
+Every TTS header selects `SPLIT_STRATEGY_ACCUMULATE_SENTENCE` so Rime automatically
+combines text fragments into sentences for speech. The SDK preserves source text,
+uses bounded Unicode-safe wire chunks, and half-closes when input ends.
+Successful writes and audio reads count as progress; source and consumer pauses
+suspend the internal stall timer. An overall timeout still applies throughout.
 Both packages expose `client.realtime.connect(...)`. Voice and language discovery
 remain on the top-level client. Tests that use private dependency seams import
 them from the feature directories.

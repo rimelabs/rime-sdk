@@ -5,7 +5,7 @@ import { Rime } from "@rimelabs/sdk";
 async function* text() {
   yield "Hello. ";
   yield "This text arrives in separate chunks. ";
-  yield "The engine detects sentence boundaries.";
+  yield "Rime automatically combines text fragments into sentences for speech.";
 }
 
 const client = new Rime();

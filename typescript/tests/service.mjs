@@ -4,7 +4,7 @@ import {
   configureTextEncoding,
   getTextEncoding,
 } from "@bufbuild/protobuf/wire";
-// Match the engine's UTF-8 decoding: a BOM in a text field is source text.
+// Preserve a BOM in a text field as part of the original source text.
 configureTextEncoding({
   ...getTextEncoding(),
   decodeUtf8: (bytes, strict) =>

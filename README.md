@@ -4,7 +4,7 @@ First-party Python, Node.js, Go, and Rust SDKs for Coda and Mist v3 streaming sp
 All four use `synthesize` for a string and `stream` for incremental text input.
 Both methods return streaming audio. Go uses `Synthesize` and `Stream`.
 The SDK handles API-key authentication, gRPC, conversion, and cancellation.
-The engine accumulates streamed text into sentences before normalization and synthesis.
+Rime automatically combines streamed text fragments into sentences for speech.
 
 All four SDKs support streaming speech recognition: `client.stt.stream` in
 Python/Node.js, `client.STT.Stream` in Go, and `client.stt().stream` in Rust. Supply a spoken language and a

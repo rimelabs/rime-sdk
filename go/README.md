@@ -226,11 +226,15 @@ Use `client.TTS.Stream(ctx, source, options)`. A `rime.TextSource` is:
 func(ctx context.Context) (string, error)
 ```
 
+Send text as it becomes available; Rime automatically combines fragments into
+sentences for speech. Ending the text stream flushes any remaining text, even
+without final punctuation. Pausing the stream may delay speech for an unfinished
+sentence.
+
 Return each text fragment as valid UTF-8. The SDK calls the source serially and
-forwards text in order, preserving whitespace. The engine accumulates fragments
-into sentences before normalization and synthesis. Return `io.EOF` when input
-ends. The last call may return both final text and `io.EOF`. Other errors stop
-the operation.
+forwards text in order, preserving whitespace. Return `io.EOF` when input ends.
+The last call may return both final text and `io.EOF`. Other errors stop the
+operation.
 
 The source must honor its context; see [Errors and cleanup](#errors-and-cleanup)
 for cancellation and cleanup limits.
@@ -238,10 +242,7 @@ for cancellation and cleanup limits.
 TTS streams start work when `Synthesize` or `Stream` returns, without waiting for
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
 at most 9,600 bytes. Text messages are at most 4,096 UTF-8 bytes; large source
-fragments are divided at character boundaries. Sentence limits belong to the
-engine. Both input methods request engine accumulation. Closing input lets the
-engine synthesize the final phrase, even without terminal punctuation. A paused
-source leaves input open, so unfinished text may wait for more input.
+fragments are divided at character boundaries.
 
 ## Custom pronunciations (Coda)
 

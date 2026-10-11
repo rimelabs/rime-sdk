@@ -40,7 +40,6 @@ Use `client.tts().synthesize(text, options)` for a string. Use
 `client.tts().stream(source, options)` for incremental text. Both return an
 `AudioStream` immediately; do not await these method calls. Read audio chunks
 as they arrive. The TTS view shares the client's configuration and shutdown.
-Both methods use `SynthesizeStreaming` with engine sentence accumulation.
 
 For example, replace the synthesis call above with:
 
@@ -58,11 +57,15 @@ let mut audio = client.tts().stream(text, SynthesisOptions::default())?;
 # }
 ```
 
+Send text as it becomes available; Rime automatically combines fragments into
+sentences for speech. Ending the text stream flushes any remaining text, even
+without final punctuation. Pausing the stream may delay speech for an unfinished
+sentence.
+
 `client.tts().stream` accepts a `Send + 'static` stream of `Result<String, Error>`.
-It forwards source text in order, preserving whitespace, and requests engine
-sentence accumulation. Messages are at most 4,096 UTF-8 bytes and never divide a
-Unicode character. Input errors cancel the request. Audio can arrive before
-input ends. Successful completion requires
+It forwards source text in order, preserving whitespace. Messages are at most
+4,096 UTF-8 bytes and never divide a Unicode character. Input errors cancel the
+request. Audio can arrive before input ends. Successful completion requires
 reading the audio stream to its end; earlier chunks can precede a later error.
 An error discards audio still in the SDK queue and takes priority on the next
 read. Audio already returned to the application remains available to it.
@@ -79,11 +82,6 @@ either pause. Synthesis requests are never replayed automatically.
 
 `AudioFormat::Mulaw8000` selects G.711 mu-law mono 8 kHz output. Conversion
 uses the same filter and test vectors as the other SDKs. Audio has no WAV header.
-
-The engine accumulates fragments into sentences before normalization and synthesis.
-When the source ends, the SDK closes input so the engine can synthesize the final
-phrase, even without terminal punctuation. A paused source leaves input open, so
-unfinished text may wait for more input. Sentence limits belong to the engine.
 
 ## Synthesis options
 

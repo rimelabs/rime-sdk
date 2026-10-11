@@ -504,7 +504,7 @@ where
         let Some(fragment) = next else { break };
         let fragment = fragment?;
         meaningful |= !fragment.trim().is_empty();
-        // Only transport-size boundaries are local; the engine accumulates sentences.
+        // Bound wire messages; Rime handles sentence accumulation automatically.
         let mut remaining = fragment.as_str();
         while !remaining.is_empty() {
             let mut end = remaining.len().min(4096);
