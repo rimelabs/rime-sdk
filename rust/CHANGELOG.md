@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.5](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.4...rust-v0.1.0-alpha.5) (2026-10-11)
+
+
+### Features
+
+* **rust:** custom lexicons, pronunciation overrides, and MistV3 timestamps ([#60](https://github.com/rimelabs/rime-sdk/issues/60)) ([8dca518](https://github.com/rimelabs/rime-sdk/commit/8dca51829a8ca8a920d615b69e961ec7ed105cb7))
+
 ## [0.1.0-alpha.4](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.3...rust-v0.1.0-alpha.4) (2026-10-10)
 
 
