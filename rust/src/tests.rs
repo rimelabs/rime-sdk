@@ -257,7 +257,7 @@ async fn next(audio: &mut AudioStream) -> Option<Result<bytes::Bytes, Error>> {
 }
 
 #[tokio::test]
-async fn complete_text_and_delayed_headers() {
+async fn synthesize_string_and_delayed_headers() {
     for mode in [Mode::Echo, Mode::DelayedHeaders] {
         let harness = Harness::new(mode).await;
         let mut audio = harness

@@ -31,11 +31,6 @@ use tokio_util::{sync::CancellationToken, task::TaskTracker};
 const QUEUE_CHUNKS: usize = 10;
 const CHUNK_BYTES: usize = 9_600;
 
-pub(crate) enum Input {
-    Streaming(Pin<Box<dyn Stream<Item = Result<String, Error>> + Send>>),
-    Complete(String),
-}
-
 /// An asynchronous stream of raw audio chunks. An error ends the stream.
 ///
 /// Dropping this value requests cancellation. Use [`Self::close`] to also wait
@@ -223,11 +218,14 @@ impl Progress {
     }
 }
 
-pub(crate) fn start(
+pub(crate) fn start<S>(
     client: Arc<Inner>,
-    input: Input,
+    source: S,
     options: SynthesisOptions,
-) -> Result<AudioStream, Error> {
+) -> Result<AudioStream, Error>
+where
+    S: Stream<Item = Result<String, Error>> + Send + 'static,
+{
     if options.timestamps && client.model != Model::MistV3 {
         return Err(Error::new(
             ErrorKind::Input,
@@ -284,7 +282,7 @@ pub(crate) fn start(
     let deadline = timeout.map(|timeout| Instant::now() + timeout);
     let worker = tracker.spawn(async move {
         let blocking_tasks = TaskTracker::new();
-        let run = std::panic::AssertUnwindSafe(run(client.clone(), input, request, sender.clone(), progress.clone(), operation_id.clone(), format, operation_timestamps, blocking_tasks.clone())).catch_unwind();
+        let run = std::panic::AssertUnwindSafe(run(client.clone(), source, request, sender.clone(), progress.clone(), operation_id.clone(), format, operation_timestamps, blocking_tasks.clone())).catch_unwind();
         let monitor = monitor(client, progress, sender, interval);
         let timeout = async {
             match deadline { Some(deadline) => tokio::time::sleep_until(deadline).await, None => std::future::pending().await }
@@ -354,35 +352,21 @@ async fn monitor(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn run(
+async fn run<S>(
     client: Arc<Inner>,
-    input: Input,
-    mut request: SynthesisRequest,
+    source: S,
+    request: SynthesisRequest,
     audio: mpsc::Sender<Bytes>,
     progress: Arc<Mutex<Progress>>,
     id: Arc<OnceLock<String>>,
     format: AudioFormat,
     timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
     blocking_tasks: TaskTracker,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    S: Stream<Item = Result<String, Error>> + Send + 'static,
+{
     let mut stub = client.stub().await?;
-    let source = match input {
-        Input::Complete(text) => {
-            request.text = text;
-            {
-                let mut state = progress.lock().expect("progress mutex poisoned");
-                state.sent_text = true;
-                state.input = InputState::Finished;
-                state.last_progress = Instant::now();
-            }
-            let response = stub
-                .synthesize(client.request(request))
-                .await
-                .map_err(Error::from)?;
-            return receive(response, audio, progress, id, format, timestamps).await;
-        }
-        Input::Streaming(source) => source,
-    };
     let (requests, incoming) = mpsc::channel(2);
     let producer = produce(source, requests, progress.clone(), request, blocking_tasks);
     let receiver = async {

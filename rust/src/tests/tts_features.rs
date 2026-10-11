@@ -4,7 +4,7 @@ use rimelabs_api::{
     self as protocol,
     text_to_speech_server::{TextToSpeech, TextToSpeechServer},
 };
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::{net::TcpListener, sync::Notify};
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::{
@@ -72,7 +72,6 @@ fn expected_words() -> TimestampResult {
 
 #[derive(Clone)]
 struct Script {
-    hold_headers: bool,
     before_gate: Vec<Frame>,
     gated: bool,
     after_gate: Vec<Frame>,
@@ -84,7 +83,6 @@ struct Script {
 impl Default for Script {
     fn default() -> Self {
         Self {
-            hold_headers: false,
             before_gate: vec![audio_frame([1, 0].repeat(2400))],
             gated: false,
             after_gate: vec![],
@@ -100,25 +98,20 @@ struct Service {
     requests: Arc<Mutex<Vec<protocol::SynthesisRequest>>>,
     texts: Arc<Mutex<Vec<String>>>,
     streaming_calls: Arc<AtomicUsize>,
-    complete_calls: Arc<AtomicUsize>,
     released: Arc<Notify>,
-    cancelled: Arc<Notify>,
 }
 
 impl Service {
     async fn response(
         &self,
         header: protocol::SynthesisRequest,
-        input: Option<tonic::Streaming<protocol::StreamingSynthesisRequest>>,
+        mut input: tonic::Streaming<protocol::StreamingSynthesisRequest>,
     ) -> Result<Response<Responses>, Status> {
         let first = {
             let mut requests = self.requests.lock().unwrap();
             requests.push(header);
             requests.len() == 1
         };
-        if self.script.hold_headers {
-            self.released.notified().await;
-        }
         let rejection = if first {
             self.script.rejection.clone()
         } else {
@@ -135,13 +128,11 @@ impl Service {
                     let _ = sender.send(Err(status)).await;
                     return;
                 }
-                if let Some(mut input) = input {
-                    while let Some(message) = input.message().await.unwrap_or(None) {
-                        let Some(Payload::TextChunk(text)) = message.payload else {
-                            panic!("expected text chunk")
-                        };
-                        service.texts.lock().unwrap().push(text);
-                    }
+                while let Some(message) = input.message().await.unwrap_or(None) {
+                    let Some(Payload::TextChunk(text)) = message.payload else {
+                        panic!("expected text chunk")
+                    };
+                    service.texts.lock().unwrap().push(text);
                 }
                 for frame in &service.script.before_gate {
                     if sender.send(Ok(frame.clone())).await.is_err() {
@@ -161,7 +152,7 @@ impl Service {
                 }
             };
             tokio::select! {
-                _ = sender.closed() => service.cancelled.notify_one(),
+                _ = sender.closed() => {},
                 _ = work => {},
             }
         });
@@ -190,11 +181,9 @@ impl TextToSpeech for Service {
 
     async fn synthesize(
         &self,
-        request: Request<protocol::SynthesisRequest>,
+        _: Request<protocol::SynthesisRequest>,
     ) -> Result<Response<Responses>, Status> {
-        check_auth(&request);
-        self.complete_calls.fetch_add(1, Ordering::SeqCst);
-        self.response(request.into_inner(), None).await
+        Err(Status::unimplemented("unused"))
     }
 
     async fn synthesize_streaming(
@@ -207,7 +196,7 @@ impl TextToSpeech for Service {
         let Some(Payload::Header(header)) = input.message().await?.unwrap().payload else {
             panic!("expected header")
         };
-        self.response(header, Some(input)).await
+        self.response(header, input).await
     }
 
     async fn normalize_text(
@@ -245,9 +234,7 @@ impl Harness {
             requests: Default::default(),
             texts: Default::default(),
             streaming_calls: Default::default(),
-            complete_calls: Default::default(),
             released: Default::default(),
-            cancelled: Default::default(),
         };
         let shutdown = CancellationToken::new();
         let stop = shutdown.clone();
@@ -284,13 +271,8 @@ impl Drop for Harness {
 enum InputMode {
     String,
     Incremental,
-    Complete,
 }
-const MODES: [InputMode; 3] = [
-    InputMode::String,
-    InputMode::Incremental,
-    InputMode::Complete,
-];
+const MODES: [InputMode; 2] = [InputMode::String, InputMode::Incremental];
 const FORMATS: [AudioFormat; 2] = [AudioFormat::Pcm24000, AudioFormat::Mulaw8000];
 
 fn start(harness: &Harness, mode: InputMode, options: SynthesisOptions) -> AudioStream {
@@ -303,10 +285,6 @@ fn start(harness: &Harness, mode: InputMode, options: SynthesisOptions) -> Audio
             futures_util::stream::iter([Ok("First. ".into()), Ok("Twenty two.".into())]),
             options,
         ),
-        InputMode::Complete => harness
-            .client
-            .tts()
-            .synthesize("First. Twenty two.", options.complete_text(true)),
     }
     .unwrap()
 }
@@ -380,20 +358,12 @@ async fn lexicons_preserve_fields_order_and_request_isolation_in_all_input_modes
                     .collect::<Vec<_>>(),
                 entries
             );
-            if matches!(mode, InputMode::Complete) {
-                assert_eq!(request.text, "First. Twenty two.");
-                assert!(harness.service.texts.lock().unwrap().is_empty());
-                assert_eq!(harness.service.complete_calls.load(Ordering::SeqCst), 1);
-                assert_eq!(harness.service.streaming_calls.load(Ordering::SeqCst), 0);
-            } else {
-                assert!(request.text.is_empty());
-                assert_eq!(
-                    harness.service.texts.lock().unwrap().concat(),
-                    "First. Twenty two."
-                );
-                assert_eq!(harness.service.complete_calls.load(Ordering::SeqCst), 0);
-                assert_eq!(harness.service.streaming_calls.load(Ordering::SeqCst), 1);
-            }
+            assert!(request.text.is_empty());
+            assert_eq!(
+                harness.service.texts.lock().unwrap().concat(),
+                "First. Twenty two."
+            );
+            assert_eq!(harness.service.streaming_calls.load(Ordering::SeqCst), 1);
             let mut plain = start(&harness, mode, SynthesisOptions::default());
             drain(&mut plain).await.unwrap();
             assert!(harness.service.requests.lock().unwrap()[1]
@@ -409,7 +379,7 @@ async fn lexicon_linguistic_and_model_validation_belongs_to_the_service() {
     let entries = vec![PronunciationEntry::new("", "not X-SAMPA 🗣"); 501];
     let mut audio = start(
         &harness,
-        InputMode::Complete,
+        InputMode::String,
         SynthesisOptions::default()
             .language("ja")
             .custom_lexicon(entries),
@@ -646,20 +616,13 @@ async fn malformed_timestamps_fail_only_the_accessor() {
 #[tokio::test]
 async fn timestamp_opt_in_and_model_validation_are_local() {
     let harness = Harness::new(Model::Coda, Script::default()).await;
-    for complete in [false, true] {
-        let error = harness
-            .client
-            .tts()
-            .synthesize(
-                "Hello.",
-                SynthesisOptions::default()
-                    .timestamps(true)
-                    .complete_text(complete),
-            )
-            .unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Input);
-        assert!(error.request_id().is_none());
-    }
+    let error = harness
+        .client
+        .tts()
+        .synthesize("Hello.", SynthesisOptions::default().timestamps(true))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Input);
+    assert!(error.request_id().is_none());
     assert!(harness.service.requests.lock().unwrap().is_empty());
     for model in [Model::Coda, Model::MistV3] {
         let harness = Harness::new(
@@ -752,144 +715,6 @@ async fn cancellation_before_consumption_cannot_publish_successful_timestamps() 
 }
 
 #[tokio::test]
-async fn full_text_rejects_incremental_and_oversized_input_before_network_work() {
-    let harness = Harness::new(Model::Coda, Script::default()).await;
-    let polled = Arc::new(AtomicBool::new(false));
-    let source_polled = polled.clone();
-    let source = futures_util::stream::poll_fn(move |_| {
-        source_polled.store(true, Ordering::SeqCst);
-        Poll::Ready(Some(Ok("text".to_owned())))
-    });
-    assert_eq!(
-        harness
-            .client
-            .tts()
-            .stream(source, SynthesisOptions::default().complete_text(true))
-            .unwrap_err()
-            .kind(),
-        ErrorKind::Input
-    );
-    for text in [
-        "".into(),
-        " \t\n".into(),
-        "é".repeat(32769),
-        "x".repeat(65537),
-    ] {
-        assert_eq!(
-            harness
-                .client
-                .tts()
-                .synthesize(text, SynthesisOptions::default().complete_text(true))
-                .unwrap_err()
-                .kind(),
-            ErrorKind::Input
-        );
-    }
-    assert!(!polled.load(Ordering::SeqCst));
-    assert!(harness.service.requests.lock().unwrap().is_empty());
-    let text = "é".repeat(32768);
-    let mut audio = harness
-        .client
-        .tts()
-        .synthesize(
-            text.clone(),
-            SynthesisOptions::default().complete_text(true),
-        )
-        .unwrap();
-    drain(&mut audio).await.unwrap();
-    assert_eq!(harness.service.requests.lock().unwrap()[0].text, text);
-}
-
-#[tokio::test]
-async fn full_text_progress_deadlines_and_cancellation_release_the_rpc() {
-    for after_audio in [false, true] {
-        let mut harness = Harness::new(
-            Model::MistV3,
-            Script {
-                before_gate: if after_audio {
-                    Script::default().before_gate
-                } else {
-                    vec![]
-                },
-                gated: true,
-                ..Default::default()
-            },
-        )
-        .await;
-        let inner = Arc::get_mut(&mut harness.client.inner).unwrap();
-        inner.first_audio_timeout = Duration::from_millis(100);
-        inner.progress_timeout = Duration::from_millis(100);
-        let mut audio = start(
-            &harness,
-            InputMode::Complete,
-            SynthesisOptions::default().timestamps(true),
-        );
-        if after_audio {
-            next(&mut audio).await.unwrap().unwrap();
-        }
-        assert_eq!(
-            drain(&mut audio).await.unwrap_err().kind(),
-            ErrorKind::Timeout
-        );
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
-        tokio::time::timeout(Duration::from_secs(5), harness.service.cancelled.notified())
-            .await
-            .unwrap();
-    }
-}
-
-#[tokio::test]
-async fn full_text_slow_consumers_keep_bounded_audio_and_overall_timeout() {
-    for format in FORMATS {
-        for deadline in [false, true] {
-            let mut harness = Harness::new(
-                Model::MistV3,
-                Script {
-                    before_gate: vec![audio_frame(vec![0; 9600]); 80],
-                    after_gate: vec![trailer(Some(words()))],
-                    ..Default::default()
-                },
-            )
-            .await;
-            Arc::get_mut(&mut harness.client.inner)
-                .unwrap()
-                .progress_timeout = Duration::from_millis(50);
-            let options = SynthesisOptions::default()
-                .timestamps(true)
-                .audio_format(format)
-                .timeout(deadline.then_some(Duration::from_millis(250)));
-            let mut audio = start(&harness, InputMode::Complete, options);
-            let first = next(&mut audio).await.unwrap().unwrap();
-            if deadline {
-                finished(&audio).await;
-            } else {
-                tokio::time::sleep(Duration::from_millis(150)).await;
-            }
-            assert!(audio.receiver.len() <= QUEUE_CHUNKS);
-            if deadline {
-                assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
-                assert_eq!(
-                    drain(&mut audio).await.unwrap_err().kind(),
-                    ErrorKind::Timeout
-                );
-            } else {
-                let mut bytes = first.to_vec();
-                while let Some(chunk) = next(&mut audio).await {
-                    let chunk = chunk.unwrap();
-                    assert!(chunk.len() <= CHUNK_BYTES);
-                    bytes.extend_from_slice(&chunk);
-                }
-                let expected = Converter::new(format)
-                    .process(&vec![0; 9600 * 80], true)
-                    .unwrap();
-                assert_eq!(bytes, expected);
-                assert_eq!(audio.timestamps().unwrap(), expected_words());
-            }
-        }
-    }
-}
-
-#[tokio::test]
 async fn overall_deadline_remains_active_until_audio_is_consumed() {
     for mode in MODES {
         let harness = Harness::new(
@@ -922,118 +747,6 @@ async fn overall_deadline_remains_active_until_audio_is_consumed() {
         assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
         tokio::time::resume();
     }
-}
-
-#[tokio::test]
-async fn full_text_cancel_and_drop_release_rpc_without_cancelling_siblings() {
-    for drop_stream in [false, true] {
-        let harness = Harness::new(
-            Model::MistV3,
-            Script {
-                gated: true,
-                after_gate: vec![trailer(Some(words()))],
-                ..Default::default()
-            },
-        )
-        .await;
-        let mut first = start(
-            &harness,
-            InputMode::Complete,
-            SynthesisOptions::default().timestamps(true),
-        );
-        let mut sibling = start(
-            &harness,
-            InputMode::Complete,
-            SynthesisOptions::default().timestamps(true),
-        );
-        next(&mut first).await.unwrap().unwrap();
-        next(&mut sibling).await.unwrap().unwrap();
-        if drop_stream {
-            drop(first);
-        } else {
-            first.cancel();
-            assert_eq!(
-                drain(&mut first).await.unwrap_err().kind(),
-                ErrorKind::Cancelled
-            );
-        }
-        tokio::time::timeout(Duration::from_secs(5), harness.service.cancelled.notified())
-            .await
-            .unwrap();
-        harness.service.released.notify_one();
-        drain(&mut sibling).await.unwrap();
-        assert_eq!(sibling.timestamps().unwrap(), expected_words());
-    }
-}
-
-#[tokio::test]
-async fn client_close_wakes_full_text_reader_before_first_audio() {
-    let harness = Harness::new(
-        Model::MistV3,
-        Script {
-            before_gate: vec![],
-            gated: true,
-            ..Default::default()
-        },
-    )
-    .await;
-    let mut audio = start(
-        &harness,
-        InputMode::Complete,
-        SynthesisOptions::default().timestamps(true),
-    );
-    // Wait for response headers while a reader is pending.
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            tokio::select! {
-                result = audio.next() => panic!("unexpected result: {result:?}"),
-                _ = tokio::task::yield_now() => {},
-            }
-            if audio.request_id().is_some() {
-                break;
-            }
-        }
-    })
-    .await
-    .unwrap();
-    harness.client.close().await;
-    assert_eq!(
-        next(&mut audio).await.unwrap().unwrap_err().kind(),
-        ErrorKind::Cancelled
-    );
-    assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Cancelled);
-    tokio::time::timeout(Duration::from_secs(5), harness.service.cancelled.notified())
-        .await
-        .unwrap();
-}
-
-#[tokio::test]
-async fn full_text_first_audio_deadline_covers_waiting_for_headers() {
-    let mut harness = Harness::new(
-        Model::MistV3,
-        Script {
-            hold_headers: true,
-            ..Default::default()
-        },
-    )
-    .await;
-    Arc::get_mut(&mut harness.client.inner)
-        .unwrap()
-        .first_audio_timeout = Duration::from_millis(100);
-    let mut audio = start(
-        &harness,
-        InputMode::Complete,
-        SynthesisOptions::default().timestamps(true),
-    );
-    assert_eq!(
-        drain(&mut audio).await.unwrap_err().kind(),
-        ErrorKind::Timeout
-    );
-    assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
-    assert!(audio.request_id().is_none());
-    assert_eq!(harness.service.complete_calls.load(Ordering::SeqCst), 1);
-    harness.service.released.notify_one();
-    harness.client.close().await;
 }
 
 #[tokio::test]

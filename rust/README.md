@@ -36,10 +36,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 The SDK does not read `.env` files. Explicit credentials use `.api_key(...)`.
 Use `.model(Model::MistV3)` to select Mist v3. Coda is the default.
 
-Use `client.tts().synthesize(text, options)` for complete text. Use
+Use `client.tts().synthesize(text, options)` for a string. Use
 `client.tts().stream(source, options)` for incremental text. Both return an
 `AudioStream` immediately; do not await these method calls. Read audio chunks
 as they arrive. The TTS view shares the client's configuration and shutdown.
+Both methods use `SynthesizeStreaming` with local sentence detection.
 
 For example, replace the synthesis call above with:
 
@@ -92,7 +93,6 @@ Both TTS methods accept `SynthesisOptions::default()` with optional builders:
 | `.timeout(Some(Duration::from_secs(60)))` | `Some(duration)` overrides the client timeout; this example sets it to 60 seconds. Default options inherit the client timeout. `None` disables it; zero is invalid. Applies until audio is fully consumed, including consumer pauses. |
 | `.custom_lexicon(entries)` | Empty vector; request-wide pronunciation overrides for Coda. |
 | `.timestamps(true)` | `false`; Mist v3 word timings after successful audio consumption. |
-| `.complete_text(true)` | `false`; selects the full-text RPC. Requires `synthesize()` and at most 65,536 UTF-8 bytes. |
 
 ## Custom pronunciations (Coda)
 
@@ -197,31 +197,6 @@ conversion. They arrive after generation, not incrementally. Reading audio to
 completion does not require waiting for speaker playback. Results own their
 values and remain available after closing a successfully consumed stream or
 client.
-
-## Complete text input
-
-Use `.complete_text(true)` on `synthesize()` to send the entire text in one
-`Synthesize` RPC while receiving streaming audio:
-
-```rust,no_run
-# use rimelabs_sdk::{Client, SynthesisOptions};
-# async fn example(client: &Client) -> Result<(), rimelabs_sdk::Error> {
-let mut audio = client.tts().synthesize(
-    "Please read this.", SynthesisOptions::default().complete_text(true),
-)?;
-// Consume audio with the same loop and cleanup as above.
-# audio.close().await;
-# Ok(())
-# }
-```
-
-The default uses `SynthesizeStreaming` and local sentence detection, including
-when `synthesize()` receives a string. Full-text mode accepts at most 65,536
-UTF-8 bytes and uses server-side text splitting. Passing this option to `stream()`
-fails locally; collect incremental input in your application and call
-`synthesize()` instead. Lexicons, Mist v3 timestamps, audio profiles, error
-details and request IDs, deadlines, and cancellation behave the same in both
-modes.
 
 ## Transcribe speech
 
