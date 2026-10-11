@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.13](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.12...typescript-v0.1.0-alpha.13) (2026-10-11)
+
+
+### Bug Fixes
+
+* **tts:** remove complete-text synthesis option ([#61](https://github.com/rimelabs/rime-sdk/issues/61)) ([4e3c133](https://github.com/rimelabs/rime-sdk/commit/4e3c1338dc9b129a0201a462f12fb414eeb520d1))
+
 ## [0.1.0-alpha.12](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.11...typescript-v0.1.0-alpha.12) (2026-10-10)
 
 
