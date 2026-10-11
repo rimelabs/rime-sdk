@@ -76,12 +76,9 @@ uv run --directory python/examples --locked -m tts.coda_ws \
 The tester prints each sent chunk, the request ID, and elapsed time from `start`
 to the first received audio byte. This timing excludes speaker buffering.
 
-To isolate synthesis input mode, use exactly the same text and voice:
+To compare initial text lookahead, use the same text and voice:
 
 ```sh
-# Complete input in start.text; output audio still streams.
-uv run --directory python/examples --locked -m tts.coda_ws \
-  --complete-text --text "Your appointment is confirmed for tomorrow at ten."
 # Streaming input: empty start, one text message, then immediate end.
 uv run --directory python/examples --locked -m tts.coda_ws \
   --text "Your appointment is confirmed for tomorrow at ten."
@@ -90,9 +87,7 @@ uv run --directory python/examples --locked -m tts.coda_ws \
   --lookahead-tokens 8 --text "Your appointment is confirmed for tomorrow at ten."
 ```
 
-`--complete-text` requires exactly one `--text` and sends no `text` or `end`
-messages. `--auto-end` still uses streaming-input mode. `--lookahead-tokens`
-defaults to zero and applies only to streaming input. More lookahead can trade
+`--lookahead-tokens` defaults to zero. More lookahead can trade
 first-audio latency for additional text context. Compare saved WAVs for speech
 quality and live playback for delivery gaps, and repeat samples because model
 generation can vary between requests.

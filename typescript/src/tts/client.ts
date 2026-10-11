@@ -27,8 +27,6 @@ export interface SynthesisOptions {
   timestamps?: boolean;
   /** Request-wide pronunciation overrides; requires a phoneme-capable Coda deployment. */
   customLexicon?: readonly PronunciationEntry[];
-  /** Send one complete string with Synthesize; audio still streams. */
-  completeText?: boolean;
   timeout?: number | null;
 }
 export interface DiscoveryOptions {
@@ -80,7 +78,12 @@ export class TTS {
       );
     if (!text.trim())
       throw new RimeInputError("Text must contain non-whitespace characters");
-    return this.createStream(text, options);
+    return this.stream(
+      (async function* () {
+        yield text;
+      })(),
+      options,
+    );
   }
   /** Stream text chunks into synthesis and return an audio stream. Do not await this call. */
   stream(text: TextSource, options: SynthesisOptions = {}) {
@@ -93,26 +96,7 @@ export class TTS {
       throw new RimeInputError(
         "text must be an async iterable of strings; use synthesize() for a string",
       );
-    return this.createStream(text, options);
-  }
-  private createStream(text: string | TextSource, options: SynthesisOptions) {
     const lexicon = snapshot(options.customLexicon);
-    const completeText = options.completeText ?? false;
-    if (
-      options.completeText !== undefined &&
-      typeof options.completeText !== "boolean"
-    )
-      throw new RimeInputError("completeText must be a boolean");
-    if (completeText) {
-      if (typeof text !== "string")
-        throw new RimeInputError(
-          "completeText=true requires synthesize() with a string",
-        );
-      if (Buffer.byteLength(text, "utf8") > policy.sentenceBytes)
-        throw new RimeInputError(
-          "Complete text must be at most 65536 UTF-8 bytes",
-        );
-    }
     const timestamps =
       options.timestamps === undefined ? false : options.timestamps;
     if (typeof timestamps !== "boolean")
@@ -121,12 +105,6 @@ export class TTS {
       throw new RimeInputError(
         "Word timestamps are supported only with model='mistv3'",
       );
-    const source =
-      typeof text === "string" && !completeText
-        ? (async function* () {
-            yield text;
-          })()
-        : text;
     const voice =
       options.voice === undefined || options.voice === null
         ? this.deployment.defaultVoice
@@ -142,14 +120,13 @@ export class TTS {
         checkOpen: () => this.checkOpen(),
         forget: (s) => this.streams.delete(s),
       },
-      source,
+      text,
       voice,
       language,
       format,
       timeout(options.timeout, this.defaultTimeout),
       timestamps,
       lexicon,
-      completeText,
     );
     this.streams.add(audio);
     return audio;

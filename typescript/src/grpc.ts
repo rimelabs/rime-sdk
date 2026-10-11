@@ -65,15 +65,15 @@ export function nativeError(
   });
 }
 
-export class ResponseCall<Output> {
+export class BidiCall<Input, Output> {
   private readonly metadataPromise: Promise<grpc.Metadata>;
-  protected readonly statusPromise: Promise<grpc.StatusObject>;
-  protected status: grpc.StatusObject | null = null;
-  protected id: string | null = null;
+  private readonly statusPromise: Promise<grpc.StatusObject>;
+  private status: grpc.StatusObject | null = null;
+  private id: string | null = null;
 
   constructor(
-    private readonly call: grpc.ClientReadableStream<Output>,
-    protected signal: AbortSignal,
+    private readonly call: grpc.ClientDuplexStream<Input, Output>,
+    private signal: AbortSignal,
   ) {
     this.metadataPromise = new Promise((resolve, reject) => {
       this.call.once("metadata", (metadata: grpc.Metadata) => {
@@ -105,7 +105,7 @@ export class ResponseCall<Output> {
     this.call.cancel();
   }
 
-  protected error(error: unknown): errors.RimeError {
+  private error(error: unknown): errors.RimeError {
     const failure = nativeError(error, this.id);
     this.id ??= failure.requestId;
     return failure;
@@ -133,15 +133,6 @@ export class ResponseCall<Output> {
       throw this.error(error);
     }
   }
-}
-
-export class BidiCall<Input, Output> extends ResponseCall<Output> {
-  constructor(
-    private readonly duplex: grpc.ClientDuplexStream<Input, Output>,
-    signal: AbortSignal,
-  ) {
-    super(duplex, signal);
-  }
   async write(message: Input): Promise<void> {
     try {
       this.signal.throwIfAborted();
@@ -156,7 +147,7 @@ export class BidiCall<Input, Output> extends ResponseCall<Output> {
       await abortable(
         new Promise<void>((resolve, reject) => {
           const finish = (error?: unknown) => {
-            this.duplex.removeListener("status", onStatus);
+            this.call.removeListener("status", onStatus);
             if (error) reject(error);
             else resolve();
           };
@@ -171,9 +162,9 @@ export class BidiCall<Input, Output> extends ResponseCall<Output> {
                   )
                 : rpcError(status.code, this.id, status.details),
             );
-          this.duplex.once("status", onStatus);
+          this.call.once("status", onStatus);
           try {
-            this.duplex.write(message, finish);
+            this.call.write(message, finish);
           } catch (error) {
             finish(error);
           }
@@ -194,7 +185,7 @@ export class BidiCall<Input, Output> extends ResponseCall<Output> {
 
   finishInput(): void {
     try {
-      this.duplex.end();
+      this.call.end();
     } catch (error) {
       throw this.error(error);
     }

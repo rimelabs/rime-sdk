@@ -4,7 +4,7 @@ You supply text; the SDK handles sentence boundaries and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
-## Complete text
+## String input
 
 Use `client.tts.synthesize(text)` for one nonblank string. It returns an audio
 stream; it does not wait for all audio to be generated. Do not await this call.
@@ -231,23 +231,3 @@ Keep the stream's `async with` block to cancel unfinished work on exit.
 `await audio.cancel()` stops one operation; `await client.close()` stops all client
 work. Both are safe to repeat. A client belongs to one process and event loop.
 Python task cancellation remains `asyncio.CancelledError`.
-
-## Complete text input
-
-`complete_text=True` on `tts.synthesize()` selects the `Synthesize` RPC, which
-sends the full input in one request and streams audio back. The default still
-uses `SynthesizeStreaming` with incremental sentence input, including when given
-a string. Full-text mode accepts
-only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
-application first. Server-side text splitting
-applies. Lexicon overrides, error details and request IDs, cancellation, audio
-profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
-
-```python
-async with client.tts.synthesize(
-    "Please read this.", complete_text=True,
-    custom_lexicon=[PronunciationEntry("read", '" r\\ E d')],
-) as audio:
-    async for chunk in audio:
-        ...  # Play or save each PCM chunk.
-```
