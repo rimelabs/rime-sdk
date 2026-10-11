@@ -37,7 +37,9 @@ def bind(channel, name):
 
 
 def header(voice, language, timestamps=False, custom_lexicon=()):
-    request = proto.SynthesisRequest(speaker=voice, language=language)
+    request = proto.SynthesisRequest(
+        speaker=voice, language=language, split_strategy=proto.SPLIT_STRATEGY_ACCUMULATE_SENTENCE
+    )
     request.audio_parameters.audio_format = "audio/pcm"
     request.audio_parameters.sampling_rate = 24000
     if timestamps:
@@ -77,6 +79,8 @@ class SynthesisCall:
 
     def __init__(self, channel, metadata):
         self._call = bind(channel, "SynthesizeStreaming")(metadata=metadata)
+        self._write_task: asyncio.Task[None] | None = None
+        self._call.add_done_callback(self._cancel_pending_write)
         self.request_id = None
         self._timestamps_requested = False
         self._timestamps = TimestampTrailer()
@@ -86,6 +90,13 @@ class SynthesisCall:
 
     def cancel(self):
         self._call.cancel()
+
+    def _cancel_pending_write(self, _call):
+        # grpc.aio can overwrite a server rejection with INTERNAL when an
+        # in-flight send resumes after the RPC ends. Cancel it synchronously
+        # in the completion callback, before it can discard the server status.
+        if self._write_task is not None:
+            self._write_task.cancel()
 
     def _error(self, error):
         self.request_id = _request_id(
@@ -110,19 +121,28 @@ class SynthesisCall:
             raise RimeResourceLimitError(
                 "Synthesis request exceeds the supported byte limit", request_id=self.request_id
             )
+        self._write_task = asyncio.create_task(self._call.write(message))
         try:
-            await self._call.write(message)
+            await self._write_task
         except grpc.aio.AioRpcError as error:
             raise self._error(error) from None
+        except asyncio.CancelledError:
+            current = asyncio.current_task()
+            if (current is not None and current.cancelling()) or not self.done():
+                raise
         except asyncio.InvalidStateError:
             # A write after server rejection must report the final status,
             # even when no reader has observed that status yet.
             if not self.done():
                 raise
-            await self._check_status()
-            raise RimeStreamError(
-                "The service completed before input finished", request_id=self.request_id
-            ) from None
+        else:
+            return
+        finally:
+            self._write_task = None
+        await self._check_status()
+        raise RimeStreamError(
+            "The service completed before input finished", request_id=self.request_id
+        ) from None
 
     async def start(self, voice, language, timestamps=False, custom_lexicon=()):
         # Do not wait for response metadata before allowing text writes.
@@ -132,8 +152,8 @@ class SynthesisCall:
     def timestamp_result(self):
         return self._timestamps.result(self.request_id)
 
-    async def write(self, sentence):
-        await self._write(proto.StreamingSynthesisRequest(text_chunk=sentence))
+    async def write(self, text):
+        await self._write(proto.StreamingSynthesisRequest(text_chunk=text))
 
     async def finish_input(self):
         try:

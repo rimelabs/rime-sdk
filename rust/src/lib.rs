@@ -11,7 +11,6 @@ mod audio;
 mod client;
 mod error;
 mod lexicon;
-mod sentences;
 mod stream;
 pub mod stt;
 mod timestamps;

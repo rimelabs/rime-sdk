@@ -107,6 +107,10 @@ impl Service {
         header: protocol::SynthesisRequest,
         mut input: tonic::Streaming<protocol::StreamingSynthesisRequest>,
     ) -> Result<Response<Responses>, Status> {
+        assert_eq!(
+            header.split_strategy,
+            Some(protocol::SplitStrategy::AccumulateSentence as i32)
+        );
         let first = {
             let mut requests = self.requests.lock().unwrap();
             requests.push(header);

@@ -1,6 +1,14 @@
 # TTS for Python
 
-You supply text; the SDK handles sentence boundaries and streams audio back.
+Send text as it becomes available; Rime automatically combines fragments into
+sentences for speech. For nonblank input, ending the text stream flushes any
+remaining text, even without final punctuation. Pausing the stream may delay
+speech for an unfinished sentence.
+
+If the source ends without any non-whitespace text, audio iteration raises
+`RimeInputError`.
+
+The SDK sends text in order with its whitespace preserved and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
@@ -21,9 +29,8 @@ async def text():
     yield "This text arrives in separate chunks."
 ```
 
-Use `client.tts.stream(text())` in the same audio loop. The SDK handles sentence
-boundaries. Do not await `tts.stream()`; entering its async context or reading
-the first chunk starts work.
+Use `client.tts.stream(text())` in the same audio loop. Do not await `tts.stream()`;
+entering its async context or reading the first chunk starts work.
 
 ## Configuration
 

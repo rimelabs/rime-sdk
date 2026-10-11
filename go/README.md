@@ -2,7 +2,7 @@
 
 Use `client.TTS.Synthesize` for a string and `client.TTS.Stream` for an
 incremental text source. Both return streaming Coda and Mist v3 audio.
-The SDK handles authentication, sentence detection, gRPC, audio conversion,
+The SDK handles authentication, gRPC, audio conversion,
 deadlines, and cancellation. It also streams speech recognition from raw PCM audio
 to partial and final transcripts. Your application owns audio capture and playback.
 
@@ -226,16 +226,26 @@ Use `client.TTS.Stream(ctx, source, options)`. A `rime.TextSource` is:
 func(ctx context.Context) (string, error)
 ```
 
+Send text as it becomes available; Rime automatically combines fragments into
+sentences for speech. For nonblank input, ending the text stream flushes any
+remaining text, even without final punctuation. Pausing the stream may delay
+speech for an unfinished sentence.
+
+If the source ends without any non-whitespace text, `Recv` returns an error
+matching `ErrInput`.
+
 Return each text fragment as valid UTF-8. The SDK calls the source serially and
-detects complete sentences. Return `io.EOF` when input ends. The last call may
-return both final text and `io.EOF`. Other errors stop the operation.
+forwards text in order, preserving whitespace. Return `io.EOF` when input ends.
+The last call may return both final text and `io.EOF`. Other errors stop the
+operation.
 
 The source must honor its context; see [Errors and cleanup](#errors-and-cleanup)
 for cancellation and cleanup limits.
 
 TTS streams start work when `Synthesize` or `Stream` returns, without waiting for
 the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
-at most 9,600 bytes. Each sentence has a 65,536-byte UTF-8 limit.
+at most 9,600 bytes. Text messages are at most 4,096 UTF-8 bytes; large source
+fragments are divided at character boundaries.
 
 ## Custom pronunciations (Coda)
 
@@ -397,6 +407,3 @@ of the repository's shared TTS, PCM input and STT fixtures. CI verifies that tho
 The versioned `github.com/rimelabs/rime-api/go` dependency supplies the protocol
 types and gRPC clients. Dependabot checks for API releases daily and opens a PR;
 CI and review are required before the SDK is released.
-
-The embedded BlingFire binary includes its source
-details and licenses in `internal/`.

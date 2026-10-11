@@ -17,7 +17,6 @@
   "files": [
     "dist",
     "docs",
-    "vendor",
     "LICENSE",
     "LICENSE-PRISM",
     "NOTICE-PRISM",

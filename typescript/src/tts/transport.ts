@@ -32,7 +32,7 @@ export const transport = {
     new grpc.Client(target, grpc.credentials.createSsl(), {
       "grpc.enable_retries": 0,
       "grpc.max_receive_message_length": policy.receiveBytes,
-      "grpc.max_send_message_length": policy.sentenceBytes + 65536,
+      "grpc.max_send_message_length": 131072,
     }),
 };
 export function connect(client: grpc.Client, signal: AbortSignal) {
@@ -61,6 +61,7 @@ function header(
       value: create(schema.SynthesisRequestSchema, {
         speaker: voice,
         language,
+        splitStrategy: schema.SplitStrategy.ACCUMULATE_SENTENCE,
         audioParameters: { audioFormat: "audio/pcm", samplingRate: 24000 },
         timestamps: timestamps ? { enable: true } : undefined,
         customLexicon: [...customLexicon],
@@ -179,8 +180,8 @@ export class SynthesisCall {
   timestampResult() {
     return this.timestampTrailer.result(this.requestId);
   }
-  write(sentence: string) {
-    return this.rpc.write(textMessage(sentence));
+  write(text: string) {
+    return this.rpc.write(textMessage(text));
   }
   finishInput() {
     this.rpc.finishInput();

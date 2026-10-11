@@ -19,13 +19,11 @@ from rimelabs_sdk import (
     RimeCancelledError,
     RimeInputError,
     RimePermissionError,
-    RimeResourceLimitError,
     RimeTimeoutError,
     RimeUnavailableError,
     _auth,
 )
 from rimelabs_sdk.tts._audio import Converter
-from rimelabs_sdk.tts._sentences import SentenceBuffer
 from rimelabs_sdk.tts._transport import rpc_error
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,109 +32,6 @@ CONTRACT = json.loads((ROOT / "conformance/contract.json").read_text())
 
 async def collect(stream):
     return b"".join([chunk async for chunk in stream])
-
-
-@pytest.mark.parametrize(
-    "case", json.loads((ROOT / "conformance/sentences.json").read_text()), ids=lambda c: c["id"]
-)
-@pytest.mark.parametrize("size", CONTRACT["chunk_sizes"])
-def test_sentence_conformance(case, size):
-    buffer = SentenceBuffer(65536)
-    actual = []
-    for offset in range(0, len(case["text"]), size):
-        actual.extend(buffer.feed(case["text"][offset : offset + size]))
-    actual.extend(buffer.feed("", final=True))
-    assert actual == case["sentences"]
-    assert "".join(actual) == case["text"]
-
-
-def test_sentences_at_every_split_and_end_of_input():
-    cases = json.loads((ROOT / "conformance/sentences.json").read_text())
-    for case in cases:
-        text = case["text"]
-        for split in range(len(text) + 1):
-            buffer = SentenceBuffer(65536)
-            actual = list(buffer.feed(text[:split]))
-            actual.extend(buffer.feed(""))
-            # final=True must use the same scans, even with a nonempty fragment.
-            actual.extend(buffer.feed(text[split:], final=True))
-            assert actual == case["sentences"], (case["id"], split)
-            assert list(buffer.feed("", final=True)) == []
-
-
-def test_sentences_after_context_rotation():
-    text = ("Hello 🚀 world. Dr. Smith paid 3.14 dollars. \u200fمرحبا بالعالم. " * 30) + "Done."
-    whole = SentenceBuffer(65536)
-    expected = list(whole.feed(text, final=True))
-    for sizes in [[1], [2, 7, 31, 128, 3], [1024]]:
-        buffer = SentenceBuffer(65536)
-        actual = []
-        offset = step = 0
-        while offset < len(text):
-            size = sizes[step % len(sizes)]
-            actual.extend(buffer.feed(text[offset : offset + size]))
-            offset += size
-            step += 1
-        actual.extend(buffer.feed("", final=True))
-        assert actual == expected
-    assert "".join(expected) == text
-
-
-@pytest.mark.parametrize("spacing", [1, 2, 15, 16, 17, 31, 32, 100])
-def test_sentence_delivery_at_lookahead_threshold(spacing):
-    buffer = SentenceBuffer(65536)
-    output = []
-    for char in "First." + " " * spacing + "The next sentenc":
-        output.extend(buffer.feed(char))
-    assert output == ["First."]
-
-
-def test_sentence_storage_does_not_grow_with_completed_text():
-    buffer = SentenceBuffer(256)
-    text = "Hello 🚀 world. This is a short sentence. " * 1000
-    output = []
-    for sentence in buffer.feed(text):
-        output.append(sentence)
-        assert len(buffer.pending.encode()) < 2048
-    output.extend(buffer.feed("", final=True))
-    assert "".join(output) == text
-    assert buffer.pending == ""
-
-
-def test_long_sentence_does_not_scan_once_per_source_chunk(monkeypatch):
-    from rimelabs_sdk.tts import _sentences
-
-    detector = _sentences.sentence_ends
-    calls = 0
-
-    def count_calls(text):
-        nonlocal calls
-        calls += 1
-        return detector(text)
-
-    monkeypatch.setattr(_sentences, "sentence_ends", count_calls)
-    buffer = SentenceBuffer(65536)
-    text = "a" * 65535 + "."
-    output = []
-    for char in text:
-        output.extend(buffer.feed(char))
-    output.extend(buffer.feed("", final=True))
-    assert output == [text]
-    assert calls < 128
-
-
-async def test_sentence_messages_ignore_source_chunk_size(setup):
-    service, client = setup
-    text = "Hi! Dr. Smith agrees. Hello."
-    for size in [None, 1, 7]:
-
-        async def source(size=size):
-            for offset in range(0, len(text), size):
-                yield text[offset : offset + size]
-
-        await collect(client.tts.synthesize(text) if size is None else client.tts.stream(source()))
-    messages = [[m.text_chunk for m in call[1:]] for call in service.calls]
-    assert messages == [["Hi!", " Dr.", " Smith agrees.", " Hello."]] * 3
 
 
 @pytest.mark.parametrize(
@@ -239,7 +134,7 @@ async def test_complete_and_incremental_shared_rpc(setup):
     service, client = setup
     async with client.tts.synthesize("Hello. Final phrase") as audio:
         assert audio.format is AudioFormat.PCM_24000
-        assert await collect(audio) == service.payload * 2
+        assert await collect(audio) == service.payload
         assert audio.request_id == "test-request"
     assert len(service.calls) == 1
     assert service.calls[0][0].header.speaker == "clementine"
@@ -253,7 +148,7 @@ async def test_incremental_audio_before_input_end(setup):
     release = asyncio.Event()
 
     async def source():
-        yield "First sentence. The next sentence "
+        yield "Hello "
         await release.wait()
         yield "is here."
 
@@ -513,36 +408,6 @@ async def test_timeout_inheritance_and_explicit_disablement(setup):
             await anext(b)
             await asyncio.sleep(0.06)
             assert await anext(b)
-
-
-async def test_large_complete_input_and_unsplittable_sentence(setup):
-    _, client = setup
-    async with client.tts.synthesize("A short sentence. " * 4000) as audio:
-        assert await anext(audio)
-    async with client.tts.synthesize("x" * 70000) as audio:
-        with pytest.raises(RimeResourceLimitError):
-            await collect(audio)
-
-
-@pytest.mark.parametrize("size", [1024, 100000])
-@pytest.mark.parametrize("char,count", [("a", 65533), ("a", 65535), ("é", 32767)])
-def test_sentence_limit_excludes_lookahead(size, char, count):
-    first = char * count + "."
-    text = first + " Short."
-    buffer = SentenceBuffer(65536)
-    actual = []
-    for offset in range(0, len(text), size):
-        actual.extend(buffer.feed(text[offset : offset + size]))
-    actual.extend(buffer.feed("", final=True))
-    assert actual == [first, " Short."]
-
-
-@pytest.mark.parametrize("text", ["a" * 65536 + ". Short.", "é" * 32769, " " * 65537])
-def test_sentence_limit_still_rejects_oversized_spans(text):
-    buffer = SentenceBuffer(65536)
-    with pytest.raises(RimeResourceLimitError):
-        list(buffer.feed(text))
-        list(buffer.feed("", final=True))
 
 
 async def test_concurrent_operations_have_no_fixed_cap(setup):
