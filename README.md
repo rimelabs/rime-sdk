@@ -1,7 +1,7 @@
 # Rime SDK
 
 First-party Python, Node.js, Go, and Rust SDKs for Coda and Mist v3 streaming speech.
-All four use `synthesize` for complete text and `stream` for incremental text input.
+All four use `synthesize` for a string and `stream` for incremental text input.
 Both methods return streaming audio. Go uses `Synthesize` and `Stream`.
 The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
 
@@ -46,7 +46,7 @@ Runnable scripts are in the
 
 ## TTS methods
 
-| Language | Complete text | Incremental text |
+| Language | String input | Incremental text |
 | --- | --- | --- |
 | Python | `client.tts.synthesize(text)` | `client.tts.stream(chunks)` |
 | TypeScript | `client.tts.synthesize(text)` | `client.tts.stream(chunks)` |

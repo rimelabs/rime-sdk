@@ -13,7 +13,6 @@ export class FakeService {
   finalResponses = [];
   beforeFinalResponses = null;
   calls = [];
-  completeCalls = [];
   metadata = [];
   discoveryCalls = 0;
   discoveryFailures = 0;
@@ -38,7 +37,6 @@ export class FakeService {
       if (
         ![
           "synthesizeStreaming",
-          "synthesize",
           "getSupportedSpeakers",
           "getSupportedLanguages",
         ].includes(name)
@@ -47,45 +45,13 @@ export class FakeService {
       methods[name] = {
         path: "/rime.TextToSpeech/" + descriptor.name,
         requestStream: descriptor.methodKind === "bidi_streaming",
-        responseStream: ["bidi_streaming", "server_streaming"].includes(
-          descriptor.methodKind,
-        ),
+        responseStream: descriptor.methodKind === "bidi_streaming",
         requestSerialize: (m) => Buffer.from(toBinary(descriptor.input, m)),
         requestDeserialize: (b) => fromBinary(descriptor.input, b),
         responseSerialize: (m) => Buffer.from(toBinary(descriptor.output, m)),
         responseDeserialize: (b) => fromBinary(descriptor.output, b),
       };
     }
-    handlers.synthesize = (call) => {
-      call.on("cancelled", () => this.markCancelled());
-      call.on("error", () => {});
-      this.completeCalls.push(call.request);
-      this.calls.push([call.request]);
-      this.metadata.push(call.metadata);
-      if (this.mode === "error_before_audio") {
-        call.emit("error", this.rejection());
-        return;
-      }
-      if (this.mode === "empty_no_headers") {
-        call.end();
-        return;
-      }
-      const metadata = this.makeMetadata(this.responseMetadata);
-      if (this.mode === "wrong_format")
-        metadata.set("x-rime-audio-content-type", "audio/wav");
-      call.sendMetadata(metadata);
-      this.markHeadersSent();
-      const send = () => {
-        if (this.mode !== "empty_audio") this.sendAudio(call);
-        if (this.mode === "partial_error")
-          this.release = () => call.emit("error", this.rejection());
-        else void this.finish(call);
-      };
-      if (this.mode === "silence") this.release = send;
-      else if (this.mode === "no_audio_error")
-        call.emit("error", this.rejection());
-      else send();
-    };
     handlers.synthesizeStreaming = (call) => {
       call.on("cancelled", () => this.markCancelled());
       this.calls.push([]);

@@ -2,7 +2,6 @@ import { connect as connectGrpc, metadata } from "../grpc.js";
 export { metadata } from "../grpc.js";
 import {
   BidiCall,
-  ResponseCall,
   rpcError,
   serializer,
   deserializer,
@@ -148,66 +147,43 @@ export async function discover(
 export class SynthesisCall {
   private timestampsRequested = false;
   private readonly timestampTrailer = new TimestampTrailer();
-  private rpc!: ResponseCall<schema.SynthesisResponseStream>;
-  private input?: BidiCall<
+  private readonly rpc: BidiCall<
     schema.StreamingSynthesisRequest,
     schema.SynthesisResponseStream
   >;
-  constructor(
-    private prepared: PreparedConnection,
-    private signal: AbortSignal,
-    private completeText = false,
-  ) {
-    if (!completeText) {
-      this.input = new BidiCall(
-        openStream(prepared.client, prepared.metadata),
-        signal,
-      );
-      this.rpc = this.input;
-    }
+  constructor(prepared: PreparedConnection, signal: AbortSignal) {
+    this.rpc = new BidiCall(
+      openStream(prepared.client, prepared.metadata),
+      signal,
+    );
   }
   get requestId() {
-    return this.rpc?.requestId ?? null;
+    return this.rpc.requestId;
   }
   get done() {
-    return this.rpc?.done ?? false;
+    return this.rpc.done;
   }
   cancel() {
-    this.rpc?.cancel();
+    this.rpc.cancel();
   }
   start(
     voice: string,
     language: string,
     timestamps = false,
     customLexicon: readonly PronunciationEntry[] = [],
-    text?: string,
   ) {
     this.timestampsRequested = timestamps;
     const message = header(voice, language, timestamps, customLexicon);
-    if (this.completeText && message.payload.case === "header") {
-      message.payload.value.text = text!;
-      this.rpc = new ResponseCall(
-        this.prepared.client.makeServerStreamRequest(
-          "/rime.TextToSpeech/Synthesize",
-          serializer(schema.SynthesisRequestSchema),
-          deserializer(schema.SynthesisResponseStreamSchema),
-          message.payload.value,
-          this.prepared.metadata,
-        ),
-        this.signal,
-      );
-      return Promise.resolve();
-    }
-    return this.input!.write(message);
+    return this.rpc.write(message);
   }
   timestampResult() {
     return this.timestampTrailer.result(this.requestId);
   }
   write(sentence: string) {
-    return this.input!.write(textMessage(sentence));
+    return this.rpc.write(textMessage(sentence));
   }
   finishInput() {
-    this.input!.finishInput();
+    this.rpc.finishInput();
   }
   private checkFormat(contentType: unknown) {
     if (contentType !== "audio/pcm")
