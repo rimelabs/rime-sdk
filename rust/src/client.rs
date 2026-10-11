@@ -1,4 +1,4 @@
-use crate::{AudioFormat, AudioStream, Error, ErrorKind};
+use crate::{AudioFormat, AudioStream, Error, ErrorKind, PronunciationEntry};
 use futures_core::Stream;
 use rimelabs_api::{
     speech_to_text_client::SpeechToTextClient, text_to_speech_client::TextToSpeechClient,
@@ -51,9 +51,24 @@ pub struct SynthesisOptions {
     pub(crate) language: Option<String>,
     pub(crate) format: AudioFormat,
     pub(crate) timeout: Option<Option<Duration>>,
+    pub(crate) timestamps: bool,
+    pub(crate) custom_lexicon: Vec<PronunciationEntry>,
 }
 
 impl SynthesisOptions {
+    /// Request Mist v3 word timings, available after successful audio consumption.
+    /// Disabled by default. Coda requests with this enabled fail locally.
+    pub fn timestamps(mut self, enabled: bool) -> Self {
+        self.timestamps = enabled;
+        self
+    }
+    /// Own request-wide pronunciation overrides. Empty means default pronunciation.
+    /// The service validates entries and model/language support. Subsequent requests
+    /// have their own options; cloned options own independent copies of the entries.
+    pub fn custom_lexicon(mut self, entries: Vec<PronunciationEntry>) -> Self {
+        self.custom_lexicon = entries;
+        self
+    }
     /// Select a voice. Empty or whitespace-only values fail validation.
     pub fn voice(mut self, voice: impl Into<String>) -> Self {
         self.voice = Some(voice.into());
@@ -358,7 +373,7 @@ pub struct Tts<'a> {
 }
 
 impl Tts<'_> {
-    /// Start synthesis of complete text. Returns immediately; consume errors from the stream.
+    /// Start synthesis from a string. Returns immediately; consume errors from the stream.
     ///
     /// # Panics
     /// Panics if the current Tokio runtime does not have time enabled.
@@ -367,6 +382,7 @@ impl Tts<'_> {
         text: impl Into<String>,
         options: SynthesisOptions,
     ) -> Result<AudioStream, Error> {
+        self.client.ensure_open()?;
         let text = text.into();
         if text.trim().is_empty() {
             return Err(Error::new(ErrorKind::Input, "text must not be blank"));

@@ -19,17 +19,21 @@ The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
 
 Mist v3 also supports opt-in word timestamps: pass `timestamps=True` in Python,
-`{ timestamps: true }` in Node.js, or `SynthesisOptions{Timestamps: true}` in Go.
-After fully consuming audio, use `await stream.timestamps()` (Python/Node.js) or
-`stream.Timestamps()` (Go). The final result includes status and word start/end
+`{ timestamps: true }` in Node.js, `SynthesisOptions{Timestamps: true}` in Go, or
+`SynthesisOptions::default().timestamps(true)` in Rust.
+After fully consuming audio, use `await stream.timestamps()` (Python/Node.js),
+`stream.Timestamps()` (Go), or `stream.timestamps()` (Rust).
+The final result includes status and word start/end
 times in seconds. Timestamps are delivered after generation, not incrementally.
 
 Coda supports request-wide pronunciation overrides through `custom_lexicon`
-(Python), `customLexicon` (Node.js), or `CustomLexicon` (Go). Each entry contains
+(Python), `customLexicon` (Node.js), `CustomLexicon` (Go), or
+`SynthesisOptions::custom_lexicon` (Rust). Each entry contains
 `spelling` and a space-separated X-SAMPA `pronunciation`. Service-rejected entries
 raise an input error with the service's explanation and request ID. Malformed
 entry types and invalid Unicode fail locally, without a service response or
-request ID. See the TTS guides below for examples and supported languages.
+request ID; Rust's typed entries and strings prevent those malformed values.
+See the TTS guides below for examples and supported languages.
 
 | Package | Location | Runtime |
 | --- | --- | --- |
@@ -40,7 +44,7 @@ request ID. See the TTS guides below for examples and supported languages.
 
 Use the package READMEs for installation and quick starts. Detailed guides cover
 [Python TTS](python/docs/tts.md), [Python STT](python/docs/stt.md), [Python Realtime](python/docs/realtime.md),
-[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), [Go STT](go/README.md#transcribe-speech), and [Rust STT](rust/README.md#transcribe-speech).
+[Node.js TTS](typescript/docs/tts.md), [Node.js STT](typescript/docs/stt.md), [Node.js Realtime](typescript/docs/realtime.md), [Go STT](go/README.md#transcribe-speech), [Rust TTS](rust/README.md#synthesis-options), and [Rust STT](rust/README.md#transcribe-speech).
 Runnable scripts are in the
 [example index](docs/examples.md).
 

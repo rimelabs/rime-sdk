@@ -3,14 +3,15 @@ use crate::{
     client::{validate_timeout, Inner},
     error::request_id,
     sentences::Buffer,
-    AudioFormat, Error, ErrorKind, SynthesisOptions,
+    timestamps::TimestampTrailer,
+    AudioFormat, Error, ErrorKind, Model, SynthesisOptions, TimestampResult,
 };
 use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::{FutureExt, StreamExt, TryFutureExt};
 use rimelabs_api::{
     streaming_synthesis_request::Payload, synthesis_response_stream, AudioParameters,
-    StreamingSynthesisRequest, SynthesisRequest,
+    StreamingSynthesisRequest, SynthesisRequest, TimestampOptions,
 };
 use std::{
     fmt,
@@ -37,12 +38,17 @@ const CHUNK_BYTES: usize = 9_600;
 pub struct AudioStream {
     receiver: mpsc::Receiver<Bytes>,
     status: WatchStream<Option<Result<(), Error>>>,
+    outcome: watch::Receiver<Option<Result<(), Error>>>,
     terminal: Option<Result<(), Error>>,
+    failure: OnceLock<Error>,
     cancellation: CancellationToken,
+    deadline: Option<Instant>,
     worker: Option<JoinHandle<()>>,
     request_id: Arc<OnceLock<String>>,
     format: AudioFormat,
     consumed: bool,
+    completed: bool,
+    timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
 }
 
 impl fmt::Debug for AudioStream {
@@ -65,9 +71,71 @@ impl AudioStream {
     pub fn request_id(&self) -> Option<&str> {
         self.request_id.get().map(String::as_str)
     }
+    /// Read requested word timings after the audio stream has returned `None`.
+    ///
+    /// Never waits or consumes audio. Early or non-opted-in calls return
+    /// [`ErrorKind::Input`]. Synthesis errors and cancellation are returned as
+    /// errors; alignment failures are reported in [`TimestampResult::status`].
+    /// Missing or malformed timestamp trailers return [`ErrorKind::Stream`]
+    /// without failing audio. Each call returns an independently owned result.
+    pub fn timestamps(&self) -> Result<TimestampResult, Error> {
+        let timestamps = self.timestamps.as_ref().ok_or_else(|| {
+            Error::new(
+                ErrorKind::Input,
+                "enable timestamps when creating the stream",
+            )
+        })?;
+        if self.completed {
+            return timestamps
+                .lock()
+                .expect("timestamp mutex poisoned")
+                .result(self.request_id());
+        }
+        if let Some(error) = self.error() {
+            return Err(error);
+        }
+        Err(Error::new(
+            ErrorKind::Input,
+            "consume all audio before reading timestamps",
+        ))
+    }
     /// Request cancellation without waiting for cleanup.
     pub fn cancel(&self) {
+        if !self.completed && self.error().is_none() {
+            let _ = self.failure.set(
+                Error::new(ErrorKind::Cancelled, "synthesis cancelled")
+                    .with_request_id(self.request_id()),
+            );
+        }
         self.cancellation.cancel();
+    }
+
+    // The worker can finish with audio still buffered. Keep cancellation and the
+    // overall deadline effective until the caller consumes EOF, and retain the
+    // first observed failure for both audio and timestamps, including after close.
+    fn error(&self) -> Option<Error> {
+        if let Some(error) = self.failure.get() {
+            return Some(error.clone());
+        }
+        let error = if let Some(Err(error)) = &*self.outcome.borrow() {
+            Some(error.clone())
+        } else if self.cancellation.is_cancelled() {
+            Some(
+                Error::new(ErrorKind::Cancelled, "synthesis cancelled")
+                    .with_request_id(self.request_id()),
+            )
+        } else if self
+            .deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            Some(
+                Error::new(ErrorKind::Timeout, "synthesis timed out")
+                    .with_request_id(self.request_id()),
+            )
+        } else {
+            None
+        };
+        error.map(|error| self.failure.get_or_init(|| error).clone())
     }
     /// Request cancellation and wait for the worker to release its RPC and source.
     pub async fn close(&mut self) {
@@ -99,11 +167,11 @@ impl Stream for AudioStream {
                 this.terminal = status;
             }
         }
-        if let Some(Err(error)) = &this.terminal {
+        if let Some(error) = this.error() {
             // Match the other SDKs: failure takes priority over queued audio.
             // A paused consumer must observe cancellation or timeout on its next read.
-            let error = error.clone();
             this.consumed = true;
+            this.cancellation.cancel();
             this.receiver.close();
             while this.receiver.try_recv().is_ok() {}
             return Poll::Ready(Some(Err(error)));
@@ -112,6 +180,7 @@ impl Stream for AudioStream {
             Poll::Ready(Some(bytes)) => Poll::Ready(Some(Ok(bytes))),
             Poll::Ready(None) if this.terminal.is_some() => {
                 this.consumed = true;
+                this.completed = true;
                 Poll::Ready(None)
             }
             // The producer can close the queue before publishing its terminal status.
@@ -157,6 +226,12 @@ pub(crate) fn start<S>(
 where
     S: Stream<Item = Result<String, Error>> + Send + 'static,
 {
+    if options.timestamps && client.model != Model::MistV3 {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "word timestamps are supported only with Model::MistV3",
+        ));
+    }
     let timeout = options.timeout.unwrap_or(client.timeout);
     validate_timeout(timeout)?;
     let voice = options.voice.unwrap_or_else(|| client.model.voice().into());
@@ -167,6 +242,27 @@ where
             "voice and language must not be blank",
         ));
     }
+    let request = SynthesisRequest {
+        speaker: Some(voice),
+        language: Some(language),
+        audio_parameters: Some(AudioParameters {
+            audio_format: Some("audio/pcm".into()),
+            sampling_rate: Some(24000),
+            ..Default::default()
+        }),
+        timestamps: options
+            .timestamps
+            .then_some(TimestampOptions { enable: true }),
+        custom_lexicon: options
+            .custom_lexicon
+            .into_iter()
+            .map(|entry| rimelabs_api::PronunciationEntry {
+                spelling: entry.spelling,
+                pronunciation: entry.pronunciation,
+            })
+            .collect(),
+        ..Default::default()
+    };
     let (sender, receiver) = mpsc::channel(QUEUE_CHUNKS);
     let (status_sender, status_receiver) = watch::channel(None);
     let cancellation = client.cancellation.child_token();
@@ -174,6 +270,10 @@ where
     let request_id = Arc::new(OnceLock::new());
     let operation_id = request_id.clone();
     let format = options.format;
+    let timestamps = options
+        .timestamps
+        .then(|| Arc::new(Mutex::new(TimestampTrailer::default())));
+    let operation_timestamps = timestamps.clone();
     let progress = Arc::new(Mutex::new(Progress::new()));
     // Construct the timer before spawning so disabled runtime time support
     // cannot panic in a worker after an AudioStream has been returned.
@@ -182,7 +282,7 @@ where
     let deadline = timeout.map(|timeout| Instant::now() + timeout);
     let worker = tracker.spawn(async move {
         let blocking_tasks = TaskTracker::new();
-        let run = std::panic::AssertUnwindSafe(run(client.clone(), source, sender.clone(), progress.clone(), operation_id.clone(), format, voice, language, blocking_tasks.clone())).catch_unwind();
+        let run = std::panic::AssertUnwindSafe(run(client.clone(), source, request, sender.clone(), progress.clone(), operation_id.clone(), format, operation_timestamps, blocking_tasks.clone())).catch_unwind();
         let monitor = monitor(client, progress, sender, interval);
         let timeout = async {
             match deadline { Some(deadline) => tokio::time::sleep_until(deadline).await, None => std::future::pending().await }
@@ -204,13 +304,18 @@ where
     })?;
     Ok(AudioStream {
         receiver,
-        status: WatchStream::new(status_receiver),
+        status: WatchStream::new(status_receiver.clone()),
+        outcome: status_receiver,
         terminal: None,
+        failure: OnceLock::new(),
         cancellation,
+        deadline,
         worker: Some(worker),
         request_id,
         format,
         consumed: false,
+        completed: false,
+        timestamps,
     })
 }
 
@@ -250,12 +355,12 @@ async fn monitor(
 async fn run<S>(
     client: Arc<Inner>,
     source: S,
+    request: SynthesisRequest,
     audio: mpsc::Sender<Bytes>,
     progress: Arc<Mutex<Progress>>,
     id: Arc<OnceLock<String>>,
     format: AudioFormat,
-    voice: String,
-    language: String,
+    timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
     blocking_tasks: TaskTracker,
 ) -> Result<(), Error>
 where
@@ -263,52 +368,58 @@ where
 {
     let mut stub = client.stub().await?;
     let (requests, incoming) = mpsc::channel(2);
-    let producer = produce(
-        source,
-        requests,
-        progress.clone(),
-        voice,
-        language,
-        blocking_tasks,
-    );
+    let producer = produce(source, requests, progress.clone(), request, blocking_tasks);
     let receiver = async {
         let response = stub
             .synthesize_streaming(client.request(ReceiverStream::new(incoming)))
             .await
             .map_err(Error::from)?;
-        if let Some(value) = request_id(response.metadata()) {
-            let _ = id.set(value.into());
-        }
-        let valid_format = response
-            .metadata()
-            .get("x-rime-audio-content-type")
-            .is_some_and(|value| value == "audio/pcm");
-        let mut responses = response.into_inner();
-        let mut converter = Converter::new(format);
-        while let Some(response) = responses.message().await.map_err(Error::from)? {
-            let Some(synthesis_response_stream::Payload::Audio(data)) = response.payload else {
+        receive(response, audio, progress.clone(), id, format, timestamps).await
+    };
+    futures_util::future::try_join(producer, receiver)
+        .map_ok(|_| ())
+        .await
+}
+
+async fn receive(
+    response: tonic::Response<tonic::Streaming<rimelabs_api::SynthesisResponseStream>>,
+    audio: mpsc::Sender<Bytes>,
+    progress: Arc<Mutex<Progress>>,
+    id: Arc<OnceLock<String>>,
+    format: AudioFormat,
+    timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
+) -> Result<(), Error> {
+    if let Some(value) = request_id(response.metadata()) {
+        let _ = id.set(value.into());
+    }
+    let valid_format = response
+        .metadata()
+        .get("x-rime-audio-content-type")
+        .is_some_and(|value| value == "audio/pcm");
+    let mut responses = response.into_inner();
+    let mut converter = Converter::new(format);
+    while let Some(response) = responses.message().await.map_err(Error::from)? {
+        let data = match response.payload {
+            Some(synthesis_response_stream::Payload::Trailer(trailer)) => {
+                if let Some(timestamps) = &timestamps {
+                    timestamps
+                        .lock()
+                        .expect("timestamp mutex poisoned")
+                        .accept(trailer);
+                }
                 continue;
-            };
-            if data.is_empty() {
-                continue;
             }
-            if !valid_format {
-                return Err(Error::new(
-                    ErrorKind::AudioFormat,
-                    "expected raw audio/pcm from the service",
-                ));
+            Some(synthesis_response_stream::Payload::Audio(data)) => data,
+            None => continue,
+        };
+        if let Some(timestamps) = &timestamps {
+            let mut timestamps = timestamps.lock().expect("timestamp mutex poisoned");
+            if timestamps.seen {
+                timestamps.invalid = true;
             }
-            {
-                let mut state = progress.lock().expect("progress mutex poisoned");
-                state.received_audio = true;
-                state.last_progress = Instant::now();
-            }
-            enqueue(&audio, &progress, converter.process(&data, false)?).await?;
         }
-        if let Some(trailers) = responses.trailers().await.map_err(Error::from)? {
-            if let Some(value) = request_id(&trailers) {
-                let _ = id.set(value.into());
-            }
+        if data.is_empty() {
+            continue;
         }
         if !valid_format {
             return Err(Error::new(
@@ -318,19 +429,33 @@ where
         }
         {
             let mut state = progress.lock().expect("progress mutex poisoned");
-            if state.input != InputState::Finished {
-                return Err(Error::new(
-                    ErrorKind::Stream,
-                    "service completed before input finished",
-                ));
-            }
-            state.output_finished = true;
+            state.received_audio = true;
+            state.last_progress = Instant::now();
         }
-        enqueue(&audio, &progress, converter.process(&[], true)?).await
-    };
-    futures_util::future::try_join(producer, receiver)
-        .map_ok(|_| ())
-        .await
+        enqueue(&audio, &progress, converter.process(&data, false)?).await?;
+    }
+    if let Some(trailers) = responses.trailers().await.map_err(Error::from)? {
+        if let Some(value) = request_id(&trailers) {
+            let _ = id.set(value.into());
+        }
+    }
+    if !valid_format {
+        return Err(Error::new(
+            ErrorKind::AudioFormat,
+            "expected raw audio/pcm from the service",
+        ));
+    }
+    {
+        let mut state = progress.lock().expect("progress mutex poisoned");
+        if state.input != InputState::Finished {
+            return Err(Error::new(
+                ErrorKind::Stream,
+                "service completed before input finished",
+            ));
+        }
+        state.output_finished = true;
+    }
+    enqueue(&audio, &progress, converter.process(&[], true)?).await
 }
 
 async fn enqueue(
@@ -360,23 +485,12 @@ async fn produce<S>(
     source: S,
     sender: mpsc::Sender<StreamingSynthesisRequest>,
     progress: Arc<Mutex<Progress>>,
-    voice: String,
-    language: String,
+    header: SynthesisRequest,
     blocking_tasks: TaskTracker,
 ) -> Result<(), Error>
 where
     S: Stream<Item = Result<String, Error>> + Send + 'static,
 {
-    let header = SynthesisRequest {
-        speaker: Some(voice),
-        language: Some(language),
-        audio_parameters: Some(AudioParameters {
-            audio_format: Some("audio/pcm".into()),
-            sampling_rate: Some(24000),
-            ..Default::default()
-        }),
-        ..Default::default()
-    };
     if sender
         .send(StreamingSynthesisRequest {
             payload: Some(Payload::Header(header)),
@@ -459,3 +573,7 @@ where
 fn worker_error(error: tokio::task::JoinError) -> Error {
     Error::new(ErrorKind::Stream, "sentence worker failed").caused_by(error)
 }
+
+#[cfg(test)]
+#[path = "tests/tts_features.rs"]
+mod tests;

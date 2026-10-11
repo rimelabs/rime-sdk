@@ -1,4 +1,4 @@
-use std::{error::Error as StdError, fmt, sync::Arc};
+use std::{borrow::Cow, error::Error as StdError, fmt, sync::Arc};
 
 /// Stable categories for application error handling.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,7 +28,7 @@ pub enum ErrorKind {
 #[derive(Clone, Debug)]
 pub struct Error {
     kind: ErrorKind,
-    message: &'static str,
+    message: Cow<'static, str>,
     request_id: Option<String>,
     source: Option<Arc<dyn StdError + Send + Sync>>,
 }
@@ -39,10 +39,10 @@ impl Error {
         Self::new(ErrorKind::Input, "input source failed").caused_by(source)
     }
 
-    pub(crate) fn new(kind: ErrorKind, message: &'static str) -> Self {
+    pub(crate) fn new(kind: ErrorKind, message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             kind,
-            message,
+            message: message.into(),
             request_id: None,
             source: None,
         }
@@ -63,6 +63,11 @@ impl Error {
     /// The category of this failure.
     pub fn kind(&self) -> ErrorKind {
         self.kind
+    }
+
+    /// The failure explanation, preserving service-provided details when available.
+    pub fn message(&self) -> &str {
+        &self.message
     }
 
     /// The request ID supplied by the service, if present.
@@ -102,7 +107,12 @@ impl From<tonic::Status> for Error {
             Code::Cancelled => ErrorKind::Cancelled,
             _ => ErrorKind::Stream,
         };
-        Self::new(kind, "speech service request failed")
+        let message = if status.message().trim().is_empty() {
+            Cow::Borrowed("speech service request failed")
+        } else {
+            Cow::Owned(status.message().to_owned())
+        };
+        Self::new(kind, message)
             .with_request_id(request_id(status.metadata()))
             .caused_by(status)
     }

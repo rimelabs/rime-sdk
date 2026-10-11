@@ -10,17 +10,21 @@
 mod audio;
 mod client;
 mod error;
+mod lexicon;
 mod sentences;
 mod stream;
 pub mod stt;
+mod timestamps;
 
 pub use audio::AudioFormat;
 pub use client::{Client, ClientBuilder, Model, SynthesisOptions, Tts};
 pub use error::{Error, ErrorKind};
+pub use lexicon::PronunciationEntry;
 pub use stream::AudioStream;
 pub use stt::{
     PcmFormat, Stt, TranscriptStream, TranscriptionMode, TranscriptionOptions, TranscriptionUpdate,
 };
+pub use timestamps::{TimestampResult, TimestampStatus, WordTimestamp};
 
 #[cfg(test)]
 mod tests;
