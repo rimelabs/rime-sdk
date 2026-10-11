@@ -9,7 +9,6 @@ requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.74,<2",
     "rime-api==0.4.0",
-    "livekit-blingfire==1.1.0",
     "httpx>=0.28,<1",
     "websockets>=15,<17",
     "audioop-lts>=0.2,<1 ; python_full_version >= '3.13'",

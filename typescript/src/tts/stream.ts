@@ -5,7 +5,6 @@ import { AudioFormat, Converter } from "./audio.js";
 import { policy } from "./policy.js";
 import { abortable } from "../cancellation.js";
 import { ByteQueue } from "./queue.js";
-import { SentenceBuffer, ready } from "./sentences.js";
 import type { TimestampResult } from "./timestamps.js";
 import type { PronunciationEntry } from "./lexicon.js";
 import { SynthesisCall, type PreparedConnection } from "./transport.js";
@@ -139,7 +138,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private async produce() {
     const source = this.source!;
     let iterator: AsyncIterator<string> | undefined;
-    const buffer = new SentenceBuffer(policy.sentenceBytes);
+    let highSurrogate = "";
     let meaningful = false;
     try {
       try {
@@ -165,34 +164,39 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
           this.sourceWaiting = false;
         }
         if (result.done) break;
-        const chunk = result.value;
-        if (typeof chunk !== "string")
+        if (typeof result.value !== "string")
           throw new RimeInputError("The text source must yield strings");
+        let chunk = highSurrogate + result.value;
+        highSurrogate = "";
+        // A JavaScript source may split one Unicode character across yields.
+        if (/[\uD800-\uDBFF]$/.test(chunk)) {
+          highSurrogate = chunk.slice(-1);
+          chunk = chunk.slice(0, -1);
+        }
         if (chunk.trim()) meaningful = true;
-        // Never split a surrogate pair when limiting native detector input size.
+        // Bound wire messages without splitting a Unicode character.
         for (let offset = 0; offset < chunk.length;) {
           let end = Math.min(chunk.length, offset + policy.sourceChars);
           if (end < chunk.length && /[\uD800-\uDBFF]/.test(chunk[end - 1]!))
             end++;
-          for (const sentence of buffer.feed(chunk.slice(offset, end))) {
-            if (!this.submitted) this.progressAt = performance.now();
-            this.submitted = true;
-            await this.call!.write(sentence);
-          }
+          const part = chunk.slice(offset, end);
+          if (/[\uD800-\uDFFF]/u.test(part))
+            throw new RimeInputError("Text must contain valid Unicode");
+          if (!this.submitted) this.progressAt = performance.now();
+          this.submitted = true;
+          await this.call!.write(part);
+          this.progressAt = performance.now();
           offset = end;
         }
       }
+      if (highSurrogate)
+        throw new RimeInputError("Text must contain valid Unicode");
       if (!meaningful)
         throw new RimeInputError(
           "The text source contained no meaningful text",
         );
-      for (const sentence of buffer.feed("", true)) {
-        if (!this.submitted) this.progressAt = performance.now();
-        this.submitted = true;
-        await this.call!.write(sentence);
-      }
-      this.call!.finishInput();
       this.inputDone = true;
+      this.call!.finishInput();
     } catch (error) {
       if (error instanceof RimeError || this.controller.signal.aborted)
         throw error;
@@ -234,7 +238,6 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private async run() {
     let tasks: Promise<void>[] = [];
     try {
-      await abortable(ready, this.controller.signal);
       const prepared = await this.owner.prepare(this.controller.signal);
       this.call = new SynthesisCall(prepared, this.controller.signal);
       await this.call.start(

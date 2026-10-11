@@ -55,9 +55,18 @@ for (const incremental of [false, true]) {
         assert.ok((await collect(stream)).length);
         assert.equal(service.calls.length, 1);
         const messages = service.calls[0];
-        assert.deepEqual(
-          messages.map((message) => message.payload.case),
-          ["header", "textChunk", "textChunk"],
+        assert.equal(messages[0].payload.case, "header");
+        assert.ok(
+          messages
+            .slice(1)
+            .every((message) => message.payload.case === "textChunk"),
+        );
+        assert.equal(
+          messages
+            .slice(1)
+            .map((message) => message.payload.value)
+            .join(""),
+          "Hello. Hello again.",
         );
         assert.deepEqual(
           messages[0].payload.value.customLexicon.map(

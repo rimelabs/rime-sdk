@@ -12,6 +12,7 @@ from rimelabs_sdk import (
     RimeAuthenticationError,
     RimeInputError,
     RimePermissionError,
+    RimeStreamError,
     RimeUnavailableError,
 )
 from rimelabs_sdk.tts._transport import SynthesisCall, discover
@@ -48,6 +49,86 @@ async def test_write_after_rejection_without_reader(connection, status, error_ty
         assert str(caught.value) == "test admission failure"
         assert call.request_id == "rejected-request"
         assert len(server.calls) == 1
+    finally:
+        call.cancel()
+
+
+@pytest.mark.parametrize("write_kind", ["header", "text_chunk"])
+@pytest.mark.parametrize(
+    "status,error_type",
+    [
+        (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError),
+        (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError),
+        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
+        (grpc.StatusCode.INVALID_ARGUMENT, RimeInputError),
+        (grpc.StatusCode.INTERNAL, RimeStreamError),
+    ],
+)
+async def test_rejection_during_write_preserves_status_without_reader(
+    connection, monkeypatch, write_kind, status, error_type
+):
+    server, channel = connection
+    server.mode = "no_audio_error"
+    server.response_metadata = ()
+    server.trailing_metadata = (("x-request-id", "rejected-request"),)
+    server.rejection_status = status
+    server.rejection_message = "service rejected this request"
+    call = SynthesisCall(channel, ())
+    finished = asyncio.Event()
+    call._call.add_done_callback(lambda _: finished.set())
+    native_write = call._call.write
+
+    async def write_during_rejection(message):
+        await native_write(message)
+        if message.WhichOneof("payload") == write_kind:
+            # The server finishes while the send is still pending. grpc.aio
+            # can then replace its status with a local send error; stop the
+            # pending write before that happens, even without an audio reader.
+            server.release.set()
+            await finished.wait()
+            raise grpc.aio.AioRpcError(
+                grpc.StatusCode.INTERNAL,
+                grpc.aio.Metadata(),
+                grpc.aio.Metadata(),
+                "Internal error from Core",
+            )
+
+    monkeypatch.setattr(call._call, "write", write_during_rejection)
+    try:
+        async with asyncio.timeout(2):
+            with pytest.raises(error_type) as caught:
+                await call.start("clementine", "en")
+                await call.write("Hello.")
+        assert str(caught.value) == server.rejection_message
+        assert caught.value.request_id == "rejected-request"
+        assert call.request_id == "rejected-request"
+        assert len(server.calls) == 1
+    finally:
+        call.cancel()
+
+
+async def test_caller_cancellation_during_rejection_stays_cancelled(connection, monkeypatch):
+    server, channel = connection
+    server.mode = "no_audio_error"
+    call = SynthesisCall(channel, ())
+    finished = asyncio.Event()
+    call._call.add_done_callback(lambda _: finished.set())
+    native_write = call._call.write
+
+    async def pending_write(message):
+        await native_write(message)
+        server.release.set()
+        await finished.wait()
+
+    try:
+        await call.start("clementine", "en")
+        monkeypatch.setattr(call._call, "write", pending_write)
+        operation = asyncio.create_task(call.write("Hello."))
+        call._call.add_done_callback(lambda _: operation.cancel())
+        async with asyncio.timeout(2):
+            with pytest.raises(asyncio.CancelledError):
+                await operation
+        assert operation.cancelled()
     finally:
         call.cancel()
 

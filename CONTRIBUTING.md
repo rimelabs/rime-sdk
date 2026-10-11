@@ -55,6 +55,11 @@ deployed compatibility.
 
 TTS uses `client.tts.synthesize(text)` for complete strings and
 `client.tts.stream(chunks)` for async text sources. Both return streaming audio.
+Every TTS header selects `SPLIT_STRATEGY_ACCUMULATE_SENTENCE` so Rime automatically
+combines text fragments into sentences for speech. The SDK preserves source text,
+uses bounded Unicode-safe wire chunks, and half-closes when input ends.
+Successful writes and audio reads count as progress; source and consumer pauses
+suspend the internal stall timer. An overall timeout still applies throughout.
 Both packages expose `client.realtime.connect(...)`. Voice and language discovery
 remain on the top-level client. Tests that use private dependency seams import
 them from the feature directories.
@@ -134,7 +139,7 @@ Keep `go/testdata/` copies of the four shared TTS fixtures, `pcm-input.json` and
 `stt/transcripts.json` identical to `conformance/`; CI checks them. Each module export includes
 those fixtures so tests work outside the monorepo. The versioned
 `github.com/rimelabs/rime-api/go` dependency supplies both TTS and STT protocol
-code. BlingFire build instructions are in `go/internal/`. Run `gofmt` on Go changes.
+code. Run `gofmt` on Go changes.
 
 When this checkout is nested inside another Go workspace, run module checks with
 `GOWORK=off` to avoid inheriting its `go.work`. The Go release archive includes
@@ -186,7 +191,7 @@ Run `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`,
 `cargo test --locked`, and `cargo package --locked` from `rust/`.
 Tests use local gRPC services and the shared
 conformance cases. Keep `rust/testdata` identical to the corresponding files in
-`conformance/`. Keep the BlingFire binary identical to the Go copy.
+`conformance/`.
 
 Local checks, CI, and releases use the published `rimelabs-api` dependency
 from crates.io. No sibling API checkout or Cargo override is required.

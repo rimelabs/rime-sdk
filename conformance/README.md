@@ -4,13 +4,14 @@ Python and TypeScript test runners read these files directly. Go and Rust use
 copies in `go/testdata/` and `rust/testdata/` so exported packages can run their
 tests. CI checks that the copies match. Changes here run all four language jobs.
 
-- `sentences.json` gives the exact expected sequence, including original whitespace.
+- `text-input.json` gives source text that the SDK must send unchanged,
+  including original whitespace. Rime handles sentence accumulation automatically.
 - `contract.json` gives chunk sizes, invalid timeouts, audio profiles, gRPC error
   mappings, and required lifecycle scenarios.
 - `audio.json` gives exact PCM and mu-law bytes for a deterministic sample signal.
 
-Sentence chunk sizes count Unicode code points. Node.js also tests splits inside
-UTF-16 surrogate pairs. The corpus covers abbreviations, numbers, URLs, mixed
+Text transport tests vary source chunk boundaries. Node.js also tests splits
+inside UTF-16 surrogate pairs. The corpus covers abbreviations, numbers, URLs, mixed
 scripts, whitespace, emoji, zero-width spaces, and BOM characters. It is an
 initial corpus, not full coverage of every supported language.
 

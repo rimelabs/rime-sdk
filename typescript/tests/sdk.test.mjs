@@ -14,15 +14,11 @@ import {
   RimePermissionError,
   RimeResourceLimitError,
 } from "../dist/index.js";
-import { SentenceBuffer, ready } from "../dist/tts/sentences.js";
 import { Converter } from "../dist/tts/audio.js";
 import { authentication, Credentials } from "../dist/auth.js";
 import { transport, rpcError } from "../dist/tts/transport.js";
 import { policy } from "../dist/tts/policy.js";
 import { FakeService } from "./service.mjs";
-const fixtures = JSON.parse(
-  fs.readFileSync(new URL("../../conformance/sentences.json", import.meta.url)),
-);
 const contract = JSON.parse(
   fs.readFileSync(new URL("../../conformance/contract.json", import.meta.url)),
 );
@@ -66,100 +62,6 @@ test("temporary bearer auth", async () => {
   await credentials.close();
   await assert.rejects(credentials.metadata(signal), /closed/);
 });
-for (const fixture of fixtures)
-  for (const size of contract.chunk_sizes)
-    test(`sentences ${fixture.id} / ${size}`, async () => {
-      await ready;
-      const buffer = new SentenceBuffer(65536);
-      const actual = [];
-      const points = [...fixture.text];
-      for (let i = 0; i < points.length; i += size)
-        actual.push(...buffer.feed(points.slice(i, i + size).join("")));
-      actual.push(...buffer.feed("", true));
-      assert.deepEqual(actual, fixture.sentences);
-      assert.equal(actual.join(""), fixture.text);
-    });
-test("sentences at every UTF-16 split and end of input", async () => {
-  await ready;
-  for (const fixture of fixtures) {
-    for (let split = 0; split <= fixture.text.length; split++) {
-      const buffer = new SentenceBuffer(65536);
-      const actual = [...buffer.feed(fixture.text.slice(0, split))];
-      actual.push(...buffer.feed(""));
-      actual.push(...buffer.feed(fixture.text.slice(split), true));
-      assert.deepEqual(actual, fixture.sentences, `${fixture.id} / ${split}`);
-      assert.deepEqual([...buffer.feed("", true)], []);
-    }
-  }
-});
-test("sentences after context rotation", async () => {
-  await ready;
-  const text =
-    "Hello 🚀 world. Dr. Smith paid 3.14 dollars. \u200fمرحبا بالعالم. ".repeat(
-      30,
-    ) + "Done.";
-  const whole = new SentenceBuffer(65536);
-  const expected = [...whole.feed(text, true)];
-  for (const sizes of [[1], [2, 7, 31, 128, 3], [1024]]) {
-    const buffer = new SentenceBuffer(65536);
-    const actual = [];
-    let offset = 0,
-      step = 0;
-    while (offset < text.length) {
-      const size = sizes[step++ % sizes.length];
-      actual.push(...buffer.feed(text.slice(offset, offset + size)));
-      offset += size;
-    }
-    actual.push(...buffer.feed("", true));
-    assert.deepEqual(actual, expected);
-  }
-  assert.equal(expected.join(""), text);
-});
-test("sentence delivery at the lookahead threshold", async () => {
-  await ready;
-  for (const spacing of [1, 2, 15, 16, 17, 31, 32, 100]) {
-    const buffer = new SentenceBuffer(65536);
-    const output = [];
-    for (const char of "First." + " ".repeat(spacing) + "The next sentenc")
-      output.push(...buffer.feed(char));
-    assert.deepEqual(output, ["First."], `spacing ${spacing}`);
-  }
-});
-test("sentence storage does not grow with completed text", async () => {
-  await ready;
-  const buffer = new SentenceBuffer(256);
-  const text = "Hello 🚀 world. This is a short sentence. ".repeat(1000);
-  const output = [];
-  for (const sentence of buffer.feed(text)) {
-    output.push(sentence);
-    assert.ok(Buffer.byteLength(buffer.pending) < 2048);
-  }
-  output.push(...buffer.feed("", true));
-  assert.equal(output.join(""), text);
-  assert.equal(buffer.pending, "");
-});
-test("sentence messages ignore source chunk size", () =>
-  setup(async (service, client) => {
-    const text = "Hi! Dr. Smith agrees. Hello.";
-    for (const size of [null, 1, 7]) {
-      async function* source() {
-        for (let offset = 0; offset < text.length; offset += size)
-          yield text.slice(offset, offset + size);
-      }
-      await collect(
-        size === null
-          ? client.tts.synthesize(text)
-          : client.tts.stream(source()),
-      );
-    }
-    const messages = service.calls.map((call) =>
-      call.slice(1).map((m) => m.payload.value),
-    );
-    assert.deepEqual(
-      messages,
-      Array(3).fill(["Hi!", " Dr.", " Smith agrees.", " Hello."]),
-    );
-  }));
 test("public validation", () => {
   for (const timeout of [...contract.invalid_timeouts, Infinity, NaN])
     assert.throws(() => new Rime({ apiKey: "test", timeout }), RimeInputError);
@@ -240,10 +142,7 @@ test("complete input uses streaming RPC", () =>
   setup(async (service, client) => {
     const audio = client.tts.synthesize("Hello. Final phrase");
     assert.equal(audio.format, AudioFormat.PCM_24000);
-    assert.deepEqual(
-      await collect(audio),
-      Buffer.concat([service.payload, service.payload]),
-    );
+    assert.deepEqual(await collect(audio), service.payload);
     assert.equal(audio.requestId, "test-request");
     assert.equal(service.calls.length, 1);
     assert.equal(service.calls[0][0].payload.value.speaker, "clementine");
@@ -257,7 +156,7 @@ test("incremental_audio_before_input_end", () =>
     let release;
     const wait = new Promise((resolve) => (release = resolve));
     async function* source() {
-      yield "First sentence. The next sentence ";
+      yield "Hello ";
       await wait;
       yield "is here.";
     }
@@ -475,16 +374,6 @@ for (const [status, errorType] of [
   });
 }
 
-test("UTF-16 chunk boundaries preserve surrogate pairs", async () => {
-  await ready;
-  const text = "Hello 🚀 world. The next sentence is complete.";
-  const buffer = new SentenceBuffer(65536);
-  const result = [];
-  for (let i = 0; i < text.length; i++)
-    result.push(...buffer.feed(text.slice(i, i + 1)));
-  result.push(...buffer.feed("", true));
-  assert.equal(result.join(""), text);
-});
 test("timeout inheritance and explicit disablement", () =>
   setup(async (service, client) => {
     service.mode = "burst";
@@ -639,39 +528,6 @@ for (const operation of ["voices", "languages"])
           );
           assert.equal(client.ttsClient.discoveryOperations.size, 0);
         }));
-
-for (const size of [1024, 100000])
-  for (const [char, count] of [
-    ["a", 65533],
-    ["a", 65535],
-    ["é", 32767],
-  ])
-    test(`sentence limit excludes lookahead / ${size} / ${char} / ${count}`, async () => {
-      await ready;
-      const first = char.repeat(count) + ".";
-      const text = first + " Short.";
-      const buffer = new SentenceBuffer(65536);
-      const actual = [];
-      for (let offset = 0; offset < text.length; offset += size)
-        actual.push(...buffer.feed(text.slice(offset, offset + size)));
-      actual.push(...buffer.feed("", true));
-      assert.deepEqual(actual, [first, " Short."]);
-    });
-
-test("sentence limit still rejects oversized spans", async () => {
-  await ready;
-  for (const text of [
-    "a".repeat(65536) + ". Short.",
-    "é".repeat(32769),
-    " ".repeat(65537),
-  ]) {
-    const buffer = new SentenceBuffer(65536);
-    assert.throws(() => {
-      [...buffer.feed(text)];
-      [...buffer.feed("", true)];
-    }, RimeResourceLimitError);
-  }
-});
 
 test("client shutdown stops paused output", async () => {
   await setup(async (service, client) => {

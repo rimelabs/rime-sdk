@@ -37,11 +37,9 @@ async def test_lexicon_is_snapshotted_once_per_stream(setup, incremental, profil
     assert audio
     assert len(service.calls) == 1
     messages = service.calls[0]
-    assert [message.WhichOneof("payload") for message in messages] == [
-        "header",
-        "text_chunk",
-        "text_chunk",
-    ]
+    assert messages[0].WhichOneof("payload") == "header"
+    assert all(message.WhichOneof("payload") == "text_chunk" for message in messages[1:])
+    assert "".join(message.text_chunk for message in messages[1:]) == "Hello. Hello again."
     assert [
         (entry.spelling, entry.pronunciation) for entry in messages[0].header.custom_lexicon
     ] == expected

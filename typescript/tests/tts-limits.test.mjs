@@ -35,6 +35,7 @@ test("serialized request limit and recovery", { timeout: 5000 }, async (t) => {
   }));
   const size = () => {
     const request = create(schema.SynthesisRequestSchema, {
+      splitStrategy: schema.SplitStrategy.ACCUMULATE_SENTENCE,
       speaker: "clementine",
       language: "en",
       audioParameters: { audioFormat: "audio/pcm", samplingRate: 24000 },

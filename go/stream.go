@@ -11,7 +11,6 @@ import (
 	"unicode/utf8"
 
 	pb "github.com/rimelabs/rime-api/go"
-	"github.com/rimelabs/rime-sdk/go/internal/sentences"
 )
 
 // TextSource returns the next UTF-8 fragment or io.EOF. It must honor cancellation.
@@ -215,7 +214,8 @@ func (s *AudioStream) run(source TextSource, voice, language string, lexicon []P
 		return
 	}
 	format, rate := "audio/pcm", int32(24000)
-	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}}}
+	strategy := pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE
+	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{SplitStrategy: &strategy, Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}}}
 	if s.timestampsRequested {
 		header.GetHeader().Timestamps = &pb.TimestampOptions{Enable: true}
 	}
@@ -258,14 +258,8 @@ func (s *AudioStream) sendError(_ pb.TextToSpeech_SynthesizeStreamingClient, err
 }
 
 func (s *AudioStream) produce(call pb.TextToSpeech_SynthesizeStreamingClient, source TextSource) error {
-	detector, err := sentences.New(s.op.ctx)
-	if err != nil {
-		return &Error{Kind: ErrInput, Message: "sentence detector initialization failed", Cause: err}
-	}
-	defer detector.Close()
-	buffer := sentences.NewBuffer(detector)
 	meaningful := false
-	emit := func(sentence string) error {
+	emit := func(text string) error {
 		s.mu.Lock()
 		switch s.output {
 		case outputAwaitingText:
@@ -276,7 +270,13 @@ func (s *AudioStream) produce(call pb.TextToSpeech_SynthesizeStreamingClient, so
 			s.lastProgress = time.Now()
 		}
 		s.mu.Unlock()
-		return call.Send(&pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_TextChunk{TextChunk: sentence}})
+		if err := call.Send(&pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_TextChunk{TextChunk: text}}); err != nil {
+			return err
+		}
+		s.mu.Lock()
+		s.lastProgress = time.Now()
+		s.mu.Unlock()
+		return nil
 	}
 	for {
 		s.mu.Lock()
@@ -298,8 +298,16 @@ func (s *AudioStream) produce(call pb.TextToSpeech_SynthesizeStreamingClient, so
 		if strings.TrimSpace(fragment) != "" {
 			meaningful = true
 		}
-		if err := buffer.Feed(s.op.ctx, fragment, false, emit); err != nil {
-			return sentenceError(err)
+		// Bound each wire message, preserving UTF-8 and all source whitespace.
+		for len(fragment) > 0 {
+			end := min(len(fragment), 4096)
+			for end < len(fragment) && !utf8.RuneStart(fragment[end]) {
+				end--
+			}
+			if err := emit(fragment[:end]); err != nil {
+				return s.sendError(call, err)
+			}
+			fragment = fragment[end:]
 		}
 		if sourceErr == io.EOF {
 			break
@@ -308,22 +316,11 @@ func (s *AudioStream) produce(call pb.TextToSpeech_SynthesizeStreamingClient, so
 	if !meaningful {
 		return failure(ErrInput, "text source contained no meaningful text")
 	}
-	if err := buffer.Feed(s.op.ctx, "", true, emit); err != nil {
-		return sentenceError(err)
-	}
 	// Mark input complete before half-close can unblock the server's final response.
 	s.mu.Lock()
 	s.input = inputFinished
 	s.mu.Unlock()
 	return s.sendError(call, call.CloseSend())
-}
-
-func sentenceError(err error) error {
-	var limit sentences.LimitError
-	if errors.As(err, &limit) {
-		return &Error{Kind: ErrResourceLimit, Message: err.Error(), Cause: err}
-	}
-	return err
 }
 
 func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) error {

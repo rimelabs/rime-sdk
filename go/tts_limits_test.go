@@ -22,7 +22,8 @@ func TestSerializedRequestLimitAndRecovery(t *testing.T) {
 	}
 	size := func() int {
 		voice, language, format, rate := "clementine", "en", "audio/pcm", int32(24000)
-		request := &pb.SynthesisRequest{Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}
+		strategy := pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE
+		request := &pb.SynthesisRequest{SplitStrategy: &strategy, Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}
 		for _, entry := range entries {
 			request.CustomLexicon = append(request.CustomLexicon, &pb.PronunciationEntry{Spelling: entry.Spelling, Pronunciation: entry.Pronunciation})
 		}
@@ -37,7 +38,7 @@ func TestSerializedRequestLimitAndRecovery(t *testing.T) {
 			last.Spelling = last.Spelling[:len(last.Spelling)+difference]
 		}
 	}
-	// Allow cold sentence-detector startup under the race detector.
+	// Allow transport startup under the race detector.
 	timeout := 10 * time.Second
 	options := SynthesisOptions{CustomLexicon: entries, Timeout: &timeout}
 	if _, err := drain(mustStream(t, client, text, options)); err != nil {
