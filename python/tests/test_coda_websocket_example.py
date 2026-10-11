@@ -85,9 +85,7 @@ async def test_audio_plays_before_next_text_and_connection_survives_turns(
         await asyncio.wait_for(played.wait(), 2)
         yield "Second sentence."
 
-    options = SimpleNamespace(
-        voice="lyra", language="en", no_playback=False, complete_text=False, lookahead_tokens=0
-    )
+    options = SimpleNamespace(voice="lyra", language="en", no_playback=False, lookahead_tokens=0)
     async with serve(peer, "127.0.0.1", 0, subprotocols=["rime.v1.json"]) as server:
         url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
         async with connect(url, subprotocols=["rime.v1.json"]) as connection:
@@ -183,10 +181,7 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
     assert sorted(path.name for path in tmp_path.iterdir()) == ["turn-001.wav", "turn-002.wav"]
 
 
-@pytest.mark.parametrize("complete_text", [True, False])
-async def test_complete_text_and_streaming_lookahead_use_distinct_protocol_modes(
-    example, monkeypatch, tmp_path, complete_text
-):
+async def test_streaming_lookahead_reaches_start_message(example, monkeypatch, tmp_path):
     monkeypatch.setenv("RIME_API_KEY", "test-key")
     requests = []
 
@@ -195,29 +190,19 @@ async def test_complete_text_and_streaming_lookahead_use_distinct_protocol_modes
         start = json.loads(await socket.recv())
         requests.append(start)
         context_id = start["contextId"]
-        if complete_text:
-            # Full input is in start; no text or end frames should follow.
-            with pytest.raises(TimeoutError):
-                await asyncio.wait_for(socket.recv(), 0.05)
-        else:
-            requests.append(json.loads(await socket.recv()))
-            requests.append(json.loads(await socket.recv()))
+        requests.append(json.loads(await socket.recv()))
+        requests.append(json.loads(await socket.recv()))
         await socket.send(json.dumps({"contextId": context_id, "audio": "AQA="}))
         await socket.send(json.dumps({"contextId": context_id, "done": {}}))
 
     async with serve(peer, "127.0.0.1", 0, subprotocols=["rime.v1.json"]) as server:
         url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
         args = ["--url", url, "--text", "Hello.", "--no-playback", "--output-dir", str(tmp_path)]
-        args.extend(["--complete-text"] if complete_text else ["--lookahead-tokens", "8"])
+        args.extend(["--lookahead-tokens", "8"])
         await asyncio.wait_for(example.main(example.arguments(args)), 5)
     start = requests[0]["start"]
-    if complete_text:
-        assert start["text"] == "Hello."
-        assert "codaParameters" not in start
-        assert len(requests) == 1
-    else:
-        assert start["text"] == ""
-        assert start["codaParameters"] == {"textLookaheadTokens": 8}
-        assert requests[1]["text"] == "Hello. "
-        assert "end" in requests[2]
+    assert start["text"] == ""
+    assert start["codaParameters"] == {"textLookaheadTokens": 8}
+    assert requests[1]["text"] == "Hello. "
+    assert "end" in requests[2]
     assert (tmp_path / "turn-001.wav").exists()

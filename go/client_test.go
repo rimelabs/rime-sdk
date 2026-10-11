@@ -28,22 +28,13 @@ import (
 
 type testService struct {
 	pb.UnimplementedTextToSpeechServer
-	completeSynthesis func(*pb.SynthesisRequest, grpc.ServerStreamingServer[pb.SynthesisResponseStream]) error
-	header            func(*pb.SynthesisRequest) error
-	synthesis         func(grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error
-	discovery         func(context.Context) error
-	calls             atomic.Int32
-	discoveries       atomic.Int32
-	mu                sync.Mutex
-	texts             []string
-}
-
-func (s *testService) Synthesize(request *pb.SynthesisRequest, stream grpc.ServerStreamingServer[pb.SynthesisResponseStream]) error {
-	s.calls.Add(1)
-	if s.completeSynthesis == nil {
-		return status.Error(codes.Unimplemented, "unexpected Synthesize")
-	}
-	return s.completeSynthesis(request, stream)
+	header      func(*pb.SynthesisRequest) error
+	synthesis   func(grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error
+	discovery   func(context.Context) error
+	calls       atomic.Int32
+	discoveries atomic.Int32
+	mu          sync.Mutex
+	texts       []string
 }
 
 func (s *testService) SynthesizeStreaming(stream grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error {

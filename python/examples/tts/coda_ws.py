@@ -55,8 +55,7 @@ async def synthesize(connection, chunks, options, destination):
     """Send input and consume audio concurrently; end only finishes this context."""
     context_id = uuid.uuid4().hex
     started_at = time.monotonic()
-    input_ended = options.complete_text
-    complete_text = "".join([chunk async for chunk in chunks]) if options.complete_text else ""
+    input_ended = False
     player = None
     received = 0
     first_audio = None
@@ -64,8 +63,6 @@ async def synthesize(connection, chunks, options, destination):
 
     async def send_text():
         nonlocal input_ended
-        if options.complete_text:
-            return
         async for chunk in chunks:
             if not chunk.strip():
                 continue
@@ -142,11 +139,10 @@ async def synthesize(connection, chunks, options, destination):
     start = {
         "speaker": options.voice,
         "language": options.language,
-        "text": complete_text,
+        "text": "",
         "audioParameters": {"audioFormat": "audio/pcm", "samplingRate": RATE},
     }
-    if not options.complete_text:
-        start["codaParameters"] = {"textLookaheadTokens": options.lookahead_tokens}
+    start["codaParameters"] = {"textLookaheadTokens": options.lookahead_tokens}
     message = json.dumps({"contextId": context_id, "start": start})
     if len(message.encode()) > 64 * 1024:
         raise ValueError("Start request exceeds the 64 KiB message limit")
@@ -214,11 +210,7 @@ async def main(options):
             if options.language not in ready.get("languages", []):
                 raise ValueError(f"Unsupported language. Available: {ready.get('languages')}")
             print(f"Connected: {options.url} | voice={options.voice}")
-            print(
-                "Input: complete text in start"
-                if options.complete_text
-                else f"Input: streaming text | lookahead={options.lookahead_tokens} tokens"
-            )
+            print(f"Input: streaming text | lookahead={options.lookahead_tokens} tokens")
             if options.text:
                 await synthesize(
                     connection,
@@ -290,11 +282,6 @@ def arguments(argv=None):
         help="Send a text chunk; repeat for multiple chunks, then exit",
     )
     parser.add_argument(
-        "--complete-text",
-        action="store_true",
-        help="Send one --text value in start.text to compare full-text synthesis",
-    )
-    parser.add_argument(
         "--lookahead-tokens",
         type=int,
         default=0,
@@ -319,12 +306,8 @@ def arguments(argv=None):
         parser.error("--chunk-delay must be non-negative")
     if result.text and not any(text.strip() for text in result.text):
         parser.error("--text must include non-whitespace text")
-    if result.complete_text and (not result.text or len(result.text) != 1):
-        parser.error("--complete-text requires exactly one --text value")
     if result.lookahead_tokens < 0:
         parser.error("--lookahead-tokens must be non-negative")
-    if result.complete_text and result.lookahead_tokens:
-        parser.error("--lookahead-tokens only applies to streaming input")
     return result
 
 

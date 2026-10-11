@@ -38,7 +38,6 @@ class AudioStream:
         timeout,
         timestamps=False,
         custom_lexicon=(),
-        complete_text=False,
     ):
         if key is not _CONSTRUCTION_KEY:
             raise TypeError(
@@ -49,7 +48,6 @@ class AudioStream:
         self._voice = voice
         self._language = language
         self._custom_lexicon = custom_lexicon
-        self._complete_text = complete_text
         self._format = profile
         self._timeout = timeout
         self._timestamps_requested = timestamps
@@ -213,20 +211,17 @@ class AudioStream:
         tasks = []
         try:
             channel, metadata = await self._client._prepare()
-            self._call = _transport.SynthesisCall(channel, metadata, self._complete_text)
+            self._call = _transport.SynthesisCall(channel, metadata)
             await self._call.start(
                 self._voice,
                 self._language,
                 self._timestamps_requested,
                 self._custom_lexicon,
-                self._source if self._complete_text else None,
             )
-            if self._complete_text:
-                self._input_done = self._submitted = True
-                self._progress_at = time.monotonic()
-            else:
-                tasks.append(asyncio.create_task(self._produce(), name="rime:input"))
-            tasks.append(asyncio.create_task(self._read(), name="rime:audio"))
+            tasks = [
+                asyncio.create_task(self._produce(), name="rime:input"),
+                asyncio.create_task(self._read(), name="rime:audio"),
+            ]
             # The worker owns child cancellation. Unlike gather(), wait() does
             # not cancel children when the worker is cancelled.
             # FIRST_EXCEPTION does not wake for a cancelled child task.

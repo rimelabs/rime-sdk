@@ -1,6 +1,6 @@
 # Rime SDK for Go
 
-Use `client.TTS.Synthesize` for complete text and `client.TTS.Stream` for an
+Use `client.TTS.Synthesize` for a string and `client.TTS.Stream` for an
 incremental text source. Both return streaming Coda and Mist v3 audio.
 The SDK handles authentication, sentence detection, gRPC, audio conversion,
 deadlines, and cancellation. It also streams speech recognition from raw PCM audio
@@ -400,21 +400,3 @@ CI and review are required before the SDK is released.
 
 The embedded BlingFire binary includes its source
 details and licenses in `internal/`.
-
-## Complete text input
-
-`CompleteText: true` selects the `Synthesize` RPC, which sends the full input in one request
-and streams audio back. The default still uses `SynthesizeStreaming` with
-incremental sentence input, including when given a string. Full-text mode accepts
-only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
-application first (Go: use `Synthesize`, not `Stream`). Server-side text splitting
-applies. Lexicon overrides, error details and request IDs, cancellation, audio
-profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
-
-```go
-audio, err := client.TTS.Synthesize(ctx, "Please read this.", rime.SynthesisOptions{
-    CompleteText: true,
-    CustomLexicon: []rime.PronunciationEntry{{Spelling: "read", Pronunciation: `" r\ E d`}},
-})
-// Handle err, defer audio.Close(), then receive PCM chunks until io.EOF.
-```

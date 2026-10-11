@@ -20,7 +20,6 @@ class FakeService:
         self.headers_sent = asyncio.Event()
         self.cancelled = asyncio.Event()
         self.calls = []
-        self.complete_calls = []
         self.metadata = []
         self.active = 0
         self.release = asyncio.Event()
@@ -94,16 +93,6 @@ class FakeService:
         finally:
             self.active -= 1
 
-    async def synthesize(self, message, context):
-        self.complete_calls.append(message)
-
-        async def requests():
-            yield proto.StreamingSynthesisRequest(header=message)
-            yield proto.StreamingSynthesisRequest(text_chunk=message.text)
-
-        async for response in self.streaming(requests(), context):
-            yield response
-
     async def languages(self, message, context):
         self.discovery_calls += 1
         if self.mode == "discovery_timeout":
@@ -141,7 +130,6 @@ class FakeService:
         methods = proto.DESCRIPTOR.services_by_name["TextToSpeech"].methods_by_name
         for name, implementation in {
             "SynthesizeStreaming": self.streaming,
-            "Synthesize": self.synthesize,
             "GetSupportedLanguages": self.languages,
             "GetSupportedSpeakers": self.voices,
         }.items():
@@ -149,11 +137,7 @@ class FakeService:
             factory = (
                 grpc.stream_stream_rpc_method_handler
                 if descriptor.client_streaming
-                else (
-                    grpc.unary_stream_rpc_method_handler
-                    if descriptor.server_streaming
-                    else grpc.unary_unary_rpc_method_handler
-                )
+                else grpc.unary_unary_rpc_method_handler
             )
             handlers[name] = factory(
                 implementation,

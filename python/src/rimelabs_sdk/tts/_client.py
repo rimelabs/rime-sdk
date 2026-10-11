@@ -49,7 +49,6 @@ class _TTS:
         audio_format: AudioFormat | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
-        complete_text: bool = False,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Synthesize complete text and return an audio stream. Do not await this call."""
@@ -62,14 +61,13 @@ class _TTS:
         async def source():
             yield text
 
-        return self._stream(
-            text if complete_text else source(),
+        return self.stream(
+            source(),
             voice=voice,
             language=language,
             audio_format=audio_format,
             timestamps=timestamps,
             custom_lexicon=custom_lexicon,
-            complete_text=complete_text,
             timeout=timeout,
         )
 
@@ -82,7 +80,6 @@ class _TTS:
         audio_format: AudioFormat | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
-        complete_text: bool = False,
         timeout: float | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Stream text chunks into synthesis and return an audio stream. Do not await this call."""
@@ -91,41 +88,7 @@ class _TTS:
             raise RimeInputError(
                 "text must be an async iterable of strings; use synthesize() for a string"
             )
-        return self._stream(
-            text,
-            voice=voice,
-            language=language,
-            audio_format=audio_format,
-            timestamps=timestamps,
-            custom_lexicon=custom_lexicon,
-            complete_text=complete_text,
-            timeout=timeout,
-        )
-
-    def _stream(
-        self,
-        text: str | AsyncIterable[str],
-        *,
-        voice: str | None,
-        language: str,
-        audio_format: AudioFormat | None,
-        timestamps: bool,
-        custom_lexicon: Sequence[PronunciationEntry],
-        complete_text: bool,
-        timeout: float | None | object,
-    ) -> AudioStream:
         lexicon = snapshot(custom_lexicon)
-        if not isinstance(complete_text, bool):
-            raise RimeInputError("complete_text must be a boolean")
-        if complete_text:
-            if not isinstance(text, str):
-                raise RimeInputError("complete_text=True requires synthesize() with a string")
-            try:
-                text_bytes = len(text.encode("utf-8"))
-            except UnicodeEncodeError:
-                raise RimeInputError("Complete text must be valid UTF-8") from None
-            if text_bytes > self._policy.sentence_bytes:
-                raise RimeInputError("Complete text must be at most 65536 UTF-8 bytes")
         if not isinstance(timestamps, bool):
             raise RimeInputError("timestamps must be a boolean")
         if timestamps and self._model != "mistv3":
@@ -145,7 +108,6 @@ class _TTS:
             _policy.timeout(timeout, self._timeout),
             timestamps,
             lexicon,
-            complete_text,
         )
         self._streams.add(stream)
         return stream

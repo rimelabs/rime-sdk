@@ -28,13 +28,7 @@ def make_channel(policy):
 
 def bind(channel, name):
     descriptor = proto.DESCRIPTOR.services_by_name["TextToSpeech"].methods_by_name[name]
-    factory = (
-        channel.stream_stream
-        if descriptor.client_streaming
-        else channel.unary_stream
-        if descriptor.server_streaming
-        else channel.unary_unary
-    )
+    factory = channel.stream_stream if descriptor.client_streaming else channel.unary_unary
     return factory(
         "/rime.TextToSpeech/" + name,
         request_serializer=GetMessageClass(descriptor.input_type).SerializeToString,
@@ -81,22 +75,17 @@ async def discover(channel, metadata, kind, language, timeout):
 class SynthesisCall:
     """One TTS RPC. Audio exhaustion means successful wire completion only."""
 
-    def __init__(self, channel, metadata, complete_text=False):
-        self._channel, self._metadata = channel, metadata
-        self._complete_text = complete_text
-        self._call = (
-            None if complete_text else bind(channel, "SynthesizeStreaming")(metadata=metadata)
-        )
+    def __init__(self, channel, metadata):
+        self._call = bind(channel, "SynthesizeStreaming")(metadata=metadata)
         self.request_id = None
         self._timestamps_requested = False
         self._timestamps = TimestampTrailer()
 
     def done(self):
-        return self._call is not None and self._call.done()
+        return self._call.done()
 
     def cancel(self):
-        if self._call is not None:
-            self._call.cancel()
+        self._call.cancel()
 
     def _error(self, error):
         self.request_id = _request_id(
@@ -105,7 +94,6 @@ class SynthesisCall:
         return rpc_error(error.code(), self.request_id, error.details())
 
     async def _check_status(self):
-        assert self._call is not None
         code = await self._call.code()
         self.request_id = _request_id(
             await self._call.initial_metadata(),
@@ -116,7 +104,6 @@ class SynthesisCall:
             raise rpc_error(code, self.request_id, await self._call.details())
 
     async def _write(self, message):
-        assert self._call is not None
         # grpc.aio can report an oversized streaming write as INTERNAL instead
         # of RESOURCE_EXHAUSTED. Keep the same limit and classify it locally.
         if message.ByteSize() > _MAX_SEND_BYTES:
@@ -137,15 +124,10 @@ class SynthesisCall:
                 "The service completed before input finished", request_id=self.request_id
             ) from None
 
-    async def start(self, voice, language, timestamps=False, custom_lexicon=(), text=None):
+    async def start(self, voice, language, timestamps=False, custom_lexicon=()):
         # Do not wait for response metadata before allowing text writes.
         self._timestamps_requested = timestamps
-        message = header(voice, language, timestamps, custom_lexicon)
-        if self._complete_text:
-            message.header.text = text
-            self._call = bind(self._channel, "Synthesize")(message.header, metadata=self._metadata)
-        else:
-            await self._write(message)
+        await self._write(header(voice, language, timestamps, custom_lexicon))
 
     def timestamp_result(self):
         return self._timestamps.result(self.request_id)
@@ -154,14 +136,12 @@ class SynthesisCall:
         await self._write(proto.StreamingSynthesisRequest(text_chunk=sentence))
 
     async def finish_input(self):
-        assert self._call is not None
         try:
             await self._call.done_writing()
         except grpc.aio.AioRpcError as error:
             raise self._error(error) from None
 
     async def audio(self):
-        assert self._call is not None
         try:
             metadata = dict(await self._call.initial_metadata())
             self.request_id = _request_id(metadata) or self.request_id

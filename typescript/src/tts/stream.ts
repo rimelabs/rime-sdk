@@ -48,14 +48,13 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   constructor(
     key: symbol,
     private owner: StreamOwner,
-    private source: string | TextSource | null,
+    private source: TextSource | null,
     private voice: string,
     private language: string,
     private formatValue: AudioFormat,
     private timeout: number | null,
     private timestampsRequested = false,
     private customLexicon: readonly PronunciationEntry[] = [],
-    private completeText = false,
   ) {
     if (key !== constructionKey)
       throw new TypeError(
@@ -138,7 +137,7 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     this.call?.cancel();
   }
   private async produce() {
-    const source = this.source as TextSource;
+    const source = this.source!;
     let iterator: AsyncIterator<string> | undefined;
     const buffer = new SentenceBuffer(policy.sentenceBytes);
     let meaningful = false;
@@ -235,25 +234,16 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   private async run() {
     let tasks: Promise<void>[] = [];
     try {
-      if (!this.completeText) await abortable(ready, this.controller.signal);
+      await abortable(ready, this.controller.signal);
       const prepared = await this.owner.prepare(this.controller.signal);
-      this.call = new SynthesisCall(
-        prepared,
-        this.controller.signal,
-        this.completeText,
-      );
+      this.call = new SynthesisCall(prepared, this.controller.signal);
       await this.call.start(
         this.voice,
         this.language,
         this.timestampsRequested,
         this.customLexicon,
-        this.completeText ? (this.source as string) : undefined,
       );
-      if (this.completeText) {
-        this.inputDone = this.submitted = true;
-        this.progressAt = performance.now();
-      } else tasks.push(this.produce());
-      tasks.push(this.read());
+      tasks = [this.produce(), this.read()];
       await Promise.all(tasks);
       this.queue.finish();
     } catch (error) {

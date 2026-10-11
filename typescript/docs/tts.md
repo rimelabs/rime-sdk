@@ -4,7 +4,7 @@ You supply text; the SDK handles sentence boundaries and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
-## Complete text
+## String input
 
 Use `client.tts.synthesize(text)` for one nonblank string. It returns an audio
 stream; it does not wait for all audio to be generated. Do not await this call.
@@ -235,24 +235,3 @@ For manual reads, call `await audio.cancel()` in `finally`. `await client.close(
 stops all client work. Both calls are safe to repeat; both objects support
 `Symbol.asyncDispose`. Cancellation stops the RPC and limits cleanup time, but
 cannot force your text source to finish an unrelated promise.
-
-## Complete text input
-
-`completeText: true` on `tts.synthesize()` selects the `Synthesize` RPC, which
-sends the full input in one request and streams audio back. The default still
-uses `SynthesizeStreaming` with incremental sentence input, including when given
-a string. Full-text mode accepts
-only a string of at most 65,536 UTF-8 bytes; collect an incremental source in the
-application first. Server-side text splitting
-applies. Lexicon overrides, error details and request IDs, cancellation, audio
-profiles, and Mist v3 timestamps use the same SDK behavior in both modes.
-
-```ts
-const audio = client.tts.synthesize("Please read this.", {
-  completeText: true,
-  customLexicon: [{ spelling: "read", pronunciation: '" r\\ E d' }],
-});
-for await (const chunk of audio) {
-  // Play or save each PCM chunk.
-}
-```
