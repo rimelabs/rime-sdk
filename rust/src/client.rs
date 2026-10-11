@@ -1,4 +1,4 @@
-use crate::{AudioFormat, AudioStream, Error, ErrorKind};
+use crate::{stream::Input, AudioFormat, AudioStream, Error, ErrorKind, PronunciationEntry};
 use futures_core::Stream;
 use rimelabs_api::{
     speech_to_text_client::SpeechToTextClient, text_to_speech_client::TextToSpeechClient,
@@ -51,9 +51,32 @@ pub struct SynthesisOptions {
     pub(crate) language: Option<String>,
     pub(crate) format: AudioFormat,
     pub(crate) timeout: Option<Option<Duration>>,
+    pub(crate) timestamps: bool,
+    pub(crate) custom_lexicon: Vec<PronunciationEntry>,
+    pub(crate) complete_text: bool,
 }
 
 impl SynthesisOptions {
+    /// Request Mist v3 word timings, available after successful audio consumption.
+    /// Disabled by default. Coda requests with this enabled fail locally.
+    pub fn timestamps(mut self, enabled: bool) -> Self {
+        self.timestamps = enabled;
+        self
+    }
+    /// Own request-wide pronunciation overrides. Empty means default pronunciation.
+    /// The service validates entries and model/language support. Subsequent requests
+    /// have their own options; cloned options own independent copies of the entries.
+    pub fn custom_lexicon(mut self, entries: Vec<PronunciationEntry>) -> Self {
+        self.custom_lexicon = entries;
+        self
+    }
+    /// Use the full-text Synthesize RPC, with streaming audio output.
+    /// Only accepted by [`Tts::synthesize`], with at most 65,536 UTF-8 bytes.
+    /// The default uses SynthesizeStreaming and local sentence detection.
+    pub fn complete_text(mut self, enabled: bool) -> Self {
+        self.complete_text = enabled;
+        self
+    }
     /// Select a voice. Empty or whitespace-only values fail validation.
     pub fn voice(mut self, voice: impl Into<String>) -> Self {
         self.voice = Some(voice.into());
@@ -367,11 +390,23 @@ impl Tts<'_> {
         text: impl Into<String>,
         options: SynthesisOptions,
     ) -> Result<AudioStream, Error> {
+        self.client.ensure_open()?;
         let text = text.into();
         if text.trim().is_empty() {
             return Err(Error::new(ErrorKind::Input, "text must not be blank"));
         }
-        self.stream(futures_util::stream::once(async { Ok(text) }), options)
+        if options.complete_text {
+            if text.len() > 65_536 {
+                return Err(Error::new(
+                    ErrorKind::Input,
+                    "complete text must be at most 65536 UTF-8 bytes",
+                ));
+            }
+            require_runtime()?;
+            crate::stream::start(self.client.inner.clone(), Input::Complete(text), options)
+        } else {
+            self.stream(futures_util::stream::once(async { Ok(text) }), options)
+        }
     }
 
     /// Start synthesis from incremental text. The source must yield without blocking Tokio.
@@ -384,8 +419,18 @@ impl Tts<'_> {
         S: Stream<Item = Result<String, Error>> + Send + 'static,
     {
         self.client.ensure_open()?;
+        if options.complete_text {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "complete_text requires synthesize() with a string",
+            ));
+        }
         require_runtime()?;
-        crate::stream::start(self.client.inner.clone(), source, options)
+        crate::stream::start(
+            self.client.inner.clone(),
+            Input::Streaming(Box::pin(source)),
+            options,
+        )
     }
 }
 
@@ -514,8 +559,12 @@ mod tests {
             let _guard = guard;
             std::future::pending::<Result<String, Error>>().await
         });
-        let error = crate::stream::start(client.inner.clone(), source, SynthesisOptions::default())
-            .unwrap_err();
+        let error = crate::stream::start(
+            client.inner.clone(),
+            Input::Streaming(Box::pin(source)),
+            SynthesisOptions::default(),
+        )
+        .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Cancelled);
         assert!(client.inner.tasks.is_empty());
         assert!(
