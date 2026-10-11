@@ -132,8 +132,10 @@ async def test_native_playback_failure_is_reported(voice, devices, setup, native
 async def test_rejected_tts_never_starts_playback(voice, devices, setup, native_playback):
     synthesis, client = setup
     synthesis.mode = "error_before_audio"
-    with pytest.raises(RimeUnavailableError):
+    with pytest.raises(RimeUnavailableError) as caught:
         await voice.speak(client, "Hello.", "en", None)
+    assert str(caught.value) == "test admission failure"
+    assert caught.value.request_id == "rejected-request"
     assert not devices.playback_started.is_set()
     assert not Path(devices.commands[0][-1]).parent.exists()
 

@@ -9,27 +9,27 @@
   },
   {
     "id": "right_to_left_mark",
-    "text": "‏مرحبا بالعالم."
+    "text": "\u200fمرحبا بالعالم."
   },
   {
     "id": "left_to_right_mark",
-    "text": "‎Hello world."
+    "text": "\u200eHello world."
   },
   {
     "id": "direction_marks_at_boundaries",
-    "text": "First. ‏مرحبا بالعالم. ‎The final sentence has enough context.‏"
+    "text": "First. \u200fمرحبا بالعالم. \u200eThe final sentence has enough context.\u200f"
   },
   {
     "id": "zero_width_space",
-    "text": "First. ​A second sentence is long enough."
+    "text": "First. \u200bA second sentence is long enough."
   },
   {
     "id": "byte_order_mark",
-    "text": "﻿Hello world. Next sentence is long enough."
+    "text": "\ufeffHello world. Next sentence is long enough."
   },
   {
     "id": "unicode_separators",
-    "text": "​Hello 🚀 world. ﻿The next sentence has an internal​separator. Final phrase​"
+    "text": "\u200bHello 🚀 world. \ufeffThe next sentence has an internal\u200bseparator. Final phrase\u200b"
   },
   {
     "id": "basic",
