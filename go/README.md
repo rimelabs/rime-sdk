@@ -227,9 +227,12 @@ func(ctx context.Context) (string, error)
 ```
 
 Send text as it becomes available; Rime automatically combines fragments into
-sentences for speech. Ending the text stream flushes any remaining text, even
-without final punctuation. Pausing the stream may delay speech for an unfinished
-sentence.
+sentences for speech. For nonblank input, ending the text stream flushes any
+remaining text, even without final punctuation. Pausing the stream may delay
+speech for an unfinished sentence.
+
+If the source ends without any non-whitespace text, `Recv` returns an error
+matching `ErrInput`.
 
 Return each text fragment as valid UTF-8. The SDK calls the source serially and
 forwards text in order, preserving whitespace. Return `io.EOF` when input ends.

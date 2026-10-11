@@ -58,9 +58,12 @@ let mut audio = client.tts().stream(text, SynthesisOptions::default())?;
 ```
 
 Send text as it becomes available; Rime automatically combines fragments into
-sentences for speech. Ending the text stream flushes any remaining text, even
-without final punctuation. Pausing the stream may delay speech for an unfinished
-sentence.
+sentences for speech. For nonblank input, ending the text stream flushes any
+remaining text, even without final punctuation. Pausing the stream may delay
+speech for an unfinished sentence.
+
+If the source ends without any non-whitespace text, the audio stream yields an
+error with `ErrorKind::Input`.
 
 `client.tts().stream` accepts a `Send + 'static` stream of `Result<String, Error>`.
 It forwards source text in order, preserving whitespace. Messages are at most

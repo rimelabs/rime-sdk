@@ -1,9 +1,12 @@
 # TTS for Python
 
 Send text as it becomes available; Rime automatically combines fragments into
-sentences for speech. Ending the text stream flushes any remaining text, even
-without final punctuation. Pausing the stream may delay speech for an unfinished
-sentence.
+sentences for speech. For nonblank input, ending the text stream flushes any
+remaining text, even without final punctuation. Pausing the stream may delay
+speech for an unfinished sentence.
+
+If the source ends without any non-whitespace text, audio iteration raises
+`RimeInputError`.
 
 The SDK sends text in order with its whitespace preserved and streams audio back.
 Your application owns playback. Start with the complete WAV example in the
