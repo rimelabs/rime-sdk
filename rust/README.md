@@ -89,7 +89,7 @@ Both TTS methods accept `SynthesisOptions::default()` with optional builders:
 | `.voice("name")` | The model's default voice: `clementine` for Coda, `astra` for Mist v3. |
 | `.language("en")` | `en`; passed to the service. Blank values fail locally. |
 | `.audio_format(AudioFormat::Mulaw8000)` | `AudioFormat::Pcm24000`; both profiles stream raw mono audio. |
-| `.timeout(Some(Duration::from_secs(60)))` | Inherits the client timeout. `None` disables it; zero is invalid. Applies until audio is fully consumed, including consumer pauses. |
+| `.timeout(Some(Duration::from_secs(60)))` | `Some(duration)` overrides the client timeout; this example sets it to 60 seconds. Default options inherit the client timeout. `None` disables it; zero is invalid. Applies until audio is fully consumed, including consumer pauses. |
 | `.custom_lexicon(entries)` | Empty vector; request-wide pronunciation overrides for Coda. |
 | `.timestamps(true)` | `false`; Mist v3 word timings after successful audio consumption. |
 | `.complete_text(true)` | `false`; selects the full-text RPC. Requires `synthesize()` and at most 65,536 UTF-8 bytes. |
