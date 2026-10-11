@@ -19,7 +19,6 @@ from .._errors import (
 from . import _transport
 from ._audio import AudioFormat, Converter
 from ._queue import ByteQueue
-from ._sentences import SentenceBuffer
 from ._timestamps import TimestampResult
 
 _LOG = logging.getLogger(__name__)
@@ -142,16 +141,16 @@ class AudioStream:
         except asyncio.CancelledError:
             pass
 
-    async def _write_sentence(self, sentence):
+    async def _write_text(self, text):
         assert self._call is not None
         if not self._submitted:
             self._progress_at = time.monotonic()
         self._submitted = True
-        await self._call.write(sentence)
+        await self._call.write(text)
+        self._progress_at = time.monotonic()
 
     async def _produce(self):
         assert self._call is not None
-        buffer = SentenceBuffer(self._client._policy.sentence_bytes)
         iterator = None
         meaningful = False
         try:
@@ -175,14 +174,17 @@ class AudioStream:
                     meaningful = True
                 step = self._client._policy.source_chars
                 for offset in range(0, len(chunk), step):
-                    for sentence in buffer.feed(chunk[offset : offset + step]):
-                        await self._write_sentence(sentence)
+                    part = chunk[offset : offset + step]
+                    try:
+                        part.encode("utf-8")
+                    except UnicodeEncodeError:
+                        raise RimeInputError("Text must contain valid Unicode") from None
+                    await self._write_text(part)
             if not meaningful:
                 raise RimeInputError("The text source contained no meaningful text")
-            for sentence in buffer.feed("", final=True):
-                await self._write_sentence(sentence)
-            await self._call.finish_input()
+            # Mark completion before half-close can unblock the final response.
             self._input_done = True
+            await self._call.finish_input()
         finally:
             if iterator is not None and hasattr(iterator, "aclose"):
                 try:

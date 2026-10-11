@@ -38,7 +38,6 @@ jobs:
               case "$path" in
                 python/*) python=true ;;
                 typescript/*|package.json|package-lock.json|.npmrc) typescript=true ;;
-                go/internal/sentences/blingfire.wasm) go=true; rust=true ;;
                 go/*) go=true ;;
                 rust/*) rust=true ;;
                 conformance/*|docs/*|.github/*|fixtures/audio/*|README.md|RELEASING.md|release-please-config.json|.release-please-manifest.json) python=true; typescript=true; go=true; rust=true ;;
@@ -128,7 +127,7 @@ jobs:
           cache-dependency-path: go/go.sum
       - name: Check shared fixtures and formatting
         run: |
-          for fixture in sentences contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
           test -z "$(gofmt -l .)"
@@ -154,12 +153,11 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
-      - name: Check shared fixtures and WASM
+      - name: Check shared fixtures
         run: |
-          for fixture in sentences contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
-          cmp ../go/internal/sentences/blingfire.wasm vendor/blingfire.wasm
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked

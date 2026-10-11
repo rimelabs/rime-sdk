@@ -1,6 +1,12 @@
 # TTS for Python
 
-You supply text; the SDK handles sentence boundaries and streams audio back.
+You supply text; the SDK forwards it to the engine and streams audio back.
+The engine accumulates fragments into sentences before normalization and synthesis.
+Both input methods request engine accumulation. Text is sent in order with its
+whitespace preserved, using bounded messages without waiting for punctuation.
+When the source ends, the SDK closes input so the engine can synthesize the final
+text, including a phrase without terminal punctuation. A source pause leaves
+input open; short unfinished text may wait for more input.
 Your application owns playback. Start with the complete WAV example in the
 [package quick start](../README.md#tts-save-speech).
 
@@ -21,7 +27,7 @@ async def text():
     yield "This text arrives in separate chunks."
 ```
 
-Use `client.tts.stream(text())` in the same audio loop. The SDK handles sentence
+Use `client.tts.stream(text())` in the same audio loop. The engine handles sentence
 boundaries. Do not await `tts.stream()`; entering its async context or reading
 the first chunk starts work.
 

@@ -32,6 +32,7 @@ type Responses =
 #[derive(Clone, Copy)]
 enum Mode {
     Echo,
+    Buffered,
     Hold,
     PartialError,
     EarlyEnd,
@@ -111,6 +112,10 @@ impl TextToSpeech for Service {
                     match message.payload {
                         Some(protocol::streaming_synthesis_request::Payload::Header(header)) => {
                             assert_eq!(
+                                header.split_strategy,
+                                Some(protocol::SplitStrategy::AccumulateSentence as i32)
+                            );
+                            assert_eq!(
                                 header
                                     .audio_parameters
                                     .as_ref()
@@ -126,6 +131,9 @@ impl TextToSpeech for Service {
                         }
                         Some(protocol::streaming_synthesis_request::Payload::TextChunk(text)) => {
                             service.texts.lock().unwrap().push(text);
+                            if matches!(service.mode, Mode::Buffered) {
+                                continue;
+                            }
                             let bytes = if matches!(service.mode, Mode::OddFrame) {
                                 vec![1]
                             } else {
@@ -157,6 +165,9 @@ impl TextToSpeech for Service {
                         }
                         None => {}
                     }
+                }
+                if matches!(service.mode, Mode::Buffered) {
+                    let _ = sender.send(audio(vec![1, 0])).await;
                 }
             };
             tokio::select! {
@@ -629,4 +640,83 @@ fn configuration_is_typed_validated_and_credentials_are_redacted() {
         .tts()
         .synthesize("Hello.", SynthesisOptions::default())
         .is_err());
+}
+
+#[tokio::test]
+async fn raw_text_preserved_across_source_boundaries() {
+    let cases: serde_json::Value =
+        serde_json::from_str(include_str!("../testdata/text-input.json")).unwrap();
+    for case in cases.as_array().unwrap() {
+        let text = case["text"].as_str().unwrap();
+        let harness = Harness::new(Mode::Echo).await;
+        let source =
+            tokio_stream::iter(text.chars().map(|c| Ok(c.to_string())).collect::<Vec<_>>());
+        let mut audio = harness
+            .client
+            .tts()
+            .stream(source, SynthesisOptions::default())
+            .unwrap();
+        while let Some(part) = next(&mut audio).await {
+            part.unwrap();
+        }
+        assert_eq!(harness.service.texts.lock().unwrap().concat(), text);
+        harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn large_text_has_only_transport_limits() {
+    for text in [
+        "x".repeat(70000),
+        "🚀".repeat(20000),
+        format!("word {}end", " ".repeat(70000)),
+    ] {
+        let harness = Harness::new(Mode::Echo).await;
+        let mut audio = harness
+            .client
+            .tts()
+            .synthesize(text.clone(), SynthesisOptions::default())
+            .unwrap();
+        while let Some(part) = next(&mut audio).await {
+            part.unwrap();
+        }
+        {
+            let texts = harness.service.texts.lock().unwrap();
+            assert_eq!(texts.concat(), text);
+            assert!(texts.iter().all(|s| !s.is_empty() && s.len() <= 4096));
+        }
+        harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn fragments_are_sent_before_source_finishes_and_final_audio_is_drained() {
+    let harness = Harness::new(Mode::Buffered).await;
+    let (sender, source) = mpsc::channel(1);
+    let mut audio = harness
+        .client
+        .tts()
+        .stream(ReceiverStream::new(source), SynthesisOptions::default())
+        .unwrap();
+    sender.send(Ok("The value is 1.".into())).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while harness.service.texts.lock().unwrap().is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("SDK held a fragment waiting for a sentence");
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    sender
+        .send(Ok("7 percent without final punctuation".into()))
+        .await
+        .unwrap();
+    drop(sender);
+    assert_eq!(next(&mut audio).await.unwrap().unwrap().as_ref(), &[1, 0]);
+    assert!(next(&mut audio).await.is_none());
+    assert_eq!(
+        harness.service.texts.lock().unwrap().concat(),
+        "The value is 1.7 percent without final punctuation"
+    );
+    harness.client.close().await;
 }

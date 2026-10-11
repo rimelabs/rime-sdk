@@ -1,5 +1,15 @@
 import * as grpc from "@grpc/grpc-js";
 import { create, fromBinary, toBinary } from "@bufbuild/protobuf";
+import {
+  configureTextEncoding,
+  getTextEncoding,
+} from "@bufbuild/protobuf/wire";
+// Match the engine's UTF-8 decoding: a BOM in a text field is source text.
+configureTextEncoding({
+  ...getTextEncoding(),
+  decodeUtf8: (bytes, strict) =>
+    new TextDecoder("utf-8", { fatal: strict, ignoreBOM: true }).decode(bytes),
+});
 import * as schema from "@rimelabs/api";
 export class FakeService {
   mode = "normal";
@@ -23,6 +33,9 @@ export class FakeService {
     this.server = new grpc.Server();
     this.cancelled = new Promise((resolve) => {
       this.markCancelled = resolve;
+    });
+    this.textReceived = new Promise((resolve) => {
+      this.markTextReceived = resolve;
     });
     this.headersSent = new Promise((resolve) => {
       this.markHeadersSent = resolve;
@@ -82,6 +95,7 @@ export class FakeService {
           call.sendMetadata(this.makeMetadata(this.responseMetadata));
           this.markHeadersSent();
         }
+        this.markTextReceived();
         if (["no_audio_error", "empty_audio"].includes(this.mode)) return;
         const send = () => this.sendAudio(call);
         if (this.mode === "silence") {

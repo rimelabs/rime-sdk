@@ -16,7 +16,6 @@ class Policy:
     audience: str = _CODA_HOSTNAME
     default_voice: str = "clementine"
     exchange_url: str = "https://themis.api.rime.ai/v1/token"
-    sentence_bytes: int = 65536
     source_chars: int = 1024
     output_bytes: int = 96000
     output_chunk_bytes: int = 9600

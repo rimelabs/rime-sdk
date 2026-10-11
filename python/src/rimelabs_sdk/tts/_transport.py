@@ -37,7 +37,9 @@ def bind(channel, name):
 
 
 def header(voice, language, timestamps=False, custom_lexicon=()):
-    request = proto.SynthesisRequest(speaker=voice, language=language)
+    request = proto.SynthesisRequest(
+        speaker=voice, language=language, split_strategy=proto.SPLIT_STRATEGY_ACCUMULATE_SENTENCE
+    )
     request.audio_parameters.audio_format = "audio/pcm"
     request.audio_parameters.sampling_rate = 24000
     if timestamps:
@@ -132,8 +134,8 @@ class SynthesisCall:
     def timestamp_result(self):
         return self._timestamps.result(self.request_id)
 
-    async def write(self, sentence):
-        await self._write(proto.StreamingSynthesisRequest(text_chunk=sentence))
+    async def write(self, text):
+        await self._write(proto.StreamingSynthesisRequest(text_chunk=text))
 
     async def finish_input(self):
         try:

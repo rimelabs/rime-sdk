@@ -2,7 +2,6 @@ use crate::{
     audio::Converter,
     client::{validate_timeout, Inner},
     error::request_id,
-    sentences::Buffer,
     timestamps::TimestampTrailer,
     AudioFormat, Error, ErrorKind, Model, SynthesisOptions, TimestampResult,
 };
@@ -26,7 +25,7 @@ use tokio::{
     time::Instant,
 };
 use tokio_stream::wrappers::{ReceiverStream, WatchStream};
-use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tokio_util::sync::CancellationToken;
 
 const QUEUE_CHUNKS: usize = 10;
 const CHUNK_BYTES: usize = 9_600;
@@ -243,6 +242,7 @@ where
         ));
     }
     let request = SynthesisRequest {
+        split_strategy: Some(rimelabs_api::SplitStrategy::AccumulateSentence as i32),
         speaker: Some(voice),
         language: Some(language),
         audio_parameters: Some(AudioParameters {
@@ -281,8 +281,7 @@ where
     let tracker = client.clone();
     let deadline = timeout.map(|timeout| Instant::now() + timeout);
     let worker = tracker.spawn(async move {
-        let blocking_tasks = TaskTracker::new();
-        let run = std::panic::AssertUnwindSafe(run(client.clone(), source, request, sender.clone(), progress.clone(), operation_id.clone(), format, operation_timestamps, blocking_tasks.clone())).catch_unwind();
+        let run = std::panic::AssertUnwindSafe(run(client.clone(), source, request, sender.clone(), progress.clone(), operation_id.clone(), format, operation_timestamps)).catch_unwind();
         let monitor = monitor(client, progress, sender, interval);
         let timeout = async {
             match deadline { Some(deadline) => tokio::time::sleep_until(deadline).await, None => std::future::pending().await }
@@ -299,8 +298,6 @@ where
             error.with_request_id(operation_id.get().map(String::as_str))
         });
         status_sender.send_replace(Some(result));
-        blocking_tasks.close();
-        blocking_tasks.wait().await;
     })?;
     Ok(AudioStream {
         receiver,
@@ -361,14 +358,13 @@ async fn run<S>(
     id: Arc<OnceLock<String>>,
     format: AudioFormat,
     timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
-    blocking_tasks: TaskTracker,
 ) -> Result<(), Error>
 where
     S: Stream<Item = Result<String, Error>> + Send + 'static,
 {
     let mut stub = client.stub().await?;
     let (requests, incoming) = mpsc::channel(2);
-    let producer = produce(source, requests, progress.clone(), request, blocking_tasks);
+    let producer = produce(source, requests, progress.clone(), request);
     let receiver = async {
         let response = stub
             .synthesize_streaming(client.request(ReceiverStream::new(incoming)))
@@ -486,7 +482,6 @@ async fn produce<S>(
     sender: mpsc::Sender<StreamingSynthesisRequest>,
     progress: Arc<Mutex<Progress>>,
     header: SynthesisRequest,
-    blocking_tasks: TaskTracker,
 ) -> Result<(), Error>
 where
     S: Stream<Item = Result<String, Error>> + Send + 'static,
@@ -500,78 +495,56 @@ where
     {
         return Ok(());
     }
-    let mut buffer = blocking_tasks
-        .spawn_blocking(Buffer::new)
-        .await
-        .map_err(worker_error)??;
     let mut source = Box::pin(source);
     let mut meaningful = false;
     loop {
         progress.lock().expect("progress mutex poisoned").input = InputState::Waiting;
         let next = source.next().await;
         progress.lock().expect("progress mutex poisoned").input = InputState::Processing;
-        let final_chunk = next.is_none();
-        let fragment = next.transpose()?.unwrap_or_default();
+        let Some(fragment) = next else { break };
+        let fragment = fragment?;
         meaningful |= !fragment.trim().is_empty();
-        if final_chunk && !meaningful {
-            return Err(Error::new(
-                ErrorKind::Input,
-                "text source contained no meaningful text",
-            ));
-        }
-        // Bound blocking work and emitted text even if a source yields a huge fragment.
+        // Only transport-size boundaries are local; the engine accumulates sentences.
         let mut remaining = fragment.as_str();
-        loop {
-            let end = remaining
-                .char_indices()
-                .nth(1024)
-                .map_or(remaining.len(), |(index, _)| index);
+        while !remaining.is_empty() {
+            let mut end = remaining.len().min(4096);
+            while !remaining.is_char_boundary(end) {
+                end -= 1;
+            }
             let part = remaining[..end].to_owned();
             remaining = &remaining[end..];
-            let final_part = final_chunk && remaining.is_empty();
-            let (returned, sentences) = blocking_tasks
-                .spawn_blocking(move || {
-                    let sentences = buffer.feed(&part, final_part);
-                    (buffer, sentences)
+            {
+                let mut state = progress.lock().expect("progress mutex poisoned");
+                if !state.sent_text {
+                    state.sent_text = true;
+                    state.last_progress = Instant::now();
+                }
+            }
+            // The receiver preserves the server status when the request pipe closes.
+            if sender
+                .send(StreamingSynthesisRequest {
+                    payload: Some(Payload::TextChunk(part)),
                 })
                 .await
-                .map_err(worker_error)?;
-            buffer = returned;
-            for sentence in sentences? {
-                {
-                    let mut state = progress.lock().expect("progress mutex poisoned");
-                    if !state.sent_text {
-                        state.sent_text = true;
-                        state.last_progress = Instant::now();
-                    }
-                }
-                // A closed request pipe can precede the server status. Let the
-                // receiver report that status instead of hiding it with a send error.
-                if sender
-                    .send(StreamingSynthesisRequest {
-                        payload: Some(Payload::TextChunk(sentence)),
-                    })
-                    .await
-                    .is_err()
-                {
-                    return Ok(());
-                }
+                .is_err()
+            {
+                return Ok(());
             }
-            if remaining.is_empty() {
-                break;
-            }
+            progress
+                .lock()
+                .expect("progress mutex poisoned")
+                .last_progress = Instant::now();
         }
-        if final_chunk {
-            break;
-        }
+    }
+    if !meaningful {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "text source contained no meaningful text",
+        ));
     }
     progress.lock().expect("progress mutex poisoned").input = InputState::Finished;
     // Dropping the sender half-closes the request stream.
     Ok(())
-}
-
-fn worker_error(error: tokio::task::JoinError) -> Error {
-    Error::new(ErrorKind::Stream, "sentence worker failed").caused_by(error)
 }
 
 #[cfg(test)]

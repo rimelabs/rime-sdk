@@ -3,7 +3,8 @@
 First-party Python, Node.js, Go, and Rust SDKs for Coda and Mist v3 streaming speech.
 All four use `synthesize` for a string and `stream` for incremental text input.
 Both methods return streaming audio. Go uses `Synthesize` and `Stream`.
-The SDK handles sentence detection, API-key authentication, gRPC, conversion, and cancellation.
+The SDK handles API-key authentication, gRPC, conversion, and cancellation.
+The engine accumulates streamed text into sentences before normalization and synthesis.
 
 All four SDKs support streaming speech recognition: `client.stt.stream` in
 Python/Node.js, `client.STT.Stream` in Go, and `client.stt().stream` in Rust. Supply a spoken language and a
@@ -88,12 +89,12 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package checks and build com
 ## Repository boundaries
 
 - Each language owns its dependencies, tests, version, changelog, and release job.
-- [Shared cases](conformance/) keep sentence, audio, and error behavior consistent.
+- [Shared cases](conformance/) keep text transport, audio, and error behavior consistent.
 - Canonical schemas remain in `rimelabs/rime`. The public `rime-api` repository
   generates and releases the Python, TypeScript, Go, and Rust protocol packages.
 - Each SDK consumes a versioned API package. Dependabot checks for API releases
   daily and opens dependency PRs. CI and review precede each SDK release.
-- Go includes BlingFire WASM and requires no C toolchain. See [Go setup](go/README.md).
+- Go requires no C toolchain. See [Go setup](go/README.md).
 
 ## Releases
 

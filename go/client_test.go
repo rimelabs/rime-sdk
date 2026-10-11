@@ -47,7 +47,7 @@ func (s *testService) SynthesizeStreaming(stream grpc.BidiStreamingServer[pb.Str
 	if err != nil {
 		return err
 	}
-	if first.GetHeader() == nil || first.GetHeader().GetAudioParameters().GetSamplingRate() != 24000 {
+	if first.GetHeader() == nil || first.GetHeader().GetSplitStrategy() != pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE || first.GetHeader().GetAudioParameters().GetSamplingRate() != 24000 {
 		return status.Error(codes.InvalidArgument, "bad header")
 	}
 	if s.header != nil {
@@ -193,7 +193,7 @@ func TestSynthesisAndDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(audio) != 9600 || s.RequestID() != "test-request" {
+	if len(audio) != 4800 || s.RequestID() != "test-request" {
 		t.Fatalf("bytes=%d id=%s", len(audio), s.RequestID())
 	}
 	if _, err := s.Recv(); err != io.EOF {
@@ -464,16 +464,14 @@ func TestInvalidConfigurationAndInput(t *testing.T) {
 	}
 }
 
-func TestSourceFailuresAndSentenceLimit(t *testing.T) {
-	for _, mode := range []string{"error", "blank", "limit"} {
+func TestSourceFailures(t *testing.T) {
+	for _, mode := range []string{"error", "blank"} {
 		t.Run(mode, func(t *testing.T) {
 			c := setupClient(t, &testService{})
 			source := func(context.Context) (string, error) {
 				switch mode {
 				case "error":
 					return "", errors.New("source failed")
-				case "limit":
-					return strings.Repeat("x", 65537), io.EOF
 				default:
 					return " ", io.EOF
 				}
@@ -485,9 +483,6 @@ func TestSourceFailuresAndSentenceLimit(t *testing.T) {
 			defer s.Close()
 			_, err = drain(s)
 			kind := ErrInput
-			if mode == "limit" {
-				kind = ErrResourceLimit
-			}
 			if !errors.Is(err, kind) {
 				t.Fatal(err)
 			}

@@ -8,7 +8,6 @@ export const policy = {
   audience: codaHostname,
   defaultVoice: "clementine",
   exchangeUrl: "https://themis.api.rime.ai/v1/token",
-  sentenceBytes: 65536,
   sourceChars: 1024,
   outputBytes: 96000,
   outputChunkBytes: 9600,

@@ -1,0 +1,54 @@
+[
+  {
+    "id": "title_after_exclamation",
+    "text": "Hi! Dr. Smith agrees. Hello."
+  },
+  {
+    "id": "title_after_sentence",
+    "text": "Hello. Dr. Smith paid 3.14 dollars. This last sentence has enough trailing context."
+  },
+  {
+    "id": "right_to_left_mark",
+    "text": "‏مرحبا بالعالم."
+  },
+  {
+    "id": "left_to_right_mark",
+    "text": "‎Hello world."
+  },
+  {
+    "id": "direction_marks_at_boundaries",
+    "text": "First. ‏مرحبا بالعالم. ‎The final sentence has enough context.‏"
+  },
+  {
+    "id": "zero_width_space",
+    "text": "First. ​A second sentence is long enough."
+  },
+  {
+    "id": "byte_order_mark",
+    "text": "﻿Hello world. Next sentence is long enough."
+  },
+  {
+    "id": "unicode_separators",
+    "text": "​Hello 🚀 world. ﻿The next sentence has an internal​separator. Final phrase​"
+  },
+  {
+    "id": "basic",
+    "text": "Hello world. This is a long second sentence. Final phrase"
+  },
+  {
+    "id": "abbreviations",
+    "text": "Dr. Smith paid 3.14 dollars. Visit https://rime.ai/docs today. Done"
+  },
+  {
+    "id": "unicode",
+    "text": "Bonjour à tous. Привет мир! 你好世界。مرحبا بالعالم."
+  },
+  {
+    "id": "whitespace",
+    "text": "First sentence.\n\n  Second sentence ends here!\tLast phrase \n\t"
+  },
+  {
+    "id": "emoji",
+    "text": "Hello 🚀 world. This is the next sentence. 🌍"
+  }
+]
