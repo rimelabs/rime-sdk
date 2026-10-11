@@ -836,7 +836,7 @@ provides-extras = ["audio"]
 
 [[package]]
 name = "rimelabs-sdk"
-version = "0.1.0a11"
+version = "0.1.0a12"
 source = { editable = "." }
 dependencies = [
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
