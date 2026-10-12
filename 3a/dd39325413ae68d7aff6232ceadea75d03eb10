@@ -1,0 +1,19 @@
+AGENTS.md
+  s_d6b8eb7aaca089::t_5259e7f2d5b1ac 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3add39325413ae68d7aff6232ceadea75d03eb10",
+  "prompts": {},
+  "sessions": {
+    "s_d6b8eb7aaca089": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a131fb-aef9-7281-a904-4b4eb2d3f9fd",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
