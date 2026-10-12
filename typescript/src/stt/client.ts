@@ -1,7 +1,7 @@
 import type * as grpc from "@grpc/grpc-js";
 import { Credentials } from "../auth.js";
 import { connect, metadata } from "../grpc.js";
-import { endpointAddress, timeout } from "../validation.js";
+import { timeout } from "../validation.js";
 import { RimeInputError } from "../errors.js";
 import { resolvePCMFormat } from "../pcm.js";
 import { transport, requireSchema } from "./transport.js";
@@ -14,7 +14,6 @@ export class STT {
   private streams = new Set<TranscriptStream>();
   constructor(
     private readonly credentials: Credentials,
-    private readonly endpoint: string | null | undefined,
     private readonly checkOpen: () => void,
   ) {}
   stream(source: AudioSource, options: TranscriptionOptions): TranscriptStream {
@@ -32,10 +31,7 @@ export class STT {
     if (!Array.isArray(terms) || terms.some((term) => typeof term !== "string"))
       throw new RimeInputError("contextTerms must be an array of strings");
     const format = resolvePCMFormat(options.inputFormat);
-    const target =
-      this.endpoint == null
-        ? policy.target
-        : endpointAddress(this.endpoint).target;
+    const target = policy.target;
     const stream = new TranscriptStream(
       {
         checkOpen: this.checkOpen,

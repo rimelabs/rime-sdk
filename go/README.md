@@ -154,8 +154,7 @@ Language and terms pass unchanged to the service. Neither is inferred from TTS
 configuration. Written/verbatim formatting depends on the model; a hint does not
 guarantee a word will appear in the transcript.
 
-`Config.STTEndpoint` selects the STT TLS hostname and optional port; see
-[Configuration](#configuration) for the default and accepted format.
+STT connects to `stt.api.rime.ai:443` using TLS. No endpoint configuration is needed.
 `Config.Model`, `Endpoint`, and `Timeout` configure TTS and do not change STT.
 Both services share credentials
 and error categories but use separate connections. STT sends the API key as a
@@ -194,7 +193,6 @@ stream lifetime rules.
 | `Model` | `coda` | `coda` or `mistv3` |
 | `Endpoint` | Model endpoint | TLS hostname with optional port; no scheme or path |
 | `Timeout` | `0` | Overall TTS operation duration; zero disables it |
-| `STTEndpoint` | `stt.api.rime.ai:443` | Independent STT TLS hostname with optional port; no scheme or path |
 
 Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
 `mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.

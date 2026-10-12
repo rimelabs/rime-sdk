@@ -54,8 +54,8 @@ split sample frames; the SDK carries incomplete bytes into the next chunk. A
 truncated final frame raises `RimeAudioFormatError`, without committing the
 utterance. Each gRPC audio payload is at most 64 KiB of 16 kHz mono PCM16.
 
-The default recognition endpoint is `stt.api.rime.ai:443`, using TLS and the same
-API key as the other features. `Rime(stt_endpoint="host:443")` overrides only STT.
+Recognition connects to `stt.api.rime.ai:443` using TLS and the same API key as
+the other features. No endpoint configuration is needed.
 The existing `model`, `endpoint` and client `timeout` settings remain TTS settings.
 There is no STT voice/model selector; the service selects its recognizer.
 

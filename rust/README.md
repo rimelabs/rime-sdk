@@ -290,8 +290,8 @@ The SDK converts input to 16 kHz mono. Chunks can split sample frames. An
 incomplete frame at source exhaustion fails the request. Each gRPC audio payload
 is at most 64 KiB. Input must have no WAV header or compressed encoding.
 
-STT uses `stt.api.rime.ai:443` with TLS and the client's API key. Override it with
-`Client::builder().stt_endpoint("host:443")`. The TTS `model`, `endpoint`, and
+STT uses `stt.api.rime.ai:443` with TLS and the client's API key. No endpoint
+configuration is needed. The TTS `model`, `endpoint`, and
 client `timeout` settings do not apply to STT. STT has no voice or model selector.
 
 Stream construction validates options. The first poll starts network work.

@@ -21,11 +21,10 @@ import (
 
 // Config selects credentials and a deployment. Zero values select Coda and no overall timeout.
 type Config struct {
-	APIKey      string        // Defaults to RIME_API_KEY. The SDK does not read .env files.
-	Model       string        // "coda" or "mistv3".
-	Endpoint    string        // TLS hostname with optional port. No scheme or path.
-	Timeout     time.Duration // TTS overall timeout. Zero disables it; negative values are invalid.
-	STTEndpoint string        // STT TLS hostname with optional port; defaults to stt.api.rime.ai:443.
+	APIKey   string        // Defaults to RIME_API_KEY. The SDK does not read .env files.
+	Model    string        // "coda" or "mistv3".
+	Endpoint string        // TLS hostname with optional port. No scheme or path.
+	Timeout  time.Duration // TTS overall timeout. Zero disables it; negative values are invalid.
 }
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
@@ -123,12 +122,8 @@ func NewClient(config Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	sttTarget, err := resolveEndpoint(config.STTEndpoint, "stt.api.rime.ai:443")
-	if err != nil {
-		return nil, err
-	}
 	c := &Client{key: key, target: target, voice: voice, model: model, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
-	c.sttTarget, c.sttLimits = sttTarget, defaultTranscriptionLimits
+	c.sttTarget, c.sttLimits = "stt.api.rime.ai:443", defaultTranscriptionLimits
 	c.STT = &STTService{c}
 	c.TTS = &TTSService{c}
 	c.Voices = &VoiceService{c}

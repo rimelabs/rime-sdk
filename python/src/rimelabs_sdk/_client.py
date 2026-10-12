@@ -23,7 +23,6 @@ class Rime:
         model: str = "coda",
         endpoint: str | None = None,
         timeout: float | None = None,
-        stt_endpoint: str | None = None,
     ):
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():
@@ -35,7 +34,7 @@ class Rime:
         self.tts = _TTS(self, model=model, endpoint=endpoint, timeout=timeout)
         self._credentials = Credentials(key, self.tts._policy)
         self.realtime = Realtime(self)
-        self.stt = STT(self, stt_endpoint)
+        self.stt = STT(self)
         self.voices = _Voices(self.tts)
         self.languages = _Languages(self.tts)
 

@@ -227,8 +227,25 @@ async fn large_source_chunks_use_bounded_wire_messages() {
 }
 
 #[test]
-fn stt_requires_runtime_and_valid_tls_endpoint() {
-    let client = Client::builder().api_key("test-key").build().unwrap();
+fn stt_uses_fixed_tls_endpoint_and_requires_runtime() {
+    let client = Client::builder()
+        .api_key("test-key")
+        .model(crate::Model::MistV3)
+        .endpoint("tts.example:8443")
+        .build()
+        .unwrap();
+    assert_eq!(
+        client.inner.endpoint.uri(),
+        &"https://tts.example:8443"
+            .parse::<tonic::transport::Uri>()
+            .unwrap()
+    );
+    assert_eq!(
+        client.inner.stt_endpoint.uri(),
+        &"https://stt.api.rime.ai:443"
+            .parse::<tonic::transport::Uri>()
+            .unwrap()
+    );
     assert_eq!(
         client
             .stt()
@@ -240,15 +257,4 @@ fn stt_requires_runtime_and_valid_tls_endpoint() {
             .kind(),
         ErrorKind::Input
     );
-    for endpoint in ["http://localhost:1234", "host/path", "host:0"] {
-        assert_eq!(
-            Client::builder()
-                .api_key("test-key")
-                .stt_endpoint(endpoint)
-                .build()
-                .unwrap_err()
-                .kind(),
-            ErrorKind::Input
-        );
-    }
 }

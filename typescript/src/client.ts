@@ -27,8 +27,6 @@ export interface RimeOptions {
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
-  /** Recognition hostname and optional port; defaults to stt.api.rime.ai:443. */
-  sttEndpoint?: string | null;
 }
 
 export class Rime {
@@ -73,9 +71,7 @@ export class Rime {
     const defaultTimeout = timeout(options.timeout);
     const deployment = resolve(options.model ?? "coda", options.endpoint);
     this.credentials = new Credentials(key, deployment);
-    this.sttClient = new STT(this.credentials, options.sttEndpoint, () =>
-      this.checkOpen(),
-    );
+    this.sttClient = new STT(this.credentials, () => this.checkOpen());
     this.stt = {
       stream: (audio, options) => this.sttClient.stream(audio, options),
     };

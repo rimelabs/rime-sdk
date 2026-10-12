@@ -110,7 +110,6 @@ pub struct ClientBuilder {
     key: Option<String>,
     model: Model,
     endpoint: Option<String>,
-    stt_endpoint: Option<String>,
     timeout: Option<Duration>,
 }
 
@@ -120,7 +119,6 @@ impl fmt::Debug for ClientBuilder {
             .debug_struct("ClientBuilder")
             .field("model", &self.model)
             .field("endpoint", &self.endpoint)
-            .field("stt_endpoint", &self.stt_endpoint)
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
@@ -140,11 +138,6 @@ impl ClientBuilder {
     /// Override the TLS hostname and optional port, without a scheme or path.
     pub fn endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = Some(endpoint.into());
-        self
-    }
-    /// Override the STT TLS hostname and optional port. Defaults to `stt.api.rime.ai:443`.
-    pub fn stt_endpoint(mut self, endpoint: impl Into<String>) -> Self {
-        self.stt_endpoint = Some(endpoint.into());
         self
     }
     /// Set an overall TTS request timeout. The default is no overall timeout.
@@ -182,13 +175,7 @@ impl ClientBuilder {
             })?
             .connect_timeout(Duration::from_secs(10));
         let cancellation = CancellationToken::new();
-        let stt_target = self
-            .stt_endpoint
-            .as_deref()
-            .unwrap_or("stt.api.rime.ai:443");
-        validate_endpoint(stt_target)?;
-        let stt_endpoint = Endpoint::from_shared(format!("https://{stt_target}"))
-            .map_err(|error| Error::new(ErrorKind::Input, "invalid STT endpoint").caused_by(error))?
+        let stt_endpoint = Endpoint::from_static("https://stt.api.rime.ai:443")
             .tls_config(ClientTlsConfig::new().with_native_roots())
             .map_err(|error| {
                 Error::new(ErrorKind::Input, "invalid STT TLS configuration").caused_by(error)

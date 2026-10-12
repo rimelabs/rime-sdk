@@ -20,9 +20,8 @@ if TYPE_CHECKING:
 
 
 class STT:
-    def __init__(self, client: Rime, endpoint: str | None):
+    def __init__(self, client: Rime):
         self._client = client
-        self._endpoint = endpoint
         self._channel: grpc.aio.Channel | None = None
         self._streams: set[TranscriptStream] = set()
 
@@ -63,7 +62,7 @@ class STT:
             tuple(context_terms),
             input_format or PCMFormat(),
             validate_timeout(timeout),
-            _policy.resolve(self._endpoint),
+            _policy.POLICY,
         )
         self._streams.add(operation)
         return operation
