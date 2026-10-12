@@ -47,11 +47,17 @@ func (s *testService) SynthesizeStreaming(stream grpc.BidiStreamingServer[pb.Str
 	if err != nil {
 		return err
 	}
-	if first.GetHeader() == nil || first.GetHeader().GetSplitStrategy() != pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE || (s.header == nil && first.GetHeader().GetAudioParameters().GetSamplingRate() != 24000) {
+	header := first.GetHeader()
+	if header == nil || header.GetSplitStrategy() != pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE {
 		return status.Error(codes.InvalidArgument, "bad header")
 	}
+	switch header.GetAudioParameters().GetSamplingRate() {
+	case 8000, 16000, 24000:
+	default:
+		return status.Error(codes.InvalidArgument, "bad sampling rate")
+	}
 	if s.header != nil {
-		if err := s.header(first.GetHeader()); err != nil {
+		if err := s.header(header); err != nil {
 			return err
 		}
 	}

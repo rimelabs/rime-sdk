@@ -64,7 +64,7 @@ an async iterable of strings. All three accept the following settings:
 | --- | --- | --- |
 | `voice` | Model's default voice | Voice name from `client.voices.list()` |
 | `language` | `"en"` | Language code |
-| `audio_format` | `AudioFormat.PCM` (24 kHz) | Output encoding, imported from `rimelabs_sdk` |
+| `audio_format` | `AudioFormat.PCM_24000` | Output encoding, imported from `rimelabs_sdk` |
 | `sample_rate` | `24000` (or fixed preset rate) | Requested output rate: `8000`, `16000`, or `24000` Hz |
 | `time_scale_factor` | Omitted (normal duration) | Duration multiplier from `0.4` to `2.5`; below 1 is faster, above 1 is slower |
 | `timestamps` | `False` | Request final word timestamps; requires `model="mistv3"` |

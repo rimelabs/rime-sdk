@@ -46,9 +46,25 @@ async def mist(setup):
         yield service, client
 
 
-@pytest.mark.parametrize("profile", [AudioFormat.PCM_24000, AudioFormat.MULAW_8000])
-async def test_timestamps_preserve_audio_and_synthesis_offsets(mist, profile):
+@pytest.mark.parametrize(
+    "profile,mime",
+    [
+        (AudioFormat.PCM, "audio/pcm"),
+        (AudioFormat.WAV, "audio/wav"),
+        (AudioFormat.MP3, "audio/mpeg"),
+        (AudioFormat.PCM_24000, "audio/pcm"),
+        (AudioFormat.MULAW_8000, "audio/pcm"),
+    ],
+)
+async def test_timestamps_preserve_audio_and_synthesis_offsets(mist, profile, mime):
     service, client = mist
+    service.response_metadata = (
+        ("x-rime-audio-content-type", mime),
+        ("x-request-id", "test-request"),
+    )
+    if profile in (AudioFormat.WAV, AudioFormat.MP3):
+        service.payload = b"odd-encoded"
+    service.mode = "odd_chunks"
     service.final_responses = [trailer(spans=WORDS)]
 
     async def text():
@@ -60,6 +76,7 @@ async def test_timestamps_preserve_audio_and_synthesis_offsets(mist, profile):
     converter = Converter(profile)
     expected = converter.process(service.payload * (len(service.calls[0]) - 1), final=True)
     assert audio == expected
+    assert service.calls[0][0].header.audio_parameters.audio_format == mime
     assert service.calls[0][0].header.timestamps.enable
     result = await stream.timestamps()
     assert result == TimestampResult(
