@@ -39,7 +39,8 @@ With `RIME_API_KEY` set and SoX installed (`brew install sox` on macOS), run:
 uv run --directory python/examples --locked -m tts.coda_ws
 ```
 
-This connects directly to `wss://api.rime.ai/coda/ws`.
+This connects directly to `wss://coda.api.rime.ai/ws` on port 443, which serves
+Coda v2. The old `api.rime.ai/<model>` routes are scheduled for retirement.
 
 Enter complete sentences or stable clauses, one per line. Each line becomes a
 `text` message in the same synthesis context, and audio plays as it arrives.
@@ -128,6 +129,10 @@ uv run --directory python/examples --locked --extra audio -m realtime.voice
 # After stopping that conversation:
 uv run --directory python/examples --locked --extra audio -m realtime.voice_tools
 ```
+
+The announced public Prism host is `prism.api.rime.ai:443`. The service is not yet
+available. Confirm availability and the `/v1/realtime` route with your deployment
+operator before setting `PRISM_URL` to `wss://prism.api.rime.ai/v1/realtime`.
 
 Use headphones. The Python example does not remove speaker echo. Keep the
 microphone active during replies so Prism can hear interruptions. Ctrl-C closes
