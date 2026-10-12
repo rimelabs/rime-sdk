@@ -6,23 +6,36 @@ import (
 	"math/bits"
 )
 
-// AudioFormat selects raw mono audio. Neither profile includes a file header.
+// AudioFormat selects a mono encoding or a fixed-rate compatibility preset.
 type AudioFormat uint8
 
 const (
-	PCM24000 AudioFormat = iota
+	// PCM is signed little-endian PCM16. SampleRate defaults to 24000.
+	PCM AudioFormat = iota
 	MULAW8000
+	PCM24000
+	WAV
+	MP3
 )
 
 func (f AudioFormat) Encoding() string {
-	if f == PCM24000 {
+	if f == PCM || f == PCM24000 {
 		return "pcm_s16le"
 	}
 	if f == MULAW8000 {
 		return "mulaw"
 	}
+	if f == WAV {
+		return "wav"
+	}
+	if f == MP3 {
+		return "mp3"
+	}
 	return ""
 }
+
+// SampleRate is the fixed preset rate, or zero for configurable encodings.
+// Use AudioStream.SampleRate for the rate selected for an operation.
 func (f AudioFormat) SampleRate() int {
 	if f == PCM24000 {
 		return 24000
@@ -33,10 +46,52 @@ func (f AudioFormat) SampleRate() int {
 	return 0
 }
 func (f AudioFormat) Channels() int {
-	if f <= MULAW8000 {
+	if f <= MP3 {
 		return 1
 	}
 	return 0
+}
+
+func (f AudioFormat) wireFormat() string {
+	if f == WAV {
+		return "audio/wav"
+	}
+	if f == MP3 {
+		return "audio/mpeg"
+	}
+	return "audio/pcm"
+}
+
+func resolveAudio(options SynthesisOptions) (AudioFormat, int, *float32, error) {
+	format, rate := options.AudioFormat, options.SampleRate
+	if format > MP3 {
+		return 0, 0, nil, failure(ErrAudioFormat, "select a named AudioFormat")
+	}
+	if rate == 0 {
+		rate = format.SampleRate()
+		if rate == 0 {
+			rate = 24000
+		}
+	}
+	if rate != 8000 && rate != 16000 && rate != 24000 {
+		return 0, 0, nil, failure(ErrAudioFormat, "SampleRate must be 8000, 16000, or 24000")
+	}
+	if format.SampleRate() != 0 && rate != format.SampleRate() {
+		return 0, 0, nil, failure(ErrAudioFormat, "SampleRate conflicts with the fixed AudioFormat preset")
+	}
+	var factor *float32
+	if options.TimeScaleFactor != nil {
+		value := *options.TimeScaleFactor
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0.4 || value > 2.5 {
+			return 0, 0, nil, failure(ErrInput, "TimeScaleFactor must be a finite number from 0.4 to 2.5")
+		}
+		converted := float32(value)
+		factor = &converted
+	}
+	if format == PCM && rate == 24000 {
+		format = PCM24000
+	}
+	return format, rate, factor, nil
 }
 
 var coefficients = func() [63]float64 {
@@ -92,6 +147,9 @@ func (c *converter) sample(sample float64) (byte, bool) {
 }
 
 func (c *converter) process(input []byte, final bool) ([]byte, error) {
+	if c.format == WAV || c.format == MP3 {
+		return input, nil
+	}
 	data := input
 	if len(c.tail) != 0 {
 		data = append(c.tail, input...)
@@ -101,7 +159,7 @@ func (c *converter) process(input []byte, final bool) ([]byte, error) {
 	if final && len(c.tail) != 0 {
 		return nil, failure(ErrAudioFormat, "incomplete final PCM sample frame")
 	}
-	if c.format == PCM24000 {
+	if c.format == PCM || c.format == PCM24000 {
 		return data[:size], nil
 	}
 	output := make([]byte, 0, size/6+11)

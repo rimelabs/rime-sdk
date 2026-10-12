@@ -54,6 +54,9 @@ function header(
   language: string,
   timestamps: boolean,
   customLexicon: readonly PronunciationEntry[],
+  audioFormat: string,
+  samplingRate: number,
+  timeScaleFactor?: number,
 ) {
   return create(schema.StreamingSynthesisRequestSchema, {
     payload: {
@@ -62,7 +65,7 @@ function header(
         speaker: voice,
         language,
         splitStrategy: schema.SplitStrategy.ACCUMULATE_SENTENCE,
-        audioParameters: { audioFormat: "audio/pcm", samplingRate: 24000 },
+        audioParameters: { audioFormat, samplingRate, timeScaleFactor },
         timestamps: timestamps ? { enable: true } : undefined,
         customLexicon: [...customLexicon],
       }),
@@ -146,6 +149,7 @@ export async function discover(
 }
 
 export class SynthesisCall {
+  private audioFormat = "audio/pcm";
   private timestampsRequested = false;
   private readonly timestampTrailer = new TimestampTrailer();
   private readonly rpc: BidiCall<
@@ -172,9 +176,21 @@ export class SynthesisCall {
     language: string,
     timestamps = false,
     customLexicon: readonly PronunciationEntry[] = [],
+    audioFormat = "audio/pcm",
+    sampleRate = 24000,
+    timeScaleFactor?: number,
   ) {
     this.timestampsRequested = timestamps;
-    const message = header(voice, language, timestamps, customLexicon);
+    this.audioFormat = audioFormat;
+    const message = header(
+      voice,
+      language,
+      timestamps,
+      customLexicon,
+      audioFormat,
+      sampleRate,
+      timeScaleFactor,
+    );
     return this.rpc.write(message);
   }
   timestampResult() {
@@ -187,9 +203,9 @@ export class SynthesisCall {
     this.rpc.finishInput();
   }
   private checkFormat(contentType: unknown) {
-    if (contentType !== "audio/pcm")
+    if (contentType !== this.audioFormat)
       throw new errors.RimeAudioFormatError(
-        "Expected raw audio/pcm from the service",
+        `Expected ${this.audioFormat} from the service`,
         this.requestId,
       );
   }

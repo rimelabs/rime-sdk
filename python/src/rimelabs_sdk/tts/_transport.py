@@ -36,12 +36,22 @@ def bind(channel, name):
     )
 
 
-def header(voice, language, timestamps=False, custom_lexicon=()):
+def header(
+    voice,
+    language,
+    timestamps=False,
+    custom_lexicon=(),
+    audio_format="audio/pcm",
+    sample_rate=24000,
+    time_scale_factor=None,
+):
     request = proto.SynthesisRequest(
         speaker=voice, language=language, split_strategy=proto.SPLIT_STRATEGY_ACCUMULATE_SENTENCE
     )
-    request.audio_parameters.audio_format = "audio/pcm"
-    request.audio_parameters.sampling_rate = 24000
+    request.audio_parameters.audio_format = audio_format
+    request.audio_parameters.sampling_rate = sample_rate
+    if time_scale_factor is not None:
+        request.audio_parameters.time_scale_factor = time_scale_factor
     if timestamps:
         request.timestamps.enable = True
     request.custom_lexicon.extend(
@@ -84,6 +94,7 @@ class SynthesisCall:
         self.request_id = None
         self._timestamps_requested = False
         self._timestamps = TimestampTrailer()
+        self._audio_format = "audio/pcm"
 
     def done(self):
         return self._call.done()
@@ -144,10 +155,30 @@ class SynthesisCall:
             "The service completed before input finished", request_id=self.request_id
         ) from None
 
-    async def start(self, voice, language, timestamps=False, custom_lexicon=()):
+    async def start(
+        self,
+        voice,
+        language,
+        timestamps=False,
+        custom_lexicon=(),
+        audio_format="audio/pcm",
+        sample_rate=24000,
+        time_scale_factor=None,
+    ):
         # Do not wait for response metadata before allowing text writes.
         self._timestamps_requested = timestamps
-        await self._write(header(voice, language, timestamps, custom_lexicon))
+        self._audio_format = audio_format
+        await self._write(
+            header(
+                voice,
+                language,
+                timestamps,
+                custom_lexicon,
+                audio_format,
+                sample_rate,
+                time_scale_factor,
+            )
+        )
 
     def timestamp_result(self):
         return self._timestamps.result(self.request_id)
@@ -187,7 +218,7 @@ class SynthesisCall:
             raise self._error(error) from None
 
     def _check_format(self, content_type):
-        if content_type != "audio/pcm":
+        if content_type != self._audio_format:
             raise RimeAudioFormatError(
-                "Expected raw audio/pcm from the service", request_id=self.request_id
+                f"Expected {self._audio_format} from the service", request_id=self.request_id
             )

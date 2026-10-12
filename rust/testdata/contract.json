@@ -1,7 +1,186 @@
 {
- "chunk_sizes": [1,2,7,17,1024],
- "invalid_timeouts": [0,-1,"30",true],
- "profiles": {"PCM_24000":{"encoding":"pcm_s16le","sample_rate":24000,"channels":1},"MULAW_8000":{"encoding":"mulaw","sample_rate":8000,"channels":1}},
- "grpc_errors": {"UNAUTHENTICATED":"RimeAuthenticationError","PERMISSION_DENIED":"RimePermissionError","INVALID_ARGUMENT":"RimeInputError","RESOURCE_EXHAUSTED":"RimeResourceLimitError","UNAVAILABLE":"RimeUnavailableError","DEADLINE_EXCEEDED":"RimeTimeoutError","CANCELLED":"RimeCancelledError","INTERNAL":"RimeStreamError"},
- "lifecycle": ["incremental_audio_before_input_end","partial_audio_then_error","cancel_keeps_sibling","overall_timeout_while_paused","no_synthesis_replay"]
+  "chunk_sizes": [
+    1,
+    2,
+    7,
+    17,
+    1024
+  ],
+  "invalid_timeouts": [
+    0,
+    -1,
+    "30",
+    true
+  ],
+  "profiles": {
+    "PCM_24000": {
+      "encoding": "pcm_s16le",
+      "sample_rate": 24000,
+      "channels": 1
+    },
+    "MULAW_8000": {
+      "encoding": "mulaw",
+      "sample_rate": 8000,
+      "channels": 1
+    }
+  },
+  "grpc_errors": {
+    "UNAUTHENTICATED": "RimeAuthenticationError",
+    "PERMISSION_DENIED": "RimePermissionError",
+    "INVALID_ARGUMENT": "RimeInputError",
+    "RESOURCE_EXHAUSTED": "RimeResourceLimitError",
+    "UNAVAILABLE": "RimeUnavailableError",
+    "DEADLINE_EXCEEDED": "RimeTimeoutError",
+    "CANCELLED": "RimeCancelledError",
+    "INTERNAL": "RimeStreamError"
+  },
+  "lifecycle": [
+    "incremental_audio_before_input_end",
+    "partial_audio_then_error",
+    "cancel_keeps_sibling",
+    "overall_timeout_while_paused",
+    "no_synthesis_replay"
+  ],
+  "output_cases": [
+    {
+      "format": "PCM",
+      "sample_rate": 8000,
+      "wire_format": "audio/pcm",
+      "wire_rate": 8000
+    },
+    {
+      "format": "PCM",
+      "sample_rate": 16000,
+      "wire_format": "audio/pcm",
+      "wire_rate": 16000
+    },
+    {
+      "format": "PCM",
+      "sample_rate": 24000,
+      "wire_format": "audio/pcm",
+      "wire_rate": 24000
+    },
+    {
+      "format": "WAV",
+      "sample_rate": 8000,
+      "wire_format": "audio/wav",
+      "wire_rate": 8000
+    },
+    {
+      "format": "WAV",
+      "sample_rate": 16000,
+      "wire_format": "audio/wav",
+      "wire_rate": 16000
+    },
+    {
+      "format": "WAV",
+      "sample_rate": 24000,
+      "wire_format": "audio/wav",
+      "wire_rate": 24000
+    },
+    {
+      "format": "MP3",
+      "sample_rate": 8000,
+      "wire_format": "audio/mpeg",
+      "wire_rate": 8000
+    },
+    {
+      "format": "MP3",
+      "sample_rate": 16000,
+      "wire_format": "audio/mpeg",
+      "wire_rate": 16000
+    },
+    {
+      "format": "MP3",
+      "sample_rate": 24000,
+      "wire_format": "audio/mpeg",
+      "wire_rate": 24000
+    },
+    {
+      "format": "PCM_24000",
+      "sample_rate": 24000,
+      "wire_format": "audio/pcm",
+      "wire_rate": 24000
+    },
+    {
+      "format": "MULAW_8000",
+      "sample_rate": 8000,
+      "wire_format": "audio/pcm",
+      "wire_rate": 24000
+    }
+  ],
+  "wav_cases": [
+    {
+      "name": "streaming",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100803e0000007d00000200100064617461ffffffff0100feff",
+      "output_hex": "524946462800000057415645666d74201000000001000100803e0000007d00000200100064617461040000000100feff"
+    },
+    {
+      "name": "complete",
+      "input_hex": "524946462800000057415645666d74201000000001000100803e0000007d00000200100064617461040000000100feff",
+      "output_hex": "524946462800000057415645666d74201000000001000100803e0000007d00000200100064617461040000000100feff"
+    },
+    {
+      "name": "ancillary",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100803e0000007d0000020010004a554e4b01000000780064617461ffffffff0100feff",
+      "output_hex": "524946463200000057415645666d74201000000001000100803e0000007d0000020010004a554e4b01000000780064617461040000000100feff"
+    },
+    {
+      "name": "empty",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100803e0000007d00000200100064617461ffffffff",
+      "output_hex": "524946462400000057415645666d74201000000001000100803e0000007d0000020010006461746100000000"
+    },
+    {
+      "name": "truncated_header",
+      "input_hex": "52494646",
+      "error": true
+    },
+    {
+      "name": "odd_pcm",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100803e0000007d00000200100064617461ffffffff01",
+      "error": true
+    },
+    {
+      "name": "wrong_rate",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100401f0000007d00000200100064617461ffffffff0100feff",
+      "error": true
+    },
+    {
+      "name": "wrong_riff_size",
+      "input_hex": "524946460000000057415645666d74201000000001000100803e0000007d00000200100064617461ffffffff0100feff",
+      "error": true
+    },
+    {
+      "name": "missing_data",
+      "input_hex": "52494646ffffffff57415645666d74201000000001000100803e0000007d000002001000",
+      "error": true
+    },
+    {
+      "name": "oversized_chunk",
+      "input_hex": "52494646ffffffff57415645666d7420f0ffffff01000100803e0000007d00000200100064617461ffffffff0100feff",
+      "error": true
+    },
+    {
+      "name": "high_bit_fourcc",
+      "input_hex": "d2494646ffffffff57415645666d74201000000001000100803e0000007d00000200100064617461ffffffff0100feff",
+      "error": true
+    },
+    {
+      "name": "duplicate_data",
+      "input_hex": "524946463000000057415645666d74201000000001000100803e0000007d00000200100064617461040000000100feff6461746100000000",
+      "error": true
+    }
+  ],
+  "invalid_sample_rates": [
+    0,
+    -1,
+    11025,
+    48000
+  ],
+  "invalid_time_scale_factors": [
+    0,
+    -1,
+    0.39,
+    2.51
+  ]
 }

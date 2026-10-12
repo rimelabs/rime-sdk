@@ -537,18 +537,13 @@ func TestTranscriptionPreservesServiceFailureDuringCleanup(t *testing.T) {
 }
 
 func TestTranscriptionValidationAndEndpoint(t *testing.T) {
-	client, err := NewClient(Config{APIKey: "test-key", Model: "mistv3", Endpoint: "TTS.Example:8443", STTEndpoint: "STT.Example"})
+	client, err := NewClient(Config{APIKey: "test-key", Model: "mistv3", Endpoint: "TTS.Example:8443"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if client.target != "tts.example:8443" || client.sttTarget != "stt.example:443" {
+	if client.target != "tts.example:8443" || client.sttTarget != "stt.api.rime.ai:443" {
 		t.Fatal("endpoint routing")
-	}
-	for _, endpoint := range []string{"https://host", "host/path", "host:0", "host:65536", "host:abc", "host:443:1", "bad host", "-bad"} {
-		if _, err := NewClient(Config{APIKey: "test-key", STTEndpoint: endpoint}); !errors.Is(err, ErrInput) {
-			t.Fatalf("%q: %v", endpoint, err)
-		}
 	}
 	negative := -time.Second
 	for _, options := range []TranscriptionOptions{{Mode: "other"}, {Timeout: &negative}, {InputFormat: PCMFormat{SampleRate: 44100}}, {InputFormat: PCMFormat{Channels: 3}}} {

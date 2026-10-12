@@ -499,7 +499,7 @@ async def test_close_while_connecting_does_not_wait_for_connection_deadline(stt_
     assert closed == [True]
 
 
-async def test_stt_uses_independent_endpoint_and_no_tts_connection(stt_setup, monkeypatch):
+async def test_stt_uses_fixed_endpoint_and_no_tts_connection(monkeypatch):
     targets = []
 
     def channel(policy):
@@ -507,14 +507,12 @@ async def test_stt_uses_independent_endpoint_and_no_tts_connection(stt_setup, mo
         raise RimeUnavailableError("test dial")
 
     monkeypatch.setattr(_transport, "make_channel", channel)
-    async with Rime(
-        api_key="test", endpoint="tts.example:123", stt_endpoint="stt.example:456"
-    ) as client:
+    async with Rime(api_key="test", model="mistv3", endpoint="tts.example:123") as client:
         async with client.stt.stream(source(), language="en") as stream:
             with pytest.raises(RimeUnavailableError):
                 await anext(stream)
         assert client.tts._channel is None
-    assert targets == ["stt.example:456"]
+    assert targets == ["stt.api.rime.ai:443"]
 
 
 async def test_cancelling_stt_preserves_tts_and_realtime(setup, stt_setup, monkeypatch):

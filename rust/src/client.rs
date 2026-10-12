@@ -1,5 +1,6 @@
 use crate::{AudioFormat, AudioStream, Error, ErrorKind, PronunciationEntry};
 use futures_core::Stream;
+use futures_util::StreamExt;
 use rimelabs_api::{
     speech_to_text_client::SpeechToTextClient, text_to_speech_client::TextToSpeechClient,
     GetSupportedLanguagesRequest, GetSupportedSpeakersRequest,
@@ -50,6 +51,8 @@ pub struct SynthesisOptions {
     pub(crate) voice: Option<String>,
     pub(crate) language: Option<String>,
     pub(crate) format: AudioFormat,
+    pub(crate) sample_rate: Option<u32>,
+    pub(crate) time_scale_factor: Option<f32>,
     pub(crate) timeout: Option<Option<Duration>>,
     pub(crate) timestamps: bool,
     pub(crate) custom_lexicon: Vec<PronunciationEntry>,
@@ -79,9 +82,19 @@ impl SynthesisOptions {
         self.language = Some(language.into());
         self
     }
-    /// Select raw PCM24 or mu-law8 output.
+    /// Select PCM, WAV, MP3, or a fixed-rate compatibility preset.
     pub fn audio_format(mut self, format: AudioFormat) -> Self {
         self.format = format;
+        self
+    }
+    /// Request 8000, 16000, or 24000 Hz output. Defaults to 24000 for PCM/WAV/MP3.
+    pub fn sample_rate(mut self, sample_rate: u32) -> Self {
+        self.sample_rate = Some(sample_rate);
+        self
+    }
+    /// Duration multiplier from 0.4 to 2.5. Below 1 speeds speech up; above 1 slows it down.
+    pub fn time_scale_factor(mut self, factor: f32) -> Self {
+        self.time_scale_factor = Some(factor);
         self
     }
     /// Override the overall timeout. `None` disables it. Zero is invalid.
@@ -97,7 +110,6 @@ pub struct ClientBuilder {
     key: Option<String>,
     model: Model,
     endpoint: Option<String>,
-    stt_endpoint: Option<String>,
     timeout: Option<Duration>,
 }
 
@@ -107,7 +119,6 @@ impl fmt::Debug for ClientBuilder {
             .debug_struct("ClientBuilder")
             .field("model", &self.model)
             .field("endpoint", &self.endpoint)
-            .field("stt_endpoint", &self.stt_endpoint)
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
@@ -127,11 +138,6 @@ impl ClientBuilder {
     /// Override the TLS hostname and optional port, without a scheme or path.
     pub fn endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = Some(endpoint.into());
-        self
-    }
-    /// Override the STT TLS hostname and optional port. Defaults to `stt.api.rime.ai:443`.
-    pub fn stt_endpoint(mut self, endpoint: impl Into<String>) -> Self {
-        self.stt_endpoint = Some(endpoint.into());
         self
     }
     /// Set an overall TTS request timeout. The default is no overall timeout.
@@ -169,13 +175,7 @@ impl ClientBuilder {
             })?
             .connect_timeout(Duration::from_secs(10));
         let cancellation = CancellationToken::new();
-        let stt_target = self
-            .stt_endpoint
-            .as_deref()
-            .unwrap_or("stt.api.rime.ai:443");
-        validate_endpoint(stt_target)?;
-        let stt_endpoint = Endpoint::from_shared(format!("https://{stt_target}"))
-            .map_err(|error| Error::new(ErrorKind::Input, "invalid STT endpoint").caused_by(error))?
+        let stt_endpoint = Endpoint::from_static("https://stt.api.rime.ai:443")
             .tls_config(ClientTlsConfig::new().with_native_roots())
             .map_err(|error| {
                 Error::new(ErrorKind::Input, "invalid STT TLS configuration").caused_by(error)
@@ -390,6 +390,39 @@ impl Tts<'_> {
         self.stream(futures_util::stream::once(async { Ok(text) }), options)
     }
 
+    /// Await complete audio in memory, finalizing WAV lengths. Never returns partial audio.
+    /// The fixed output limit is 64 MiB (67,108,864 bytes); exceeding it returns
+    /// `ErrorKind::ResourceLimit`. Use streaming synthesis for larger outputs or timestamps.
+    pub async fn synthesize_to_buffer(
+        &self,
+        text: impl Into<String>,
+        options: SynthesisOptions,
+    ) -> Result<Vec<u8>, Error> {
+        let mut audio = self.synthesize(text, options)?;
+        let result = async {
+            let mut data = Vec::new();
+            while let Some(chunk) = audio.next().await {
+                let chunk = chunk?;
+                if chunk.len() > crate::buffer::MAX_BUFFER_BYTES - data.len() {
+                    return Err(Error::new(
+                        ErrorKind::ResourceLimit,
+                        "audio exceeds the 64 MiB buffer limit",
+                    )
+                    .with_request_id(audio.request_id()));
+                }
+                data.extend_from_slice(&chunk);
+            }
+            if audio.format() == AudioFormat::Wav {
+                crate::buffer::finalize_wav(&mut data, audio.sample_rate())
+                    .map_err(|error| error.with_request_id(audio.request_id()))?;
+            }
+            Ok(data)
+        }
+        .await;
+        audio.close().await;
+        result
+    }
+
     /// Start synthesis from incremental text. The source must yield without blocking Tokio.
     /// Dropping the audio stream cancels the source and the RPC.
     ///
@@ -411,7 +444,7 @@ impl Client {
         ClientBuilder::default()
     }
 
-    /// Access text-to-speech operations. Both methods return streaming audio.
+    /// Access streaming and buffered text-to-speech operations.
     pub fn tts(&self) -> Tts<'_> {
         Tts { client: self }
     }

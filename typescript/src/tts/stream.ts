@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { debuglog } from "node:util";
 const log = debuglog("rime-sdk");
-import { AudioFormat, Converter } from "./audio.js";
+import { AudioFormat, Converter, wireFormat } from "./audio.js";
 import { policy } from "./policy.js";
 import { abortable } from "../cancellation.js";
 import { ByteQueue } from "./queue.js";
@@ -54,6 +54,8 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
     private timeout: number | null,
     private timestampsRequested = false,
     private customLexicon: readonly PronunciationEntry[] = [],
+    private sampleRateValue = 24000,
+    private timeScaleFactor?: number,
   ) {
     if (key !== constructionKey)
       throw new TypeError(
@@ -62,6 +64,10 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
   }
   get format(): AudioFormat {
     return this.formatValue;
+  }
+  /** Requested output rate. MP3 headers describe the encoded rate. */
+  get sampleRate(): number {
+    return this.sampleRateValue;
   }
   get requestId(): string | null {
     return this.call?.requestId ?? null;
@@ -245,6 +251,9 @@ export class AudioStream implements AsyncIterableIterator<Uint8Array> {
         this.language,
         this.timestampsRequested,
         this.customLexicon,
+        wireFormat(this.format),
+        this.format === AudioFormat.MULAW_8000 ? 24000 : this.sampleRate,
+        this.timeScaleFactor,
       );
       tasks = [this.produce(), this.read()];
       await Promise.all(tasks);

@@ -13,7 +13,7 @@ const options: TranscriptionOptions = {
   mode: "verbatim",
   contextTerms: ["Rime"],
 };
-const client = new Rime({ apiKey: "test", sttEndpoint: "stt.example:443" });
+const client = new Rime({ apiKey: "test" });
 async function* audio() {
   yield new Uint8Array(4);
 }

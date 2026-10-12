@@ -1,8 +1,6 @@
 """Independent transport and resource policy for speech recognition."""
 
-from dataclasses import dataclass, replace
-
-from .._validation import endpoint_address
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -20,7 +18,3 @@ class Policy:
 
 
 POLICY = Policy()
-
-
-def resolve(endpoint: str | None) -> Policy:
-    return replace(POLICY, target=endpoint_address(endpoint)[0]) if endpoint is not None else POLICY

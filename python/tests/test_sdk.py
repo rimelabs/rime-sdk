@@ -99,7 +99,7 @@ def test_error_conformance():
         assert not hasattr(error, "grpc_status")
 
 
-@pytest.mark.parametrize("profile", list(AudioFormat))
+@pytest.mark.parametrize("profile", [AudioFormat.PCM_24000, AudioFormat.MULAW_8000])
 def test_audio_profiles_and_chunk_invariance(profile):
     assert {
         key: getattr(profile, key) for key in ("encoding", "sample_rate", "channels")
@@ -463,7 +463,7 @@ async def test_client_shutdown_stops_paused_output(setup):
         client.tts.synthesize("Later.")
 
 
-@pytest.mark.parametrize("profile", list(AudioFormat))
+@pytest.mark.parametrize("profile", [AudioFormat.PCM_24000, AudioFormat.MULAW_8000])
 async def test_large_audio_is_delivered_in_bounded_chunks(setup, profile):
     service, client = setup
     # Test queue limits without making FIR conversion race the short stall timeout.

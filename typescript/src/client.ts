@@ -27,8 +27,6 @@ export interface RimeOptions {
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
-  /** Recognition hostname and optional port; defaults to stt.api.rime.ai:443. */
-  sttEndpoint?: string | null;
 }
 
 export class Rime {
@@ -50,6 +48,11 @@ export class Rime {
   readonly tts: {
     /** Synthesize complete text and return streaming audio. Do not await this call. */
     synthesize: (text: string, options?: SynthesisOptions) => AudioStream;
+    /** Await complete audio bytes, finalizing WAV lengths. Fixed output limit: 64 MiB. */
+    synthesizeToBuffer: (
+      text: string,
+      options?: SynthesisOptions,
+    ) => Promise<Buffer>;
     /** Supply incremental text and return streaming audio. Do not await this call. */
     stream: (text: TextSource, options?: SynthesisOptions) => AudioStream;
   };
@@ -68,9 +71,7 @@ export class Rime {
     const defaultTimeout = timeout(options.timeout);
     const deployment = resolve(options.model ?? "coda", options.endpoint);
     this.credentials = new Credentials(key, deployment);
-    this.sttClient = new STT(this.credentials, options.sttEndpoint, () =>
-      this.checkOpen(),
-    );
+    this.sttClient = new STT(this.credentials, () => this.checkOpen());
     this.stt = {
       stream: (audio, options) => this.sttClient.stream(audio, options),
     };
@@ -85,6 +86,8 @@ export class Rime {
     );
     this.tts = {
       synthesize: (text, options) => this.ttsClient.synthesize(text, options),
+      synthesizeToBuffer: (text, options) =>
+        this.ttsClient.synthesizeToBuffer(text, options),
       stream: (text, options) => this.ttsClient.stream(text, options),
     };
     this.voices = this.ttsClient.voices;

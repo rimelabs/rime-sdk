@@ -54,7 +54,10 @@ API key and production TLS endpoints; fake-server tests alone do not demonstrate
 deployed compatibility.
 
 TTS uses `client.tts.synthesize(text)` for complete strings and
-`client.tts.stream(chunks)` for async text sources. Both return streaming audio.
+`client.tts.stream(chunks)` for async text sources. Both return streaming audio. The buffered method `synthesize_to_buffer` (with
+idiomatic casing in Go/TypeScript) collects the same streaming RPC and finalizes
+PCM16 WAV lengths only after successful completion. Audio output cases and WAV
+fixtures live in `conformance/contract.json` and its Go/Rust package copies.
 Every TTS header selects `SPLIT_STRATEGY_ACCUMULATE_SENTENCE` so Rime automatically
 combines text fragments into sentences for speech. The SDK preserves source text,
 uses bounded Unicode-safe wire chunks, and half-closes when input ends.

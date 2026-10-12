@@ -37,6 +37,8 @@ class AudioStream:
         timeout,
         timestamps=False,
         custom_lexicon=(),
+        sample_rate=24000,
+        time_scale_factor=None,
     ):
         if key is not _CONSTRUCTION_KEY:
             raise TypeError(
@@ -48,6 +50,8 @@ class AudioStream:
         self._language = language
         self._custom_lexicon = custom_lexicon
         self._format = profile
+        self._sample_rate = sample_rate
+        self._time_scale_factor = time_scale_factor
         self._timeout = timeout
         self._timestamps_requested = timestamps
         self._operation_id = uuid.uuid4().hex
@@ -69,6 +73,11 @@ class AudioStream:
     @property
     def format(self) -> AudioFormat:
         return self._format
+
+    @property
+    def sample_rate(self) -> int:
+        """Requested output sample rate in Hz; MP3 headers describe the encoded rate."""
+        return self._sample_rate
 
     @property
     def request_id(self) -> str | None:
@@ -219,6 +228,9 @@ class AudioStream:
                 self._language,
                 self._timestamps_requested,
                 self._custom_lexicon,
+                self._format._wire_format,
+                24000 if self._format is AudioFormat.MULAW_8000 else self._sample_rate,
+                self._time_scale_factor,
             )
             tasks = [
                 asyncio.create_task(self._produce(), name="rime:input"),

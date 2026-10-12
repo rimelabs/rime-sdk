@@ -60,29 +60,68 @@ Model defaults still apply.
 
 ### Synthesis options
 
-Both methods require text input: a nonblank string for `synthesize`, or an
-async iterable of strings for `stream`. Both accept the following optional settings:
+`synthesize` and `synthesizeToBuffer` require a nonblank string; `stream` requires
+an async iterable of strings. All three accept the following settings:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `voice` | Model's default voice | Voice name from `client.voices.list()` |
 | `language` | `"en"` | Language code |
-| `audioFormat` | `AudioFormat.PCM_24000` | Output profile, imported from `@rimelabs/sdk` |
+| `audioFormat` | `AudioFormat.PCM` (24 kHz) | Output encoding, imported from `@rimelabs/sdk` |
+| `sampleRate` | `24000` (or fixed preset rate) | Requested output rate: `8000`, `16000`, or `24000` Hz |
+| `timeScaleFactor` | Omitted (normal duration) | Duration multiplier from `0.4` to `2.5`; below 1 is faster, above 1 is slower |
 | `timestamps` | `false` | Request final word timestamps; requires `model: "mistv3"` |
 | `customLexicon` | `[]` | Array of pronunciation overrides for this request; requires Coda |
 | `timeout` | Client setting | Seconds; pass `null` to disable the overall deadline |
 
 ### Audio formats
 
-Both profiles return raw audio without a file header.
+All output is mono. PCM and WAV use signed 16-bit little-endian samples.
 
-| `AudioFormat` profile | Encoding | Sample rate | Channels |
-| --- | --- | --- | --- |
-| `PCM_24000` | Signed 16-bit little-endian PCM | 24 kHz | Mono |
-| `MULAW_8000` | G.711 mu-law | 8 kHz | Mono |
+| `AudioFormat` | Encoding | Requested rate |
+| --- | --- | --- |
+| `PCM` | Headerless PCM16 | 8, 16, or 24 kHz |
+| `WAV` | PCM16 WAV | 8, 16, or 24 kHz |
+| `MP3` | MP3 (`audio/mpeg`) | 8, 16, or 24 kHz; encoded headers determine the actual rate |
+| `PCM_24000` | Headerless PCM16 compatibility preset | Fixed 24 kHz |
+| `MULAW_8000` | G.711 mu-law compatibility preset | Fixed 8 kHz |
 
-Chunks are `Uint8Array` values with complete sample frames; sizes vary. Inspect the
-read-only `audio.format.encoding`, `audio.format.sampleRate`, and `audio.format.channels`.
+PCM/WAV sample rates are requested from the server; the SDK does not resample
+these formats. The existing mu-law preset still converts 24 kHz PCM locally.
+An explicit rate conflicting with a fixed preset fails locally. For configurable
+formats, `audio.format.sampleRate` is zero; use `audio.sampleRate` for the rate requested
+by the operation. Existing default streams still report `PCM_24000` as their format.
+
+PCM chunks contain complete sample frames. WAV and MP3 chunks are fragments of
+one encoded stream, not independent files. Streaming WAV may contain unknown
+lengths in its header; use `synthesizeToBuffer` for a completed IVR file.
+
+### Complete audio in memory
+
+Await `synthesizeToBuffer` to get all audio bytes. It uses the same streaming RPC,
+waits for successful completion, and finalizes WAV file lengths. On failure it
+raises an error and releases the stream; it never returns partial audio.
+The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
+file headers. Exceeding it raises `RimeResourceLimitError` and returns no partial
+audio. For mono PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes
+at 16 kHz, or 23 minutes at 24 kHz. Use streaming synthesis for larger outputs.
+Collection can temporarily use more memory than the output limit.
+Timeouts and client shutdown still apply. Use the streaming API to retrieve word timestamps.
+
+```javascript
+import { writeFile } from "node:fs/promises";
+import { AudioFormat, Rime } from "@rimelabs/sdk";
+
+const client = new Rime();
+try {
+  const audio = await client.tts.synthesizeToBuffer("Thank you for calling.", {
+    audioFormat: AudioFormat.WAV, sampleRate: 16000, timeScaleFactor: 0.9,
+  });
+  await writeFile("greeting.wav", audio);
+} finally {
+  await client.close();
+}
+```
 
 ### Timeouts
 

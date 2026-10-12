@@ -532,8 +532,7 @@ test("closing during connection setup cancels without waiting for readiness", as
   assert.ok(closed);
 });
 
-test("STT uses its endpoint independently of the TTS endpoint", async (t) => {
-  await setup(t);
+test("STT uses its fixed endpoint independently of TTS configuration", async (t) => {
   const targets = [];
   t.mock.method(transport, "makeClient", (target) => {
     targets.push(target);
@@ -541,13 +540,13 @@ test("STT uses its endpoint independently of the TTS endpoint", async (t) => {
   });
   const client = new sdk.Rime({
     apiKey: "test",
+    model: "mistv3",
     endpoint: "tts.example:123",
-    sttEndpoint: "stt.example:456",
   });
   t.after(() => client.close());
   const stream = client.stt.stream(source(), { language: "en" });
   await assert.rejects(stream.next(), sdk.RimeUnavailableError);
-  assert.deepEqual(targets, ["stt.example:456"]);
+  assert.deepEqual(targets, ["stt.api.rime.ai:443"]);
   assert.equal(client.ttsClient.client, null);
 });
 

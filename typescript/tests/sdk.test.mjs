@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import * as grpc from "@grpc/grpc-js";
+import * as schema from "@rimelabs/api";
+import { create } from "@bufbuild/protobuf";
 import {
   Rime,
   AudioFormat,
@@ -681,5 +683,194 @@ for (const mode of ["normal", "empty_audio", "empty_no_headers"]) {
       service.responseMetadata = { "x-request-id": "header-id" };
       const audio = client.tts.synthesize("Hello.", { timeout: 1 });
       await assert.rejects(audio.next(), RimeAudioFormatError);
+    }));
+}
+
+for (const entry of contract.output_cases) {
+  for (const incremental of [false, true]) {
+    test(`output ${entry.format}/${entry.sample_rate}, incremental=${incremental}`, () =>
+      setup(async (service, client) => {
+        service.mode = "odd_chunks";
+        service.responseMetadata["x-rime-audio-content-type"] =
+          entry.wire_format;
+        service.payload = ["WAV", "MP3"].includes(entry.format)
+          ? Buffer.from("encoded")
+          : Buffer.from([1, 0, 2, 0, 3, 0]);
+        const options = {
+          audioFormat: AudioFormat[entry.format],
+          sampleRate: entry.sample_rate,
+          timeScaleFactor: 0.8,
+        };
+        const audio = incremental
+          ? client.tts.stream(
+              (async function* () {
+                yield "Hello.";
+              })(),
+              options,
+            )
+          : client.tts.synthesize("Hello.", options);
+        assert.equal(audio.sampleRate, entry.sample_rate);
+        const result = await collect(audio);
+        if (entry.format !== "MULAW_8000")
+          assert.deepEqual(result, service.payload);
+        else assert.equal(result.length, 1);
+        const params = service.calls[0][0].payload.value.audioParameters;
+        assert.equal(params.audioFormat, entry.wire_format);
+        assert.equal(params.samplingRate, entry.wire_rate);
+        assert.ok(Math.abs(params.timeScaleFactor - 0.8) < 1e-6);
+      }));
+  }
+}
+
+test("buffer output validation happens before an RPC", () =>
+  setup(async (service, client) => {
+    for (const sampleRate of [
+      ...contract.invalid_sample_rates,
+      true,
+      "8000",
+      8000.5,
+    ])
+      assert.throws(
+        () => client.tts.synthesize("Hello.", { sampleRate }),
+        RimeAudioFormatError,
+      );
+    for (const timeScaleFactor of [
+      ...contract.invalid_time_scale_factors,
+      NaN,
+      Infinity,
+      true,
+      "1",
+    ])
+      assert.throws(
+        () => client.tts.synthesize("Hello.", { timeScaleFactor }),
+        RimeInputError,
+      );
+    for (const [audioFormat, sampleRate] of [
+      [AudioFormat.PCM_24000, 8000],
+      [AudioFormat.MULAW_8000, 16000],
+    ])
+      assert.throws(
+        () => client.tts.synthesize("Hello.", { audioFormat, sampleRate }),
+        RimeAudioFormatError,
+      );
+    assert.equal(service.calls.length, 0);
+  }));
+
+for (const entry of contract.wav_cases) {
+  test(`buffered WAV ${entry.name}`, () =>
+    setup(async (service, client) => {
+      service.mode = "odd_chunks";
+      service.responseMetadata["x-rime-audio-content-type"] = "audio/wav";
+      service.payload = Buffer.from(entry.input_hex, "hex");
+      const result = client.tts.synthesizeToBuffer("Hello.", {
+        audioFormat: AudioFormat.WAV,
+        sampleRate: 16000,
+      });
+      if (entry.error)
+        await assert.rejects(result, {
+          name: "RimeAudioFormatError",
+          requestId: "test-request",
+        });
+      else assert.equal((await result).toString("hex"), entry.output_hex);
+      assert.equal(
+        service.calls[0][0].payload.value.audioParameters.timeScaleFactor,
+        undefined,
+      );
+    }));
+}
+
+test("buffered MP3 preserves odd-length encoded output", () =>
+  setup(async (service, client) => {
+    service.mode = "odd_chunks";
+    service.responseMetadata["x-rime-audio-content-type"] = "audio/mpeg";
+    service.payload = Buffer.from("odd-mp3");
+    assert.deepEqual(
+      await client.tts.synthesizeToBuffer("Hello.", {
+        audioFormat: AudioFormat.MP3,
+      }),
+      service.payload,
+    );
+  }));
+
+for (const [mode, options, name] of [
+  ["error_after_trailer", {}, "RimeUnavailableError"],
+  ["silence", { timeout: 0.1 }, "RimeTimeoutError"],
+  ["wrong_format", {}, "RimeAudioFormatError"],
+]) {
+  test(`buffer failure ${name} preserves request ID and client`, () =>
+    setup(async (service, client) => {
+      service.mode = mode;
+      await assert.rejects(client.tts.synthesizeToBuffer("Hello.", options), {
+        name,
+        requestId: "test-request",
+      });
+      service.mode = "normal";
+      assert.deepEqual(
+        await client.tts.synthesizeToBuffer("Still works."),
+        service.payload,
+      );
+    }));
+}
+
+test("client close cancels pending buffered synthesis", () =>
+  setup(async (service, client) => {
+    service.mode = "silence";
+    const pending = client.tts.synthesizeToBuffer("Hello.");
+    const rejected = assert.rejects(pending, RimeCancelledError);
+    await service.textReceived;
+    await client.close();
+    await rejected;
+  }));
+
+for (const [sampleRate, timeScaleFactor] of [
+  [8000, 0.4],
+  [16000, 1],
+  [24000, 2.5],
+]) {
+  test(`sample rate without format and factor boundary ${sampleRate}/${timeScaleFactor}`, () =>
+    setup(async (service, client) => {
+      const audio = client.tts.synthesize("Hello.", {
+        sampleRate,
+        timeScaleFactor,
+      });
+      assert.throws(() => {
+        audio.sampleRate = 48000;
+      }, TypeError);
+      assert.deepEqual(await collect(audio), service.payload);
+      const params = service.calls[0][0].payload.value.audioParameters;
+      assert.equal(params.samplingRate, sampleRate);
+      assert.ok(Math.abs(params.timeScaleFactor - timeScaleFactor) < 1e-6);
+    }));
+}
+
+for (const extraBytes of [0, 2]) {
+  test(`fixed 64 MiB buffer limit, extra bytes=${extraBytes}`, () =>
+    setup(async (service, client) => {
+      service.payload = Buffer.alloc(1024 * 1024);
+      service.finalResponses = Array(63).fill(
+        create(schema.SynthesisResponseStreamSchema, {
+          payload: { case: "audio", value: service.payload },
+        }),
+      );
+      if (extraBytes)
+        service.finalResponses.push(
+          create(schema.SynthesisResponseStreamSchema, {
+            payload: { case: "audio", value: Buffer.alloc(extraBytes) },
+          }),
+        );
+      const result = client.tts.synthesizeToBuffer("Hello.");
+      if (extraBytes)
+        await assert.rejects(result, {
+          name: "RimeResourceLimitError",
+          requestId: "test-request",
+          message: /64 MiB/,
+        });
+      else assert.equal((await result).length, 64 * 1024 * 1024);
+      service.finalResponses = [];
+      service.payload = Buffer.from([1, 0]);
+      assert.deepEqual(
+        await client.tts.synthesizeToBuffer("Still works."),
+        service.payload,
+      );
     }));
 }
