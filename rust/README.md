@@ -1,320 +1,231 @@
 # Rime SDK for Rust
 
-Asynchronous text-to-speech for Coda and Mist v3, plus streaming speech recognition.
-Requires Rust 1.88 or later
-and a Tokio runtime with I/O and time enabled. Realtime Prism support is not
-included.
+Generate speech with Coda or Mist v3 and transcribe audio with streaming STT
+through the async `Client`. Your application handles audio capture and playback.
 
-Add these dependencies to your `Cargo.toml`:
+## Installation
+
+Requires **Rust 1.88 or later** and a Tokio runtime with I/O and time enabled.
+Install the alpha crate from crates.io. For a new project:
+
+```sh
+cargo new rime-quickstart
+cd rime-quickstart
+export RIME_API_KEY="your-api-key"
+```
+
+Add these dependencies to `Cargo.toml`. Tokio's `fs` and `io-util` features,
+`bytes`, and `futures-util` support the examples below.
 
 ```toml
 [dependencies]
-rimelabs-sdk = "0.1.0-alpha.1"
+rimelabs-sdk = "0.1.0-alpha.5"
+bytes = "1"
 futures-util = "0.3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "fs", "io-util"] }
 ```
 
-Set `RIME_API_KEY`, then use this example in `src/main.rs`:
+Get an API key from the [Rime dashboard](https://app.rime.ai/). A key is required:
+`Client::builder().build()` reads `RIME_API_KEY`, or you can use
+`Client::builder().api_key("...").build()` to override it. The SDK does not load
+`.env` files. Shell commands below assume macOS or Linux.
+
+## TTS
+
+Use `client.tts().synthesize(text, options)` for a complete string, or
+`client.tts().stream(source, options)` for incremental text. Both return
+`Result<AudioStream, Error>` immediately; do not await these method calls.
+Read audio with `StreamExt::next().await`. For complete audio in memory, await
+`client.tts().synthesize_to_buffer(text, options)` for `Result<Vec<u8>, Error>`.
+Text is required and must contain non-whitespace characters.
+
+### Client options
+
+These optional `Client::builder()` methods configure TTS. They do not configure STT.
+
+| Builder method | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `.model(model)` | Select `Model::Coda` or `Model::MistV3`. | No | `Model::Coda` |
+| `.endpoint(host)` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
+| `.timeout(duration)` | Overall TTS timeout as a positive `Duration`, such as `Duration::from_secs(60)`; zero is invalid. | No | No overall timeout. |
+
+### Synthesis options
+
+All three TTS methods accept `SynthesisOptions::default()` with these optional
+builders. Import `AudioFormat`, `Model`, and `PronunciationEntry` from
+`rimelabs_sdk` as needed, and `Duration` from `std::time`.
+
+| Builder method | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `.voice(name)` | Voice name for the selected model, such as `"clementine"` or `"astra"`. | No | `"clementine"` for Coda; `"astra"` for Mist v3. |
+| `.language(code)` | Spoken language code, such as `"en"` or `"es"`; the service validates support. | No | `"en"` |
+| `.audio_format(format)` | Output encoding: `AudioFormat::Pcm`, `Wav`, `Mp3`, `Pcm24000`, or `Mulaw8000`. | No | Raw PCM16 at 24 kHz. |
+| `.sample_rate(rate)` | Requested output rate in Hz: `8000`, `16000`, or `24000`. | No | `24000`; `8000` for `Mulaw8000`. |
+| `.time_scale_factor(factor)` | `f32` duration multiplier from `0.4` to `2.5`; below `1` speeds speech up, above `1` slows it down. | No | Omitted; normal duration (`1`). |
+| `.timestamps(enabled)` | `true` requests word timings; supported only with Mist v3. | No | `false` |
+| `.custom_lexicon(entries)` | `Vec<PronunciationEntry>` for Coda, created with `PronunciationEntry::new(spelling, pronunciation)`; pronunciations use space-separated X-SAMPA. | No | Empty vector. |
+| `.timeout(budget)` | `Some(Duration)` overrides the overall timeout; `None` disables it. Zero is invalid. | No | Inherits the client timeout. |
+
+Discover valid values with `client.voices(Some("en")).await` and
+`client.languages().await`. Both return `Result<Vec<String>, Error>`. Use
+`client.voices(None)` to list all voices for the selected model. Discovery uses
+the client timeout with an additional ten-second maximum.
+
+### Example: save an IVR greeting
+
+Replace `src/main.rs` with this example. It writes a complete 16 kHz WAV file,
+ready for playback or upload.
 
 ```rust,no_run
-use futures_util::StreamExt;
-use rimelabs_sdk::{Client, SynthesisOptions};
+use rimelabs_sdk::{AudioFormat, Client, SynthesisOptions};
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::builder().build()?; // Reads RIME_API_KEY.
-    let mut audio = client.tts().synthesize("Hello.", SynthesisOptions::default())?;
-    while let Some(chunk) = audio.next().await {
-        let pcm_bytes = chunk?;
-        // Send raw PCM16 little-endian mono 24 kHz bytes to your audio sink.
-    }
+    let client = Client::builder().timeout(Duration::from_secs(60)).build()?;
+    let result = client
+        .tts()
+        .synthesize_to_buffer(
+            "Thank you for calling. Your appointment is confirmed for tomorrow.",
+            SynthesisOptions::default()
+                .audio_format(AudioFormat::Wav)
+                .sample_rate(16000)
+                .time_scale_factor(0.9),
+        )
+        .await;
     client.close().await;
+    tokio::fs::write("greeting.wav", result?).await?;
+    println!("Saved greeting.wav");
     Ok(())
 }
 ```
 
-The SDK does not read `.env` files. Explicit credentials use `.api_key(...)`.
-Use `.model(Model::MistV3)` to select Mist v3. Coda is the default.
+Run `cargo run`, then open `greeting.wav` in an audio player.
 
-Use `client.tts().synthesize(text, options)` for a string. Use
-`client.tts().stream(source, options)` for incremental text. Both return an
-`AudioStream` immediately; do not await these method calls. Read audio chunks
-as they arrive. The TTS view shares the client's configuration and shutdown.
+### Audio and stream behavior
 
-For example, replace the synthesis call above with:
+All output is mono. PCM is signed 16-bit little-endian audio without a header;
+WAV contains PCM16; MP3 is encoded by the service. PCM/WAV rates are requested
+from the server. MP3 headers determine the actual encoded rate. The fixed
+`Pcm24000` and `Mulaw8000` presets reject conflicting sample rates; mu-law is
+converted locally from 24 kHz PCM. Read `audio.sample_rate()` for the requested rate.
 
-```rust,no_run
-# use rimelabs_sdk::{Client, SynthesisOptions};
-# async fn example(client: &Client) -> Result<(), rimelabs_sdk::Error> {
-let text = futures_util::stream::iter([
-    Ok("Hello. ".to_owned()),
-    Ok("This text arrives in chunks.".to_owned()),
-]);
-let mut audio = client.tts().stream(text, SynthesisOptions::default())?;
-// Consume audio with the same loop as above.
-# audio.close().await;
-# Ok(())
-# }
-```
+The buffer helper waits for successful completion and finalizes WAV lengths.
+Its fixed limit is **64 MiB per call**, including headers; exceeding it returns
+`ErrorKind::ResourceLimit` without partial audio. WAV/MP3 stream chunks are
+fragments of one file. Use the buffer helper when you need a complete WAV.
 
-Send text as it becomes available; Rime automatically combines fragments into
-sentences for speech. For nonblank input, ending the text stream flushes any
-remaining text, even without final punctuation. Pausing the stream may delay
-speech for an unfinished sentence.
+For incremental text, supply a `Stream<Item = Result<String, Error>> + Send + 'static`.
+Send fragments as they arrive; the service combines them into sentences.
+Consume streaming audio through the final `None` to confirm success, since an
+error can follow earlier audio. Dropping a stream requests cancellation;
+`audio.close().await` also waits for cleanup. `client.close().await` cancels
+operations on all client clones. Keep the Tokio runtime alive during cleanup.
+Synthesis is not retried automatically, and overall timeouts include pauses by
+the caller; connection and progress limits also apply.
 
-If the source ends without any non-whitespace text, the audio stream yields an
-error with `ErrorKind::Input`.
+For timestamps, enable `.timestamps(true)`, consume audio through the final
+`None`, then call the synchronous `audio.timestamps()`. The result has `status`
+and `spans` with word text and start/end seconds. Nonzero alignment status does
+not fail the audio. The buffer helper returns only bytes, so use an audio stream
+to access timings. Custom lexicons apply to the whole request; the options own
+their entries, and the service validates pronunciations and model/language support.
 
-`client.tts().stream` accepts a `Send + 'static` stream of `Result<String, Error>`.
-It forwards source text in order, preserving whitespace. Messages are at most
-4,096 UTF-8 bytes and never divide a Unicode character. Input errors cancel the
-request. Audio can arrive before input ends. Successful completion requires
-reading the audio stream to its end; earlier chunks can precede a later error.
-An error discards audio still in the SDK queue and takes priority on the next
-read. Audio already returned to the application remains available to it.
+## STT
 
-Dropping an audio stream requests cancellation. `audio.close().await` also
-waits for its worker to stop. `client.close().await` cancels all operations on
-all clones. Dropping the last client handle requests cancellation. Applications
-must keep their Tokio runtime alive while waiting for cleanup.
+Use `client.stt().stream(source, options)` to transcribe one utterance.
+The required source is a `Stream<Item = Result<Bytes, Error>> + Send + 'static`
+of headerless signed PCM16 little-endian audio. Ending the source ends the
+utterance; your application decides when to stop.
 
-The audio queue holds at most 96,000 bytes in chunks of at most 9,600 bytes.
-Backpressure pauses output reads. Progress deadlines exclude a paused text
-source and buffered audio. An optional overall timeout still applies during
-either pause. Synthesis requests are never replayed automatically.
+STT uses streaming gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
+key. There is no STT model, endpoint, or protocol selector. TTS client settings,
+including its timeout, do not apply to STT.
 
-`AudioFormat::Mulaw8000` selects G.711 mu-law mono 8 kHz output. Conversion
-uses the same filter and test vectors as the other SDKs. Audio has no WAV header.
+### Transcription options
 
-## Synthesis options
+Start with `TranscriptionOptions::new(language)`, then use the optional builders.
+Import `PcmFormat`, `TranscriptionMode`, and `TranscriptionOptions` from `rimelabs_sdk`.
 
-All three TTS methods accept `SynthesisOptions::default()` with optional builders:
+| Constructor or builder | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `TranscriptionOptions::new(language)` | Spoken BCP-47 language tag, such as `"en"` or `"es"`; passed to the service. | Yes | None; no automatic detection. |
+| `.mode(mode)` | `TranscriptionMode::Written` normalizes written text; `Verbatim` prefers spoken wording. | No | `Written` |
+| `.context_terms(terms)` | `Vec<String>` recognition hints, such as `vec!["Rime".into()]`; hints do not force a match. | No | Empty vector. |
+| `.input_format(format)` | `PcmFormat { sample_rate: 16000, channels: 1 }`: rates `8000`, `16000`, `24000`, `48000`; channels `1` or `2`. | No | `PcmFormat::default()`: 16 kHz mono PCM16. |
+| `.timeout(budget)` | `Some(Duration)` overall budget, including source/consumer pauses; `None` disables it. Zero is invalid. | No | `None`; independent of the client timeout. |
 
-| Builder method | Default and behavior |
-| --- | --- |
-| `.voice("name")` | The model's default voice: `clementine` for Coda, `astra` for Mist v3. |
-| `.language("en")` | `en`; passed to the service. Blank values fail locally. |
-| `.audio_format(AudioFormat::Wav)` | `AudioFormat::Pcm` (raw PCM16, 24 kHz). Also `Mp3`, `Pcm24000`, `Mulaw8000`. |
-| `.sample_rate(16000)` | Requested rate: 8000, 16000 or 24000 Hz. Defaults to 24000 for configurable formats. |
-| `.time_scale_factor(0.9)` | Omitted (normal duration). Finite duration multiplier from 0.4 to 2.5; below 1 is faster, above 1 is slower. |
-| `.timeout(Some(Duration::from_secs(60)))` | `Some(duration)` overrides the client timeout; this example sets it to 60 seconds. Default options inherit the client timeout. `None` disables it; zero is invalid. Applies until audio is fully consumed, including consumer pauses. |
-| `.custom_lexicon(entries)` | Empty vector; request-wide pronunciation overrides for Coda. |
-| `.timestamps(true)` | `false`; Mist v3 word timings after successful audio consumption. |
+### Example: transcribe a recording
 
-`Pcm` (headerless PCM16), `Wav` (PCM16 WAV) and `Mp3` (`audio/mpeg`) are mono.
-PCM/WAV sample rates are requested from the server, without SDK resampling.
-MP3 encoder headers determine its actual rate. Fixed presets `Pcm24000` and
-`Mulaw8000` reject conflicting explicit rates. Mu-law still converts 24 kHz PCM locally.
-Use `audio.sample_rate()` for the requested rate; `AudioFormat::sample_rate()`
-is zero for configurable encodings. Default streams still report `Pcm24000`.
-PCM chunks contain complete sample frames; WAV/MP3 chunks are fragments of one
-encoded stream, not independent files.
-
-## Complete audio in memory
-
-Await `client.tts().synthesize_to_buffer(text, options)` for a `Vec<u8>`. It uses
-the same streaming RPC, waits for success and finalizes WAV lengths for IVR files.
-Errors release the stream and never return partial audio. Streaming WAV may have
-unknown lengths in its header, so use this helper for a completed file.
-The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
-file headers. Exceeding it returns `ErrorKind::ResourceLimit` without partial
-audio. For mono PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes
-at 16 kHz, or 23 minutes at 24 kHz. Use streaming synthesis for larger outputs
-or timestamps. Collection can temporarily use more memory than the output limit.
-Timeouts still apply; dropping the future cancels synthesis.
-
-```rust,no_run
-use rimelabs_sdk::{AudioFormat, Client, SynthesisOptions};
-
-# async fn example() -> Result<(), Box<dyn std::error::Error>> {
-let client = Client::builder().build()?;
-let audio = client.tts().synthesize_to_buffer(
-    "Thank you for calling.",
-    SynthesisOptions::default().audio_format(AudioFormat::Wav)
-        .sample_rate(16000).time_scale_factor(0.9),
-).await?;
-tokio::fs::write("greeting.wav", audio).await?;
-client.close().await;
-# Ok(())
-# }
-```
-
-## Custom pronunciations (Coda)
-
-Pass words or phrases and their space-separated X-SAMPA pronunciations:
-
-```rust,no_run
-use futures_util::StreamExt;
-use rimelabs_sdk::{Client, ErrorKind, PronunciationEntry, SynthesisOptions};
-
-# async fn example() -> Result<(), rimelabs_sdk::Error> {
-let client = Client::builder().build()?; // Coda is the default.
-let options = SynthesisOptions::default()
-    .language("en")
-    .custom_lexicon(vec![PronunciationEntry::new("hello", r#"h @ . " l oU"#)]);
-let mut audio = client.tts().synthesize("Hello world.", options)?;
-while let Some(chunk) = audio.next().await {
-    match chunk {
-        Ok(bytes) => { /* Send bytes to your audio sink. */ }
-        Err(error) => {
-            if error.kind() == ErrorKind::Input {
-                eprintln!("{}; request: {:?}", error.message(), error.request_id());
-            }
-            return Err(error);
-        }
-    }
-}
-client.close().await;
-# Ok(())
-# }
-```
-
-Options own their lexicon entries. Calling `synthesize()` or `stream()` transfers
-those options to the request; cloning options makes an independent copy. The
-same lexicon applies to the entire request, including incremental text. Subsequent
-requests have their own options. Omit the option or use an empty vector for
-default pronunciation. Rust's typed entries and strings guarantee field types
-and valid UTF-8.
-
-The service matches whole words or phrases case-insensitively and applies the
-pronunciation after text normalization. Longest matches take precedence; the
-last entry for a repeated spelling wins. Inline `pronounce(...)` directives are
-not supported.
-
-Coda accepts custom pronunciations in German, English, Spanish, French, Italian,
-and Portuguese, with up to 500 entries per request. The service validates
-languages, pronunciation rules, and entry limits. Mist rejects nonempty lexicons.
-The SDK passes entries unchanged, including their order, case, and whitespace.
-
-Service-rejected entries fail the request with `ErrorKind::Input` before audio.
-Check errors when consuming the stream as well as at construction.
-`error.message()` preserves the service's explanation, including checks such as
-`no-primary-stress` or `unknown-phone`, and `error.request_id()` identifies the
-request when supplied by the service. Entries are never silently skipped or
-repaired, and rejected requests are never replayed automatically.
-
-## Word timestamps (Mist v3)
-
-Enable timestamps, consume all audio, then read the result:
-
-```rust,no_run
-use futures_util::StreamExt;
-use rimelabs_sdk::{Client, Model, SynthesisOptions};
-
-# async fn example() -> Result<(), rimelabs_sdk::Error> {
-let client = Client::builder().model(Model::MistV3).build()?;
-let mut audio = client.tts().synthesize(
-    "Twenty two.", SynthesisOptions::default().timestamps(true),
-)?;
-while let Some(chunk) = audio.next().await {
-    let bytes = chunk?;
-    // Send bytes to your audio sink.
-}
-let result = audio.timestamps()?;
-if result.status.code == 0 {
-    for word in result.spans {
-        println!("{}: {:.3}–{:.3}s", word.text, word.start, word.end);
-    }
-} else {
-    eprintln!("Alignment unavailable: {}", result.status.message);
-}
-client.close().await;
-# Ok(())
-# }
-```
-
-`audio.timestamps()` is synchronous: it never waits or consumes audio. Calls
-without opt-in, or early calls on an otherwise healthy stream, return
-`ErrorKind::Input`. Read audio through the stream's final `None` before requesting
-the result. Enabling timestamps with Coda fails locally.
-
-`TimestampResult` contains a `TimestampStatus` and a vector of `WordTimestamp`
-values. Status code zero means success; nonzero codes are the service's
-`google.rpc.Code` alignment failures, with an explanation and no spans. Alignment
-failures do not fail audio. Missing or malformed timestamp trailers produce
-`ErrorKind::Stream` from the accessor while audio remains usable. A failed RPC,
-cancellation, or timeout is returned as an SDK error and cannot produce a
-successful final result.
-
-Timings describe normalized spoken words, with `start` and `end` in seconds from
-the beginning of the entire synthesis. They are unchanged by PCM or mu-law output
-conversion. They arrive after generation, not incrementally. Reading audio to
-completion does not require waiting for speaker playback. Results own their
-values and remain available after closing a successfully consumed stream or
-client.
-
-## Transcribe speech
-
-Use `client.stt().stream(source, options)` for one utterance. The source supplies
-raw signed little-endian PCM16 bytes. Source exhaustion ends the utterance.
-The application owns file access, microphone capture, and the decision to stop.
+Save a short recording as `utterance.pcm`: **16 kHz, mono, signed PCM16
+little-endian, with no WAV header**. Replace `src/main.rs` with this example.
 
 ```rust,no_run
 use bytes::Bytes;
-use futures_util::StreamExt;
-use rimelabs_sdk::{Client, TranscriptionOptions, TranscriptionUpdate};
+use futures_util::{stream, StreamExt};
+use rimelabs_sdk::{Client, Error, TranscriptionOptions, TranscriptionUpdate};
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
 
-# async fn example() -> Result<(), Box<dyn std::error::Error>> {
-let client = Client::builder().build()?;
-// Replace with an asynchronous source of your recorded PCM16 audio.
-let source = futures_util::stream::iter([Ok(Bytes::from_static(&[0, 0]))]);
-let mut transcript = client.stt().stream(source, TranscriptionOptions::new("en"))?;
-while let Some(update) = transcript.next().await {
-    match update? {
-        TranscriptionUpdate::Partial { text } => println!("partial: {text}"),
-        TranscriptionUpdate::Final { text, language } => println!("final ({language}): {text}"),
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let file = tokio::fs::File::open("utterance.pcm").await?;
+    let source = stream::try_unfold(file, |mut file| async move {
+        let mut data = vec![0; 3200];
+        let count = file.read(&mut data).await.map_err(Error::input)?;
+        if count == 0 {
+            return Ok(None);
+        }
+        data.truncate(count);
+        Ok(Some((Bytes::from(data), file)))
+    });
+    let client = Client::builder().build()?;
+    let mut transcript = client.stt().stream(
+        source,
+        TranscriptionOptions::new("en").timeout(Some(Duration::from_secs(120))),
+    )?;
+    let result = async {
+        while let Some(update) = transcript.next().await {
+            match update? {
+                TranscriptionUpdate::Partial { text } => println!("partial: {text}"),
+                TranscriptionUpdate::Final { text, language } => {
+                    println!("final ({language}): {text}")
+                }
+            }
+        }
+        Ok::<(), Error>(())
     }
+    .await;
+    client.close().await;
+    result?;
+    Ok(())
 }
-println!("request: {:?}", transcript.request_id());
-client.close().await;
-# Ok(())
-# }
 ```
 
-Add `bytes = "1"` to your dependencies for audio chunks. The source must implement
-`Stream<Item = Result<Bytes, Error>> + Send + 'static`. Use `Error::input(error)`
-to report a source failure. See [the file example](examples/transcribe.rs) for
-asynchronous file reads.
+Run `cargo run`. Each partial update replaces the **complete current
+transcript**; do not append snapshots. A final update confirms successful
+completion and may be empty for silence. Errors do not turn partials into finals.
 
-`TranscriptionOptions::new(language)` requires a spoken BCP-47 language tag.
-The SDK passes it unchanged to the service. Options are:
+The SDK converts supported input formats to 16 kHz mono. Stereo must be
+interleaved. WAV headers, MP3, and mu-law input are not accepted. Chunks may split
+sample frames, but an incomplete final frame fails the request. The SDK does not
+provide microphone capture, automatic end-of-speech detection, word timings, or
+diarization. Recognition is not retried automatically.
 
-| Builder method | Behavior |
-| --- | --- |
-| `.mode(TranscriptionMode::Written)` | Default formatting intent. Use `Verbatim` to preserve spoken wording. |
-| `.context_terms(vec!["Rime".into()])` | Recognition hints, passed unchanged and in order. |
-| `.input_format(PcmFormat { sample_rate: 24000, channels: 2 })` | PCM16 at 8, 16, 24, or 48 kHz; mono or interleaved stereo. Default: 16 kHz mono. |
-| `.timeout(Some(Duration::from_secs(120)))` | Overall timeout from the first poll until final consumption, including source and consumer pauses. Default: `None`. Zero is invalid. |
+The first poll starts network work and the overall timeout. Audio sources must
+yield without blocking Tokio; use `Error::input(error)` for source failures.
+Dropping the transcript or calling `transcript.cancel()` requests cancellation;
+`transcript.close().await` also waits for cleanup. Closing the client cancels all
+its operations. Connection, acceptance, and completion limits still apply when
+the overall timeout is disabled.
 
-The SDK converts input to 16 kHz mono. Chunks can split sample frames. An
-incomplete frame at source exhaustion fails the request. Each gRPC audio payload
-is at most 64 KiB. Input must have no WAV header or compressed encoding.
+## Help and licenses
 
-STT uses `stt.api.rime.ai:443` with TLS and the client's API key. No endpoint
-configuration is needed. The TTS `model`, `endpoint`, and
-client `timeout` settings do not apply to STT. STT has no voice or model selector.
+See the [examples](https://github.com/rimelabs/rime-sdk/tree/main/rust/examples)
+for streaming text and transcription. Visit [Rime documentation](https://docs.rime.ai/)
+for service information, or report SDK issues on
+[GitHub](https://github.com/rimelabs/rime-sdk/issues). Use `error.kind()` to check
+categories such as `ErrorKind::Timeout`, and `error.request_id()` to identify a
+request. Include the SDK version and request ID when reporting a failure; omit API keys.
 
-Stream construction validates options. The first poll starts network work.
-The SDK reads no audio until the service accepts the configuration. Upload and
-transcript reading then run concurrently. Each partial replaces the previous
-transcript. Do not concatenate partials. Silence can return an empty final.
-
-A final requires source exhaustion, a matching protocol result, and successful
-gRPC completion. Errors never convert partial text into a final result. Requests
-are not replayed automatically. The SDK has no voice activity detection, automatic
-endpointing, word timing, or speaker diarization.
-
-The transcript queue holds at most 16 updates, each with at most 64 KiB of UTF-8
-text. The gRPC response limit is 256 KiB. Slow readers pause response processing.
-Connection and acceptance each have a ten-second limit. Completion has a
-120-second limit after source exhaustion, ending on successful gRPC completion.
-The optional overall timeout stays active until the caller consumes the final.
-Server limits also apply.
-
-Dropping a transcript stream cancels its operation. `transcript.cancel()` requests
-cancellation; `transcript.close().await` also waits for worker cleanup. Client
-close cancels all TTS and STT operations, including unpolled streams. Cancelling
-one stream leaves other streams active. Audio sources must yield without blocking
-Tokio. Cancellation drops the source; it cannot stop external work started by
-the application. Errors use the shared `ErrorKind` categories and retain the
-request ID when the service supplies it.
+SDK code uses the [MIT license](LICENSE).

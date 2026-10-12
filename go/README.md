@@ -1,441 +1,269 @@
 # Rime SDK for Go
 
-Use `client.TTS.Synthesize` for a string and `client.TTS.Stream` for an
-incremental text source. Both return streaming Coda and Mist v3 audio.
-The SDK handles authentication, gRPC, audio conversion,
-deadlines, and cancellation. It also streams speech recognition from raw PCM audio
-to partial and final transcripts. Your application owns audio capture and playback.
+Generate speech with Coda or Mist v3 and transcribe audio with streaming STT
+through the `rime.Client`. Your application handles audio capture and playback.
 
-Go 1.24 or later is required. The SDK does not require cgo.
+## Installation
 
-Install a published version from the public `rimelabs/rime-sdk` repository:
+Requires **Go 1.24 or later**; cgo is not required. Install the module from the
+public `rimelabs/rime-sdk` repository:
 
 ```sh
+mkdir rime-quickstart
+cd rime-quickstart
+go mod init example.com/rime-quickstart
 go get github.com/rimelabs/rime-sdk/go@latest
+export RIME_API_KEY="your-api-key"
 ```
 
-The module is in the repository's `go/` directory. Release tags use `go/v…`.
-To select an exact release, pass its version without the directory prefix, for
-example `go get github.com/rimelabs/rime-sdk/go@v0.1.0-alpha.2`.
-The repository must be public and the release tag must exist before installation.
-See [the release guide](../RELEASING.md).
+For an existing module, skip the first three commands. Get an API key from the
+[Rime dashboard](https://app.rime.ai/). A key is required:
+`rime.NewClient(rime.Config{})` reads `RIME_API_KEY`, or you can set `Config.APIKey`
+to override it. The SDK does not load `.env` files. Shell commands below assume
+macOS or Linux.
 
-Set `RIME_API_KEY` in the application environment. The SDK does not load `.env` files.
+## TTS
 
-## Save speech
+Use `client.TTS.Synthesize(ctx, text, options)` for a complete string, or
+`client.TTS.Stream(ctx, source, options)` for incremental text. Both return
+`(*AudioStream, error)`; read audio with `Recv()` until `io.EOF`. For complete
+audio in memory, `client.TTS.SynthesizeToBuffer(ctx, text, options)` returns
+`([]byte, error)`. Text is required and must contain non-whitespace characters.
+Pass a non-nil `context.Context` to every operation.
+
+### Client options
+
+These optional `rime.Config` fields configure TTS. They do not configure STT.
+
+| Option | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `Model` | Select `"coda"` or `"mistv3"`. | No | `"coda"` when empty. |
+| `Endpoint` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
+| `Timeout` | Overall TTS timeout as a `time.Duration`, such as `60 * time.Second`; zero disables it. | No | `0` |
+
+### Synthesis options
+
+All three TTS methods accept `rime.SynthesisOptions{}` with these optional fields.
+
+| Option | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `Voice` | Voice name for the selected model, such as `"clementine"` or `"astra"`. | No | `"clementine"` for Coda; `"astra"` for Mist v3. |
+| `Language` | Spoken language code, such as `"en"` or `"es"`; the service validates support. | No | `"en"` when empty. |
+| `AudioFormat` | Output encoding: `rime.PCM`, `rime.WAV`, `rime.MP3`, `rime.PCM24000`, or `rime.MULAW8000`. | No | Raw PCM16 at 24 kHz. |
+| `SampleRate` | Requested output rate in Hz: `8000`, `16000`, or `24000`; zero selects the format's default. | No | `24000`; `8000` for `MULAW8000`. |
+| `TimeScaleFactor` | `*float64` duration multiplier from `0.4` to `2.5`; below `1` speeds speech up, above `1` slows it down. | No | `nil`; normal duration (`1`). |
+| `Timestamps` | `true` requests word timings; supported only with Mist v3. | No | `false` |
+| `CustomLexicon` | `[]rime.PronunciationEntry` with `Spelling` and space-separated X-SAMPA `Pronunciation` strings for Coda. | No | Empty slice. |
+| `Timeout` | `*time.Duration` override; a pointer to zero disables the overall timeout. Negative values are invalid. | No | `nil`; inherits the client timeout. |
+
+Discover valid values with `client.Voices.List(ctx, rime.VoiceListOptions{Language: "en"})`
+and `client.Languages.List(ctx, rime.DiscoveryOptions{})`. Both return
+`([]string, error)`. Omit the voice language filter to list all voices for the
+selected model. Both options structs accept `Timeout`; discovery has an
+additional ten-second maximum.
+
+### Example: save an IVR greeting
+
+Save as `tts.go`. This writes a complete 16 kHz WAV file, ready for playback or upload.
 
 ```go
 package main
 
 import (
-    "context"
-    "io"
-    "log"
-    "os"
+	"context"
+	"fmt"
+	"log"
+	"os"
+	"time"
 
-    rime "github.com/rimelabs/rime-sdk/go"
+	rime "github.com/rimelabs/rime-sdk/go"
 )
 
 func main() {
-    if err := save(); err != nil { log.Fatal(err) }
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func save() error {
-    client, err := rime.NewClient(rime.Config{})
-    if err != nil { return err }
-    defer client.Close()
-    stream, err := client.TTS.Synthesize(context.Background(), "Hello. This is Rime.", rime.SynthesisOptions{})
-    if err != nil { return err }
-    defer stream.Close()
-    file, err := os.Create("speech.pcm")
-    if err != nil { return err }
-    defer file.Close()
-    for {
-        chunk, err := stream.Recv()
-        if err == io.EOF { return file.Close() }
-        if err != nil { return err }
-        if _, err := file.Write(chunk); err != nil { return err }
-    }
+func run() error {
+	client, err := rime.NewClient(rime.Config{Timeout: 60 * time.Second})
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	factor := 0.9
+	audio, err := client.TTS.SynthesizeToBuffer(context.Background(),
+		"Thank you for calling. Your appointment is confirmed for tomorrow.",
+		rime.SynthesisOptions{
+			AudioFormat:     rime.WAV,
+			SampleRate:      16000,
+			TimeScaleFactor: &factor,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile("greeting.wav", audio, 0600); err != nil {
+		return err
+	}
+	fmt.Println("Saved greeting.wav")
+	return nil
 }
 ```
 
-`speech.pcm` contains raw 16-bit little-endian mono PCM at 24 kHz. It has no WAV
-header. `examples/save` in this module writes a WAV file and supports streaming
-text input.
+Run `go run tts.go`, then open `greeting.wav` in an audio player.
 
-## Transcribe speech
+### Audio and stream behavior
 
-`client.STT.Stream(ctx, source, options)` transcribes one caller-ended utterance.
-The caller supplies raw audio and decides when the utterance ends. The SDK handles
-the gRPC connection, authentication, input conversion and transcript validation.
-It does not capture microphone audio, detect end of speech, or retry recognition.
+All output is mono. PCM is signed 16-bit little-endian audio without a header;
+WAV contains PCM16; MP3 is encoded by the service. PCM/WAV rates are requested
+from the server. MP3 headers determine the actual encoded rate. The fixed
+`PCM24000` and `MULAW8000` presets reject conflicting sample rates; mu-law is
+converted locally from 24 kHz PCM. Read `stream.SampleRate()` for the requested rate.
 
-### Read transcripts
+The buffer helper waits for successful completion and finalizes WAV lengths.
+Its fixed limit is **64 MiB per call**, including headers; exceeding it returns
+`ErrResourceLimit` and nil audio. WAV/MP3 stream chunks are fragments of one file.
+Use the buffer helper when you need a complete WAV.
+
+For incremental text, supply a `rime.TextSource`, a
+`func(context.Context) (string, error)` that returns `io.EOF` when finished.
+Send fragments as they arrive; the service combines them into sentences.
+Consume streaming audio until `io.EOF` to confirm success, since an error can
+follow earlier audio. Defer `stream.Close()` and `client.Close()` for cleanup.
+A client supports concurrent operations; each stream supports one reader.
+Sources must honor cancellation. Synthesis is not retried automatically, and
+overall timeouts include pauses by the caller; connection and progress limits
+also apply. A caller context can impose an earlier deadline.
+
+For timestamps, enable `Timestamps: true`, consume audio through `io.EOF`, then
+call `stream.Timestamps()`. The result has `Status` and `Spans` with word text and
+start/end seconds. Nonzero alignment status does not fail the audio. The buffer
+helper returns only bytes, so use an audio stream to access timings. Custom
+lexicons apply to the whole request; the service validates pronunciations and
+model/language support.
+
+## STT
+
+Use `client.STT.Stream(ctx, source, options)` to transcribe one utterance.
+The required `rime.AudioSource` is a `func(context.Context) ([]byte, error)`
+supplying headerless signed PCM16 little-endian audio. Return `io.EOF` to end
+the utterance; bytes returned with `io.EOF` are sent first. Your application
+decides when to stop.
+
+STT uses streaming gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
+key. There is no STT model, endpoint, or protocol selector. TTS client settings,
+including its timeout, do not apply to STT.
+
+### Transcription options
+
+Pass these fields in `rime.TranscriptionOptions`.
+
+| Option | Purpose and values | Required | Default |
+| --- | --- | --- | --- |
+| `Language` | Spoken BCP-47 language tag, such as `"en"` or `"es"`; passed to the service. | Yes | None; no automatic detection. |
+| `Mode` | `rime.TranscriptionWritten` normalizes written text; `rime.TranscriptionVerbatim` prefers spoken wording. | No | `TranscriptionWritten` when empty. |
+| `ContextTerms` | `[]string` recognition hints, such as `[]string{"Rime"}`; hints do not force a match. | No | Empty slice. |
+| `InputFormat` | `rime.PCMFormat{SampleRate: 16000, Channels: 1}`: rates `8000`, `16000`, `24000`, `48000`; channels `1` or `2`. | No | 16 kHz mono PCM16; zero fields select these defaults. |
+| `Timeout` | `*time.Duration` overall budget, including source/consumer pauses; `nil` or a pointer to zero disables it. Negative values are invalid. | No | `nil`; independent of the client timeout. |
+
+### Example: transcribe a recording
+
+Save a short recording as `utterance.pcm`: **16 kHz, mono, signed PCM16
+little-endian, with no WAV header**. Save this as `stt.go`.
 
 ```go
-stream, err := client.STT.Stream(ctx, source, rime.TranscriptionOptions{
-    Language: "en",
-    Mode: rime.TranscriptionWritten,
-    ContextTerms: []string{"Rime"},
-    InputFormat: rime.PCMFormat{SampleRate: 24000, Channels: 1},
-})
-if err != nil { return err }
-defer stream.Close()
-for {
-    update, err := stream.Recv()
-    if err == io.EOF { break }
-    if err != nil { return err }
-    switch value := update.(type) {
-    case rime.TranscriptionPartial:
-        fmt.Println("partial:", value.Text)
-    case rime.TranscriptionFinal:
-        fmt.Println("final:", value.Text, "language:", value.Language)
-    }
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"time"
+
+	rime "github.com/rimelabs/rime-sdk/go"
+)
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
+	file, err := os.Open("utterance.pcm")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	client, err := rime.NewClient(rime.Config{})
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	buffer := make([]byte, 3200)
+	source := func(ctx context.Context) ([]byte, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		n, err := file.Read(buffer)
+		return buffer[:n], err
+	}
+	budget := 120 * time.Second
+	transcript, err := client.STT.Stream(context.Background(), source,
+		rime.TranscriptionOptions{Language: "en", Timeout: &budget})
+	if err != nil {
+		return err
+	}
+	defer transcript.Close()
+	for {
+		update, err := transcript.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		switch value := update.(type) {
+		case rime.TranscriptionPartial:
+			fmt.Println("partial:", value.Text)
+		case rime.TranscriptionFinal:
+			fmt.Println("final:", value.Text)
+		}
+	}
 }
 ```
 
-Every partial is the **complete current transcript**. Replace the previous text;
-do not append snapshots. A final is emitted exactly once, after input exhaustion,
-a consistent final service response, and successful gRPC termination. Silence
-may produce an empty final. Failed operations never produce a final; partial text
-already delivered remains provisional. After the final, `Recv` returns `io.EOF`.
-
-Run the file example from the Go module directory:
-
-```sh
-go run ./examples/transcribe -language en -sample-rate 24000 audio.pcm
-```
-
-Use a raw PCM file with no WAV header. The example opens the file only after the
-service accepts the request, prints snapshots and the request ID, and handles
-Ctrl+C. Set `RIME_API_KEY` in your environment first.
-
-For live microphone testing, `examples/voice` provides an Enter-to-talk terminal
-loop and speaks the final transcript through TTS. Install SoX, then run
-`go run ./examples/voice --language en`. Press Enter to start, Enter to finish,
-and Ctrl+C to cancel. `--mode`, repeatable `--term` and `--voice` select recognition
-and playback options. To avoid opening audio devices, use
-`--input recording.wav --output reply.wav` for one recorded turn.
-Microphone mode supports macOS and Linux. On Windows, use `--input`; microphone
-mode is rejected because the recorder cannot be stopped with a POSIX interrupt.
-
-### Supply audio
-
-An `AudioSource` is `func(context.Context) ([]byte, error)`. Calls are serial and
-start only after service acceptance. Return `io.EOF` to finish the utterance;
-bytes returned alongside `io.EOF` are sent first. A different error cancels the
-operation without committing input. The source owns its file or device and must
-honor its context. Returned bytes must remain unchanged until the next call.
-
-Input is headerless signed PCM16 little-endian, at 8, 16, 24 or 48 kHz, with one
-or two channels. Stereo samples are interleaved. The zero `PCMFormat` means mono
-16 kHz. The SDK downmixes and resamples to mono 16 kHz using streaming linear
-interpolation. State is independent for each utterance. This lightweight converter
-does not provide anti-alias filtering; applications needing that control can
-supply prepared 16 kHz mono PCM.
-
-Source chunks can split frames at any byte boundary. The SDK keeps incomplete
-frames until the next chunk and rejects an incomplete frame at EOF with
-`ErrAudioFormat`. Conversion processes at most 16 KiB of source bytes at a time,
-and wire messages contain at most 64 KiB of complete PCM frames. Backpressure
-slows source reads. Empty chunks are allowed but do not finish the utterance.
-
-### Options and routing
-
-| Field | Default | Meaning |
-| --- | --- | --- |
-| `Language` | None | Explicit spoken language, such as `en` or `es`; validated by the service |
-| `Mode` | `TranscriptionWritten` | Written normalization or `TranscriptionVerbatim` for spoken wording |
-| `ContextTerms` | None | Recognition hints, copied in order without trimming or deduplication |
-| `InputFormat` | Mono PCM16, 16 kHz | Sample rate and channel count of supplied raw audio |
-| `Timeout` | Disabled | Optional `*time.Duration` overall budget from the first `Recv` |
-
-Language and terms pass unchanged to the service. Neither is inferred from TTS
-configuration. Written/verbatim formatting depends on the model; a hint does not
-guarantee a word will appear in the transcript.
-
-STT connects to `stt.api.rime.ai:443` using TLS. No endpoint configuration is needed.
-`Config.Model`, `Endpoint`, and `Timeout` configure TTS and do not change STT.
-Both services share credentials
-and error categories but use separate connections. STT sends the API key as a
-Bearer authorization header over TLS. Protocol types remain internal.
-
-### Lifetime, limits and errors
-
-Construction validates local option types and values. The first `Recv` starts
-network work and the optional overall timeout. A nil or zero timeout disables
-that budget; negative durations are invalid. The caller's context applies
-immediately, including before the first read and while either source or consumer
-is paused.
-
-Connection and acceptance each have a 10-second limit. Once source EOF is reached,
-completion has a 120-second limit. The completion timer stops after successful
-gRPC completion. The optional overall timeout remains active until the final
-result is consumed. Transcript snapshots are limited to 64 KiB of UTF-8 text,
-incoming gRPC messages to 256 KiB, and the output queue to 16 snapshots.
-The queue preserves entire updates. Slow consumers apply backpressure.
-
-An audio source error becomes `ErrInput`, preserving the original error as its
-cause. Invalid server sequencing becomes `ErrStream`; resource limits become
-`ErrResourceLimit`. Service errors preserve their category and the request ID
-when available. Read it with `stream.RequestID()` or `errors.As` to `*rime.Error`.
-Recognition is never automatically replayed, even before the first partial.
-
-Cancelling recognition discards unread updates, including an unread final.
-See [Errors and cleanup](#errors-and-cleanup) for shared error handling and
-stream lifetime rules.
-
-## Configuration
-
-| Config field | Default | Meaning |
-| --- | --- | --- |
-| `APIKey` | `RIME_API_KEY` | An explicit nonempty key overrides the environment |
-| `Model` | `coda` | `coda` or `mistv3` |
-| `Endpoint` | Model endpoint | TLS hostname with optional port; no scheme or path |
-| `Timeout` | `0` | Overall TTS operation duration; zero disables it |
-
-Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
-`mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.
-
-`SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, `SampleRate`,
-`TimeScaleFactor`, `Timeout`, `CustomLexicon` (default nil,
-requires Coda), and `Timestamps` (default false, Mist v3 only).
-Empty voice and language values select defaults.
-
-Output encodings are `PCM` (headerless PCM16, the default), `WAV` (PCM16 WAV),
-and `MP3` (`audio/mpeg`). All are mono. `SampleRate` accepts 8000, 16000 or 24000 Hz;
-zero defaults to 24000 for these encodings. PCM/WAV rates are requested from the
-server, without SDK resampling. MP3 encoder headers determine its actual rate.
-The compatibility presets `PCM24000` and `MULAW8000` retain their fixed rates and
-reject conflicting explicit rates. Mu-law still converts 24 kHz PCM locally.
-
-Use `stream.SampleRate()` for the requested output rate and
-`stream.Format().Encoding()` / `Channels()` for encoding metadata.
-`AudioFormat.SampleRate()` is zero for configurable encodings.
-Default streams continue to report `PCM24000`. PCM chunks contain complete sample
-frames. WAV/MP3 chunks are fragments of one stream, not independent files.
-
-`TimeScaleFactor` is an optional `*float64` duration multiplier from 0.4 to 2.5:
-values below 1 speed speech up; values above 1 slow it down. Nil keeps normal duration.
-
-### Complete audio in memory
-
-`client.TTS.SynthesizeToBuffer(ctx, text, opts)` returns `([]byte, error)` after the
-streaming RPC succeeds. It finalizes WAV header lengths for IVR files. Errors
-return nil audio and release the stream, including failures after audio arrives.
-The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
-file headers. Exceeding it returns `ErrResourceLimit` and nil audio. For mono
-PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes at 16 kHz, or
-23 minutes at 24 kHz. Use streaming synthesis for larger outputs or timestamps.
-Collection can temporarily use more memory than the output limit. Context
-cancellation and timeouts still apply.
-
-```go
-factor := 0.9
-audio, err := client.TTS.SynthesizeToBuffer(ctx, "Thank you for calling.", rime.SynthesisOptions{
-    AudioFormat: rime.WAV, SampleRate: 16000, TimeScaleFactor: &factor,
-})
-if err != nil { return err }
-if err := os.WriteFile("greeting.wav", audio, 0600); err != nil { return err }
-```
-
-Each operation accepts a `context.Context`. Its cancellation and deadline remain
-active even while the application pauses reads. `Timeout` in operation options
-for TTS is a `*time.Duration`: nil inherits the client setting, a pointer to zero disables
-that setting, and a positive value overrides it. A caller's context deadline
-still applies. Negative durations are invalid.
-
-Connection establishment has a 10-second limit. First audio has a 30-second
-progress limit. Later progress has a 60-second limit. Waiting for text input or
-for the application to consume queued output does not count as a service stall.
-Discovery takes at most 10 seconds, including retries.
-
-## Incremental input
-
-Use `client.TTS.Stream(ctx, source, options)`. A `rime.TextSource` is:
-
-```go
-func(ctx context.Context) (string, error)
-```
-
-Send text as it becomes available; Rime automatically combines fragments into
-sentences for speech. For nonblank input, ending the text stream flushes any
-remaining text, even without final punctuation. Pausing the stream may delay
-speech for an unfinished sentence.
-
-If the source ends without any non-whitespace text, `Recv` returns an error
-matching `ErrInput`.
-
-Return each text fragment as valid UTF-8. The SDK calls the source serially and
-forwards text in order, preserving whitespace. Return `io.EOF` when input ends.
-The last call may return both final text and `io.EOF`. Other errors stop the
-operation.
-
-The source must honor its context; see [Errors and cleanup](#errors-and-cleanup)
-for cancellation and cleanup limits.
-
-TTS streams start work when `Synthesize` or `Stream` returns, without waiting for
-the first `Recv`. Output buffering is bounded to 96,000 bytes, with chunks of
-at most 9,600 bytes. Text messages are at most 4,096 UTF-8 bytes; large source
-fragments are divided at character boundaries.
-
-## Custom pronunciations (Coda)
-
-Create a Coda client with `Config{Model: "coda"}`. Pass words or phrases and
-their space-separated X-SAMPA pronunciations:
-
-```go
-stream, err := client.TTS.Synthesize(ctx, "Hello world.", rime.SynthesisOptions{
-    Language: "en",
-    CustomLexicon: []rime.PronunciationEntry{
-        {Spelling: "hello", Pronunciation: `h @ . " l oU`},
-    },
-})
-if err != nil { return err }
-defer stream.Close()
-for {
-    chunk, err := stream.Recv()
-    if err == io.EOF { break }
-    if err != nil {
-        var detail *rime.Error
-        if errors.Is(err, rime.ErrInput) && errors.As(err, &detail) {
-            fmt.Println(detail.Message, "request ID:", detail.RequestID)
-        }
-        return err
-    }
-    if _, err := output.Write(chunk); err != nil { return err }
-}
-```
-
-Here `output` is the file or audio sink your application owns. `Synthesize` and
-`Stream` copy the lexicon before starting work. It applies to the entire
-request, including incremental text; subsequent requests have their own options.
-Omit the option or pass an empty slice for default pronunciation.
-
-The service matches whole words or phrases case-insensitively and applies the
-pronunciation after text normalization. Longest matches take precedence; the
-last entry for a repeated spelling wins. Inline `pronounce(...)` directives are
-not supported.
-
-Coda accepts custom pronunciations in German, English, Spanish, French,
-Italian, and Portuguese, with up to 500 entries per request. The service validates
-supported languages and pronunciation rules. Mist rejects nonempty lexicons.
-
-Invalid UTF-8 fails locally. The service rejects unsupported models or languages,
-oversized lexicons, and ill-formed entries with `ErrInput` before producing audio.
-Check errors from `Recv`, as well as stream creation. `*rime.Error.Message`
-preserves the offending spelling and checks such as `no-primary-stress` or
-`unknown-phone`, and `RequestID` identifies the request. The whole request fails;
-entries are never silently skipped or repaired.
-
-## Word timestamps (Mist v3)
-
-Create the client with `Config{Model: "mistv3"}`. Enable timestamps on the stream,
-consume audio through `io.EOF`, then read its result:
-
-```go
-stream, err := client.TTS.Synthesize(ctx, "Hello world.", rime.SynthesisOptions{Timestamps: true})
-if err != nil {
-    return err
-}
-defer stream.Close()
-for {
-    chunk, err := stream.Recv()
-    if err == io.EOF {
-        break
-    }
-    if err != nil {
-        return err
-    }
-    if _, err := output.Write(chunk); err != nil {
-        return err
-    }
-}
-result, err := stream.Timestamps()
-if err != nil {
-    return err
-}
-if result.Status.Code == codes.OK {
-    for _, word := range result.Spans {
-        fmt.Println(word.Text, word.Start, word.End)
-    }
-} else {
-    fmt.Println("Timestamps unavailable:", result.Status.Code, result.Status.Message)
-}
-```
-
-Here `output` is your audio writer; `codes` is `google.golang.org/grpc/codes`.
-`TimestampResult.Spans` contains `WordTimestamp` values with `Text` and
-`Start`/`End` as `float64` seconds from the beginning of the entire synthesis.
-Offsets continue across incremental input sentences and stay the same for
-`PCM24000` and `MULAW8000`. Words reflect normalized spoken text: a number may
-become several words. Timings come from the model, without SDK estimation.
-
-Timestamps arrive once, after generation finishes; they are not incremental
-events for live interruption handling. `Timestamps()` never consumes audio or
-waits: calling before `Recv` returns `io.EOF`, or without enabling timestamps,
-returns `ErrInput`. Results remain available after a successfully consumed
-stream or its client is closed. Each call returns independently owned spans.
-
-`TimestampStatus` carries a gRPC `Code` and a `Message`. Non-OK alignment statuses
-have no spans and do not fail successful audio. Missing or malformed timestamp
-responses return `ErrStream` only when reading timestamps. Synthesis errors or
-cancellation also prevent reading a successful result. Enabling timestamps with
-Coda returns `ErrInput` before any request is sent.
-
-## Discovery
-
-```go
-voices, err := client.Voices.List(ctx, rime.VoiceListOptions{Language: "en"})
-languages, err := client.Languages.List(ctx, rime.DiscoveryOptions{})
-```
-
-Both methods return `[]string`. Omit the voice language to disable filtering.
-Discovery retries `UNAVAILABLE` up to twice within the same deadline.
-
-## Errors and cleanup
-
-Use `errors.Is(err, rime.ErrTimeout)` to check a category. Categories are
-`ErrAuthentication`, `ErrPermission`, `ErrInput`, `ErrResourceLimit`,
-`ErrUnavailable`, `ErrTimeout`, `ErrAudioFormat`, `ErrCancelled`, and `ErrStream`.
-Use `errors.As` with `*rime.Error` to read `Message`, `RequestID`, and the original `Cause`.
-Service errors retain their diagnostic message when provided. Use the error
-category for programmatic handling; message wording may change.
-Caller context errors remain available through error unwrapping.
-
-Partial audio can precede an error. Output is complete only after `Recv` returns
-`io.EOF`. The SDK does not retry synthesis. Buffered audio is discarded on failure.
-
-Call `stream.Close()` when stopping early. It cancels one operation.
-`client.Close()` cancels all client operations and closes both service connections. Both
-are safe to repeat. Clients support concurrent operations. Each stream permits
-one concurrent reader. Always release both the stream and the client.
-
-Stream cleanup waits at most two seconds. The SDK cannot force an application
-source function to return. A source that ignores its context can retain its
-goroutine and memory after `Close` returns.
-
-## Development
-
-To use a local checkout from another Go project before publication:
-
-```sh
-go mod edit -require=github.com/rimelabs/rime-sdk/go@v0.1.0-alpha.1
-go mod edit -replace=github.com/rimelabs/rime-sdk/go=/absolute/path/to/rime-sdk/go
-go mod tidy
-```
-
-Run these checks from the SDK's `go/` directory:
-
-
-```sh
-go test -race ./...
-go vet ./...
-CGO_ENABLED=0 go build ./...
-```
-
-Tests use a local gRPC service and need no credentials. `testdata/` contains copies
-of the repository's shared TTS, PCM input and STT fixtures. CI verifies that those copies match.
-The versioned `github.com/rimelabs/rime-api/go` dependency supplies the protocol
-types and gRPC clients. Dependabot checks for API releases daily and opens a PR;
-CI and review are required before the SDK is released.
+Run `go run stt.go`. The TTS and STT examples are separate programs; run each
+by filename. Each partial update replaces the **complete current transcript**;
+do not append snapshots. A final update confirms successful completion and may
+be empty for silence. Errors do not turn partials into finals.
+
+The SDK converts supported input formats to 16 kHz mono. Stereo must be
+interleaved. WAV headers, MP3, and mu-law input are not accepted. Chunks may split
+sample frames, but an incomplete final frame fails the request. The SDK does not
+provide microphone capture, automatic end-of-speech detection, word timings, or
+diarization. Recognition is not retried automatically.
+
+The first `Recv()` starts network work and the overall timeout. Source calls are
+serial; returned bytes must remain unchanged until the next call. Cancel the
+context or close the stream to stop one utterance. Closing the client cancels
+all its operations. Sources must honor their context; the SDK cannot stop a
+blocked source function. Connection, acceptance, and completion limits still
+apply when the overall timeout is disabled.
+
+## Help and licenses
+
+See the [examples](https://github.com/rimelabs/rime-sdk/tree/main/go/examples)
+for streaming text, transcription, and a microphone conversation loop.
+Visit [Rime documentation](https://docs.rime.ai/) for service information, or
+report SDK issues on [GitHub](https://github.com/rimelabs/rime-sdk/issues).
+Use `errors.Is` to check categories such as `rime.ErrTimeout`, and `errors.As`
+with `*rime.Error` to read `Message` and `RequestID`. Include the SDK version and
+request ID when reporting a failure; omit API keys.
+
+SDK code uses the [MIT license](LICENSE).
