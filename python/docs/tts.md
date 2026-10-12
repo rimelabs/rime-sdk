@@ -57,29 +57,69 @@ and path. TLS is required; the default port is `443`. Model defaults still apply
 
 ### Synthesis options
 
-Both methods require text input: a nonblank string for `synthesize`, or an
-async iterable of strings for `stream`. Both accept the following optional settings:
+`synthesize` and `synthesize_to_buffer` require a nonblank string; `stream` requires
+an async iterable of strings. All three accept the following settings:
 
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `voice` | Model's default voice | Voice name from `client.voices.list()` |
 | `language` | `"en"` | Language code |
-| `audio_format` | `AudioFormat.PCM_24000` | Output profile, imported from `rimelabs_sdk` |
+| `audio_format` | `AudioFormat.PCM` (24 kHz) | Output encoding, imported from `rimelabs_sdk` |
+| `sample_rate` | `24000` (or fixed preset rate) | Requested output rate: `8000`, `16000`, or `24000` Hz |
+| `time_scale_factor` | Omitted (normal duration) | Duration multiplier from `0.4` to `2.5`; below 1 is faster, above 1 is slower |
 | `timestamps` | `False` | Request final word timestamps; requires `model="mistv3"` |
 | `custom_lexicon` | `()` | Sequence of `PronunciationEntry` overrides for this request; requires Coda |
 | `timeout` | Client setting | Seconds; pass `None` to disable the overall deadline |
 
 ### Audio formats
 
-Both profiles return raw audio without a file header.
+All output is mono. PCM and WAV use signed 16-bit little-endian samples.
 
-| `AudioFormat` profile | Encoding | Sample rate | Channels |
-| --- | --- | --- | --- |
-| `PCM_24000` | Signed 16-bit little-endian PCM | 24 kHz | Mono |
-| `MULAW_8000` | G.711 mu-law | 8 kHz | Mono |
+| `AudioFormat` | Encoding | Requested rate |
+| --- | --- | --- |
+| `PCM` | Headerless PCM16 | 8, 16, or 24 kHz |
+| `WAV` | PCM16 WAV | 8, 16, or 24 kHz |
+| `MP3` | MP3 (`audio/mpeg`) | 8, 16, or 24 kHz; encoded headers determine the actual rate |
+| `PCM_24000` | Headerless PCM16 compatibility preset | Fixed 24 kHz |
+| `MULAW_8000` | G.711 mu-law compatibility preset | Fixed 8 kHz |
 
-Chunks contain complete sample frames, but their sizes vary. Inspect the read-only
-`audio.format.encoding`, `audio.format.sample_rate`, and `audio.format.channels`.
+PCM/WAV sample rates are requested from the server; the SDK does not resample
+these formats. The existing mu-law preset still converts 24 kHz PCM locally.
+An explicit rate conflicting with a fixed preset fails locally. For configurable
+formats, `audio.format.sample_rate` is zero; use `audio.sample_rate` for the rate requested
+by the operation. Existing default streams still report `PCM_24000` as their format.
+
+PCM chunks contain complete sample frames. WAV and MP3 chunks are fragments of
+one encoded stream, not independent files. Streaming WAV may contain unknown
+lengths in its header; use `synthesize_to_buffer` for a completed IVR file.
+
+### Complete audio in memory
+
+Await `synthesize_to_buffer` to get all audio bytes. It uses the same streaming RPC,
+waits for successful completion, and finalizes WAV file lengths. On failure it
+raises an error and releases the stream; it never returns partial audio.
+The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
+file headers. Exceeding it raises `RimeResourceLimitError` and returns no partial
+audio. For mono PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes
+at 16 kHz, or 23 minutes at 24 kHz. Use streaming synthesis for larger outputs.
+Collection can temporarily use more memory than the output limit.
+Timeouts and client shutdown still apply. Use the streaming API to retrieve word timestamps.
+
+```python
+import asyncio
+from pathlib import Path
+from rimelabs_sdk import AudioFormat, Rime
+
+async def main():
+    async with Rime() as client:
+        audio = await client.tts.synthesize_to_buffer(
+            "Thank you for calling.", audio_format=AudioFormat.WAV,
+            sample_rate=16000, time_scale_factor=0.9,
+        )
+        Path("greeting.wav").write_bytes(audio)
+
+asyncio.run(main())
+```
 
 ### Timeouts
 

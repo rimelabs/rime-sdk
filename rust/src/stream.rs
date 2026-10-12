@@ -1,5 +1,5 @@
 use crate::{
-    audio::Converter,
+    audio::{resolve_audio, Converter},
     client::{validate_timeout, Inner},
     error::request_id,
     timestamps::TimestampTrailer,
@@ -30,7 +30,7 @@ use tokio_util::sync::CancellationToken;
 const QUEUE_CHUNKS: usize = 10;
 const CHUNK_BYTES: usize = 9_600;
 
-/// An asynchronous stream of raw audio chunks. An error ends the stream.
+/// An asynchronous stream of audio bytes. An error ends the stream.
 ///
 /// Dropping this value requests cancellation. Use [`Self::close`] to also wait
 /// for the stream worker. Cancellation does not affect sibling streams.
@@ -45,6 +45,7 @@ pub struct AudioStream {
     worker: Option<JoinHandle<()>>,
     request_id: Arc<OnceLock<String>>,
     format: AudioFormat,
+    sample_rate: u32,
     consumed: bool,
     completed: bool,
     timestamps: Option<Arc<Mutex<TimestampTrailer>>>,
@@ -62,9 +63,13 @@ impl fmt::Debug for AudioStream {
 }
 
 impl AudioStream {
-    /// The encoding and sample rate of returned chunks.
+    /// The output encoding or fixed-rate preset.
     pub fn format(&self) -> AudioFormat {
         self.format
+    }
+    /// Requested output sample rate in Hz. MP3 headers describe the encoded rate.
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
     }
     /// The service request ID, once response metadata has arrived.
     pub fn request_id(&self) -> Option<&str> {
@@ -233,6 +238,11 @@ where
     }
     let timeout = options.timeout.unwrap_or(client.timeout);
     validate_timeout(timeout)?;
+    let (format, sample_rate) = resolve_audio(
+        options.format,
+        options.sample_rate,
+        options.time_scale_factor,
+    )?;
     let voice = options.voice.unwrap_or_else(|| client.model.voice().into());
     let language = options.language.unwrap_or_else(|| "en".into());
     if voice.trim().is_empty() || language.trim().is_empty() {
@@ -246,9 +256,13 @@ where
         speaker: Some(voice),
         language: Some(language),
         audio_parameters: Some(AudioParameters {
-            audio_format: Some("audio/pcm".into()),
-            sampling_rate: Some(24000),
-            ..Default::default()
+            audio_format: Some(format.wire_format().into()),
+            sampling_rate: Some(if format == AudioFormat::Mulaw8000 {
+                24000
+            } else {
+                sample_rate as i32
+            }),
+            time_scale_factor: options.time_scale_factor,
         }),
         timestamps: options
             .timestamps
@@ -269,7 +283,6 @@ where
     let operation_cancellation = cancellation.clone();
     let request_id = Arc::new(OnceLock::new());
     let operation_id = request_id.clone();
-    let format = options.format;
     let timestamps = options
         .timestamps
         .then(|| Arc::new(Mutex::new(TimestampTrailer::default())));
@@ -310,6 +323,7 @@ where
         worker: Some(worker),
         request_id,
         format,
+        sample_rate,
         consumed: false,
         completed: false,
         timestamps,
@@ -391,7 +405,7 @@ async fn receive(
     let valid_format = response
         .metadata()
         .get("x-rime-audio-content-type")
-        .is_some_and(|value| value == "audio/pcm");
+        .is_some_and(|value| value == format.wire_format());
     let mut responses = response.into_inner();
     let mut converter = Converter::new(format);
     while let Some(response) = responses.message().await.map_err(Error::from)? {
@@ -420,7 +434,7 @@ async fn receive(
         if !valid_format {
             return Err(Error::new(
                 ErrorKind::AudioFormat,
-                "expected raw audio/pcm from the service",
+                format!("expected {} from the service", format.wire_format()),
             ));
         }
         {
@@ -438,7 +452,7 @@ async fn receive(
     if !valid_format {
         return Err(Error::new(
             ErrorKind::AudioFormat,
-            "expected raw audio/pcm from the service",
+            format!("expected {} from the service", format.wire_format()),
         ));
     }
     {

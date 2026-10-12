@@ -18,7 +18,7 @@ pub enum ErrorKind {
     Timeout,
     /// The client or stream was cancelled.
     Cancelled,
-    /// Audio does not match the required PCM format.
+    /// Audio does not match the requested output format.
     AudioFormat,
     /// A protocol or stream failure.
     Stream,

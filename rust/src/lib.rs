@@ -1,13 +1,14 @@
 //! Asynchronous speech recognition and Coda and Mist v3 text-to-speech.
 //!
 //! Use [`Client::builder`] to configure credentials. The SDK uses the caller's
-//! Tokio runtime with I/O and time enabled. Audio is raw mono PCM16 at 24 kHz
-//! or mu-law at 8 kHz.
+//! Tokio runtime with I/O and time enabled. Audio supports mono PCM16 and WAV
+//! at 8/16/24 kHz, MP3, and mu-law at 8 kHz.
 //! Applications own audio playback. Realtime Prism is not included.
 #![forbid(unsafe_code)]
 #![doc = include_str!("../README.md")]
 
 mod audio;
+mod buffer;
 mod client;
 mod error;
 mod lexicon;

@@ -54,6 +54,10 @@ A failed run can leave a partial file. Only a successful exit confirms completio
 Coda is the default model. Use `Rime(model="mistv3")` for Mist v3, or pass
 `voice="your-voice"` to `client.tts.synthesize(...)` to select a voice for that model.
 The default output is mono 24 kHz PCM16. The example adds its WAV header.
+Use `await client.tts.synthesize_to_buffer(text, audio_format=AudioFormat.WAV, sample_rate=16000)`
+for a complete IVR WAV file (import `AudioFormat` from `rimelabs_sdk`).
+PCM, WAV and MP3 accept 8, 16 or 24 kHz requests; `time_scale_factor` controls duration.
+
 Use `client.tts.synthesize(text)` for a complete string. To supply text from an LLM,
 pass an async iterable of strings to `client.tts.stream(chunks)`. Both methods
 return streaming audio. Rime automatically combines text fragments into

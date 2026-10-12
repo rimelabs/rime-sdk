@@ -88,16 +88,56 @@ uses the same filter and test vectors as the other SDKs. Audio has no WAV header
 
 ## Synthesis options
 
-Both TTS methods accept `SynthesisOptions::default()` with optional builders:
+All three TTS methods accept `SynthesisOptions::default()` with optional builders:
 
 | Builder method | Default and behavior |
 | --- | --- |
 | `.voice("name")` | The model's default voice: `clementine` for Coda, `astra` for Mist v3. |
 | `.language("en")` | `en`; passed to the service. Blank values fail locally. |
-| `.audio_format(AudioFormat::Mulaw8000)` | `AudioFormat::Pcm24000`; both profiles stream raw mono audio. |
+| `.audio_format(AudioFormat::Wav)` | `AudioFormat::Pcm` (raw PCM16, 24 kHz). Also `Mp3`, `Pcm24000`, `Mulaw8000`. |
+| `.sample_rate(16000)` | Requested rate: 8000, 16000 or 24000 Hz. Defaults to 24000 for configurable formats. |
+| `.time_scale_factor(0.9)` | Omitted (normal duration). Finite duration multiplier from 0.4 to 2.5; below 1 is faster, above 1 is slower. |
 | `.timeout(Some(Duration::from_secs(60)))` | `Some(duration)` overrides the client timeout; this example sets it to 60 seconds. Default options inherit the client timeout. `None` disables it; zero is invalid. Applies until audio is fully consumed, including consumer pauses. |
 | `.custom_lexicon(entries)` | Empty vector; request-wide pronunciation overrides for Coda. |
 | `.timestamps(true)` | `false`; Mist v3 word timings after successful audio consumption. |
+
+`Pcm` (headerless PCM16), `Wav` (PCM16 WAV) and `Mp3` (`audio/mpeg`) are mono.
+PCM/WAV sample rates are requested from the server, without SDK resampling.
+MP3 encoder headers determine its actual rate. Fixed presets `Pcm24000` and
+`Mulaw8000` reject conflicting explicit rates. Mu-law still converts 24 kHz PCM locally.
+Use `audio.sample_rate()` for the requested rate; `AudioFormat::sample_rate()`
+is zero for configurable encodings. Default streams still report `Pcm24000`.
+PCM chunks contain complete sample frames; WAV/MP3 chunks are fragments of one
+encoded stream, not independent files.
+
+## Complete audio in memory
+
+Await `client.tts().synthesize_to_buffer(text, options)` for a `Vec<u8>`. It uses
+the same streaming RPC, waits for success and finalizes WAV lengths for IVR files.
+Errors release the stream and never return partial audio. Streaming WAV may have
+unknown lengths in its header, so use this helper for a completed file.
+The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
+file headers. Exceeding it returns `ErrorKind::ResourceLimit` without partial
+audio. For mono PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes
+at 16 kHz, or 23 minutes at 24 kHz. Use streaming synthesis for larger outputs
+or timestamps. Collection can temporarily use more memory than the output limit.
+Timeouts still apply; dropping the future cancels synthesis.
+
+```rust,no_run
+use rimelabs_sdk::{AudioFormat, Client, SynthesisOptions};
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let client = Client::builder().build()?;
+let audio = client.tts().synthesize_to_buffer(
+    "Thank you for calling.",
+    SynthesisOptions::default().audio_format(AudioFormat::Wav)
+        .sample_rate(16000).time_scale_factor(0.9),
+).await?;
+tokio::fs::write("greeting.wav", audio).await?;
+client.close().await;
+# Ok(())
+# }
+```
 
 ## Custom pronunciations (Coda)
 

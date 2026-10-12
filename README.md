@@ -58,6 +58,15 @@ Runnable scripts are in the
 | Go | `client.TTS.Synthesize(ctx, text, opts)` | `client.TTS.Stream(ctx, source, opts)` |
 | Rust | `client.tts().synthesize(text, opts)` | `client.tts().stream(chunks, opts)` |
 
+For complete audio in memory, use `synthesize_to_buffer` in Python/Rust,
+`synthesizeToBuffer` in TypeScript, or `SynthesizeToBuffer` in Go. These methods
+wait for successful completion and finalize WAV lengths for IVR files. Each call
+has a fixed 64 MiB output limit; exceeding it returns a resource-limit error
+without partial audio. All four
+SDKs accept PCM/WAV/MP3, requested rates of 8/16/24 kHz, and a duration multiplier
+(`time_scale_factor` / `timeScaleFactor` / `TimeScaleFactor`). Existing fixed-rate
+PCM and mu-law presets remain available.
+
 This changes the earlier alpha API. Move complete-string calls from `stream` to
 `synthesize`. In Go, rename `StreamSource` to `Stream`. In Rust, move synthesis
 under `client.tts()` and rename `synthesize_stream` to `stream`. The old entry

@@ -47,6 +47,8 @@ type AudioStream struct {
 	op                  *operation
 	queue               *audioQueue
 	format              AudioFormat
+	sampleRate          int
+	timeScaleFactor     *float32
 	reading             atomic.Bool
 	mu                  sync.Mutex
 	id                  string
@@ -91,8 +93,9 @@ func (t *TTSService) Stream(ctx context.Context, source TextSource, options Synt
 	if source == nil {
 		return nil, failure(ErrInput, "text source must not be nil")
 	}
-	if options.AudioFormat > MULAW8000 {
-		return nil, failure(ErrAudioFormat, "select PCM24000 or MULAW8000")
+	format, sampleRate, timeScaleFactor, err := resolveAudio(options)
+	if err != nil {
+		return nil, err
 	}
 	voice, language := options.Voice, options.Language
 	if voice == "" {
@@ -108,7 +111,7 @@ func (t *TTSService) Stream(ctx context.Context, source TextSource, options Synt
 	if err != nil {
 		return nil, err
 	}
-	s := &AudioStream{op: o, queue: newAudioQueue(), format: options.AudioFormat, lastProgress: time.Now(), done: make(chan struct{}), workersDone: make(chan struct{})}
+	s := &AudioStream{op: o, queue: newAudioQueue(), format: format, sampleRate: sampleRate, timeScaleFactor: timeScaleFactor, lastProgress: time.Now(), done: make(chan struct{}), workersDone: make(chan struct{})}
 	s.timestampsRequested = options.Timestamps
 	go s.watch()
 	go s.run(source, voice, language, lexicon)
@@ -116,7 +119,10 @@ func (t *TTSService) Stream(ctx context.Context, source TextSource, options Synt
 }
 
 func (s *AudioStream) Format() AudioFormat { return s.format }
-func (s *AudioStream) RequestID() string   { s.mu.Lock(); defer s.mu.Unlock(); return s.id }
+
+// SampleRate returns the requested output rate in Hz. MP3 headers describe the encoded rate.
+func (s *AudioStream) SampleRate() int   { return s.sampleRate }
+func (s *AudioStream) RequestID() string { s.mu.Lock(); defer s.mu.Unlock(); return s.id }
 func (s *AudioStream) setID(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -141,7 +147,7 @@ func (s *AudioStream) fail(err error) {
 	s.op.cancel(mapped)
 }
 
-// Recv returns independently owned bytes containing complete sample frames.
+// Recv returns independently owned audio bytes. Raw PCM chunks contain complete sample frames.
 func (s *AudioStream) Recv() ([]byte, error) {
 	if !s.reading.CompareAndSwap(false, true) {
 		return nil, failure(ErrInput, "AudioStream permits only one concurrent reader")
@@ -213,9 +219,12 @@ func (s *AudioStream) run(source TextSource, voice, language string, lexicon []P
 		s.fail(err)
 		return
 	}
-	format, rate := "audio/pcm", int32(24000)
+	format, rate := s.format.wireFormat(), int32(s.sampleRate)
+	if s.format == MULAW8000 {
+		rate = 24000
+	}
 	strategy := pb.SplitStrategy_SPLIT_STRATEGY_ACCUMULATE_SENTENCE
-	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{SplitStrategy: &strategy, Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate}}}}
+	header := &pb.StreamingSynthesisRequest{Payload: &pb.StreamingSynthesisRequest_Header{Header: &pb.SynthesisRequest{SplitStrategy: &strategy, Speaker: &voice, Language: &language, AudioParameters: &pb.AudioParameters{AudioFormat: &format, SamplingRate: &rate, TimeScaleFactor: s.timeScaleFactor}}}}
 	if s.timestampsRequested {
 		header.GetHeader().Timestamps = &pb.TimestampOptions{Enable: true}
 	}
@@ -330,7 +339,7 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 		s.setID(requestID(nil, call.Trailer()))
 		return err
 	}
-	validFormat := len(headers.Get("x-rime-audio-content-type")) > 0 && headers.Get("x-rime-audio-content-type")[0] == "audio/pcm"
+	validFormat := len(headers.Get("x-rime-audio-content-type")) > 0 && headers.Get("x-rime-audio-content-type")[0] == s.format.wireFormat()
 	converter := converter{format: s.format}
 	for {
 		response, err := call.Recv()
@@ -340,7 +349,7 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 				return err
 			}
 			if !validFormat {
-				return failure(ErrAudioFormat, "expected raw audio/pcm from the service")
+				return failure(ErrAudioFormat, "expected "+s.format.wireFormat()+" from the service")
 			}
 			s.mu.Lock()
 			if s.input != inputFinished {
@@ -372,7 +381,7 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 			continue
 		}
 		if !validFormat {
-			return failure(ErrAudioFormat, "expected raw audio/pcm from the service")
+			return failure(ErrAudioFormat, "expected "+s.format.wireFormat()+" from the service")
 		}
 		s.mu.Lock()
 		if s.output == outputAwaitingText || s.output == outputAwaitingTextAfterAudio {

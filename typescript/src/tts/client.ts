@@ -1,4 +1,5 @@
-import { AudioFormat } from "./audio.js";
+import { AudioFormat, resolveAudio } from "./audio.js";
+import { maxBufferBytes, finalizeWav } from "./buffer.js";
 import { snapshot, type PronunciationEntry } from "./lexicon.js";
 import { AudioStream, constructionKey, type TextSource } from "./stream.js";
 import { Credentials } from "../auth.js";
@@ -14,7 +15,7 @@ import {
 } from "./transport.js";
 import {
   RimeInputError,
-  RimeAudioFormatError,
+  RimeResourceLimitError,
   RimeCancelledError,
   RimeTimeoutError,
   RimeUnavailableError,
@@ -23,6 +24,10 @@ export interface SynthesisOptions {
   voice?: string | null;
   language?: string;
   audioFormat?: AudioFormat | null;
+  /** Requested output rate: 8000, 16000, or 24000 Hz. Defaults to 24000 for PCM/WAV/MP3. */
+  sampleRate?: number | null;
+  /** Duration multiplier from 0.4 to 2.5. Below 1 speeds speech up; above 1 slows it down. */
+  timeScaleFactor?: number | null;
   /** Request final word timestamps. Supported only with model="mistv3". */
   timestamps?: boolean;
   /** Request-wide pronunciation overrides; requires a phoneme-capable Coda deployment. */
@@ -85,6 +90,35 @@ export class TTS {
       options,
     );
   }
+  /** Await complete audio in memory, finalizing WAV lengths. Never returns partial audio.
+   * The fixed output limit is 64 MiB (67,108,864 bytes); exceeding it raises
+   * RimeResourceLimitError. Use streaming synthesis for larger outputs or timestamps.
+   */
+  async synthesizeToBuffer(
+    text: string,
+    options: SynthesisOptions = {},
+  ): Promise<Buffer> {
+    const audio = this.synthesize(text, options);
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      for await (const chunk of audio) {
+        if (chunk.byteLength > maxBufferBytes - size)
+          throw new RimeResourceLimitError(
+            "Audio exceeds the 64 MiB buffer limit",
+            audio.requestId,
+          );
+        chunks.push(chunk);
+        size += chunk.byteLength;
+      }
+      const data = Buffer.concat(chunks, size);
+      if (audio.format === AudioFormat.WAV)
+        finalizeWav(data, audio.sampleRate, audio.requestId);
+      return data;
+    } finally {
+      await audio.cancel();
+    }
+  }
   /** Stream text chunks into synthesis and return an audio stream. Do not await this call. */
   stream(text: TextSource, options: SynthesisOptions = {}) {
     this.checkOpen();
@@ -110,9 +144,11 @@ export class TTS {
         ? this.deployment.defaultVoice
         : nonempty(options.voice, "voice");
     const language = nonempty(options.language ?? "en", "language");
-    const format = options.audioFormat ?? AudioFormat.PCM_24000;
-    if (format !== AudioFormat.PCM_24000 && format !== AudioFormat.MULAW_8000)
-      throw new RimeAudioFormatError("Select a named AudioFormat profile");
+    const { format, sampleRate } = resolveAudio(
+      options.audioFormat,
+      options.sampleRate,
+      options.timeScaleFactor,
+    );
     const audio = new AudioStream(
       constructionKey,
       {
@@ -127,6 +163,8 @@ export class TTS {
       timeout(options.timeout, this.defaultTimeout),
       timestamps,
       lexicon,
+      sampleRate,
+      options.timeScaleFactor ?? undefined,
     );
     this.streams.add(audio);
     return audio;

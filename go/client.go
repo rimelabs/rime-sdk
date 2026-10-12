@@ -30,12 +30,14 @@ type Config struct {
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
 type SynthesisOptions struct {
-	Voice         string
-	Language      string
-	AudioFormat   AudioFormat
-	Timeout       *time.Duration
-	Timestamps    bool                 // Request final word timestamps; supported only with Model="mistv3".
-	CustomLexicon []PronunciationEntry // Request-wide overrides; copied when the stream is created.
+	Voice           string
+	Language        string
+	AudioFormat     AudioFormat
+	SampleRate      int      // 8000, 16000, or 24000 Hz. Zero selects the format's default.
+	TimeScaleFactor *float64 // Duration multiplier, 0.4–2.5. Nil preserves normal speed (1).
+	Timeout         *time.Duration
+	Timestamps      bool                 // Request final word timestamps; supported only with Model="mistv3".
+	CustomLexicon   []PronunciationEntry // Request-wide overrides; copied when the stream is created.
 }
 
 type DiscoveryOptions struct{ Timeout *time.Duration }

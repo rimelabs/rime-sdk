@@ -46,7 +46,7 @@ async def mist(setup):
         yield service, client
 
 
-@pytest.mark.parametrize("profile", list(AudioFormat))
+@pytest.mark.parametrize("profile", [AudioFormat.PCM_24000, AudioFormat.MULAW_8000])
 async def test_timestamps_preserve_audio_and_synthesis_offsets(mist, profile):
     service, client = mist
     service.final_responses = [trailer(spans=WORDS)]

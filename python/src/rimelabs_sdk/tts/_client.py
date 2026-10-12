@@ -9,14 +9,16 @@ from typing import TYPE_CHECKING, Any
 import grpc
 
 from .._errors import (
-    RimeAudioFormatError,
     RimeCancelledError,
+    RimeError,
     RimeInputError,
+    RimeResourceLimitError,
     RimeTimeoutError,
     RimeUnavailableError,
 )
 from . import _policy, _transport
-from ._audio import AudioFormat
+from ._audio import AudioFormat, resolve_audio
+from ._buffer import MAX_BUFFER_BYTES, finalize_wav
 from ._lexicon import PronunciationEntry, snapshot
 from ._stream import _CONSTRUCTION_KEY, AudioStream
 
@@ -47,6 +49,8 @@ class _TTS:
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
+        sample_rate: int | None = None,
+        time_scale_factor: float | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
         timeout: float | None | object = _policy.INHERIT,
@@ -66,10 +70,56 @@ class _TTS:
             voice=voice,
             language=language,
             audio_format=audio_format,
+            sample_rate=sample_rate,
+            time_scale_factor=time_scale_factor,
             timestamps=timestamps,
             custom_lexicon=custom_lexicon,
             timeout=timeout,
         )
+
+    async def synthesize_to_buffer(
+        self,
+        text: str,
+        *,
+        voice: str | None = None,
+        language: str = "en",
+        audio_format: AudioFormat | None = None,
+        sample_rate: int | None = None,
+        time_scale_factor: float | None = None,
+        timestamps: bool = False,
+        custom_lexicon: Sequence[PronunciationEntry] = (),
+        timeout: float | None | object = _policy.INHERIT,
+    ) -> bytes:
+        """Await complete audio, finalizing WAV lengths. Never returns partial audio.
+
+        The fixed output limit is 64 MiB (67,108,864 bytes). Exceeding it raises
+        RimeResourceLimitError. Use streaming synthesis for larger outputs or timestamps.
+        """
+        stream = self.synthesize(
+            text,
+            voice=voice,
+            language=language,
+            audio_format=audio_format,
+            sample_rate=sample_rate,
+            time_scale_factor=time_scale_factor,
+            timestamps=timestamps,
+            custom_lexicon=custom_lexicon,
+            timeout=timeout,
+        )
+        data = bytearray()
+        try:
+            async for chunk in stream:
+                if len(chunk) > MAX_BUFFER_BYTES - len(data):
+                    raise RimeResourceLimitError("Audio exceeds the 64 MiB buffer limit")
+                data.extend(chunk)
+            if stream.format is AudioFormat.WAV:
+                finalize_wav(data, stream.sample_rate)
+            return bytes(data)
+        except RimeError as error:
+            error.request_id = stream.request_id
+            raise
+        finally:
+            await stream.cancel()
 
     def stream(
         self,
@@ -78,6 +128,8 @@ class _TTS:
         voice: str | None = None,
         language: str = "en",
         audio_format: AudioFormat | None = None,
+        sample_rate: int | None = None,
+        time_scale_factor: float | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
         timeout: float | None | object = _policy.INHERIT,
@@ -95,9 +147,7 @@ class _TTS:
             raise RimeInputError("Word timestamps are supported only with model='mistv3'")
         voice = self._policy.default_voice if voice is None else _policy.nonempty(voice, "voice")
         _policy.nonempty(language, "language")
-        profile = AudioFormat.PCM_24000 if audio_format is None else audio_format
-        if not isinstance(profile, AudioFormat):
-            raise RimeAudioFormatError("Select a named AudioFormat profile")
+        profile, sample_rate = resolve_audio(audio_format, sample_rate, time_scale_factor)
         stream = AudioStream(
             _CONSTRUCTION_KEY,
             self,
@@ -108,6 +158,8 @@ class _TTS:
             _policy.timeout(timeout, self._timeout),
             timestamps,
             lexicon,
+            sample_rate,
+            time_scale_factor,
         )
         self._streams.add(stream)
         return stream

@@ -199,13 +199,47 @@ stream lifetime rules.
 Coda uses `coda.api.rime.ai:443` and voice `clementine`. Mist v3 uses
 `mist.api.rime.ai:443` and voice `astra`. Both use language `en` by default.
 
-`SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, `Timeout`,
-`CustomLexicon` (default nil, requires Coda), and `Timestamps`
-(default `false`, supported only with `Model: "mistv3"`).
-Empty voice and language values select defaults. Audio formats are `PCM24000`
-and `MULAW8000`. Both are raw mono audio. `MULAW8000` contains G.711 mu-law at
-8 kHz. The SDK converts the service's PCM locally. Chunks contain complete frames.
-Use `stream.Format().Encoding()`, `SampleRate()`, and `Channels()` for metadata.
+`SynthesisOptions` accepts `Voice`, `Language`, `AudioFormat`, `SampleRate`,
+`TimeScaleFactor`, `Timeout`, `CustomLexicon` (default nil,
+requires Coda), and `Timestamps` (default false, Mist v3 only).
+Empty voice and language values select defaults.
+
+Output encodings are `PCM` (headerless PCM16, the default), `WAV` (PCM16 WAV),
+and `MP3` (`audio/mpeg`). All are mono. `SampleRate` accepts 8000, 16000 or 24000 Hz;
+zero defaults to 24000 for these encodings. PCM/WAV rates are requested from the
+server, without SDK resampling. MP3 encoder headers determine its actual rate.
+The compatibility presets `PCM24000` and `MULAW8000` retain their fixed rates and
+reject conflicting explicit rates. Mu-law still converts 24 kHz PCM locally.
+
+Use `stream.SampleRate()` for the requested output rate and
+`stream.Format().Encoding()` / `Channels()` for encoding metadata.
+`AudioFormat.SampleRate()` is zero for configurable encodings.
+Default streams continue to report `PCM24000`. PCM chunks contain complete sample
+frames. WAV/MP3 chunks are fragments of one stream, not independent files.
+
+`TimeScaleFactor` is an optional `*float64` duration multiplier from 0.4 to 2.5:
+values below 1 speed speech up; values above 1 slow it down. Nil keeps normal duration.
+
+### Complete audio in memory
+
+`client.TTS.SynthesizeToBuffer(ctx, text, opts)` returns `([]byte, error)` after the
+streaming RPC succeeds. It finalizes WAV header lengths for IVR files. Errors
+return nil audio and release the stream, including failures after audio arrives.
+The output limit is fixed at **64 MiB (67,108,864 bytes)** per call, including
+file headers. Exceeding it returns `ErrResourceLimit` and nil audio. For mono
+PCM16/WAV, this is approximately 70 minutes at 8 kHz, 35 minutes at 16 kHz, or
+23 minutes at 24 kHz. Use streaming synthesis for larger outputs or timestamps.
+Collection can temporarily use more memory than the output limit. Context
+cancellation and timeouts still apply.
+
+```go
+factor := 0.9
+audio, err := client.TTS.SynthesizeToBuffer(ctx, "Thank you for calling.", rime.SynthesisOptions{
+    AudioFormat: rime.WAV, SampleRate: 16000, TimeScaleFactor: &factor,
+})
+if err != nil { return err }
+if err := os.WriteFile("greeting.wav", audio, 0600); err != nil { return err }
+```
 
 Each operation accepts a `context.Context`. Its cancellation and deadline remain
 active even while the application pauses reads. `Timeout` in operation options

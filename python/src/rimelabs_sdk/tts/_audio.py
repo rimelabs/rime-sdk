@@ -5,10 +5,15 @@ import struct
 from collections import deque
 from enum import Enum
 
-from .._errors import RimeAudioFormatError
+from .._errors import RimeAudioFormatError, RimeInputError
 
 
 class AudioFormat(Enum):
+    """Mono output encodings. A preset rate of zero is selected per request."""
+
+    PCM = ("pcm_s16le", 0, 1)
+    WAV = ("wav", 0, 1)
+    MP3 = ("mp3", 0, 1)
     PCM_24000 = ("pcm_s16le", 24000, 1)
     MULAW_8000 = ("mulaw", 8000, 1)
 
@@ -23,6 +28,32 @@ class AudioFormat(Enum):
     @property
     def channels(self):
         return self.value[2]
+
+    @property
+    def _wire_format(self):
+        return {AudioFormat.WAV: "audio/wav", AudioFormat.MP3: "audio/mpeg"}.get(self, "audio/pcm")
+
+
+def resolve_audio(audio_format, sample_rate, time_scale_factor):
+    profile = AudioFormat.PCM if audio_format is None else audio_format
+    if not isinstance(profile, AudioFormat):
+        raise RimeAudioFormatError("Select a named AudioFormat")
+    if sample_rate is None:
+        sample_rate = profile.sample_rate or 24000
+    if type(sample_rate) is not int or sample_rate not in (8000, 16000, 24000):
+        raise RimeAudioFormatError("sample_rate must be 8000, 16000, or 24000")
+    if profile.sample_rate and sample_rate != profile.sample_rate:
+        raise RimeAudioFormatError("sample_rate conflicts with the fixed AudioFormat preset")
+    if time_scale_factor is not None and (
+        isinstance(time_scale_factor, bool)
+        or not isinstance(time_scale_factor, (int, float))
+        or not 0.4 <= time_scale_factor <= 2.5
+        or not math.isfinite(time_scale_factor)
+    ):
+        raise RimeInputError("time_scale_factor must be a finite number from 0.4 to 2.5")
+    if profile is AudioFormat.PCM and sample_rate == 24000:
+        profile = AudioFormat.PCM_24000
+    return profile, sample_rate
 
 
 # 63-tap low-pass filter, 3.4 kHz cutoff, Hamming window. Same coefficients in Node.
@@ -69,12 +100,14 @@ class Converter:
         return None
 
     def process(self, data, *, final=False):
+        if self._profile in (AudioFormat.WAV, AudioFormat.MP3):
+            return data
         data = self._tail + data
         size = len(data) // 2 * 2
         self._tail = data[size:]
         if final and self._tail:
             raise RimeAudioFormatError("Incomplete final PCM sample frame")
-        if self._profile is AudioFormat.PCM_24000:
+        if self._profile in (AudioFormat.PCM, AudioFormat.PCM_24000):
             return data[:size]
         result = bytearray()
         for (sample,) in struct.iter_unpack("<h", data[:size]):

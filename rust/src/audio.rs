@@ -1,23 +1,30 @@
 use crate::{Error, ErrorKind};
 use std::sync::LazyLock;
 
-/// Raw mono audio profile. Neither profile contains a file header.
+/// Mono output encoding or a fixed-rate compatibility preset.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AudioFormat {
-    /// Signed 16-bit little-endian PCM, 24,000 samples per second.
+    /// Signed little-endian PCM16; select the rate with `SynthesisOptions::sample_rate`.
     #[default]
+    Pcm,
+    /// PCM16 WAV. Buffered synthesis finalizes the file's length fields.
+    Wav,
+    /// MP3 encoded by the service.
+    Mp3,
+    /// Signed 16-bit little-endian PCM, 24,000 samples per second.
     Pcm24000,
     /// G.711 mu-law, 8,000 samples per second.
     Mulaw8000,
 }
 
 impl AudioFormat {
-    /// Samples per second.
+    /// Fixed preset rate, or zero for configurable encodings. See `AudioStream::sample_rate`.
     pub fn sample_rate(self) -> u32 {
         match self {
             Self::Pcm24000 => 24_000,
             Self::Mulaw8000 => 8_000,
+            Self::Pcm | Self::Wav | Self::Mp3 => 0,
         }
     }
     /// Number of audio channels.
@@ -27,10 +34,60 @@ impl AudioFormat {
     /// Encoding identifier used by the other Rime SDKs.
     pub fn encoding(self) -> &'static str {
         match self {
-            Self::Pcm24000 => "pcm_s16le",
+            Self::Pcm | Self::Pcm24000 => "pcm_s16le",
             Self::Mulaw8000 => "mulaw",
+            Self::Wav => "wav",
+            Self::Mp3 => "mp3",
         }
     }
+    pub(crate) fn wire_format(self) -> &'static str {
+        match self {
+            Self::Wav => "audio/wav",
+            Self::Mp3 => "audio/mpeg",
+            _ => "audio/pcm",
+        }
+    }
+}
+
+pub(crate) fn resolve_audio(
+    format: AudioFormat,
+    sample_rate: Option<u32>,
+    time_scale_factor: Option<f32>,
+) -> Result<(AudioFormat, u32), Error> {
+    let rate = sample_rate.unwrap_or_else(|| {
+        if format.sample_rate() == 0 {
+            24000
+        } else {
+            format.sample_rate()
+        }
+    });
+    if ![8000, 16000, 24000].contains(&rate) {
+        return Err(Error::new(
+            ErrorKind::AudioFormat,
+            "sample_rate must be 8000, 16000, or 24000",
+        ));
+    }
+    if format.sample_rate() != 0 && rate != format.sample_rate() {
+        return Err(Error::new(
+            ErrorKind::AudioFormat,
+            "sample_rate conflicts with the fixed AudioFormat preset",
+        ));
+    }
+    if time_scale_factor.is_some_and(|factor| !factor.is_finite() || !(0.4..=2.5).contains(&factor))
+    {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "time_scale_factor must be a finite number from 0.4 to 2.5",
+        ));
+    }
+    Ok((
+        if format == AudioFormat::Pcm && rate == 24000 {
+            AudioFormat::Pcm24000
+        } else {
+            format
+        },
+        rate,
+    ))
 }
 
 static COEFFICIENTS: LazyLock<[f64; 63]> = LazyLock::new(|| {
@@ -102,6 +159,9 @@ impl Converter {
         }
     }
     pub(crate) fn process(&mut self, input: &[u8], final_chunk: bool) -> Result<Vec<u8>, Error> {
+        if matches!(self.format, AudioFormat::Wav | AudioFormat::Mp3) {
+            return Ok(input.to_vec());
+        }
         let mut data = Vec::with_capacity(input.len() + 1);
         data.extend(self.tail.take());
         data.extend_from_slice(input);
@@ -114,7 +174,7 @@ impl Converter {
                 "incomplete final PCM sample frame",
             ));
         }
-        if self.format == AudioFormat::Pcm24000 {
+        if matches!(self.format, AudioFormat::Pcm | AudioFormat::Pcm24000) {
             return Ok(data);
         }
         let mut output = Vec::with_capacity(data.len() / 6 + 11);

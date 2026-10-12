@@ -72,7 +72,9 @@ fn expected_words() -> TimestampResult {
 
 #[derive(Clone)]
 struct Script {
+    content_type: &'static str,
     before_gate: Vec<Frame>,
+    repeats: usize,
     gated: bool,
     after_gate: Vec<Frame>,
     final_error: Option<Status>,
@@ -83,7 +85,9 @@ struct Script {
 impl Default for Script {
     fn default() -> Self {
         Self {
+            content_type: "audio/pcm",
             before_gate: vec![audio_frame([1, 0].repeat(2400))],
+            repeats: 1,
             gated: false,
             after_gate: vec![],
             final_error: None,
@@ -138,9 +142,11 @@ impl Service {
                     };
                     service.texts.lock().unwrap().push(text);
                 }
-                for frame in &service.script.before_gate {
-                    if sender.send(Ok(frame.clone())).await.is_err() {
-                        return;
+                for _ in 0..service.script.repeats {
+                    for frame in &service.script.before_gate {
+                        if sender.send(Ok(frame.clone())).await.is_err() {
+                            return;
+                        }
                     }
                 }
                 if service.script.gated {
@@ -161,9 +167,10 @@ impl Service {
             }
         });
         let mut response = Response::new(Box::pin(ReceiverStream::new(receiver)) as Responses);
-        response
-            .metadata_mut()
-            .insert("x-rime-audio-content-type", "audio/pcm".parse().unwrap());
+        response.metadata_mut().insert(
+            "x-rime-audio-content-type",
+            self.script.content_type.parse().unwrap(),
+        );
         response
             .metadata_mut()
             .insert("x-request-id", "feature-request".parse().unwrap());
@@ -783,4 +790,316 @@ async fn source_failure_is_returned_by_both_audio_and_timestamps() {
         audio.timestamps().unwrap_err().message(),
         "input source failed"
     );
+}
+
+fn output_contract() -> serde_json::Value {
+    serde_json::from_str(include_str!("../../testdata/contract.json")).unwrap()
+}
+
+fn output_format(name: &str) -> AudioFormat {
+    match name {
+        "PCM" => AudioFormat::Pcm,
+        "PCM_24000" => AudioFormat::Pcm24000,
+        "MULAW_8000" => AudioFormat::Mulaw8000,
+        "WAV" => AudioFormat::Wav,
+        "MP3" => AudioFormat::Mp3,
+        _ => panic!("unknown format"),
+    }
+}
+
+#[tokio::test]
+async fn output_headers_and_chunk_boundaries() {
+    for case in output_contract()["output_cases"].as_array().unwrap() {
+        for mode in MODES {
+            let format = output_format(case["format"].as_str().unwrap());
+            let rate = case["sample_rate"].as_u64().unwrap() as u32;
+            let mime = match format {
+                AudioFormat::Wav => "audio/wav",
+                AudioFormat::Mp3 => "audio/mpeg",
+                _ => "audio/pcm",
+            };
+            let payload = if matches!(format, AudioFormat::Wav | AudioFormat::Mp3) {
+                b"encoded".to_vec()
+            } else {
+                vec![1, 0, 2, 0, 3, 0]
+            };
+            let harness = Harness::new(
+                Model::Coda,
+                Script {
+                    content_type: mime,
+                    before_gate: vec![
+                        audio_frame(payload[..1].to_vec()),
+                        audio_frame(payload[1..].to_vec()),
+                    ],
+                    ..Default::default()
+                },
+            )
+            .await;
+            let mut audio = start(
+                &harness,
+                mode,
+                SynthesisOptions::default()
+                    .audio_format(format)
+                    .sample_rate(rate)
+                    .time_scale_factor(0.8),
+            );
+            assert_eq!(audio.sample_rate(), rate);
+            let mut data = Vec::new();
+            while let Some(chunk) = next(&mut audio).await {
+                data.extend_from_slice(&chunk.unwrap());
+            }
+            if format == AudioFormat::Mulaw8000 {
+                assert_eq!(data.len(), 1);
+            } else {
+                assert_eq!(data, payload);
+            }
+            {
+                let requests = harness.service.requests.lock().unwrap();
+                let params = requests[0].audio_parameters.as_ref().unwrap();
+                assert_eq!(params.audio_format.as_deref(), Some(mime));
+                assert_eq!(
+                    params.sampling_rate.unwrap(),
+                    case["wire_rate"].as_i64().unwrap() as i32
+                );
+                assert_eq!(params.time_scale_factor, Some(0.8));
+            }
+            audio.close().await;
+            harness.client.close().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn buffered_wav_conformance() {
+    for case in output_contract()["wav_cases"].as_array().unwrap() {
+        let payload = hex::decode(case["input_hex"].as_str().unwrap()).unwrap();
+        let harness = Harness::new(
+            Model::Coda,
+            Script {
+                content_type: "audio/wav",
+                before_gate: vec![
+                    audio_frame(payload[..1].to_vec()),
+                    audio_frame(payload[1..].to_vec()),
+                ],
+                ..Default::default()
+            },
+        )
+        .await;
+        let result = harness
+            .client
+            .tts()
+            .synthesize_to_buffer(
+                "Hello.",
+                SynthesisOptions::default()
+                    .audio_format(AudioFormat::Wav)
+                    .sample_rate(16000),
+            )
+            .await;
+        if case["error"].as_bool().unwrap_or(false) {
+            let error = result.unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::AudioFormat, "{}", case["name"]);
+            assert_eq!(error.request_id(), Some("feature-request"));
+        } else {
+            assert_eq!(
+                hex::encode(result.unwrap()),
+                case["output_hex"].as_str().unwrap()
+            );
+        }
+        assert_eq!(
+            harness.service.requests.lock().unwrap()[0]
+                .audio_parameters
+                .as_ref()
+                .unwrap()
+                .time_scale_factor,
+            None
+        );
+        harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn audio_output_validation_is_local() {
+    let harness = Harness::new(Model::Coda, Script::default()).await;
+    for rate in [0, 11025, 48000] {
+        let error = harness
+            .client
+            .tts()
+            .synthesize("Hello.", SynthesisOptions::default().sample_rate(rate))
+            .err()
+            .unwrap();
+        assert_eq!(error.kind(), ErrorKind::AudioFormat);
+    }
+    for factor in [0.0, -1.0, 0.39, 2.51, f32::NAN, f32::INFINITY] {
+        let error = harness
+            .client
+            .tts()
+            .synthesize(
+                "Hello.",
+                SynthesisOptions::default().time_scale_factor(factor),
+            )
+            .err()
+            .unwrap();
+        assert_eq!(error.kind(), ErrorKind::Input);
+    }
+    for (format, rate) in [
+        (AudioFormat::Pcm24000, 8000),
+        (AudioFormat::Mulaw8000, 16000),
+    ] {
+        let error = harness
+            .client
+            .tts()
+            .synthesize(
+                "Hello.",
+                SynthesisOptions::default()
+                    .audio_format(format)
+                    .sample_rate(rate),
+            )
+            .err()
+            .unwrap();
+        assert_eq!(error.kind(), ErrorKind::AudioFormat);
+    }
+    assert_eq!(harness.service.streaming_calls.load(Ordering::SeqCst), 0);
+    harness.client.close().await;
+}
+
+#[tokio::test]
+async fn buffer_failures_preserve_terminal_error_and_request_id() {
+    for mode in ["late_error", "timeout", "mismatch"] {
+        let mut script = Script::default();
+        let mut options = SynthesisOptions::default();
+        let kind = match mode {
+            "late_error" => {
+                script.final_error = Some(Status::unavailable("late failure"));
+                ErrorKind::Unavailable
+            }
+            "timeout" => {
+                script.gated = true;
+                options = options.timeout(Some(Duration::from_millis(100)));
+                ErrorKind::Timeout
+            }
+            _ => {
+                script.content_type = "audio/wav";
+                ErrorKind::AudioFormat
+            }
+        };
+        let harness = Harness::new(Model::Coda, script).await;
+        let error = harness
+            .client
+            .tts()
+            .synthesize_to_buffer("Hello.", options)
+            .await
+            .unwrap_err();
+        assert_eq!(error.kind(), kind);
+        assert_eq!(error.request_id(), Some("feature-request"));
+        harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn buffered_mp3_preserves_encoded_output() {
+    let harness = Harness::new(
+        Model::Coda,
+        Script {
+            content_type: "audio/mpeg",
+            before_gate: vec![audio_frame(b"odd-mp3".to_vec())],
+            ..Default::default()
+        },
+    )
+    .await;
+    let data = harness
+        .client
+        .tts()
+        .synthesize_to_buffer(
+            "Hello.",
+            SynthesisOptions::default().audio_format(AudioFormat::Mp3),
+        )
+        .await
+        .unwrap();
+    assert_eq!(data, b"odd-mp3");
+    harness.client.close().await;
+}
+
+#[tokio::test]
+async fn sample_rate_without_format_and_factor_boundaries() {
+    for (rate, factor) in [(8000, 0.4), (16000, 1.0), (24000, 2.5)] {
+        let harness = Harness::new(Model::Coda, Script::default()).await;
+        let data = harness
+            .client
+            .tts()
+            .synthesize_to_buffer(
+                "Hello.",
+                SynthesisOptions::default()
+                    .sample_rate(rate)
+                    .time_scale_factor(factor),
+            )
+            .await
+            .unwrap();
+        assert_eq!(data.len(), 4800);
+        {
+            let requests = harness.service.requests.lock().unwrap();
+            let params = requests[0].audio_parameters.as_ref().unwrap();
+            assert_eq!(params.sampling_rate, Some(rate as i32));
+            assert_eq!(params.time_scale_factor, Some(factor));
+        }
+        harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn dropping_buffer_future_cancels_its_operation() {
+    let harness = Harness::new(
+        Model::Coda,
+        Script {
+            gated: true,
+            ..Default::default()
+        },
+    )
+    .await;
+    let tts = harness.client.tts();
+    let mut pending = Box::pin(tts.synthesize_to_buffer("Hello.", SynthesisOptions::default()));
+    tokio::select! {
+        _ = &mut pending => panic!("buffer must wait for RPC completion"),
+        _ = async {while harness.service.streaming_calls.load(Ordering::SeqCst)==0 {tokio::task::yield_now().await;}} => {}
+    }
+    drop(pending);
+    tokio::time::timeout(Duration::from_secs(2), harness.client.close())
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn fixed_buffer_limit() {
+    for extra in [0, 2] {
+        let harness = Harness::new(
+            Model::Coda,
+            Script {
+                before_gate: vec![audio_frame(vec![0; 1024 * 1024])],
+                repeats: 64,
+                after_gate: if extra == 0 {
+                    vec![]
+                } else {
+                    vec![audio_frame(vec![0; extra])]
+                },
+                ..Default::default()
+            },
+        )
+        .await;
+        let result = harness
+            .client
+            .tts()
+            .synthesize_to_buffer(
+                "Hello.",
+                SynthesisOptions::default().timeout(Some(Duration::from_secs(10))),
+            )
+            .await;
+        if extra == 0 {
+            assert_eq!(result.unwrap().len(), 64 * 1024 * 1024);
+        } else {
+            let error = result.unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::ResourceLimit);
+            assert_eq!(error.request_id(), Some("feature-request"));
+            assert!(error.message().contains("64 MiB"));
+        }
+        harness.client.close().await;
+    }
 }
