@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.14](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.13...typescript-v0.1.0-alpha.14) (2026-10-12)
+
+
+### Features
+
+* **tts:** add sample rates, time-scale control, and buffered audio output ([1856d0d](https://github.com/rimelabs/rime-sdk/commit/1856d0d6c00a46d7917b61d73bc7f2a8526c8bb0))
+
 ## [0.1.0-alpha.13](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.12...typescript-v0.1.0-alpha.13) (2026-10-11)
 
 
