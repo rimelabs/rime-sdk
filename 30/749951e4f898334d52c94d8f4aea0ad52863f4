@@ -1,0 +1,26 @@
+python/README.md
+  s_3334d6f33a9904::t_577cf8fd784f79 93-96
+python/examples/tts/coda_ws.py
+  s_3334d6f33a9904::t_577cf8fd784f79 20
+docs/examples.md
+  s_3334d6f33a9904::t_577cf8fd784f79 42-43,133-135
+  s_3334d6f33a9904::t_9b290db8181b7e 136
+typescript/README.md
+  s_3334d6f33a9904::t_577cf8fd784f79 109-112
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "30749951e4f898334d52c94d8f4aea0ad52863f4",
+  "prompts": {},
+  "sessions": {
+    "s_3334d6f33a9904": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a130fa-1aa1-7fe1-81dd-b1a54e13669e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
