@@ -50,7 +50,7 @@ pub(crate) fn finalize_wav(data: &mut [u8], sample_rate: u32) -> Result<(), Erro
             }
             found_format = true;
         } else if name == b"data" {
-            if !found_format || data_size_field.is_some() || size % 2 != 0 {
+            if !found_format || data_size_field.is_some() || !size.is_multiple_of(2) {
                 return Err(invalid());
             }
             data_size_field = Some((offset + 4, size as u32));
