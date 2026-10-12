@@ -37,6 +37,10 @@ export PRISM_URL="wss://your-prism-host/v1/realtime"
 export PRISM_VOICE="your-deployment-voice"
 ```
 
+The announced public Prism host is `prism.api.rime.ai:443`. The service is not yet
+available. Confirm availability and the `/v1/realtime` route with your deployment
+operator before setting `PRISM_URL` to `wss://prism.api.rime.ai/v1/realtime`.
+
 You can omit `PRISM_VOICE` if the deployment has a default voice.
 Record a short question and export it as `question.wav`, using **16 kHz, mono, signed 16-bit PCM WAV**.
 Save the following as `prism.mjs` beside that file. It sends the recording at capture speed,

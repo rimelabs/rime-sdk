@@ -17,7 +17,7 @@ from pathlib import Path
 from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
-URL = "wss://api.rime.ai/coda/ws"
+URL = "wss://coda.api.rime.ai/ws"
 RATE = 24000
 
 
