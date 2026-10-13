@@ -40,7 +40,7 @@ uv run --directory python/examples --locked -m tts.coda_ws
 ```
 
 This connects directly to `wss://coda.api.rime.ai/ws` on port 443, which serves
-Coda v2. The old `api.rime.ai/<model>` routes are scheduled for retirement.
+Coda v2.
 
 Enter complete sentences or stable clauses, one per line. Each line becomes a
 `text` message in the same synthesis context, and audio plays as it arrives.
