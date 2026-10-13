@@ -53,7 +53,7 @@ async function payload(events, kind) {
   }
 }
 async function turn(session, peer, id = "reply-1") {
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(session.sendText("hello"));
   const request = await peer.next("response.create");
   peer.accepted(request, id);
@@ -125,20 +125,20 @@ test("Prism config, direct credentials, typed output and large incoming audio", 
 
 test("one readiness event admits one turn; named busy refusal waits for new readiness", async (t) => {
   const { session, peer } = await setup(t);
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const first = watch(session.sendText("first")),
     second = watch(session.sendText("second"));
   const refused = await peer.next("response.create");
   peer.fault(refused, "typed_turn_busy");
   await sleep(20);
   assert.equal(peer.queue.length, 0);
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   peer.accepted(await peer.next("response.create"));
   await first;
   await sleep(20);
   assert.equal(peer.queue.length, 0);
   peer.ended();
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   peer.accepted(await peer.next("response.create"), "reply-2");
   assert.equal((await second).responseId, "reply-2");
 });
@@ -162,7 +162,7 @@ test("request acknowledgment has its own deadline after admission", async (t) =>
   const { session, peer } = await setup(t, {
     timeouts: { readyS: 0.03, requestS: 0.4 },
   });
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(session.sendText("hello"));
   const request = await peer.next("response.create");
   await sleep(60);
@@ -174,7 +174,7 @@ test("unknown request outcome closes the session and never replays", async (t) =
   const { session, peer, events } = await setup(t, {
     timeouts: { readyS: 0.2, requestS: 0.03 },
   });
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(session.sendText("hello"));
   await peer.next("response.create");
   await assert.rejects(
@@ -194,7 +194,7 @@ test("unknown request outcome closes the session and never replays", async (t) =
 test("aborted submitted turn cancels its late response exactly once", async (t) => {
   const { session, peer, events } = await setup(t);
   const controller = new AbortController();
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(
     session.sendText("hello", { signal: controller.signal }),
   );
@@ -215,14 +215,14 @@ test("aborted submitted turn cancels its late response exactly once", async (t) 
     1,
   );
   assert.equal(
-    peer.requests.filter((r) => r.type === "prsm.playback.drained").length,
+    peer.requests.filter((r) => r.type === "prism.playback.drained").length,
     0,
   );
 });
 
 test("typed supersession matches the acknowledged item ID", async (t) => {
   const { session, peer } = await setup(t);
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(session.sendText("hello"));
   const request = await peer.next("response.create");
   peer.ack(request);
@@ -250,14 +250,14 @@ test("history and proactive replies use distinct wire operations", async (t) => 
     sessionId: "session-1",
     itemId: "history-1",
   });
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const reply = watch(
     session.requestReply({ instruction: "Welcome the caller" }),
   );
   const proactive = await peer.next("response.create");
   assert.deepEqual(proactive.response, {
-    prsm_instruction: "Welcome the caller",
-    metadata: { prsm_cause: "proactive" },
+    prism_instruction: "Welcome the caller",
+    metadata: { prism_cause: "proactive" },
   });
   peer.accepted(proactive);
   await reply;
@@ -287,8 +287,8 @@ test("tool continuation waits for every result acknowledgment and parent complet
   await result2;
   const request = await peer.next("response.create");
   assert.deepEqual(request.response.metadata, {
-    prsm_cause: "tool_continuation",
-    prsm_parent_response_id: ref.responseId,
+    prism_cause: "tool_continuation",
+    prism_parent_response_id: ref.responseId,
   });
   peer.accepted(request, "reply-2");
   await continuation;
@@ -331,10 +331,10 @@ test("late tool result is recorded and can be reported by call ID", async (t) =>
   peer.ack(await peer.next("conversation.item.create"));
   await result;
   peer.ended("reply-2");
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const report = watch(session.requestReply({ toolCall: call }));
   const request = await peer.next("response.create");
-  assert.equal(request.response.prsm_call_id, call.callId);
+  assert.equal(request.response.prism_call_id, call.callId);
   peer.accepted(request, "reply-3");
   await report;
 });
@@ -406,9 +406,9 @@ test("playback uses message identity, waits for done, and sends the drain token"
   assert.equal(peer.queue.length, 0);
   peer.ended();
   await finish;
-  const drained = await peer.next("prsm.playback.drained");
+  const drained = await peer.next("prism.playback.drained");
   assert.deepEqual(drained, {
-    type: "prsm.playback.drained",
+    type: "prism.playback.drained",
     response_id: ref.responseId,
     drain_token: "drain-1",
     played_ms: 123,
@@ -443,7 +443,7 @@ test("cancel requests share a slot; completion can win the cancellation race", a
 test("response faults do not end generation; unknown enum values stay explicit", async (t) => {
   const { session, peer, events } = await setup(t);
   peer.emit("response.created", {
-    response: { id: "reply-1", metadata: { prsm_cause: "future" } },
+    response: { id: "reply-1", metadata: { prism_cause: "future" } },
   });
   const start = await payload(events, "response.started");
   assert.equal(start.cause, "unknown");
@@ -498,7 +498,7 @@ test("one event consumer, cross-session references, and owner cleanup", async (t
   const { session, peer, client, events } = await setup(t);
   const waiting = events.next();
   await assert.rejects(session.events.next(), RimeInputError);
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   await waiting;
   await assert.rejects(
     session.cancel({ sessionId: "another", responseId: "reply-1" }),
@@ -529,7 +529,7 @@ for (const mode of [
     const pending = watch(session.addMessage("user", "history"));
     await peer.next("conversation.item.create");
     if (mode === "overflow")
-      for (let i = 0; i < 257; i++) peer.emit("prsm.typed_input.ready");
+      for (let i = 0; i < 257; i++) peer.emit("prism.typed_input.ready");
     if (mode === "lost") peer.socket.terminate();
     if (mode === "malformed") peer.socket.send("{");
     if (mode === "oversize") peer.socket.send(" ".repeat(1024 * 1024 + 1));
@@ -707,7 +707,7 @@ for (const kind of ["text", "continuation"]) {
     const blocker = watch(session.addMessage("user", "history"));
     await hold.waiting;
     if (kind === "text") {
-      peer.emit("prsm.typed_input.ready");
+      peer.emit("prism.typed_input.ready");
       await payload(events, "input.ready");
     }
     const controller = new AbortController();
@@ -739,7 +739,7 @@ test("pre-send cancellation does not restore readiness after new speech", async 
   const hold = holdWrites(t, "conversation.item.create");
   const blocker = watch(session.addMessage("user", "history"));
   await hold.waiting;
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   await payload(events, "input.ready");
   const controller = new AbortController();
   const request = watch(
@@ -769,7 +769,7 @@ test("operation limit does not consume readiness", async (t) => {
   const requests = [];
   for (let i = 0; i < 128; i++)
     requests.push(await peer.next("conversation.item.create"));
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   await payload(events, "input.ready");
   await assert.rejects(session.sendText("first"), RimeResourceLimitError);
   for (const request of requests) peer.ack(request);
@@ -1026,7 +1026,7 @@ test("duplicate tool and terminal events are emitted once; unknown events are ig
   peer.ended();
   peer.ended();
   peer.emit("future.event", { anything: true });
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const kinds = [];
   for (;;) {
     const kind = (await events.next()).value.payload.kind;

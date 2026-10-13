@@ -68,11 +68,11 @@ test("voice interruption reports the cut and continues into a completed next tur
   peer.onRequest = (request) => {
     if (request.type === "session.update")
       peer.emit("session.updated", {
-        prsm_request_event_id: request.event_id,
+        prism_request_event_id: request.event_id,
         session: {
           id: "session-1",
           voice: "test",
-          prsm_effective_interrupt_response: true,
+          prism_effective_interrupt_response: true,
         },
       });
     else if (peer.waiters.length) peer.waiters.shift()(request);
@@ -136,11 +136,11 @@ test("voice interruption reports the cut and continues into a completed next tur
     item_id: "first",
     content_index: 0,
     audio_end_ms: 20,
-    prsm_request_event_id: cut.event_id,
+    prism_request_event_id: cut.event_id,
   });
   reply("next");
   peer.ended("next");
-  const drained = await peer.next("prsm.playback.drained");
+  const drained = await peer.next("prism.playback.drained");
   assert.equal(drained.response_id, "next");
   assert.equal(drained.played_ms, 40);
   audio.close();
@@ -157,11 +157,11 @@ for (const interrupted of [false, true]) {
       peer.onRequest = (request) => {
         if (request.type === "session.update")
           peer.emit("session.updated", {
-            prsm_request_event_id: request.event_id,
+            prism_request_event_id: request.event_id,
             session: {
               id: "session-1",
               voice: "test",
-              prsm_effective_interrupt_response: true,
+              prism_effective_interrupt_response: true,
             },
           });
       };
@@ -221,7 +221,7 @@ for (const interrupted of [false, true]) {
       await remoteClosed;
       assert.deepEqual(
         peer.requests.filter((request) =>
-          ["conversation.item.truncate", "prsm.playback.drained"].includes(
+          ["conversation.item.truncate", "prism.playback.drained"].includes(
             request.type,
           ),
         ),

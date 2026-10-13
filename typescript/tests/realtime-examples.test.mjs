@@ -29,7 +29,7 @@ async function run(t, file, respond, source) {
   peer.server.on("connection", (socket) => {
     socket.on("message", (raw) => {
       if (JSON.parse(raw.toString()).type === "session.update")
-        peer.emit("prsm.typed_input.ready");
+        peer.emit("prism.typed_input.ready");
     });
   });
   peer.onRequest = (request) => respond(peer, request);
@@ -91,7 +91,9 @@ for (const calls of [0, 1, 2]) {
         assert.equal(JSON.parse(request.item.output).status, "shipped");
         peer.ack(request);
         completed++;
-      } else if (request.response.metadata.prsm_cause === "tool_continuation") {
+      } else if (
+        request.response.metadata.prism_cause === "tool_continuation"
+      ) {
         continuation = true;
         assert.equal(completed, calls);
         reply(peer, request, "reply-2");

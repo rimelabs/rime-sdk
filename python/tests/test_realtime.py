@@ -49,7 +49,7 @@ class Peer:
             self.settings = event["session"]
             self.emit(
                 "session.updated",
-                prsm_request_event_id=event["event_id"],
+                prism_request_event_id=event["event_id"],
                 session={"id": "session-1", "voice": "test"},
             )
         else:
@@ -77,7 +77,7 @@ class Peer:
     def accepted(self, request, response_id="reply-1", **metadata):
         self.emit(
             "response.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             response={
                 "id": response_id,
                 "metadata": {**request.get("response", {}).get("metadata", {}), **metadata},
@@ -90,7 +90,7 @@ class Peer:
             response={
                 "id": response_id,
                 "status": status,
-                "metadata": {"prsm_drain_token": "drain-1"},
+                "metadata": {"prism_drain_token": "drain-1"},
             },
         )
 
@@ -118,7 +118,7 @@ async def session(monkeypatch, *, timeouts=None):
 
 
 async def accepted_turn(current, peer):
-    peer.emit("prsm.typed_input.ready")
+    peer.emit("prism.typed_input.ready")
     task = asyncio.create_task(current.send_text("hello"))
     request = await peer.next("response.create")
     peer.accepted(request)
@@ -247,7 +247,7 @@ async def test_outgoing_audio_limit_preserves_conversion_state(monkeypatch):
 
 @pytest.mark.parametrize(
     ("metadata", "expected"),
-    [({}, "speech"), ({"prsm_cause": "future_cause"}, "unknown")],
+    [({}, "speech"), ({"prism_cause": "future_cause"}, "unknown")],
 )
 async def test_unknown_server_enum_values_are_explicit(monkeypatch, metadata, expected):
     async with session(monkeypatch) as (current, peer, _):
@@ -277,7 +277,7 @@ async def test_unknown_server_enum_values_are_explicit(monkeypatch, metadata, ex
 
 async def test_one_ready_admits_one_turn_and_busy_needs_next_ready(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         first = asyncio.create_task(current.send_text("one"))
         request = await peer.next("response.create")
         second = asyncio.create_task(current.send_text("two"))
@@ -292,7 +292,7 @@ async def test_one_ready_admits_one_turn_and_busy_needs_next_ready(monkeypatch):
         )
         await asyncio.sleep(0.01)
         assert peer.sent.empty()
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         retry = await peer.next("response.create")
         assert retry["event_id"] != request["event_id"]
         peer.accepted(retry)
@@ -308,14 +308,14 @@ async def test_cancel_before_ready_never_sends(monkeypatch):
         await asyncio.sleep(0)
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         await asyncio.sleep(0.01)
         assert peer.sent.empty()
 
 
 async def test_cancel_after_send_cancels_late_response(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         task = asyncio.create_task(current.request_reply(instruction="hello"))
         request = await peer.next("response.create")
         task.cancel()
@@ -328,12 +328,12 @@ async def test_cancel_after_send_cancels_late_response(monkeypatch):
 
 async def test_typed_turn_superseded_after_item_ack_matches_item_identity(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         pending = asyncio.create_task(current.send_text("superseded before generation"))
         request = await peer.next("response.create")
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"id": "typed-user-item", "type": "message", "role": "user"},
         )
         peer.emit(
@@ -356,7 +356,7 @@ async def test_typed_turn_superseded_after_item_ack_matches_item_identity(monkey
 
 async def test_unknown_outcome_closes_without_replay(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         task = asyncio.create_task(current.send_text("once"))
         await peer.next("response.create")
         with pytest.raises(RimeTimeoutError, match="outcome unknown"):
@@ -426,7 +426,7 @@ async def test_playback_uses_output_identity_and_waits_for_done(monkeypatch):
         assert peer.sent.empty()
         peer.ended()
         await receipt
-        assert (await peer.next("prsm.playback.drained"))["response_id"] == ref.response_id
+        assert (await peer.next("prism.playback.drained"))["response_id"] == ref.response_id
         await iterator.aclose()
 
 
@@ -453,12 +453,12 @@ async def test_tools_wait_for_result_ack_and_parent_done(monkeypatch):
         assert peer.sent.empty()
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
         request = await peer.next("response.create")
-        assert request["response"]["metadata"]["prsm_parent_response_id"] == ref.response_id
+        assert request["response"]["metadata"]["prism_parent_response_id"] == ref.response_id
         peer.accepted(request, "reply-2")
         await continuation
         with pytest.raises(RimeInputError):
@@ -496,7 +496,7 @@ async def test_continuation_retries_only_after_confirmed_not_ready(monkeypatch, 
         request = await peer.next("conversation.item.create")
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
@@ -552,7 +552,7 @@ async def completed_tool_round(current, peer):
     request = await peer.next("conversation.item.create")
     peer.emit(
         "conversation.item.created",
-        prsm_request_event_id=request["event_id"],
+        prism_request_event_id=request["event_id"],
         item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
     )
     await result
@@ -575,7 +575,7 @@ async def test_unsent_turn_can_be_retried(monkeypatch, turn_kind, failure):
                 return current.continue_reply(parent)
 
         else:
-            peer.emit("prsm.typed_input.ready")
+            peer.emit("prism.typed_input.ready")
             await current._ready.wait()
 
             def start_turn():
@@ -612,7 +612,7 @@ async def test_unsent_turn_can_be_retried(monkeypatch, turn_kind, failure):
 
 async def test_unsent_turn_does_not_restore_readiness_after_speech(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         async with current._write_lock:
             waiting = asyncio.create_task(current.send_text("cancelled"))
             async with asyncio.timeout(1):
@@ -777,7 +777,7 @@ async def test_tools_and_terminal_are_once_and_output_identity_is_preserved(monk
         peer.ended(status=status)
         peer.ended(status=status)
         # This event also proves the connection remains usable after completion.
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         iterator = current.events
         events = []
         while True:
@@ -807,7 +807,7 @@ async def test_tools_and_terminal_are_once_and_output_identity_is_preserved(monk
 async def test_slow_consumer_fails_instead_of_dropping(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
         for _ in range(257):
-            peer.emit("prsm.typed_input.ready")
+            peer.emit("prism.typed_input.ready")
         await asyncio.sleep(0.02)
         with pytest.raises(RimeResourceLimitError):
             await anext(current.events)
@@ -884,7 +884,7 @@ async def test_cancelled_clear_resets_conversion_only_after_ack(monkeypatch, out
             release.set()
             peer.emit(
                 "conversation.item.created",
-                prsm_request_event_id=request["event_id"],
+                prism_request_event_id=request["event_id"],
                 item={"id": "history-item"},
             )
             await history
@@ -942,16 +942,16 @@ async def test_late_tool_result_is_recorded_and_reported_by_call_id(monkeypatch)
         request = await peer.next("conversation.item.create")
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         await result
         with pytest.raises(RimeInputError, match="superseded"):
             await current.continue_reply(old)
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         report = asyncio.create_task(current.request_reply(tool_call=call))
         request = await peer.next("response.create")
-        assert request["response"]["prsm_call_id"] == "late"
+        assert request["response"]["prism_call_id"] == "late"
         peer.accepted(request, "report")
         await report
         await iterator.aclose()
@@ -978,7 +978,7 @@ async def test_cancelled_tool_result_still_updates_round_after_ack(monkeypatch):
         await asyncio.gather(result, return_exceptions=True)
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"type": "function_call_output", "call_id": request["item"]["call_id"]},
         )
         peer.ended()
@@ -1038,7 +1038,7 @@ async def test_transcription_failure_is_scoped_to_its_utterance(monkeypatch):
 
 async def test_second_event_consumer_is_rejected(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         first = current.events
         await anext(first)
         with pytest.raises(RimeInputError, match="one consumer"):
@@ -1098,7 +1098,7 @@ async def test_concurrent_cancel_and_playback_stop_share_one_cancel(monkeypatch)
         assert peer.sent.empty()
         peer.ended(status="cancelled")
         await asyncio.gather(first, playback)
-        receipt = await peer.next("prsm.playback.drained")
+        receipt = await peer.next("prism.playback.drained")
         assert receipt["response_id"] == ref.response_id
         assert peer.sent.empty()
 
@@ -1147,7 +1147,7 @@ async def test_completion_wins_cancel_race_without_changing_terminal_status(monk
                 "owner": {"kind": "event", "event_id": request["event_id"]},
             },
         )
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         next_turn = asyncio.create_task(current.send_text("next turn"))
         next_request = await peer.next("response.create")
         peer.accepted(next_request, "reply-2")
@@ -1212,7 +1212,7 @@ async def test_abandoned_response_notice_is_once_and_does_not_report_playback(
     monkeypatch, accepted_before_cancel
 ):
     async with session(monkeypatch) as (current, peer, _):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         task = asyncio.create_task(current.send_text("hello"))
         request = await peer.next("response.create")
         if accepted_before_cancel:
@@ -1222,7 +1222,7 @@ async def test_abandoned_response_notice_is_once_and_does_not_report_playback(
                 json.dumps(
                     {
                         "type": "response.created",
-                        "prsm_request_event_id": request["event_id"],
+                        "prism_request_event_id": request["event_id"],
                         "response": {"id": "reply-1", "metadata": {}},
                     }
                 ),
@@ -1258,7 +1258,7 @@ async def test_request_ack_deadline_is_independent_of_admission_deadline(monkeyp
         peer,
         _,
     ):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         task = asyncio.create_task(current.send_text("hello"))
         request = await peer.next("response.create")
         await asyncio.sleep(0.03)
@@ -1273,7 +1273,7 @@ async def test_unknown_request_outcome_is_not_an_admission_timeout(monkeypatch):
         peer,
         _,
     ):
-        peer.emit("prsm.typed_input.ready")
+        peer.emit("prism.typed_input.ready")
         task = asyncio.create_task(current.send_text("hello"))
         await peer.next("response.create")
         with pytest.raises(RimeTimeoutError) as raised:

@@ -1,5 +1,8 @@
 # Realtime / Prism for Node.js
 
+The endpoint must use Rime's `prism.` events and `prism_` fields. Endpoints
+that use the former `prsm` names are not supported.
+
 Keep one event consumer running while your application sends input, runs tools,
 and plays audio. The SDK manages the protocol state. Your application owns
 microphone capture, tool execution, and playback.

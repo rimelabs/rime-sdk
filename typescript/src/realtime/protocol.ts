@@ -169,17 +169,17 @@ function duration(value: unknown, field: string): number | null {
 function session(value: unknown): SessionView {
   const view = object(value, "session");
   const waits =
-    view.prsm_tool_waits === undefined
+    view.prism_tool_waits === undefined
       ? {}
-      : object(view.prsm_tool_waits, "session.prsm_tool_waits");
+      : object(view.prism_tool_waits, "session.prism_tool_waits");
   if (
-    view.prsm_tool_waits !== undefined &&
+    view.prism_tool_waits !== undefined &&
     (!("result_timeout_s" in waits) || !("continuation_timeout_s" in waits))
   )
-    invalid("session.prsm_tool_waits");
-  const interrupt = view.prsm_effective_interrupt_response;
+    invalid("session.prism_tool_waits");
+  const interrupt = view.prism_effective_interrupt_response;
   if (interrupt !== undefined && typeof interrupt !== "boolean")
-    invalid("session.prsm_effective_interrupt_response");
+    invalid("session.prism_effective_interrupt_response");
   return {
     id: id(view.id, "session.id"),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
@@ -311,7 +311,7 @@ function decodeValue(
         contentIndex: integer(event.content_index, "content_index"),
       };
       break;
-    case "prsm.typed_input.ready":
+    case "prism.typed_input.ready":
       payload = { kind: "input.ready" };
       break;
     case "input_audio_buffer.speech_started":
@@ -370,12 +370,12 @@ function decodeValue(
             ? {}
             : object(response.metadata, "metadata");
       const cause =
-        metadata.prsm_cause === undefined
+        metadata.prism_cause === undefined
           ? undefined
-          : string(metadata.prsm_cause, "prsm_cause");
+          : string(metadata.prism_cause, "prism_cause");
       const parent = optionalString(
-        metadata.prsm_parent_response_id,
-        "prsm_parent_response_id",
+        metadata.prism_parent_response_id,
+        "prism_parent_response_id",
       );
       payload = {
         kind: "response.started",
@@ -392,8 +392,8 @@ function decodeValue(
                   : "unknown",
         parent: parent === null ? null : ref(parent),
         inputItemId: optionalString(
-          metadata.prsm_input_item_id,
-          "prsm_input_item_id",
+          metadata.prism_input_item_id,
+          "prism_input_item_id",
         ),
       };
       break;
@@ -420,8 +420,8 @@ function decodeValue(
             : "unknown",
         reason: optionalString(details.reason, "reason"),
         drainToken: optionalString(
-          metadata.prsm_drain_token,
-          "prsm_drain_token",
+          metadata.prism_drain_token,
+          "prism_drain_token",
         ),
       };
       break;
@@ -492,8 +492,8 @@ function decodeValue(
     eventId:
       event.event_id === undefined ? "" : string(event.event_id, "event_id"),
     requestId: optionalString(
-      event.prsm_request_event_id,
-      "prsm_request_event_id",
+      event.prism_request_event_id,
+      "prism_request_event_id",
     ),
     payload,
   };

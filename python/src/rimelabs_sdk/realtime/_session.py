@@ -342,21 +342,21 @@ class RealtimeSession:
         """Start a typed user turn. Wait for readiness and return at response creation."""
         self._text(text)
         return await self._create(
-            {"prsm_input_text": text, "metadata": {"prsm_cause": "user_text"}}, p.TEXT
+            {"prism_input_text": text, "metadata": {"prism_cause": "user_text"}}, p.TEXT
         )
 
     async def request_reply(
         self, *, instruction: str | None = None, tool_call: t.ToolCallRef | None = None
     ) -> t.ResponseRef:
-        body: dict[str, object] = {"metadata": {"prsm_cause": "proactive"}}
+        body: dict[str, object] = {"metadata": {"prism_cause": "proactive"}}
         if instruction is not None:
             self._text(instruction)
-            body["prsm_instruction"] = instruction
+            body["prism_instruction"] = instruction
         if tool_call is not None:
             response = self._response(tool_call)
             if response.calls[tool_call.call_id] is None:
                 raise RimeInputError("Record the tool result before requesting its report")
-            body["prsm_call_id"] = tool_call.call_id
+            body["prism_call_id"] = tool_call.call_id
         return await self._create(body)
 
     async def add_message(self, role: Literal["user", "assistant"], text: str) -> t.ItemRef:
@@ -431,8 +431,8 @@ class RealtimeSession:
                 {
                     "response": {
                         "metadata": {
-                            "prsm_cause": "tool_continuation",
-                            "prsm_parent_response_id": parent.response_id,
+                            "prism_cause": "tool_continuation",
+                            "prism_parent_response_id": parent.response_id,
                         }
                     }
                 },
@@ -522,7 +522,7 @@ class RealtimeSession:
             if state.token:
                 await self._send(
                     {
-                        "type": "prsm.playback.drained",
+                        "type": "prism.playback.drained",
                         "response_id": report.response.response_id,
                         "drain_token": state.token,
                         "played_ms": report.played_ms,
