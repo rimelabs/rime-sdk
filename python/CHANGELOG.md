@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.14](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.13...python-v0.1.0-alpha.14) (2026-10-13)
+
+
+### Bug Fixes
+
+* **realtime:** align Prism protocol names and contract fixtures ([#68](https://github.com/rimelabs/rime-sdk/issues/68)) ([806d8a4](https://github.com/rimelabs/rime-sdk/commit/806d8a4811f0baf6b220487dfc6ccd21cfe8ea18))
+
 ## [0.1.0-alpha.13](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.12...python-v0.1.0-alpha.13) (2026-10-12)
 
 
