@@ -129,10 +129,6 @@ uv run --directory python/examples --locked --extra audio -m realtime.voice
 uv run --directory python/examples --locked --extra audio -m realtime.voice_tools
 ```
 
-The announced public Prism host is `prism.api.rime.ai:443`. The service is not yet
-available. Confirm availability and the `/v1/realtime` route with your deployment
-operator before setting `PRISM_URL` to `wss://prism.api.rime.ai/v1/realtime`.
-
 Use headphones. The Python example does not remove speaker echo. Keep the
 microphone active during replies so Prism can hear interruptions. Ctrl-C closes
 capture, playback, and the SDK connection. Use `--list-devices`, `--input-device N`,
