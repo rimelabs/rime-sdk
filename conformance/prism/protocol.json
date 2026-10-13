@@ -1,5 +1,21 @@
 [
   {
+    "name": "typed input readiness",
+    "event": {
+      "type": "prism.typed_input.ready",
+      "event_id": "ready-1"
+    },
+    "expected_kind": "input.ready"
+  },
+  {
+    "name": "old typed input readiness is unknown",
+    "event": {
+      "type": "prsm.typed_input.ready",
+      "event_id": "ready-1"
+    },
+    "expected_kind": "ignored"
+  },
+  {
     "name": "text delta",
     "event": {
       "type": "response.text.delta",
@@ -62,7 +78,7 @@
       "response": {
         "id": "reply-2",
         "metadata": {
-          "prsm_cause": "future"
+          "prism_cause": "future"
         }
       }
     },
@@ -143,7 +159,7 @@
       "type": "session.created",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": null,
           "continuation_timeout_s": null
         }
@@ -157,7 +173,7 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": null,
           "continuation_timeout_s": null
         }
@@ -301,7 +317,7 @@
       "response": {
         "id": "reply-2",
         "metadata": {
-          "prsm_cause": false
+          "prism_cause": false
         }
       }
     },
@@ -314,7 +330,7 @@
       "response": {
         "id": "reply-2",
         "metadata": {
-          "prsm_parent_response_id": 123
+          "prism_parent_response_id": 123
         }
       }
     },
@@ -353,7 +369,7 @@
         "id": "reply-1",
         "status": "completed",
         "metadata": {
-          "prsm_drain_token": 123
+          "prism_drain_token": 123
         }
       }
     },
@@ -376,7 +392,7 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_effective_interrupt_response": 1
+        "prism_effective_interrupt_response": 1
       }
     },
     "invalid": true
@@ -387,7 +403,7 @@
       "type": "session.created",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": null
+        "prism_tool_waits": null
       }
     },
     "invalid": true
@@ -398,7 +414,7 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": null
+        "prism_tool_waits": null
       }
     },
     "invalid": true
@@ -409,7 +425,7 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": "10"
         }
       }
@@ -422,7 +438,7 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": 0
         }
       }
@@ -564,7 +580,7 @@
       "output_index": 0,
       "content_index": 0,
       "delta": "hello",
-      "prsm_request_event_id": {}
+      "prism_request_event_id": {}
     },
     "invalid": true
   },
@@ -610,7 +626,7 @@
       "type": "session.created",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {}
+        "prism_tool_waits": {}
       }
     },
     "invalid": true
@@ -621,7 +637,7 @@
       "type": "session.created",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "continuation_timeout_s": 5
         }
       }
@@ -634,7 +650,7 @@
       "type": "session.created",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": 10
         }
       }
@@ -647,9 +663,9 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {}
+        "prism_tool_waits": {}
       },
-      "prsm_request_event_id": "request-1"
+      "prism_request_event_id": "request-1"
     },
     "invalid": true
   },
@@ -659,11 +675,11 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "continuation_timeout_s": 5
         }
       },
-      "prsm_request_event_id": "request-1"
+      "prism_request_event_id": "request-1"
     },
     "invalid": true
   },
@@ -673,11 +689,11 @@
       "type": "session.updated",
       "session": {
         "id": "session-1",
-        "prsm_tool_waits": {
+        "prism_tool_waits": {
           "result_timeout_s": 10
         }
       },
-      "prsm_request_event_id": "request-1"
+      "prism_request_event_id": "request-1"
     },
     "invalid": true
   },

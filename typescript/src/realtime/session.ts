@@ -418,7 +418,7 @@ export class RealtimeSession {
     text(value);
     return this.operation(options, (signal) =>
       this.create(
-        { prsm_input_text: value, metadata: { prsm_cause: "user_text" } },
+        { prism_input_text: value, metadata: { prism_cause: "user_text" } },
         signal,
         p.requests.text,
       ),
@@ -426,11 +426,11 @@ export class RealtimeSession {
   }
   async requestReply(options: t.ReplyOptions = {}): Promise<t.ResponseRef> {
     const body: Record<string, unknown> = {
-      metadata: { prsm_cause: "proactive" },
+      metadata: { prism_cause: "proactive" },
     };
     if (options.instruction != null) {
       text(options.instruction);
-      body.prsm_instruction = options.instruction;
+      body.prism_instruction = options.instruction;
     }
     if (options.toolCall != null) {
       const state = this.response(options.toolCall);
@@ -438,7 +438,7 @@ export class RealtimeSession {
         throw new RimeInputError(
           "Record the tool result before requesting its report",
         );
-      body.prsm_call_id = options.toolCall.callId;
+      body.prism_call_id = options.toolCall.callId;
     }
     return this.operation(options, (signal) => this.create(body, signal));
   }
@@ -544,8 +544,8 @@ export class RealtimeSession {
           {
             response: {
               metadata: {
-                prsm_cause: "tool_continuation",
-                prsm_parent_response_id: ref.responseId,
+                prism_cause: "tool_continuation",
+                prism_parent_response_id: ref.responseId,
               },
             },
           },
@@ -683,7 +683,7 @@ export class RealtimeSession {
       if (state.token)
         await this.send(
           {
-            type: "prsm.playback.drained",
+            type: "prism.playback.drained",
             response_id: state.ref.responseId,
             drain_token: state.token,
             played_ms: played,

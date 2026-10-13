@@ -201,18 +201,18 @@ def _duration(value: object, name: str) -> float | None:
 def _session(value: object) -> SessionView:
     view = _object(value, "session")
     waits = (
-        _object(view["prsm_tool_waits"], "session.prsm_tool_waits")
-        if "prsm_tool_waits" in view
+        _object(view["prism_tool_waits"], "session.prism_tool_waits")
+        if "prism_tool_waits" in view
         else {}
     )
-    if "prsm_tool_waits" in view and (
+    if "prism_tool_waits" in view and (
         "result_timeout_s" not in waits or "continuation_timeout_s" not in waits
     ):
-        _invalid("session.prsm_tool_waits")
-    interrupt = view.get("prsm_effective_interrupt_response")
+        _invalid("session.prism_tool_waits")
+    interrupt = view.get("prism_effective_interrupt_response")
     if not isinstance(interrupt, bool):
-        if "prsm_effective_interrupt_response" in view:
-            _invalid("session.prsm_effective_interrupt_response")
+        if "prism_effective_interrupt_response" in view:
+            _invalid("session.prism_effective_interrupt_response")
         interrupt = None
     return SessionView(
         id=_id(view.get("id"), "session.id"),
@@ -319,7 +319,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             item_id=_id(event.get("item_id"), "item_id"),
             content_index=_integer(event.get("content_index"), "content_index"),
         )
-    elif kind == "prsm.typed_input.ready":
+    elif kind == "prism.typed_input.ready":
         payload = t.InputReady()
     elif kind == "input_audio_buffer.speech_started":
         payload = t.SpeechStarted(
@@ -363,9 +363,11 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             if response.get("metadata") is not None
             else {}
         )
-        cause = _string(metadata["prsm_cause"], "prsm_cause") if "prsm_cause" in metadata else None
+        cause = (
+            _string(metadata["prism_cause"], "prism_cause") if "prism_cause" in metadata else None
+        )
         parent = _optional_string(
-            metadata.get("prsm_parent_response_id"), "prsm_parent_response_id"
+            metadata.get("prism_parent_response_id"), "prism_parent_response_id"
         )
         payload = t.ResponseStarted(
             response=ref(response.get("id")),
@@ -381,7 +383,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             ),
             parent=ref(parent) if parent is not None else None,
             input_item_id=_optional_string(
-                metadata.get("prsm_input_item_id"), "prsm_input_item_id"
+                metadata.get("prism_input_item_id"), "prism_input_item_id"
             ),
         )
     elif kind == "response.done":
@@ -404,7 +406,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
                 status if status in ("completed", "cancelled", "failed") else "unknown",
             ),
             reason=_optional_string(details.get("reason"), "reason"),
-            drain_token=_optional_string(metadata.get("prsm_drain_token"), "prsm_drain_token"),
+            drain_token=_optional_string(metadata.get("prism_drain_token"), "prism_drain_token"),
         )
     elif kind == "response.function_call_arguments.done":
         response_ref = ref(event.get("response_id"))
@@ -458,6 +460,6 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         return None
     return ServerEvent(
         event_id=_string(event.get("event_id", ""), "event_id"),
-        request_id=_optional_string(event.get("prsm_request_event_id"), "prsm_request_event_id"),
+        request_id=_optional_string(event.get("prism_request_event_id"), "prism_request_event_id"),
         payload=payload,
     )

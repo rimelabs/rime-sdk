@@ -2,19 +2,19 @@
   {
     "name": "known response cause",
     "schema": "responseMetadata",
-    "value": { "prsm_cause": "user_text" },
+    "value": { "prism_cause": "user_text" },
     "valid": true
   },
   {
     "name": "future response cause",
     "schema": "responseMetadata",
-    "value": { "prsm_cause": "future" },
-    "valid": true
+    "value": { "prism_cause": "future" },
+    "valid": false
   },
   {
     "name": "nonstring response cause",
     "schema": "responseMetadata",
-    "value": { "prsm_cause": 123 },
+    "value": { "prism_cause": 123 },
     "valid": false
   },
   {
@@ -33,7 +33,7 @@
     "name": "future terminal status",
     "schema": "responseDoneEvent/allOf/1/properties/response/allOf/1/properties/status",
     "value": "future",
-    "valid": true
+    "valid": false
   },
   {
     "name": "nonstring terminal status",
@@ -45,7 +45,7 @@
     "name": "future error scope",
     "schema": "errorInfo/properties/scope",
     "value": "future",
-    "valid": true
+    "valid": false
   },
   {
     "name": "nonstring error scope",
@@ -69,7 +69,7 @@
     "name": "future error owner",
     "schema": "errorOwner",
     "value": { "kind": "future", "future_id": "future-1" },
-    "valid": true
+    "valid": false
   },
   {
     "name": "nonstring error owner kind",
@@ -84,11 +84,24 @@
       "type": "response.create",
       "event_id": "evt-1",
       "response": {
+        "metadata": { "prism_cause": "user_text" },
+        "prism_input_text": "hello"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "old client protocol prefix",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
         "metadata": { "prsm_cause": "user_text" },
         "prsm_input_text": "hello"
       }
     },
-    "valid": true
+    "valid": false
   },
   {
     "name": "unknown client cause",
@@ -97,8 +110,8 @@
       "type": "response.create",
       "event_id": "evt-1",
       "response": {
-        "metadata": { "prsm_cause": "future" },
-        "prsm_input_text": "hello"
+        "metadata": { "prism_cause": "future" },
+        "prism_input_text": "hello"
       }
     },
     "valid": false

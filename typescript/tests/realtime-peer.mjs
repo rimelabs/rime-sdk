@@ -53,12 +53,12 @@ export class Peer {
           this.emit(
             "session.updated",
             {
-              prsm_request_event_id: event.event_id,
+              prism_request_event_id: event.event_id,
               session: {
                 id: "session-1",
                 voice: "test",
-                prsm_effective_interrupt_response: false,
-                prsm_tool_waits: {
+                prism_effective_interrupt_response: false,
+                prism_tool_waits: {
                   result_timeout_s: 20,
                   continuation_timeout_s: 5,
                 },
@@ -98,7 +98,7 @@ export class Peer {
   }
   accepted(request, id = "reply-1", metadata = {}) {
     this.emit("response.created", {
-      prsm_request_event_id: request.event_id,
+      prism_request_event_id: request.event_id,
       response: {
         id,
         metadata: { ...request.response?.metadata, ...metadata },
@@ -107,7 +107,7 @@ export class Peer {
   }
   ended(id = "reply-1", status = "completed") {
     this.emit("response.done", {
-      response: { id, status, metadata: { prsm_drain_token: "drain-1" } },
+      response: { id, status, metadata: { prism_drain_token: "drain-1" } },
     });
   }
   fault(request, code, scope = "event", owner = {}) {
@@ -138,7 +138,7 @@ export class Peer {
   }
   ack(request) {
     this.emit("conversation.item.created", {
-      prsm_request_event_id: request.event_id,
+      prism_request_event_id: request.event_id,
       item:
         request.item?.type === "function_call_output"
           ? { type: "function_call_output", call_id: request.item.call_id }

@@ -24,7 +24,7 @@ def load_example(path):
 @pytest.fixture
 def prism_peer(monkeypatch, tmp_path):
     peer = Peer()
-    peer.emit("prsm.typed_input.ready")
+    peer.emit("prism.typed_input.ready")
 
     async def connect(endpoint, **kwargs):
         assert endpoint == "ws://localhost/v1/realtime"
@@ -53,7 +53,7 @@ async def test_typed_example_saves_audio_and_checks_status(prism_peer, tmp_path,
     async with asyncio.timeout(2):
         task = asyncio.create_task(load_example("realtime/typed_turn.py").main())
         request = await peer.next("response.create")
-        assert request["response"]["metadata"]["prsm_cause"] == "user_text"
+        assert request["response"]["metadata"]["prism_cause"] == "user_text"
         peer.accepted(request)
         peer.emit(
             "response.text.delta",
@@ -115,14 +115,14 @@ async def test_tool_example_waits_for_all_results_before_continuing(prism_peer, 
             assert peer.sent.empty()
             peer.emit(
                 "conversation.item.created",
-                prsm_request_event_id=result["event_id"],
+                prism_request_event_id=result["event_id"],
                 item={"type": "function_call_output", "call_id": result["item"]["call_id"]},
             )
         if call_count:
             continuation = await peer.next("response.create")
             assert continuation["response"]["metadata"] == {
-                "prsm_cause": "tool_continuation",
-                "prsm_parent_response_id": "reply-1",
+                "prism_cause": "tool_continuation",
+                "prism_parent_response_id": "reply-1",
             }
             peer.accepted(continuation, "reply-2")
             peer.ended("reply-2")

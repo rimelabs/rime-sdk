@@ -17,7 +17,7 @@ SCHEMA_CASES = json.loads((Path(__file__).parents[2] / "conformance/prism/schema
 
 
 @pytest.mark.parametrize("case", SCHEMA_CASES, ids=lambda case: case["name"])
-def test_schema_preserves_server_extensibility_and_client_validation(case):
+def test_schema_matches_protocol_contract(case):
     validator = Draft7Validator(
         {"$ref": "#/components/schemas/" + case["schema"], "components": _CONTRACT["components"]}
     )
@@ -69,7 +69,7 @@ async def test_mismatched_acknowledgment_closes_without_returning_wrong_result(
 ):
     async with session(monkeypatch) as (current, peer, _):
         if operation in ("text", "proactive"):
-            peer.emit("prsm.typed_input.ready")
+            peer.emit("prism.typed_input.ready")
             pending = asyncio.create_task(
                 current.send_text("hello") if operation == "text" else current.request_reply()
             )
@@ -99,7 +99,7 @@ async def test_mismatched_acknowledgment_closes_without_returning_wrong_result(
         if acknowledgment == "session.updated":
             peer.emit(
                 acknowledgment,
-                prsm_request_event_id=request["event_id"],
+                prism_request_event_id=request["event_id"],
                 session={"id": "session-1"},
             )
         elif acknowledgment == "response.created":
@@ -107,13 +107,13 @@ async def test_mismatched_acknowledgment_closes_without_returning_wrong_result(
         elif acknowledgment == "wrong-call":
             peer.emit(
                 "conversation.item.created",
-                prsm_request_event_id=request["event_id"],
+                prism_request_event_id=request["event_id"],
                 item={"type": "function_call_output", "call_id": "another-call"},
             )
         else:
             peer.emit(
                 acknowledgment,
-                prsm_request_event_id=request["event_id"],
+                prism_request_event_id=request["event_id"],
                 item={"id": "history-1", "type": "message", "role": "user"},
             )
         with pytest.raises(RimeStreamError):
@@ -143,7 +143,7 @@ async def test_tool_result_acknowledgment_needs_no_item_id(monkeypatch):
         acknowledgment = {
             "type": "conversation.item.created",
             "event_id": "server-ack",
-            "prsm_request_event_id": request["event_id"],
+            "prism_request_event_id": request["event_id"],
             "item": {"type": "function_call_output", "call_id": call.call_id},
         }
         _VALIDATORS[acknowledgment["type"]].validate(acknowledgment)
@@ -160,16 +160,16 @@ async def test_unknown_events_and_stale_acknowledgments_do_not_consume_request(m
         pending = asyncio.create_task(current.add_message("user", "history"))
         request = await peer.next("conversation.item.create")
         peer.emit(
-            "future.event", prsm_request_event_id=request["event_id"], unknown={"anything": True}
+            "future.event", prism_request_event_id=request["event_id"], unknown={"anything": True}
         )
         peer.emit(
-            "session.updated", prsm_request_event_id="old-request", session={"id": "session-1"}
+            "session.updated", prism_request_event_id="old-request", session={"id": "session-1"}
         )
         await asyncio.sleep(0)
         assert not pending.done()
         peer.emit(
             "conversation.item.created",
-            prsm_request_event_id=request["event_id"],
+            prism_request_event_id=request["event_id"],
             item={"id": "history-1"},
             future={"ignored": True},
         )

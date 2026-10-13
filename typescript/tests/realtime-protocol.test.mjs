@@ -30,7 +30,7 @@ const contract = parse(
 );
 const ajv = new Ajv({ strict: false, validateFormats: false });
 for (const item of schemaCases) {
-  test(`schema compatibility: ${item.name}`, () => {
+  test(`protocol schema: ${item.name}`, () => {
     const validate = ajv.compile({
       $ref: `#/components/schemas/${item.schema}`,
       components: contract.components,
@@ -56,7 +56,7 @@ const watch = (promise) => {
   return promise;
 };
 async function turn(session, peer) {
-  peer.emit("prsm.typed_input.ready");
+  peer.emit("prism.typed_input.ready");
   const result = watch(session.sendText("hello"));
   peer.accepted(await peer.next("response.create"));
   return result;
@@ -105,7 +105,7 @@ for (const [operation, acknowledgment] of [
     const { session, peer } = await setup(t);
     let pending, request;
     if (operation === "text" || operation === "proactive") {
-      peer.emit("prsm.typed_input.ready");
+      peer.emit("prism.typed_input.ready");
       pending = watch(
         operation === "text"
           ? session.sendText("hello")
@@ -125,19 +125,19 @@ for (const [operation, acknowledgment] of [
     }
     if (acknowledgment === "session.updated")
       peer.emit(acknowledgment, {
-        prsm_request_event_id: request.event_id,
+        prism_request_event_id: request.event_id,
         session: { id: "session-1" },
       });
     else if (acknowledgment === "response.created")
       peer.accepted(request, "wrong-response");
     else if (acknowledgment === "wrong-call")
       peer.emit("conversation.item.created", {
-        prsm_request_event_id: request.event_id,
+        prism_request_event_id: request.event_id,
         item: { type: "function_call_output", call_id: "another-call" },
       });
     else
       peer.emit(acknowledgment, {
-        prsm_request_event_id: request.event_id,
+        prism_request_event_id: request.event_id,
         item: { id: "history-1", type: "message", role: "user" },
       });
     await assert.rejects(pending, RimeStreamError);
@@ -152,7 +152,7 @@ test("tool result acknowledgment without item ID permits continuation", async (t
   const result = watch(session.submitToolResult(call, "done"));
   const request = await peer.next("conversation.item.create");
   peer.emit("conversation.item.created", {
-    prsm_request_event_id: request.event_id,
+    prism_request_event_id: request.event_id,
     item: { type: "function_call_output", call_id: call.callId },
   });
   await result;
@@ -167,11 +167,11 @@ test("unknown events and stale acknowledgments do not consume a request", async 
   const pending = watch(session.addMessage("user", "history"));
   const request = await peer.next("conversation.item.create");
   peer.emit("future.event", {
-    prsm_request_event_id: request.event_id,
+    prism_request_event_id: request.event_id,
     anything: true,
   });
   peer.emit("session.updated", {
-    prsm_request_event_id: "old-request",
+    prism_request_event_id: "old-request",
     session: { id: "session-1" },
   });
   peer.ack(request);

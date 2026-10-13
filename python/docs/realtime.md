@@ -1,5 +1,8 @@
 # Realtime / Prism for Python
 
+The endpoint must use Rime's `prism.` events and `prism_` fields. Endpoints
+that use the former `prsm` names are not supported.
+
 A conversation keeps producing events while your application sends input, runs
 tools, and plays audio. Keep one event consumer running for the session.
 The SDK handles protocol state; your application handles those external actions.
