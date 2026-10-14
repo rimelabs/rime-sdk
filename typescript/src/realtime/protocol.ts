@@ -314,6 +314,12 @@ function decodeValue(
     case "prism.typed_input.ready":
       payload = { kind: "input.ready" };
       break;
+    case "prism.input_audio_buffer.speech_hint":
+      payload = {
+        kind: "speech.hint",
+        audioStartMs: integer(event.audio_start_ms, "audio_start_ms"),
+      };
+      break;
     case "input_audio_buffer.speech_started":
       payload = {
         kind: "speech.started",

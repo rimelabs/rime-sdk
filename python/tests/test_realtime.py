@@ -564,6 +564,20 @@ async def completed_tool_round(current, peer):
     return parent
 
 
+async def test_speech_hint_is_published_and_leaves_a_tool_round_open(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        parent = await completed_tool_round(current, peer)
+        peer.emit("prism.input_audio_buffer.speech_hint", audio_start_ms=10)
+        async with asyncio.timeout(1):
+            async for event in current.events:
+                if isinstance(event.payload, r.SpeechHint):
+                    assert event.payload.audio_start_ms == 10
+                    break
+        continuation = asyncio.create_task(current.continue_reply(parent))
+        peer.accepted(await peer.next("response.create"), "continued")
+        assert (await continuation).response_id == "continued"
+
+
 @pytest.mark.parametrize("turn_kind", ["text", "tools"])
 @pytest.mark.parametrize("failure", ["operation_limit", "cancel_before_send"])
 async def test_unsent_turn_can_be_retried(monkeypatch, turn_kind, failure):

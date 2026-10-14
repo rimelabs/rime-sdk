@@ -16,6 +16,14 @@
     "expected_kind": "ignored"
   },
   {
+    "name": "speech hint",
+    "event": {
+      "type": "prism.input_audio_buffer.speech_hint",
+      "audio_start_ms": 1300
+    },
+    "expected_kind": "speech.hint"
+  },
+  {
     "name": "text delta",
     "event": {
       "type": "response.text.delta",
@@ -286,6 +294,14 @@
     "event": {
       "type": "input_audio_buffer.speech_started",
       "item_id": "speech",
+      "audio_start_ms": -1
+    },
+    "invalid": true
+  },
+  {
+    "name": "negative speech hint time",
+    "event": {
+      "type": "prism.input_audio_buffer.speech_hint",
       "audio_start_ms": -1
     },
     "invalid": true

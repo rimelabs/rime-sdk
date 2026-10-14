@@ -460,6 +460,16 @@ test("response faults do not end generation; unknown enum values stay explicit",
   assert.equal((await payload(events, "error")).error.scope, "unknown");
 });
 
+test("a speech hint is published and leaves a tool round open", async (t) => {
+  const { session, peer, events } = await setup(t);
+  const { ref } = await round(session, peer, events);
+  peer.emit("prism.input_audio_buffer.speech_hint", { audio_start_ms: 10 });
+  assert.equal((await payload(events, "speech.hint")).audioStartMs, 10);
+  const continuation = watch(session.continueReply(ref));
+  peer.accepted(await peer.next("response.create"), "reply-2");
+  await continuation;
+});
+
 test("transcript events and speech supersede tool admission", async (t) => {
   const { session, peer, events } = await setup(t);
   const { ref } = await round(session, peer, events);
