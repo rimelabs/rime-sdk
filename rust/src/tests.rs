@@ -1,5 +1,7 @@
 // Local gRPC conformance tests are kept inside the crate so production callers
 // cannot disable TLS through a test transport option.
+mod tts_compat_contract;
+
 use crate::*;
 use futures_core::Stream;
 use futures_util::StreamExt;

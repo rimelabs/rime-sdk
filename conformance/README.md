@@ -9,6 +9,9 @@ tests. CI checks that the copies match. Changes here run all four language jobs.
 - `contract.json` gives chunk sizes, invalid timeouts, audio profiles, gRPC error
   mappings, and required lifecycle scenarios.
 - `audio.json` gives exact PCM and mu-law bytes for a deterministic sample signal.
+- [`tts-compat/`](tts-compat/README.md) inventories both LiveKit Rime plugins and
+  specifies the proposed cross-language TTS contract. Its T0 checks validate the
+  corpus only; they do not claim the new transports are implemented.
 
 Text transport tests vary source chunk boundaries. Node.js also tests splits
 inside UTF-16 surrogate pairs. The corpus covers abbreviations, numbers, URLs, mixed

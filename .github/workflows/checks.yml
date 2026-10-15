@@ -127,7 +127,7 @@ jobs:
           cache-dependency-path: go/go.sum
       - name: Check shared fixtures and formatting
         run: |
-          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts tts-compat/contract tts-compat/schema tts-compat/invalid; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
           test -z "$(gofmt -l .)"
@@ -155,7 +155,7 @@ jobs:
           components: rustfmt, clippy
       - name: Check shared fixtures
         run: |
-          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts tts-compat/contract tts-compat/schema tts-compat/invalid; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
       - run: cargo fmt --check

@@ -1,0 +1,315 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Rime TTS compatibility inventory (T0; not an SDK conformance result)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "stage": {
+      "const": "T0"
+    },
+    "languages": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "python",
+          "typescript",
+          "go",
+          "rust"
+        ]
+      },
+      "minItems": 1
+    },
+    "baseline_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baselines": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "object"
+        },
+        "typescript": {
+          "type": "object"
+        },
+        "sdk": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "python",
+        "typescript",
+        "sdk"
+      ],
+      "additionalProperties": false
+    },
+    "sources": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verification": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "url",
+          "verification"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "families": {
+      "type": "object",
+      "minProperties": 14,
+      "maxProperties": 14,
+      "patternProperties": {
+        "^C(0[1-9]|1[0-4])$": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "enum": [
+              "open",
+              "resolved"
+            ]
+          },
+          "owner_stage": {
+            "type": "string",
+            "minLength": 1
+          },
+          "question": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "status",
+          "owner_stage",
+          "question"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline": {
+            "enum": [
+              "python",
+              "typescript"
+            ]
+          },
+          "entrypoint": {
+            "type": "string",
+            "minLength": 1
+          },
+          "argument": {
+            "type": "string",
+            "minLength": 1
+          },
+          "declared_default": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "baseline",
+          "entrypoint",
+          "argument",
+          "declared_default",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline": {
+            "enum": [
+              "python",
+              "typescript",
+              "sdk"
+            ]
+          },
+          "transport": {
+            "enum": [
+              "http",
+              "ws3",
+              "v1",
+              "grpc",
+              "all"
+            ]
+          },
+          "families": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "evidence": {
+            "enum": [
+              "source",
+              "design",
+              "requires_live"
+            ]
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "status": {
+            "enum": [
+              "specified",
+              "unresolved"
+            ]
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "given": {
+            "type": "object"
+          },
+          "expected": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "op": {
+                  "enum": [
+                    "equal",
+                    "absent",
+                    "reject",
+                    "ordered",
+                    "pending"
+                  ]
+                },
+                "value": {}
+              },
+              "required": [
+                "target",
+                "op",
+                "value"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "sdk_verification": {
+            "type": "object",
+            "properties": {
+              "python": {
+                "const": "not_run"
+              },
+              "typescript": {
+                "const": "not_run"
+              },
+              "go": {
+                "const": "not_run"
+              },
+              "rust": {
+                "const": "not_run"
+              }
+            },
+            "required": [
+              "python",
+              "typescript",
+              "go",
+              "rust"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "baseline",
+          "transport",
+          "families",
+          "evidence",
+          "sources",
+          "gates",
+          "status",
+          "covers",
+          "given",
+          "expected",
+          "sdk_verification"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "stage",
+    "languages",
+    "baseline_policy",
+    "baselines",
+    "sources",
+    "families",
+    "gates",
+    "inventory",
+    "cases"
+  ],
+  "additionalProperties": false
+}

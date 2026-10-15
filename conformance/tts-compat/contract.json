@@ -1,0 +1,7036 @@
+{
+  "schema_version": 1,
+  "stage": "T0",
+  "languages": [
+    "python",
+    "typescript",
+    "go",
+    "rust"
+  ],
+  "baseline_policy": "current released plugins frozen on 2026-10-15; older releases excluded",
+  "baselines": {
+    "python": {
+      "package": "livekit-plugins-rime",
+      "version": "1.8.8",
+      "requires_python": ">=3.10.0",
+      "dependencies": [
+        "livekit-agents[codecs]>=1.8.8",
+        "protobuf>=6.33.5",
+        "rime-api>=0.0.1"
+      ],
+      "artifact_url": "https://files.pythonhosted.org/packages/21/1d/32dafd2a08bbea9676e60e8a4b48107662a75df2a8bfe2bee15ddc2f97b6/livekit_plugins_rime-1.8.8-py3-none-any.whl",
+      "sha256": "20ba19ab20d03424d474d2ddeb14e22bfa4897c098afa71cb3ce0156e8961acc",
+      "framework": {
+        "package": "livekit-agents",
+        "qualification_baseline": "1.8.8",
+        "declared_range": ">=1.8.8",
+        "requires_python": ">=3.10,<3.15"
+      },
+      "source_revision": "31c6026df14eebb71975c16ca6a422ce68644b71"
+    },
+    "typescript": {
+      "package": "@livekit/agents-plugin-rime",
+      "version": "1.9.3",
+      "dependencies": {
+        "ws": "^8.21.0",
+        "@livekit/av": "^10.0.0",
+        "@rimelabs/api": "0.0.1",
+        "@bufbuild/protobuf": "^2.14.1"
+      },
+      "peer_dependencies": {
+        "@livekit/agents": "1.9.3",
+        "@livekit/rtc-node": "^1.1.0"
+      },
+      "artifact_url": "https://registry.npmjs.org/@livekit/agents-plugin-rime/-/agents-plugin-rime-1.9.3.tgz",
+      "integrity": "sha512-vyQ+3x637U43wdEKCYZ7/lTHPAIPA0UqjGn2MtEIkEKQK23w5Q2n1HEWkzKm8jPGPz0O0vDxaoQX0XZvzmVK/A==",
+      "framework": {
+        "package": "@livekit/agents",
+        "qualification_baseline": "1.9.3",
+        "declared_range": "1.9.3"
+      },
+      "runtime": {
+        "documented_node_major_floor": 20,
+        "package_engines": null,
+        "qualified_patch_floor": null
+      },
+      "loaders": [
+        "import",
+        "require"
+      ],
+      "source_revision": "1871ba2c4eb8fa69e8d04ee60365eab468d051e1"
+    },
+    "sdk": {
+      "source_revision": "b5c1fe4a02e15df6cbd66c26ee0eb0626e20465d",
+      "purpose": "existing behavior and proposed provider-owned contract in all four languages"
+    }
+  },
+  "sources": {
+    "python.tts.py": {
+      "url": "https://github.com/livekit/agents/blob/31c6026df14eebb71975c16ca6a422ce68644b71/livekit-plugins/livekit-plugins-rime/livekit/plugins/rime/tts.py",
+      "sha256": "043a3e7af8de181d38c0f1934665e614bd1ce29b576546392e067a9852afaa38",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "python._websocket_v1.py": {
+      "url": "https://github.com/livekit/agents/blob/31c6026df14eebb71975c16ca6a422ce68644b71/livekit-plugins/livekit-plugins-rime/livekit/plugins/rime/_websocket_v1.py",
+      "sha256": "204ab7a4d02df3a9a121be9ebd67f9574aad1993498b1020f1ec49cb1e0122f2",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "python._websocket_v1_adapter.py": {
+      "url": "https://github.com/livekit/agents/blob/31c6026df14eebb71975c16ca6a422ce68644b71/livekit-plugins/livekit-plugins-rime/livekit/plugins/rime/_websocket_v1_adapter.py",
+      "sha256": "ac2346e2418f398b70e43f9a33a472a6b042e651f9684a0938c712ac052d1f5f",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "python._legacy_websocket_adapter.py": {
+      "url": "https://github.com/livekit/agents/blob/31c6026df14eebb71975c16ca6a422ce68644b71/livekit-plugins/livekit-plugins-rime/livekit/plugins/rime/_legacy_websocket_adapter.py",
+      "sha256": "bfaf80c19bfdd8b027afd5b58d385fcc7960b5669816596e6e43f67d9b0a6baa",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "python.models.py": {
+      "url": "https://github.com/livekit/agents/blob/31c6026df14eebb71975c16ca6a422ce68644b71/livekit-plugins/livekit-plugins-rime/livekit/plugins/rime/models.py",
+      "sha256": "0d17f1f0b637160b33747086e77cf58b4a9d408a03bc80b048a8d9bdef25f8c5",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "typescript.tts.ts": {
+      "url": "https://github.com/livekit/agents-js/blob/1871ba2c4eb8fa69e8d04ee60365eab468d051e1/plugins/rime/src/tts.ts",
+      "sha256": "ae2178dfb7e8874d934864d5c1f976abda6643f2f96923dc0c8a467dcd09f077",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "typescript.options.ts": {
+      "url": "https://github.com/livekit/agents-js/blob/1871ba2c4eb8fa69e8d04ee60365eab468d051e1/plugins/rime/src/options.ts",
+      "sha256": "2837f2fb8b11e92175cb0efac6c782b9047802fe9888a49ec0efeab1bdd75ffd",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "typescript.stream.ts": {
+      "url": "https://github.com/livekit/agents-js/blob/1871ba2c4eb8fa69e8d04ee60365eab468d051e1/plugins/rime/src/stream.ts",
+      "sha256": "e2e9abacf783170b65e8be4804dc5c32ad0e27ed43cc8ad8a1e92480ef60f695",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "typescript.connection.ts": {
+      "url": "https://github.com/livekit/agents-js/blob/1871ba2c4eb8fa69e8d04ee60365eab468d051e1/plugins/rime/src/connection.ts",
+      "sha256": "bd6e3f2c09bde5bff5fa4f49dec250a74f85a16a458e35bd6deb6349e29bf86e",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "typescript.audio.ts": {
+      "url": "https://github.com/livekit/agents-js/blob/1871ba2c4eb8fa69e8d04ee60365eab468d051e1/plugins/rime/src/audio.ts",
+      "sha256": "9b4fe7c1aa373c0f8ad346041740c0523b44c1acf6ecb5b34e792e39d77ab25d",
+      "verification": "published artifact bytes match pinned source"
+    },
+    "shared.plan": {
+      "url": "../../docs/livekit-tts-sdk-plan.md",
+      "verification": "proposed SDK behavior; not implemented"
+    },
+    "sdk.contract": {
+      "url": "../contract.json",
+      "verification": "existing gRPC conformance baseline"
+    },
+    "livekit.runtime": {
+      "url": "https://docs.livekit.io/agents/start/voice-ai/",
+      "verification": "documentation read 2026-10-15; dependency resolution still requires qualification"
+    },
+    "engine.proto": {
+      "url": "https://github.com/rimelabs/rime/blob/4645997bca5da24f2710b5dfcf4bf90010b7767b/interfaces/rime/text_to_speech.proto",
+      "verification": "local pinned source; deployment not established"
+    }
+  },
+  "families": {
+    "C01": "Options",
+    "C02": "Runtime compatibility",
+    "C03": "Transport",
+    "C04": "Endpoints and sessions",
+    "C05": "Models",
+    "C06": "Mist controls",
+    "C07": "Legacy Coda controls",
+    "C08": "Provider extensions",
+    "C09": "Speed",
+    "C10": "Output",
+    "C11": "Text policy",
+    "C12": "Timings",
+    "C13": "Preparation and timeouts",
+    "C14": "Errors and ownership"
+  },
+  "gates": {
+    "Q1": {
+      "status": "resolved",
+      "owner_stage": "T0",
+      "question": "Use current published Rime plugins and their declared framework/runtime floors; earlier plugin releases excluded by user decision on 2026-10-15."
+    },
+    "Q2": {
+      "status": "open",
+      "owner_stage": "transports",
+      "question": "Qualify direct Mist v2 HTTP/WS3 and required custom endpoints/models."
+    },
+    "Q3": {
+      "status": "open",
+      "owner_stage": "audio",
+      "question": "Qualify actual codec/rate pairs and requested versus encoded rate."
+    },
+    "Q4": {
+      "status": "open",
+      "owner_stage": "timings",
+      "question": "Resolve native scaling wording, WS3 origin/units and malformed metadata policy."
+    },
+    "Q5": {
+      "status": "open",
+      "owner_stage": "provider controls",
+      "question": "Legacy forwarding is recorded; deployed interpretation/effect of those fields remains unqualified."
+    },
+    "Q6": {
+      "status": "open",
+      "owner_stage": "runtime and resources",
+      "question": "Qualify dependency patch floors, proxy/TLS/session and redirect behavior, including Node 20 and both module loaders."
+    },
+    "Q7": {
+      "status": "open",
+      "owner_stage": "qualification",
+      "question": "Set numeric latency, drain, memory and cancellation regression budgets from measured baselines."
+    },
+    "Q8": {
+      "status": "open",
+      "owner_stage": "release and adapters",
+      "question": "Select finite tested SDK ranges with fixed migrated plugin and Agents artifacts."
+    }
+  },
+  "inventory": [
+    {
+      "id": "python.constructor.base_url",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "base_url",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.websocket_url",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "websocket_url",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.websocket_protocol",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "websocket_protocol",
+      "declared_default": "'binary'",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.model",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "model",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.speaker",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "speaker",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.lang",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "lang",
+      "declared_default": "'eng'",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.audio_format",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "audio_format",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.repetition_penalty",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "repetition_penalty",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.temperature",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "temperature",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.top_p",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "top_p",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.max_tokens",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "max_tokens",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.time_scale_factor",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "time_scale_factor",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.speed_alpha",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "speed_alpha",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.sample_rate",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "sample_rate",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.reduce_latency",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "reduce_latency",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.pause_between_brackets",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "pause_between_brackets",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.phonemize_between_brackets",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "phonemize_between_brackets",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.api_key",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "api_key",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.http_session",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "http_session",
+      "declared_default": "None",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.use_websocket",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "use_websocket",
+      "declared_default": "False",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.segment",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "segment",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.tokenizer",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "tokenizer",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.constructor.allow_custom_endpoint",
+      "baseline": "python",
+      "entrypoint": "constructor",
+      "argument": "allow_custom_endpoint",
+      "declared_default": "False",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.model",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "model",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.speaker",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "speaker",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.lang",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "lang",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.repetition_penalty",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "repetition_penalty",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.temperature",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "temperature",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.top_p",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "top_p",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.max_tokens",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "max_tokens",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.sample_rate",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "sample_rate",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.audio_format",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "audio_format",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.time_scale_factor",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "time_scale_factor",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.speed_alpha",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "speed_alpha",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.reduce_latency",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "reduce_latency",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.pause_between_brackets",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "pause_between_brackets",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.phonemize_between_brackets",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "phonemize_between_brackets",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.base_url",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "base_url",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.update.websocket_url",
+      "baseline": "python",
+      "entrypoint": "update",
+      "argument": "websocket_url",
+      "declared_default": "NOT_GIVEN",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "typescript.constructor.websocketURL",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "websocketURL",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.websocketProtocol",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "websocketProtocol",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.audioFormat",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "audioFormat",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.allowCustomEndpoint",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "allowCustomEndpoint",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.speaker",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "speaker",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.modelId",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "modelId",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.baseURL",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "baseURL",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.apiKey",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "apiKey",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.useWebsocket",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "useWebsocket",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.segment",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "segment",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.tokenizer",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "tokenizer",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.lang",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "lang",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.repetition_penalty",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "repetition_penalty",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.temperature",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "temperature",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.top_p",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "top_p",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.max_tokens",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "max_tokens",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.samplingRate",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "samplingRate",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.timeScaleFactor",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "timeScaleFactor",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.speedAlpha",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "speedAlpha",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.reduceLatency",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "reduceLatency",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.pauseBetweenBrackets",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "pauseBetweenBrackets",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.phonemizeBetweenBrackets",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "phonemizeBetweenBrackets",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.inlineSpeedAlpha",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "inlineSpeedAlpha",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.noTextNormalization",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "noTextNormalization",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.saveOovs",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "saveOovs",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.constructor.[key:string]",
+      "baseline": "typescript",
+      "entrypoint": "constructor",
+      "argument": "[key:string]",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.websocketURL",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "websocketURL",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.websocketProtocol",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "websocketProtocol",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.audioFormat",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "audioFormat",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.allowCustomEndpoint",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "allowCustomEndpoint",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.speaker",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "speaker",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.modelId",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "modelId",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.baseURL",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "baseURL",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.apiKey",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "apiKey",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.useWebsocket",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "useWebsocket",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.segment",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "segment",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.tokenizer",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "tokenizer",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.lang",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "lang",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.repetition_penalty",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "repetition_penalty",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.temperature",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "temperature",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.top_p",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "top_p",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.max_tokens",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "max_tokens",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.samplingRate",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "samplingRate",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.timeScaleFactor",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "timeScaleFactor",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.speedAlpha",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "speedAlpha",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.reduceLatency",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "reduceLatency",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.pauseBetweenBrackets",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "pauseBetweenBrackets",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.phonemizeBetweenBrackets",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "phonemizeBetweenBrackets",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.inlineSpeedAlpha",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "inlineSpeedAlpha",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.noTextNormalization",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "noTextNormalization",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.saveOovs",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "saveOovs",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "typescript.update.[key:string]",
+      "baseline": "typescript",
+      "entrypoint": "update",
+      "argument": "[key:string]",
+      "declared_default": "resolveOptions; constructor defaults and update inheritance differ",
+      "source": "typescript.options.ts"
+    },
+    {
+      "id": "python.synthesize.text",
+      "baseline": "python",
+      "entrypoint": "synthesize",
+      "argument": "text",
+      "declared_default": "see pinned public method",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.synthesize.conn_options",
+      "baseline": "python",
+      "entrypoint": "synthesize",
+      "argument": "conn_options",
+      "declared_default": "see pinned public method",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.stream.conn_options",
+      "baseline": "python",
+      "entrypoint": "stream",
+      "argument": "conn_options",
+      "declared_default": "see pinned public method",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.prewarm.$call",
+      "baseline": "python",
+      "entrypoint": "prewarm",
+      "argument": "$call",
+      "declared_default": "see pinned public method",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "python.aclose.$call",
+      "baseline": "python",
+      "entrypoint": "aclose",
+      "argument": "$call",
+      "declared_default": "see pinned public method",
+      "source": "python.tts.py"
+    },
+    {
+      "id": "typescript.synthesize.text",
+      "baseline": "typescript",
+      "entrypoint": "synthesize",
+      "argument": "text",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.synthesize.connOptions",
+      "baseline": "typescript",
+      "entrypoint": "synthesize",
+      "argument": "connOptions",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.synthesize.abortSignal",
+      "baseline": "typescript",
+      "entrypoint": "synthesize",
+      "argument": "abortSignal",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.stream.options.connOptions",
+      "baseline": "typescript",
+      "entrypoint": "stream",
+      "argument": "options.connOptions",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.prewarm.$call",
+      "baseline": "typescript",
+      "entrypoint": "prewarm",
+      "argument": "$call",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.close.$call",
+      "baseline": "typescript",
+      "entrypoint": "close",
+      "argument": "$call",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    },
+    {
+      "id": "typescript.releaseIdleConnections.$call",
+      "baseline": "typescript",
+      "entrypoint": "releaseIdleConnections",
+      "argument": "$call",
+      "declared_default": "see pinned public method",
+      "source": "typescript.tts.ts"
+    }
+  ],
+  "cases": [
+    {
+      "id": "python.option.base_url",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.base_url",
+        "python.update.base_url"
+      ],
+      "given": {
+        "options": {
+          "base_url": {
+            "state": "value",
+            "value": "https://custom.rime.ai/tts?route=blue"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.url",
+          "op": "equal",
+          "value": "https://custom.rime.ai/tts?route=blue"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.websocket_url",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C04",
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.websocket_url",
+        "python.update.websocket_url"
+      ],
+      "given": {
+        "options": {
+          "websocket_url": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "model": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.model",
+          "op": "equal",
+          "value": "coda"
+        },
+        {
+          "target": "connection.url",
+          "op": "equal",
+          "value": "wss://coda.api.rime.ai/ws"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.websocket_protocol",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.websocket_protocol"
+      ],
+      "given": {
+        "options": {
+          "websocket_protocol": {
+            "state": "value",
+            "value": "json"
+          },
+          "websocket_url": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "model": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "connection.subprotocol",
+          "op": "equal",
+          "value": "rime.v1.json"
+        },
+        {
+          "target": "wire.frame_type",
+          "op": "equal",
+          "value": "text"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.model",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.model",
+        "python.update.model"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv2"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.modelId",
+          "op": "equal",
+          "value": "mistv2"
+        },
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 22050
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.speaker",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C01"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.speaker",
+        "python.update.speaker"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "speaker": {
+            "state": "value",
+            "value": "lyra"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.speaker",
+          "op": "equal",
+          "value": "lyra"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.lang",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C01"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.lang",
+        "python.update.lang"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "lang": {
+            "state": "value",
+            "value": "spa"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.lang",
+          "op": "equal",
+          "value": "spa"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.audio_format",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.audio_format",
+        "python.update.audio_format"
+      ],
+      "given": {
+        "options": {
+          "audio_format": {
+            "state": "value",
+            "value": "audio/ogg;codecs=opus"
+          },
+          "websocket_url": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "model": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "start.audioParameters.audioFormat",
+          "op": "equal",
+          "value": "audio/ogg;codecs=opus"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.repetition_penalty",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.repetition_penalty",
+        "python.update.repetition_penalty"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "repetition_penalty": {
+            "state": "value",
+            "value": 1.1
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.repetition_penalty",
+          "op": "equal",
+          "value": 1.1
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.temperature",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.temperature",
+        "python.update.temperature"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "temperature": {
+            "state": "value",
+            "value": 0.7
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.temperature",
+          "op": "equal",
+          "value": 0.7
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.top_p",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.top_p",
+        "python.update.top_p"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "top_p": {
+            "state": "value",
+            "value": 0.8
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.top_p",
+          "op": "equal",
+          "value": 0.8
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.max_tokens",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.max_tokens",
+        "python.update.max_tokens"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "max_tokens": {
+            "state": "value",
+            "value": 128
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.max_tokens",
+          "op": "equal",
+          "value": 128
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.time_scale_factor",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.time_scale_factor",
+        "python.update.time_scale_factor"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "time_scale_factor": {
+            "state": "value",
+            "value": 1.2
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.timeScaleFactor",
+          "op": "equal",
+          "value": 1.2
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.speed_alpha",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.speed_alpha",
+        "python.update.speed_alpha"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "speed_alpha": {
+            "state": "value",
+            "value": 1.2
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.speedAlpha",
+          "op": "equal",
+          "value": 1.2
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.sample_rate",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.sample_rate",
+        "python.update.sample_rate"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "sample_rate": {
+            "state": "value",
+            "value": 22050
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 22050
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.reduce_latency",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.reduce_latency",
+        "python.update.reduce_latency"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "reduce_latency": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.reduceLatency",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.pause_between_brackets",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.pause_between_brackets",
+        "python.update.pause_between_brackets"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "pause_between_brackets": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.pauseBetweenBrackets",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.phonemize_between_brackets",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.phonemize_between_brackets",
+        "python.update.phonemize_between_brackets"
+      ],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "phonemize_between_brackets": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.phonemizeBetweenBrackets",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.api_key",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.api_key"
+      ],
+      "given": {
+        "options": {
+          "api_key": {
+            "state": "value",
+            "value": {
+              "resource_ref": "explicit_credential"
+            }
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "authorization.source",
+          "op": "equal",
+          "value": "explicit_credential"
+        },
+        {
+          "target": "request.body.apiKey",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.http_session",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C04",
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.http_session"
+      ],
+      "given": {
+        "options": {
+          "http_session": {
+            "state": "value",
+            "value": {
+              "resource_ref": "borrowed_http_session"
+            }
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.session",
+          "op": "equal",
+          "value": "borrowed_http_session"
+        },
+        {
+          "target": "session.closed_after_plugin_close",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.use_websocket",
+      "baseline": "python",
+      "transport": "ws3",
+      "families": [
+        "C03"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.use_websocket"
+      ],
+      "given": {
+        "options": {
+          "use_websocket": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.transport",
+          "op": "equal",
+          "value": "ws3"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.segment",
+      "baseline": "python",
+      "transport": "ws3",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.segment"
+      ],
+      "given": {
+        "options": {
+          "segment": {
+            "state": "value",
+            "value": "bySentence"
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.query.segment",
+          "op": "equal",
+          "value": "bySentence"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.tokenizer",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.tokenizer"
+      ],
+      "given": {
+        "options": {
+          "tokenizer": {
+            "state": "value",
+            "value": {
+              "resource_ref": "custom_tokenizer"
+            }
+          },
+          "websocket_url": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "model": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "text_units.origin",
+          "op": "equal",
+          "value": "custom_tokenizer"
+        },
+        {
+          "target": "request.body.tokenizer",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.option.allow_custom_endpoint",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.constructor.allow_custom_endpoint"
+      ],
+      "given": {
+        "options": {
+          "allow_custom_endpoint": {
+            "state": "value",
+            "value": true
+          },
+          "base_url": {
+            "state": "value",
+            "value": "https://custom.example/tts"
+          }
+        },
+        "entrypoints": [
+          "constructor"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.accepts_endpoint",
+          "op": "equal",
+          "value": "https://custom.example/tts"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.websocketURL",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C04",
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.websocketURL",
+        "typescript.update.websocketURL"
+      ],
+      "given": {
+        "options": {
+          "websocketURL": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.model",
+          "op": "equal",
+          "value": "coda"
+        },
+        {
+          "target": "connection.url",
+          "op": "equal",
+          "value": "wss://coda.api.rime.ai/ws"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.websocketProtocol",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.websocketProtocol",
+        "typescript.update.websocketProtocol"
+      ],
+      "given": {
+        "options": {
+          "websocketProtocol": {
+            "state": "value",
+            "value": "json"
+          },
+          "websocketURL": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "connection.subprotocol",
+          "op": "equal",
+          "value": "rime.v1.json"
+        },
+        {
+          "target": "wire.frame_type",
+          "op": "equal",
+          "value": "text"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.audioFormat",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.audioFormat",
+        "typescript.update.audioFormat"
+      ],
+      "given": {
+        "options": {
+          "audioFormat": {
+            "state": "value",
+            "value": "audio/ogg;codecs=opus"
+          },
+          "websocketURL": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "start.audioParameters.audioFormat",
+          "op": "equal",
+          "value": "audio/ogg;codecs=opus"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.allowCustomEndpoint",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.allowCustomEndpoint",
+        "typescript.update.allowCustomEndpoint"
+      ],
+      "given": {
+        "options": {
+          "allowCustomEndpoint": {
+            "state": "value",
+            "value": true
+          },
+          "baseURL": {
+            "state": "value",
+            "value": "https://custom.example/tts"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.accepts_endpoint",
+          "op": "equal",
+          "value": "https://custom.example/tts"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.speaker",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C01"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.speaker",
+        "typescript.update.speaker"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "speaker": {
+            "state": "value",
+            "value": "lyra"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.speaker",
+          "op": "equal",
+          "value": "lyra"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.modelId",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.modelId",
+        "typescript.update.modelId"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv2"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.modelId",
+          "op": "equal",
+          "value": "mistv2"
+        },
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 22050
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.baseURL",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.baseURL",
+        "typescript.update.baseURL"
+      ],
+      "given": {
+        "options": {
+          "baseURL": {
+            "state": "value",
+            "value": "https://custom.rime.ai/tts?route=blue"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.url",
+          "op": "equal",
+          "value": "https://custom.rime.ai/tts?route=blue"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.apiKey",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.apiKey",
+        "typescript.update.apiKey"
+      ],
+      "given": {
+        "options": {
+          "apiKey": {
+            "state": "value",
+            "value": {
+              "resource_ref": "explicit_credential"
+            }
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "authorization.source",
+          "op": "equal",
+          "value": "explicit_credential"
+        },
+        {
+          "target": "request.body.apiKey",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.useWebsocket",
+      "baseline": "typescript",
+      "transport": "ws3",
+      "families": [
+        "C03"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.useWebsocket",
+        "typescript.update.useWebsocket"
+      ],
+      "given": {
+        "options": {
+          "useWebsocket": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "configuration.transport",
+          "op": "equal",
+          "value": "ws3"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.segment",
+      "baseline": "typescript",
+      "transport": "ws3",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.segment",
+        "typescript.update.segment"
+      ],
+      "given": {
+        "options": {
+          "segment": {
+            "state": "value",
+            "value": "bySentence"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.query.segment",
+          "op": "equal",
+          "value": "bySentence"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.tokenizer",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.tokenizer",
+        "typescript.update.tokenizer"
+      ],
+      "given": {
+        "options": {
+          "tokenizer": {
+            "state": "value",
+            "value": {
+              "resource_ref": "custom_tokenizer"
+            }
+          },
+          "websocketURL": {
+            "state": "value",
+            "value": "wss://coda.api.rime.ai/ws"
+          },
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "text_units.origin",
+          "op": "equal",
+          "value": "custom_tokenizer"
+        },
+        {
+          "target": "request.body.tokenizer",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.lang",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C01"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.lang",
+        "typescript.update.lang"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "lang": {
+            "state": "value",
+            "value": "spa"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.lang",
+          "op": "equal",
+          "value": "spa"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.repetition_penalty",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.repetition_penalty",
+        "typescript.update.repetition_penalty"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "repetition_penalty": {
+            "state": "value",
+            "value": 1.1
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.repetition_penalty",
+          "op": "equal",
+          "value": 1.1
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.temperature",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.temperature",
+        "typescript.update.temperature"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "temperature": {
+            "state": "value",
+            "value": 0.7
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.temperature",
+          "op": "equal",
+          "value": 0.7
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.top_p",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.top_p",
+        "typescript.update.top_p"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "top_p": {
+            "state": "value",
+            "value": 0.8
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.top_p",
+          "op": "equal",
+          "value": 0.8
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.max_tokens",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C07"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.max_tokens",
+        "typescript.update.max_tokens"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "max_tokens": {
+            "state": "value",
+            "value": 128
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.max_tokens",
+          "op": "equal",
+          "value": 128
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.samplingRate",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.samplingRate",
+        "typescript.update.samplingRate"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "samplingRate": {
+            "state": "value",
+            "value": 22050
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 22050
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.timeScaleFactor",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.timeScaleFactor",
+        "typescript.update.timeScaleFactor"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "timeScaleFactor": {
+            "state": "value",
+            "value": 1.2
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.timeScaleFactor",
+          "op": "equal",
+          "value": 1.2
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.speedAlpha",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.speedAlpha",
+        "typescript.update.speedAlpha"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "speedAlpha": {
+            "state": "value",
+            "value": 1.2
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.speedAlpha",
+          "op": "equal",
+          "value": 1.2
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.reduceLatency",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.reduceLatency",
+        "typescript.update.reduceLatency"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "reduceLatency": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.reduceLatency",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.pauseBetweenBrackets",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.pauseBetweenBrackets",
+        "typescript.update.pauseBetweenBrackets"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "pauseBetweenBrackets": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.pauseBetweenBrackets",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.phonemizeBetweenBrackets",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.phonemizeBetweenBrackets",
+        "typescript.update.phonemizeBetweenBrackets"
+      ],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv3"
+          },
+          "phonemizeBetweenBrackets": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.phonemizeBetweenBrackets",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.inlineSpeedAlpha",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.inlineSpeedAlpha",
+        "typescript.update.inlineSpeedAlpha"
+      ],
+      "given": {
+        "options": {
+          "inlineSpeedAlpha": {
+            "state": "value",
+            "value": "0.8,1.2"
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.inlineSpeedAlpha",
+          "op": "equal",
+          "value": "0.8,1.2"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.noTextNormalization",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.noTextNormalization",
+        "typescript.update.noTextNormalization"
+      ],
+      "given": {
+        "options": {
+          "noTextNormalization": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.noTextNormalization",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.saveOovs",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.saveOovs",
+        "typescript.update.saveOovs"
+      ],
+      "given": {
+        "options": {
+          "saveOovs": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.saveOovs",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.option.additional",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.constructor.[key:string]",
+        "typescript.update.[key:string]"
+      ],
+      "given": {
+        "options": {
+          "[key:string]": {
+            "state": "value",
+            "value": {
+              "extraFlag": false
+            }
+          }
+        },
+        "entrypoints": [
+          "constructor",
+          "update"
+        ],
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.extraFlag",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.http.defaults",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C01",
+        "C03",
+        "C05",
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {},
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body",
+          "op": "equal",
+          "value": {
+            "speaker": "lyra",
+            "text": "Hello.",
+            "modelId": "coda",
+            "samplingRate": 24000,
+            "lang": "eng"
+          }
+        },
+        {
+          "target": "request.accept",
+          "op": "equal",
+          "value": "audio/pcm"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.v1.defaults",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C01",
+        "C04",
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py",
+        "python._websocket_v1.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "websocket_url": {
+            "state": "value",
+            "value": "wss://api.rime.ai/mist/ws"
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "configuration.model",
+          "op": "equal",
+          "value": "mistv3"
+        },
+        {
+          "target": "configuration.voice",
+          "op": "equal",
+          "value": "cove"
+        },
+        {
+          "target": "start.language",
+          "op": "equal",
+          "value": "eng"
+        },
+        {
+          "target": "start.splitStrategy",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "connection.subprotocol",
+          "op": "equal",
+          "value": "rime.v1.binary"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.mistv2.time_scale_rejected",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C05",
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "time_scale_factor": {
+            "state": "value",
+            "value": 1
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "time scale unsupported for Mist v2"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.ws3.reduce_latency_omitted",
+      "baseline": "python",
+      "transport": "ws3",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "reduce_latency": {
+            "state": "value",
+            "value": true
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.query.reduceLatency",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.v1.legacy_controls_rejected",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C06",
+        "C07",
+        "C09",
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "options": [
+            "speed_alpha",
+            "temperature",
+            "top_p",
+            "repetition_penalty",
+            "max_tokens",
+            "reduce_latency",
+            "segment"
+          ]
+        },
+        "options": {}
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "unsupported V1 option"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.update.snapshot",
+      "baseline": "python",
+      "transport": "all",
+      "families": [
+        "C01",
+        "C04",
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "create_stream",
+            "label": "old"
+          },
+          {
+            "action": "update",
+            "voice": "new_voice",
+            "endpoint": "https://new.rime.ai/tts"
+          },
+          {
+            "action": "consume",
+            "label": "old"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "old_stream.configuration",
+          "op": "equal",
+          "value": "creation_snapshot"
+        },
+        {
+          "target": "old_stream.cancelled_by_update",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.update.explicit_rate_retained",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C01",
+        "C05",
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "sample_rate": {
+            "state": "value",
+            "value": 16000
+          }
+        },
+        "updates": [
+          {
+            "model": {
+              "state": "value",
+              "value": "mistv2"
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 16000
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.v1.model_update_requires_new_endpoint",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C04",
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "construct",
+            "model": "coda",
+            "endpoint": "wss://dedicated.rime.ai/ws"
+          },
+          {
+            "action": "update",
+            "model": "mistv3",
+            "endpoint": "wss://dedicated.rime.ai/ws"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "model cannot change at the same endpoint"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.endpoint.trust",
+      "baseline": "python",
+      "transport": "all",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python._websocket_v1.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "untrusted": [
+            "https://other.example/tts",
+            "wss://rime.ai.other.example/ws"
+          ],
+          "insecure": [
+            "http://rime.ai/tts",
+            "ws://rime.ai/ws"
+          ],
+          "loopback": [
+            "http://127.0.0.1:8080/tts",
+            "ws://127.0.0.1:8080/ws"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "untrusted_without_opt_in",
+          "op": "equal",
+          "value": "reject"
+        },
+        {
+          "target": "insecure_non_loopback",
+          "op": "equal",
+          "value": "reject"
+        },
+        {
+          "target": "loopback",
+          "op": "equal",
+          "value": "accept"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.http.defaults",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C01",
+        "C03",
+        "C05",
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {},
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body",
+          "op": "equal",
+          "value": {
+            "speaker": "luna",
+            "text": "Hello.",
+            "modelId": "coda",
+            "samplingRate": 24000
+          }
+        },
+        {
+          "target": "request.accept",
+          "op": "equal",
+          "value": "audio/pcm"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.v1.defaults",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C01",
+        "C04",
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts",
+        "typescript.stream.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "websocketURL": {
+            "state": "value",
+            "value": "wss://api.rime.ai/mist/ws"
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "configuration.model",
+          "op": "equal",
+          "value": "mistv3"
+        },
+        {
+          "target": "configuration.voice",
+          "op": "equal",
+          "value": "cove"
+        },
+        {
+          "target": "start.language",
+          "op": "equal",
+          "value": "eng"
+        },
+        {
+          "target": "start.splitStrategy",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "connection.subprotocol",
+          "op": "equal",
+          "value": "rime.v1.binary"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.mistv2.time_scale_rejected",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C05",
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "timeScaleFactor": {
+            "state": "value",
+            "value": 1
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "time scale unsupported for Mist v2"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.ws3.reduce_latency_omitted",
+      "baseline": "typescript",
+      "transport": "ws3",
+      "families": [
+        "C06"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "mistv2"
+          },
+          "reduceLatency": {
+            "state": "value",
+            "value": true
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.query.reduceLatency",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.v1.legacy_controls_rejected",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C06",
+        "C07",
+        "C09",
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "options": [
+            "speedAlpha",
+            "temperature",
+            "top_p",
+            "repetition_penalty",
+            "max_tokens",
+            "reduceLatency",
+            "segment"
+          ]
+        },
+        "options": {}
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "unsupported V1 option"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.update.snapshot",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C01",
+        "C04",
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "create_stream",
+            "label": "old"
+          },
+          {
+            "action": "update",
+            "voice": "new_voice",
+            "endpoint": "https://new.rime.ai/tts"
+          },
+          {
+            "action": "consume",
+            "label": "old"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "old_stream.configuration",
+          "op": "equal",
+          "value": "creation_snapshot"
+        },
+        {
+          "target": "old_stream.cancelled_by_update",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.update.explicit_rate_retained",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C01",
+        "C05",
+        "C10"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "samplingRate": {
+            "state": "value",
+            "value": 16000
+          }
+        },
+        "updates": [
+          {
+            "modelId": {
+              "state": "value",
+              "value": "mistv2"
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "request.body.samplingRate",
+          "op": "equal",
+          "value": 16000
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.v1.model_update_requires_new_endpoint",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C04",
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "construct",
+            "model": "coda",
+            "endpoint": "wss://dedicated.rime.ai/ws"
+          },
+          {
+            "action": "update",
+            "model": "mistv3",
+            "endpoint": "wss://dedicated.rime.ai/ws"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "model cannot change at the same endpoint"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.endpoint.trust",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C04"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "untrusted": [
+            "https://other.example/tts",
+            "wss://rime.ai.other.example/ws"
+          ],
+          "insecure": [
+            "http://rime.ai/tts",
+            "ws://rime.ai/ws"
+          ],
+          "loopback": [
+            "http://127.0.0.1:8080/tts",
+            "ws://127.0.0.1:8080/ws"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "untrusted_without_opt_in",
+          "op": "equal",
+          "value": "reject"
+        },
+        {
+          "target": "insecure_non_loopback",
+          "op": "equal",
+          "value": "reject"
+        },
+        {
+          "target": "loopback",
+          "op": "equal",
+          "value": "accept"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.http.explicit_coda_voice",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C01",
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.body.speaker",
+          "op": "equal",
+          "value": "lyra"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.update.transport_rejected",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C01",
+        "C03"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "useWebsocket": {
+            "state": "value",
+            "value": false
+          }
+        },
+        "updates": [
+          {
+            "useWebsocket": {
+              "state": "value",
+              "value": true
+            }
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "cannot change transport"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.v1.tokenizer",
+      "baseline": "python",
+      "transport": "v1",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python._websocket_v1_adapter.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {},
+        "tokenizer_output": [
+          "Hello.",
+          " World! ",
+          ""
+        ]
+      },
+      "expected": [
+        {
+          "target": "default_tokenizer",
+          "op": "equal",
+          "value": "blingfire"
+        },
+        {
+          "target": "default_tokenizer_options",
+          "op": "equal",
+          "value": {
+            "min_sentence_len": 1
+          }
+        },
+        {
+          "target": "submitted_text_units",
+          "op": "equal",
+          "value": [
+            "Hello. ",
+            " World! "
+          ]
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.v1.tokenizer",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C11"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.stream.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {},
+        "tokenizer_output": [
+          "Hello.",
+          " World! ",
+          ""
+        ]
+      },
+      "expected": [
+        {
+          "target": "default_tokenizer",
+          "op": "equal",
+          "value": "basic"
+        },
+        {
+          "target": "default_tokenizer_options",
+          "op": "equal",
+          "value": {
+            "minSentenceLength": 1,
+            "streamContextLength": 1
+          }
+        },
+        {
+          "target": "submitted_text_units",
+          "op": "equal",
+          "value": [
+            "Hello. ",
+            " World! "
+          ]
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.coda.speed_forwarded",
+      "baseline": "python",
+      "transport": "ws3",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "model": {
+            "state": "value",
+            "value": "coda"
+          },
+          "speed_alpha": {
+            "state": "value",
+            "value": 1.25
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.query.speedAlpha",
+          "op": "equal",
+          "value": "1.25"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.coda.speed_omitted",
+      "baseline": "typescript",
+      "transport": "ws3",
+      "families": [
+        "C09"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "modelId": {
+            "state": "value",
+            "value": "coda"
+          },
+          "speedAlpha": {
+            "state": "value",
+            "value": 1.25
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.query.speedAlpha",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.http.text_collision",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "text": {
+            "state": "value",
+            "value": "replacement"
+          }
+        },
+        "text": "original"
+      },
+      "expected": [
+        {
+          "target": "request.body.text",
+          "op": "equal",
+          "value": "replacement"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.ws3.extensions_omitted",
+      "baseline": "typescript",
+      "transport": "ws3",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "inlineSpeedAlpha": {
+            "state": "value",
+            "value": "0.8"
+          },
+          "noTextNormalization": {
+            "state": "value",
+            "value": true
+          },
+          "saveOovs": {
+            "state": "value",
+            "value": false
+          },
+          "extraFlag": {
+            "state": "value",
+            "value": 1
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "request.query.inlineSpeedAlpha",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "request.query.noTextNormalization",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "request.query.saveOovs",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "request.query.extraFlag",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.v1.extensions_rejected",
+      "baseline": "typescript",
+      "transport": "v1",
+      "families": [
+        "C08"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "options": [
+            "inlineSpeedAlpha",
+            "noTextNormalization",
+            "saveOovs"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "unsupported V1 control"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.http.model_timeout",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "models": [
+            "coda",
+            "mistv2",
+            "mistv3",
+            "custom"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "total_seconds_by_model",
+          "op": "equal",
+          "value": {
+            "coda": 240,
+            "mistv2": 30,
+            "mistv3": 30,
+            "custom": 30
+          }
+        },
+        {
+          "target": "connect_timeout_source",
+          "op": "equal",
+          "value": "conn_options.timeout"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.http.phase_timeout",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "wait_fetch"
+          },
+          {
+            "action": "read_body_chunk"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "each_phase_timeout_source",
+          "op": "equal",
+          "value": "connOptions.timeoutMs"
+        },
+        {
+          "target": "fixed_model_total_timeout",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "plugin.custom_model_difference",
+      "baseline": "sdk",
+      "transport": "http",
+      "families": [
+        "C05"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.models.py",
+        "python.tts.py",
+        "typescript.options.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "models": [
+            "custom",
+            "custom-mist-model",
+            "mist-custom"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "python.mist_detection",
+          "op": "equal",
+          "value": "starts_with_mist"
+        },
+        {
+          "target": "typescript.mist_detection",
+          "op": "equal",
+          "value": "includes_mist"
+        },
+        {
+          "target": "python.custom_default_rate",
+          "op": "equal",
+          "value": 22050
+        },
+        {
+          "target": "typescript.custom_default_rate",
+          "op": "equal",
+          "value": 24000
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.synthesize.text",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C03"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.synthesize.text"
+      ],
+      "given": {
+        "entrypoint": "synthesize",
+        "argument": "text",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.text",
+          "op": "equal",
+          "value": "Hello."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.synthesize.conn_options",
+      "baseline": "python",
+      "transport": "http",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.synthesize.conn_options"
+      ],
+      "given": {
+        "entrypoint": "synthesize",
+        "argument": "conn_options",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "deadline_configuration.source",
+          "op": "equal",
+          "value": "caller_connection_options"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.stream.conn_options",
+      "baseline": "python",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.stream.conn_options"
+      ],
+      "given": {
+        "entrypoint": "stream",
+        "argument": "conn_options",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "deadline_configuration.source",
+          "op": "equal",
+          "value": "caller_connection_options"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.prewarm.$call",
+      "baseline": "python",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.prewarm.$call"
+      ],
+      "given": {
+        "entrypoint": "prewarm",
+        "argument": "$call",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "prewarm.synthesis_calls",
+          "op": "equal",
+          "value": 0
+        },
+        {
+          "target": "prewarm.http_network_calls",
+          "op": "equal",
+          "value": 0
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "python.aclose.$call",
+      "baseline": "python",
+      "transport": "all",
+      "families": [
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "python.tts.py"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "python.aclose.$call"
+      ],
+      "given": {
+        "entrypoint": "aclose",
+        "argument": "$call",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "active_streams.cleaned_up",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "borrowed_session.closed",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.synthesize.text",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C03"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.synthesize.text"
+      ],
+      "given": {
+        "entrypoint": "synthesize",
+        "argument": "text",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "request.body.text",
+          "op": "equal",
+          "value": "Hello."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.synthesize.connOptions",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.synthesize.connOptions"
+      ],
+      "given": {
+        "entrypoint": "synthesize",
+        "argument": "connOptions",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "deadline_configuration.source",
+          "op": "equal",
+          "value": "caller_connection_options"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.synthesize.abortSignal",
+      "baseline": "typescript",
+      "transport": "http",
+      "families": [
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.synthesize.abortSignal"
+      ],
+      "given": {
+        "entrypoint": "synthesize",
+        "argument": "abortSignal",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "aborted_request.network_calls",
+          "op": "equal",
+          "value": 0
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.stream.options.connOptions",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.stream.options.connOptions"
+      ],
+      "given": {
+        "entrypoint": "stream",
+        "argument": "options.connOptions",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "deadline_configuration.source",
+          "op": "equal",
+          "value": "caller_connection_options"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.prewarm.$call",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.prewarm.$call"
+      ],
+      "given": {
+        "entrypoint": "prewarm",
+        "argument": "$call",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "prewarm.synthesis_calls",
+          "op": "equal",
+          "value": 0
+        },
+        {
+          "target": "prewarm.http_network_calls",
+          "op": "equal",
+          "value": 0
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.close.$call",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.close.$call"
+      ],
+      "given": {
+        "entrypoint": "close",
+        "argument": "$call",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "active_streams.cleaned_up",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "borrowed_session.closed",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "typescript.releaseIdleConnections.$call",
+      "baseline": "typescript",
+      "transport": "all",
+      "families": [
+        "C14"
+      ],
+      "evidence": "source",
+      "sources": [
+        "typescript.tts.ts"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [
+        "typescript.releaseIdleConnections.$call"
+      ],
+      "given": {
+        "entrypoint": "releaseIdleConnections",
+        "argument": "$call",
+        "text": "Hello."
+      },
+      "expected": [
+        {
+          "target": "idle_connections.closed",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "active_streams.cancelled",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.options.precedence",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C01"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "voice": {
+            "state": "value",
+            "value": "base"
+          },
+          "timestamps": {
+            "state": "value",
+            "value": true
+          },
+          "custom_lexicon": {
+            "state": "value",
+            "value": [
+              "entry"
+            ]
+          }
+        },
+        "overrides": {
+          "voice": {
+            "state": "value",
+            "value": "override"
+          },
+          "timestamps": {
+            "state": "value",
+            "value": false
+          },
+          "custom_lexicon": {
+            "state": "value",
+            "value": []
+          },
+          "speed_alpha": {
+            "state": "clear"
+          }
+        }
+      },
+      "expected": [
+        {
+          "target": "resolved.voice",
+          "op": "equal",
+          "value": "override"
+        },
+        {
+          "target": "resolved.timestamps",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "resolved.custom_lexicon",
+          "op": "equal",
+          "value": []
+        },
+        {
+          "target": "request.speed_alpha",
+          "op": "absent",
+          "value": null
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.options.omission",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C01"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "voice": {
+            "state": "omitted"
+          },
+          "time_scale_factor": {
+            "state": "value",
+            "value": 0
+          }
+        },
+        "steps": [
+          {
+            "action": "create_stream"
+          },
+          {
+            "action": "mutate_nested_input"
+          },
+          {
+            "action": "read_audio"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "stream.configuration",
+          "op": "equal",
+          "value": "creation_snapshot"
+        },
+        {
+          "target": "zero_is_omission",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.runtime.matrix",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C02"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q6"
+      ],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "python": [
+          "3.10",
+          "3.11",
+          "3.12",
+          "3.13",
+          "3.14"
+        ],
+        "node_majors": [
+          20,
+          22,
+          24
+        ],
+        "go": [
+          "1.24",
+          "stable"
+        ],
+        "rust": [
+          "1.88",
+          "stable"
+        ],
+        "node_loaders": [
+          "import",
+          "require"
+        ]
+      },
+      "expected": [
+        {
+          "target": "clean_install_and_public_imports",
+          "op": "equal",
+          "value": "pass"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.http.early_audio",
+      "baseline": "sdk",
+      "transport": "http",
+      "families": [
+        "C03"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "send_complete_text",
+            "text": "Hello."
+          },
+          {
+            "action": "peer_audio",
+            "bytes_hex": "0100"
+          },
+          {
+            "action": "hold_response_open"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "caller.audio_before_http_eof",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.http.incremental_input",
+      "baseline": "sdk",
+      "transport": "http",
+      "families": [
+        "C03"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "input_kind": "async_text_source"
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "incremental input unsupported on HTTP"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.no_replay",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C03",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "failure_phase": [
+            "before_audio",
+            "after_audio"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "synthesis_attempts",
+          "op": "equal",
+          "value": 1
+        },
+        {
+          "target": "automatic_fallback",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.owned_borrowed_resources",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C04",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "ownership": [
+            "owned",
+            "borrowed"
+          ],
+          "exit": [
+            "success",
+            "cancel",
+            "error",
+            "client_close"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "owned_resource.closed",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "borrowed_resource.closed",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "request_and_leased_socket.cleaned_up",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.native.brackets_lexicon",
+      "baseline": "sdk",
+      "transport": "grpc",
+      "families": [
+        "C06"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan",
+        "engine.proto"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "options": {
+          "pause_between_brackets": {
+            "state": "value",
+            "value": false
+          },
+          "phonemize_between_brackets": {
+            "state": "value",
+            "value": true
+          }
+        },
+        "separate_coda_case": {
+          "custom_lexicon": [
+            {
+              "spelling": "cache",
+              "pronunciation": "\" k { S"
+            }
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "mist.pause_between_brackets",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "mist.phonemize_between_brackets",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "coda.custom_lexicon",
+          "op": "equal",
+          "value": "independent_snapshot"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.native.legacy_rejection",
+      "baseline": "sdk",
+      "transport": "v1",
+      "families": [
+        "C07"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "fields": [
+            "temperature",
+            "top_p",
+            "repetition_penalty",
+            "max_tokens"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "validation",
+          "op": "reject",
+          "value": "legacy control unavailable in native protocol"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.speed.route_policy",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C09"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q2",
+        "Q5"
+      ],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "time_scale_factor": [
+            null,
+            0,
+            0.39,
+            1,
+            2.51
+          ],
+          "speed_alpha": [
+            null,
+            0,
+            0.5,
+            2
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "legacy_http.policy",
+          "op": "equal",
+          "value": "forward supplied fields; service prefers timeScaleFactor, otherwise reciprocal nonzero speedAlpha, default 1 and clamp 0.4..2.5"
+        },
+        {
+          "target": "existing_native_bounds",
+          "op": "equal",
+          "value": [
+            0.4,
+            2.5
+          ]
+        },
+        {
+          "target": "mistv2.time_scale_factor",
+          "op": "equal",
+          "value": "reject"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.audio.fixed_presets",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C10"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan",
+        "sdk.contract"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "presets": [
+          "PCM_24000",
+          "MULAW_8000",
+          "PCMU"
+        ]
+      },
+      "expected": [
+        {
+          "target": "MULAW_8000.wire",
+          "op": "equal",
+          "value": {
+            "encoding": "audio/pcm",
+            "sample_rate": 24000
+          }
+        },
+        {
+          "target": "MULAW_8000.output",
+          "op": "equal",
+          "value": {
+            "encoding": "mulaw",
+            "sample_rate": 8000
+          }
+        },
+        {
+          "target": "PCMU.forced_8000",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.audio.boundaries_buffer",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C10"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan",
+        "sdk.contract"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "chunk_boundaries": [
+            1,
+            2,
+            7,
+            17
+          ],
+          "formats": [
+            "pcm",
+            "wav",
+            "mp3",
+            "ogg_opus",
+            "webm_opus",
+            "pcmu"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "pcm.odd_terminal_byte",
+          "op": "equal",
+          "value": "reject"
+        },
+        {
+          "target": "encoded_bytes.converted_as_pcm",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "buffer_limit_bytes",
+          "op": "equal",
+          "value": 67108864
+        },
+        {
+          "target": "wav.finalize_only_after_success",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.text.policies",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C11"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "policies": [
+          "service_default",
+          "sentence",
+          "none",
+          "accumulate_sentence"
+        ],
+        "source": "  Hello.\nWorld!  "
+      },
+      "expected": [
+        {
+          "target": "default_native_policy",
+          "op": "equal",
+          "value": "accumulate_sentence"
+        },
+        {
+          "target": "source_text",
+          "op": "equal",
+          "value": "  Hello.\nWorld!  "
+        },
+        {
+          "target": "service_default.split_field",
+          "op": "absent",
+          "value": null
+        },
+        {
+          "target": "ws3_segment_is_native_split",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.text.stable_units",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C11"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "input": [
+            "Mr. Smith arrived.",
+            "1.7 percent",
+            {
+              "repeat": "x",
+              "count": 4097
+            }
+          ]
+        },
+        "policy": "none"
+      },
+      "expected": [
+        {
+          "target": "automatic_unit_splitting",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "unrepresentable_unit",
+          "op": "equal",
+          "value": "explicit input/resource error"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.ws3.lifecycle",
+      "baseline": "sdk",
+      "transport": "ws3",
+      "families": [
+        "C03",
+        "C11",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "text",
+            "text": "Hello."
+          },
+          {
+            "action": "local_flush"
+          },
+          {
+            "action": "text",
+            "text": " More."
+          },
+          {
+            "action": "end_input"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "context_count",
+          "op": "equal",
+          "value": 1
+        },
+        {
+          "target": "wire.operations",
+          "op": "ordered",
+          "value": [
+            "text",
+            "text",
+            "flush"
+          ]
+        },
+        {
+          "target": "wire.flush_on_local_flush",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "audio_before_input_end",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.v1.lifecycle",
+      "baseline": "sdk",
+      "transport": "v1",
+      "families": [
+        "C03",
+        "C11",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "text",
+            "text": "Hello."
+          },
+          {
+            "action": "local_flush"
+          },
+          {
+            "action": "text",
+            "text": " More."
+          },
+          {
+            "action": "end_input"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "context_count",
+          "op": "equal",
+          "value": 1
+        },
+        {
+          "target": "wire.operations",
+          "op": "ordered",
+          "value": [
+            "start",
+            "text",
+            "text",
+            "end"
+          ]
+        },
+        {
+          "target": "wire.flush_on_local_flush",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "audio_before_input_end",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.v1.codecs",
+      "baseline": "sdk",
+      "transport": "v1",
+      "families": [
+        "C04",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "encoding": [
+            "binary",
+            "json"
+          ],
+          "bad_frame": [
+            "wrong_type",
+            "multiple_payloads",
+            "wrong_context",
+            "invalid_base64",
+            "done_before_started",
+            "done_before_end"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "handshake.ready_before_start",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "malformed_frame",
+          "op": "equal",
+          "value": "protocol error"
+        },
+        {
+          "target": "poisoned_socket.reused",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.v1.cancel_reuse",
+      "baseline": "sdk",
+      "transport": "v1",
+      "families": [
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "start"
+          },
+          {
+            "action": "cancel"
+          },
+          {
+            "action": "peer_cancelled"
+          },
+          {
+            "action": "next_operation"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "wire.operations",
+          "op": "ordered",
+          "value": [
+            "start",
+            "cancel",
+            "drain",
+            "start"
+          ]
+        },
+        {
+          "target": "failed_drain.closes_socket",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "sibling.cancelled",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.empty_input",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C11"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "route": [
+            "ws3",
+            "v1"
+          ]
+        },
+        "input_tokens": []
+      },
+      "expected": [
+        {
+          "target": "empty_text_contexts",
+          "op": "equal",
+          "value": 0
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.whitespace_input",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C11"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "text": "   ",
+        "policy": "none"
+      },
+      "expected": [
+        {
+          "target": "submitted_text",
+          "op": "equal",
+          "value": "   "
+        },
+        {
+          "target": "source_trimmed",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.timing.ordered_events",
+      "baseline": "sdk",
+      "transport": "ws3",
+      "families": [
+        "C12"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "peer_audio",
+            "bytes_hex": "0100"
+          },
+          {
+            "action": "peer_timing",
+            "words": [
+              "hello"
+            ],
+            "start": [
+              0.0
+            ],
+            "end": [
+              0.5
+            ]
+          },
+          {
+            "action": "peer_audio",
+            "bytes_hex": "0200"
+          },
+          {
+            "action": "peer_done"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "event_view.kinds",
+          "op": "ordered",
+          "value": [
+            "audio",
+            "timing",
+            "audio",
+            "done"
+          ]
+        },
+        {
+          "target": "timing.before_eof",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "reader_count",
+          "op": "equal",
+          "value": 1
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.timing.consumers",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C12"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "consumer": [
+            "bytes_only",
+            "events_slow",
+            "competing_readers"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "bytes_only.metadata_does_not_block",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "event_memory",
+          "op": "equal",
+          "value": "bounded"
+        },
+        {
+          "target": "competing_readers",
+          "op": "equal",
+          "value": "reject"
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.timing.final_result",
+      "baseline": "sdk",
+      "transport": "grpc",
+      "families": [
+        "C12",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan",
+        "sdk.contract"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "outcome": [
+            "success",
+            "alignment_failure",
+            "missing_metadata",
+            "malformed_metadata",
+            "synthesis_failure",
+            "cancelled"
+          ],
+          "access": [
+            "before_eof",
+            "after_eof"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "before_eof",
+          "op": "equal",
+          "value": "input error"
+        },
+        {
+          "target": "alignment_failure.fails_audio",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "failed_synthesis.successful_timestamps",
+          "op": "equal",
+          "value": false
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.prewarm.races",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C13",
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "prewarm",
+            "waiter": "a"
+          },
+          {
+            "action": "prewarm",
+            "waiter": "b"
+          },
+          {
+            "action": "cancel_waiter",
+            "waiter": "a"
+          },
+          {
+            "action": "close_client"
+          },
+          {
+            "action": "connection_resolves"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "dummy_synthesis_calls",
+          "op": "equal",
+          "value": 0
+        },
+        {
+          "target": "cancel_a_cancels_b",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "late_socket.closed",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.deadline.phases",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "phase": [
+            "connect",
+            "write",
+            "start",
+            "response_idle",
+            "completion",
+            "cleanup",
+            "overall"
+          ],
+          "pause": [
+            "input",
+            "consumer"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "native_defaults_seconds",
+          "op": "equal",
+          "value": {
+            "connect": 10,
+            "first_audio": 30,
+            "progress": 60,
+            "overall": null
+          }
+        },
+        {
+          "target": "v1.open_input_pause_times_out_without_overall",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "python_ws3.receive_timeout_preserved",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "overall_applies_while_paused",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.retirement.concurrent_streams",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "steps": [
+          {
+            "action": "create_stream",
+            "label": "old_unread"
+          },
+          {
+            "action": "create_stream",
+            "label": "old_active"
+          },
+          {
+            "action": "replace_configuration"
+          },
+          {
+            "action": "retire_old"
+          },
+          {
+            "action": "consume",
+            "label": "old_unread"
+          }
+        ]
+      },
+      "expected": [
+        {
+          "target": "old_streams.cancelled_by_retirement",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "old_idle_connections.closed",
+          "op": "equal",
+          "value": true
+        },
+        {
+          "target": "one_active_context_per_socket",
+          "op": "equal",
+          "value": true
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.errors.metadata",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C14"
+      ],
+      "evidence": "design",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [],
+      "status": "specified",
+      "covers": [],
+      "given": {
+        "parameterize": {
+          "origin": [
+            "local",
+            "provider"
+          ],
+          "http_status": [
+            400,
+            401,
+            403,
+            404,
+            429,
+            500,
+            501,
+            503,
+            504
+          ],
+          "phase": [
+            "before_audio",
+            "after_audio"
+          ]
+        }
+      },
+      "expected": [
+        {
+          "target": "preserved_fields",
+          "op": "equal",
+          "value": [
+            "origin",
+            "http_status",
+            "grpc_code",
+            "websocket_kind",
+            "close_code",
+            "request_id",
+            "context_id",
+            "audio_delivered"
+          ]
+        },
+        {
+          "target": "credentials_in_messages_or_causes",
+          "op": "equal",
+          "value": false
+        },
+        {
+          "target": "synthesis_retries",
+          "op": "equal",
+          "value": 0
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.mistv2.direct",
+      "baseline": "sdk",
+      "transport": "http",
+      "families": [
+        "C05"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q2"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "model": "mistv2",
+        "routes": [
+          "http",
+          "ws3"
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Authenticated direct-endpoint Mist v2 availability and options."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.audio.qualified_pairs",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C10"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q3"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "formats": [
+          "pcm",
+          "pcmu",
+          "wav",
+          "mp3",
+          "ogg_opus",
+          "webm_opus"
+        ],
+        "rates": [
+          8000,
+          16000,
+          22050,
+          24000,
+          48000
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Actual supported pairs and codec metadata; Cartesian product is a qualification candidate, not supported output."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.timing.units",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C12"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q4"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "rates": [
+          16000,
+          22050,
+          24000
+        ],
+        "time_scale_factors": [
+          0.5,
+          1,
+          2
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Timestamp origin and pre/post scaling; compare final native timing and incremental WS3 independently."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.extensions.engine_effect",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C08"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q5"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "fields": [
+          "inlineSpeedAlpha",
+          "noTextNormalization",
+          "saveOovs",
+          "temperature",
+          "top_p",
+          "repetition_penalty",
+          "max_tokens"
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Forwarding is established by source; deployed service interpretation is unknown."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.http.redirects",
+      "baseline": "sdk",
+      "transport": "http",
+      "families": [
+        "C04"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q6"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "redirects": [
+          "same_origin",
+          "cross_origin"
+        ],
+        "session_ownership": [
+          "owned",
+          "borrowed"
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Preserve supported Python session redirect behavior and Node redirect:error without implicit credential forwarding."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.runtime.dependency_resolution",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C02"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q6"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "python_floor": "3.10",
+        "node_major_floor": 20
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Qualify exact Node patch/transitive dependency floors and both module loaders."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.performance.budgets",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C13"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q7"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "metrics": [
+          "first_audio_cold",
+          "first_audio_warm",
+          "drain",
+          "memory",
+          "concurrency",
+          "cancellation"
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Measure both plugin baselines and set numeric regression thresholds."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    },
+    {
+      "id": "sdk.sdk.independent_upgrades",
+      "baseline": "sdk",
+      "transport": "all",
+      "families": [
+        "C02"
+      ],
+      "evidence": "requires_live",
+      "sources": [
+        "shared.plan"
+      ],
+      "gates": [
+        "Q8"
+      ],
+      "status": "unresolved",
+      "covers": [],
+      "given": {
+        "fixed": [
+          "agents",
+          "migrated_plugin"
+        ],
+        "changed": [
+          "sdk"
+        ]
+      },
+      "expected": [
+        {
+          "target": "qualification",
+          "op": "pending",
+          "value": "Determine finite SDK compatibility range and test oldest/newest released artifacts."
+        }
+      ],
+      "sdk_verification": {
+        "python": "not_run",
+        "typescript": "not_run",
+        "go": "not_run",
+        "rust": "not_run"
+      }
+    }
+  ]
+}

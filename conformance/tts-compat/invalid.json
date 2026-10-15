@@ -1,0 +1,106 @@
+[
+  {
+    "id": "duplicate_case",
+    "path": "/cases/1/id",
+    "value": "python.option.base_url"
+  },
+  {
+    "id": "unknown_family",
+    "path": "/cases/0/families/0",
+    "value": "C99"
+  },
+  {
+    "id": "unknown_source",
+    "path": "/cases/0/sources/0",
+    "value": "missing.source"
+  },
+  {
+    "id": "unknown_inventory",
+    "path": "/cases/0/covers",
+    "value": [
+      "missing.argument"
+    ]
+  },
+  {
+    "id": "uncovered_inventory",
+    "path": "/cases/0/covers",
+    "value": []
+  },
+  {
+    "id": "missing_language",
+    "path": "/languages",
+    "value": [
+      "python",
+      "typescript",
+      "go"
+    ]
+  },
+  {
+    "id": "invented_success",
+    "path": "/cases/0/sdk_verification/go",
+    "value": "passed"
+  },
+  {
+    "id": "invalid_presence",
+    "path": "/cases/0/given/options/base_url",
+    "value": {
+      "state": "default"
+    }
+  },
+  {
+    "id": "missing_explicit_value",
+    "path": "/cases/0/given/options/base_url",
+    "value": {
+      "state": "value"
+    }
+  },
+  {
+    "id": "omitted_with_value",
+    "path": "/cases/0/given/options/base_url",
+    "value": {
+      "state": "omitted",
+      "value": false
+    }
+  },
+  {
+    "id": "unknown_baseline",
+    "path": "/cases/0/baseline",
+    "value": "unknown"
+  },
+  {
+    "id": "unknown_gate",
+    "path": "/cases/0/gates",
+    "value": [
+      "Q99"
+    ]
+  },
+  {
+    "id": "unresolved_without_gate",
+    "path": "/cases/0/status",
+    "value": "unresolved"
+  },
+  {
+    "id": "missing_family",
+    "path": "/families",
+    "value": {
+      "C01": "Options",
+      "C02": "Runtime compatibility",
+      "C03": "Transport",
+      "C04": "Endpoints and sessions",
+      "C05": "Models",
+      "C06": "Mist controls",
+      "C07": "Legacy Coda controls",
+      "C08": "Provider extensions",
+      "C09": "Speed",
+      "C10": "Output",
+      "C11": "Text policy",
+      "C12": "Timings",
+      "C13": "Preparation and timeouts"
+    }
+  },
+  {
+    "id": "unresolved_with_asserted_answer",
+    "path": "/cases/125/expected/0/op",
+    "value": "equal"
+  }
+]
