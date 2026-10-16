@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.7](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.6...rust-v0.1.0-alpha.7) (2026-10-16)
+
+
+### Features
+
+* add unary STT transcription to all SDKs ([#80](https://github.com/rimelabs/rime-sdk/issues/80)) ([39427eb](https://github.com/rimelabs/rime-sdk/commit/39427eba7738e4f2fe0514a2cddaa219137dcc4d))
+
 ## [0.1.0-alpha.6](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.5...rust-v0.1.0-alpha.6) (2026-10-12)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.17](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.16...typescript-v0.1.0-alpha.17) (2026-10-16)
+
+
+### Features
+
+* add unary STT transcription to all SDKs ([#80](https://github.com/rimelabs/rime-sdk/issues/80)) ([39427eb](https://github.com/rimelabs/rime-sdk/commit/39427eba7738e4f2fe0514a2cddaa219137dcc4d))
+
 ## [0.1.0-alpha.16](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.15...typescript-v0.1.0-alpha.16) (2026-10-16)
 
 
