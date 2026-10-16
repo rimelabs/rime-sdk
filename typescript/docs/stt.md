@@ -1,4 +1,43 @@
-# Streaming speech recognition
+# Speech recognition
+
+## Complete recordings
+
+For a complete recording, use the native unary `Transcribe` RPC through the SDK.
+Pass **complete WAV bytes, including the header**, up to **16 MiB (16,777,216
+bytes)**. PCM16 mono 16 kHz WAV is the portable format. The SDK sends the file
+unchanged; it does not decode, resample, or add a header. The service validates
+its encoding and the supplied language and recognition hints.
+
+The result is a `Transcription` containing final text, resolved language, and a
+request ID when available. Silence may return empty text. There are no partial
+updates or automatic retries. TTS client settings do not apply. An optional
+overall timeout includes connection and upload; the SDK also bounds connection
+time and the unary request (120 seconds). Timeout, cancellation, and service
+errors use the existing SDK error categories. A request ID is included when the
+transport has made it available.
+
+```typescript
+import { readFile } from "node:fs/promises";
+import { Rime } from "@rimelabs/sdk";
+
+const client = new Rime();
+try {
+  const result = await client.stt.transcribe(await readFile("utterance.wav"), {
+    language: "en",
+    mode: "written",
+    contextTerms: ["Super-G", "USOC"],
+    timeout: 120,
+  });
+  console.log(result.text, result.language, result.requestId);
+} finally {
+  await client.close();
+}
+```
+
+`TranscribeOptions` also accepts an `AbortSignal` as `signal`. Aborting it or
+closing the client cancels pending requests with `RimeCancelledError`.
+
+## Streaming recognition
 
 `client.stt.stream` transcribes one utterance from an async source of `Uint8Array` chunks (including Node buffers).
 The SDK handles the gRPC protocol, authentication, audio conversion, transcript

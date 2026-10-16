@@ -12,6 +12,7 @@ class RecognitionService:
         self.mode = "normal"
         self.rejection = grpc.StatusCode.UNAVAILABLE
         self.calls = []
+        self.unary_calls = []
         self.metadata = []
         self.config_seen = asyncio.Event()
         self.input_finished = asyncio.Event()
@@ -19,6 +20,26 @@ class RecognitionService:
         self.cancelled = asyncio.Event()
         self.completed = asyncio.Event()
         self.active = 0
+
+    async def transcribe(self, request, context):
+        self.unary_calls.append(request)
+        self.metadata.append(dict(context.invocation_metadata()))
+        self.config_seen.set()
+        if self.mode == "reject":
+            context.set_trailing_metadata((("x-request-id", "stt-rejected"),))
+            await context.abort(self.rejection, "deliberate rejection")
+        await context.send_initial_metadata((("x-request-id", "stt-request"),))
+        if self.mode == "no_completion":
+            try:
+                await self.release.wait()
+            finally:
+                self.cancelled.set()
+        return proto.TranscriptionResponse(
+            text="" if self.mode == "silence" else "Ice cream",
+            language=None
+            if self.mode == "missing_language"
+            else proto.ResolvedLanguage(tag="en", source=proto.LANGUAGE_SOURCE_SELECTED),
+        )
 
     async def streaming(self, requests, context):
         handler = asyncio.current_task()
@@ -106,12 +127,22 @@ class RecognitionService:
     async def __aenter__(self):
         service = proto.DESCRIPTOR.services_by_name["SpeechToText"]
         method = service.methods_by_name["TranscribeStreaming"]
-        self.server = grpc.aio.server()
+        unary = service.methods_by_name["Transcribe"]
+        self.server = grpc.aio.server(
+            options=[("grpc.max_receive_message_length", 17 * 1024 * 1024)]
+        )
         self.server.add_generic_rpc_handlers(
             (
                 grpc.method_handlers_generic_handler(
                     service.full_name,
                     {
+                        unary.name: grpc.unary_unary_rpc_method_handler(
+                            self.transcribe,
+                            request_deserializer=GetMessageClass(unary.input_type).FromString,
+                            response_serializer=GetMessageClass(
+                                unary.output_type
+                            ).SerializeToString,
+                        ),
                         method.name: grpc.stream_stream_rpc_method_handler(
                             self.streaming,
                             request_deserializer=GetMessageClass(method.input_type).FromString,

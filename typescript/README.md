@@ -224,12 +224,51 @@ and model/language support.
 
 ## STT
 
+### Transcribe a complete WAV recording
+
+For a complete recording, use the native unary `Transcribe` RPC through the SDK.
+Pass **complete WAV bytes, including the header**, up to **16 MiB (16,777,216
+bytes)**. PCM16 mono 16 kHz WAV is the portable format. The SDK sends the file
+unchanged; it does not decode, resample, or add a header. The service validates
+its encoding and the supplied language and recognition hints.
+
+The result is a `Transcription` containing final text, resolved language, and a
+request ID when available. Silence may return empty text. There are no partial
+updates or automatic retries. TTS client settings do not apply. An optional
+overall timeout includes connection and upload; the SDK also bounds connection
+time and the unary request (120 seconds). Timeout, cancellation, and service
+errors use the existing SDK error categories. A request ID is included when the
+transport has made it available.
+
+```typescript
+import { readFile } from "node:fs/promises";
+import { Rime } from "@rimelabs/sdk";
+
+const client = new Rime();
+try {
+  const result = await client.stt.transcribe(await readFile("utterance.wav"), {
+    language: "en",
+    mode: "written",
+    contextTerms: ["Super-G", "USOC"],
+    timeout: 120,
+  });
+  console.log(result.text, result.language, result.requestId);
+} finally {
+  await client.close();
+}
+```
+
+`TranscribeOptions` also accepts an `AbortSignal` as `signal`. Aborting it or
+closing the client cancels pending requests with `RimeCancelledError`.
+
+### Stream an utterance
+
 Use `client.stt.stream(audioChunks, options)` to transcribe one utterance.
 The required source is an async iterable of headerless signed PCM16 little-endian
 `Uint8Array` chunks (`Buffer` also works). Ending the source ends the utterance;
 your application decides when to stop.
 
-STT uses streaming gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
+STT uses gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
 key. There is no STT model, endpoint, or protocol selector. TTS client settings,
 including its timeout, do not apply to STT.
 

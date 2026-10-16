@@ -5,7 +5,9 @@ mod queue;
 mod stream;
 #[cfg(test)]
 mod tests;
+mod transcribe;
 mod transport;
+pub use transcribe::{TranscribeOptions, Transcription};
 
 use crate::{client::validate_timeout, Client, Error};
 pub use audio::PcmFormat;

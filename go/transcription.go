@@ -78,13 +78,9 @@ func (service *STTService) Stream(ctx context.Context, source AudioSource, optio
 	if source == nil {
 		return nil, failure(ErrInput, "audio source must not be nil")
 	}
-	mode := pb.TranscriptionMode_TRANSCRIPTION_MODE_WRITTEN
-	switch options.Mode {
-	case "", TranscriptionWritten:
-	case TranscriptionVerbatim:
-		mode = pb.TranscriptionMode_TRANSCRIPTION_MODE_VERBATIM
-	default:
-		return nil, failure(ErrInput, "mode must be written or verbatim")
+	mode, err := transcriptionMode(options.Mode)
+	if err != nil {
+		return nil, err
 	}
 	format, err := resolvePCMFormat(options.InputFormat)
 	if err != nil {

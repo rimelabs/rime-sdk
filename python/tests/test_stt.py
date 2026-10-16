@@ -48,11 +48,100 @@ async def stt_setup(monkeypatch):
                 cleanup_timeout=0.05,
             ),
         )
+        # Keep production message limits and retry policy while using local plaintext.
         monkeypatch.setattr(
-            _transport, "make_channel", lambda policy: grpc.aio.insecure_channel(policy.target)
+            grpc.aio,
+            "secure_channel",
+            lambda target, credentials, **kwargs: grpc.aio.insecure_channel(target, **kwargs),
         )
         async with Rime(api_key="test-key") as client:
             yield service, client
+
+
+async def test_transcribe_forwards_complete_wav_and_returns_result(stt_setup, monkeypatch):
+    service, client = stt_setup
+    monkeypatch.setattr(_policy, "POLICY", replace(_policy.POLICY, completion_timeout=3))
+    # A full-size payload exercises the unary gRPC limit rather than stream chunk limits.
+    audio = b"RIFF" + bytes(16 * 1024 * 1024 - 4)
+    result = await client.stt.transcribe(
+        audio,
+        language="en-GB",
+        mode=TranscriptionMode.VERBATIM,
+        context_terms=[" Super-G ", "uno,dos", "Español"],
+    )
+    assert (result.text, result.language, result.request_id) == ("Ice cream", "en", "stt-request")
+    assert service.calls == []
+    (request,) = service.unary_calls
+    assert request.audio == audio
+    assert request.options.language == "en-GB"
+    assert request.options.mode == proto.TRANSCRIPTION_MODE_VERBATIM
+    assert list(request.options.context_terms) == [" Super-G ", "uno,dos", "Español"]
+    assert service.metadata[0]["authorization"] == "Bearer test-key"
+
+
+@pytest.mark.parametrize(
+    "mode,error",
+    [
+        ("reject", RimeUnavailableError),
+        ("missing_language", RimeStreamError),
+        ("no_completion", RimeTimeoutError),
+    ],
+)
+async def test_transcribe_failure_is_not_retried(stt_setup, mode, error):
+    service, client = stt_setup
+    service.mode = mode
+    with pytest.raises(error) as failure:
+        await client.stt.transcribe(b"wav", language="en")
+    assert failure.value.request_id == ("stt-rejected" if mode == "reject" else "stt-request")
+    assert len(service.unary_calls) == 1
+
+
+async def test_transcribe_silence_and_independent_defaults(stt_setup):
+    service, _ = stt_setup
+    service.mode = "silence"
+    async with Rime(api_key="test-key", timeout=0.000001) as short_tts_client:
+        assert (await short_tts_client.stt.transcribe(b"wav", language="en")).text == ""
+    assert service.unary_calls[0].options.mode == proto.TRANSCRIPTION_MODE_WRITTEN
+
+
+@pytest.mark.parametrize("action", ["caller", "close", "deadline"])
+async def test_transcribe_cancellation(stt_setup, action):
+    service, client = stt_setup
+    service.mode = "no_completion"
+    task = asyncio.create_task(
+        client.stt.transcribe(b"wav", language="en", timeout=0.08 if action == "deadline" else None)
+    )
+    await asyncio.wait_for(service.config_seen.wait(), 1)
+    await asyncio.sleep(0.01)  # let response headers reach the client
+    if action == "close":
+        await client.close()
+    elif action == "caller":
+        task.cancel()
+    error = {
+        "caller": asyncio.CancelledError,
+        "close": RimeCancelledError,
+        "deadline": RimeTimeoutError,
+    }[action]
+    with pytest.raises(error) as failure:
+        await task
+    if action != "caller":
+        # grpc.aio may expose unary response headers only once the call completes.
+        assert failure.value.request_id in (None, "stt-request")
+    await asyncio.wait_for(service.cancelled.wait(), 1)
+
+
+async def test_transcribe_rejects_invalid_inputs_before_network(stt_setup):
+    service, client = stt_setup
+    for audio, error in [
+        (b"", RimeAudioFormatError),
+        ("wav", RimeAudioFormatError),
+        (bytes(16 * 1024 * 1024 + 1), RimeResourceLimitError),
+    ]:
+        with pytest.raises(error):
+            await client.stt.transcribe(audio, language="en")
+    with pytest.raises(RimeInputError):
+        await client.stt.transcribe(b"wav", language="en", mode="other")
+    assert not service.unary_calls
 
 
 async def source(*chunks):

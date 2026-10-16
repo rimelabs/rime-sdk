@@ -1,5 +1,10 @@
 import { STT } from "./stt/client.js";
-import type { AudioSource, TranscriptionOptions } from "./stt/types.js";
+import type {
+  AudioSource,
+  TranscriptionOptions,
+  TranscribeOptions,
+  Transcription,
+} from "./stt/types.js";
 import type { TranscriptStream } from "./stt/stream.js";
 import { Credentials } from "./auth.js";
 import { RimeAuthenticationError, RimeInputError } from "./errors.js";
@@ -34,6 +39,11 @@ export class Rime {
   private readonly ttsClient: TTS;
   private readonly sttClient: STT;
   readonly stt: {
+    /** Transcribe complete WAV bytes. PCM16 mono 16 kHz is the portable format; maximum 16 MiB. */
+    transcribe: (
+      audio: Uint8Array,
+      options: TranscribeOptions,
+    ) => Promise<Transcription>;
     stream: (
       audio: AudioSource,
       options: TranscriptionOptions,
@@ -73,6 +83,7 @@ export class Rime {
     this.credentials = new Credentials(key, deployment);
     this.sttClient = new STT(this.credentials, () => this.checkOpen());
     this.stt = {
+      transcribe: (audio, options) => this.sttClient.transcribe(audio, options),
       stream: (audio, options) => this.sttClient.stream(audio, options),
     };
     this.realtimeClient = new Realtime(this.credentials, () =>
