@@ -1,0 +1,26 @@
+python/tests/test_audio_output.py
+  s_14c94c97552185::t_10552e85db8c9a 7
+  s_14c94c97552185::t_1c9074d6b6b037 77-87
+python/tests/test_grpc.py
+  s_14c94c97552185::t_1c9074d6b6b037 1-31
+python/src/rimelabs_sdk/tts/_transport.py
+  s_14c94c97552185::t_3f57e7fd171a7e 10,197
+python/src/rimelabs_sdk/_grpc.py
+  s_14c94c97552185::t_3f57e7fd171a7e 3-4,37-43,46,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0fad21321554986fc49195eb794c9d56e15c7dde",
+  "prompts": {},
+  "sessions": {
+    "s_14c94c97552185": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a14250-e18f-7860-ac9e-9dde98a24cec",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
