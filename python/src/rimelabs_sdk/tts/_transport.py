@@ -7,8 +7,8 @@ from google.protobuf.message_factory import GetMessageClass
 from rime_api import text_to_speech_pb2 as proto
 
 from .._errors import RimeAudioFormatError, RimeResourceLimitError, RimeStreamError
+from .._grpc import metadata_dict, rpc_error
 from .._grpc import request_id as _request_id
-from .._grpc import rpc_error
 from ._timestamps import TimestampTrailer
 
 _MAX_SEND_BYTES = 131072
@@ -194,7 +194,7 @@ class SynthesisCall:
 
     async def audio(self):
         try:
-            metadata = dict(await self._call.initial_metadata())
+            metadata = metadata_dict(await self._call.initial_metadata())
             self.request_id = _request_id(metadata) or self.request_id
             content_type = metadata.get("x-rime-audio-content-type")
             while True:

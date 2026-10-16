@@ -4,6 +4,7 @@ import json
 import wave
 from pathlib import Path
 
+import grpc
 import pytest
 from rime_api import text_to_speech_pb2 as proto
 
@@ -71,6 +72,17 @@ def test_wav_files(case):
             assert audio.getsampwidth() == 2
             assert audio.getnchannels() == 1
             assert len(audio.readframes(audio.getnframes())) == audio.getnframes() * 2
+
+
+async def test_synthesis_with_legacy_metadata_keys(setup, monkeypatch):
+    # Exercise the native RPC with the metadata keys behavior of gRPC 1.78.
+    monkeypatch.setattr(grpc.aio.Metadata, "keys", lambda self: iter(self), raising=False)
+    service, client = setup
+    service.mode = "odd_chunks"
+    service.payload = b"\x01\x00" * 12
+    audio = client.tts.synthesize("Hello.")
+    assert b"".join([chunk async for chunk in audio]) == service.payload
+    assert audio.request_id == "test-request"
 
 
 async def test_buffered_formats_and_default_header(setup):

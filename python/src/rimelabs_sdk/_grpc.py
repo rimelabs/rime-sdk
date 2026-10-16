@@ -1,5 +1,7 @@
 """Shared gRPC status and request identity handling."""
 
+from collections.abc import Mapping
+
 import grpc
 
 from ._errors import (
@@ -32,9 +34,16 @@ def rpc_error(code, request_id=None, details=None):
     return cls(message, request_id=request_id)
 
 
+def metadata_dict(metadata):
+    """Read mappings or metadata pairs without relying on gRPC's keys() view."""
+    if isinstance(metadata, Mapping):
+        return dict(metadata)
+    return {key: value for key, value in metadata or ()}
+
+
 def request_id(headers, trailers=(), previous=None):
     return (
-        dict(headers or ()).get("x-request-id")
+        metadata_dict(headers).get("x-request-id")
         or previous
-        or dict(trailers or ()).get("x-request-id")
+        or metadata_dict(trailers).get("x-request-id")
     )
