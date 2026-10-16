@@ -75,7 +75,13 @@ async fn silence_and_written_default() {
 #[tokio::test]
 async fn cancellation_reaches_server() {
     for action in ["drop", "close", "deadline", "rpc-deadline"] {
-        let h = Harness::new(Mode::NeverComplete).await;
+        let mut h = Harness::new(Mode::NeverComplete).await;
+        if action == "rpc-deadline" {
+            Arc::get_mut(&mut h.client.inner)
+                .unwrap()
+                .stt_limits
+                .completion = Duration::from_millis(80);
+        }
         let client = h.client.clone();
         let options = TranscribeOptions::new("en").timeout(if action == "deadline" {
             Some(Duration::from_millis(80))
@@ -98,7 +104,26 @@ async fn cancellation_reaches_server() {
                     ErrorKind::Cancelled
                 );
             }
-            _ => assert_eq!(task.await.unwrap().unwrap_err().kind(), ErrorKind::Timeout),
+            _ => {
+                // Pause only after network setup; the configured deadline must
+                // expire before the harness's default 200 ms completion budget.
+                tokio::time::pause();
+                let error = tokio::time::timeout(Duration::from_millis(100), task)
+                    .await
+                    .expect("configured deadline did not cancel the RPC")
+                    .unwrap()
+                    .unwrap_err();
+                tokio::time::resume();
+                assert_eq!(error.kind(), ErrorKind::Timeout);
+                assert_eq!(
+                    error.message(),
+                    if action == "deadline" {
+                        "overall transcription deadline expired"
+                    } else {
+                        "transcription request timed out"
+                    }
+                );
+            }
         }
         tokio::time::timeout(Duration::from_secs(3), h.service.cancelled.notified())
             .await

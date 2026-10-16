@@ -149,7 +149,7 @@ time and the unary request (120 seconds). Timeout, cancellation, and service
 errors use the existing SDK error categories. A request ID is included when the
 transport has made it available.
 
-```rust
+```no_run
 use rimelabs_sdk::{Client, TranscribeOptions, TranscriptionMode};
 
 #[tokio::main]
