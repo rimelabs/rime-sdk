@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0-alpha.15](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.14...python-v0.1.0-alpha.15) (2026-10-16)
+
+
+### Features
+
+* **realtime:** expose Prism's speech hint ([#73](https://github.com/rimelabs/rime-sdk/issues/73)) ([cb7187d](https://github.com/rimelabs/rime-sdk/commit/cb7187d687c2210332fee704d43ac9ba45c760ea))
+
+
+### Bug Fixes
+
+* **python:** handle metadata across supported gRPC versions ([#77](https://github.com/rimelabs/rime-sdk/issues/77)) ([685103a](https://github.com/rimelabs/rime-sdk/commit/685103a6e2eaa9ab4864d00d0955527e30ac8bb2))
+
 ## [0.1.0-alpha.14](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.13...python-v0.1.0-alpha.14) (2026-10-13)
 
 

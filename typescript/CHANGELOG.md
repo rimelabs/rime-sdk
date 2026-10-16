@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.16](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.15...typescript-v0.1.0-alpha.16) (2026-10-16)
+
+
+### Features
+
+* **realtime:** expose Prism's speech hint ([#73](https://github.com/rimelabs/rime-sdk/issues/73)) ([cb7187d](https://github.com/rimelabs/rime-sdk/commit/cb7187d687c2210332fee704d43ac9ba45c760ea))
+
 ## [0.1.0-alpha.15](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.14...typescript-v0.1.0-alpha.15) (2026-10-13)
 
 
