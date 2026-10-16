@@ -395,14 +395,23 @@ async def test_python_task_cancellation(setup):
     assert not client.tts._streams
 
 
-async def test_timeout_inheritance_and_explicit_disablement(setup):
+@pytest.mark.parametrize("startup_delay", [0, 0.06])
+async def test_timeout_inheritance_and_explicit_disablement(setup, monkeypatch, startup_delay):
     service, _ = setup
     service.mode = "burst"
+    exchange = _auth.exchange_key
+
+    async def delayed_exchange(key, policy):
+        await asyncio.sleep(startup_delay)
+        return await exchange(key, policy)
+
+    monkeypatch.setattr(_auth, "exchange_key", delayed_exchange)
     async with Rime(api_key="test", timeout=0.03) as client:
         async with client.tts.synthesize("Hi.") as a:
-            await anext(a)
-            await asyncio.sleep(0.06)
-            with pytest.raises(RimeTimeoutError):
+            # The overall deadline can expire before the first audio arrives.
+            with pytest.raises(RimeTimeoutError, match="Overall synthesis deadline expired"):
+                await anext(a)
+                await asyncio.sleep(0.06)
                 await anext(a)
         async with client.tts.synthesize("Hi.", timeout=None) as b:
             await anext(b)
