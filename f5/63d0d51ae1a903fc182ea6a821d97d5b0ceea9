@@ -1,0 +1,19 @@
+python/tests/test_sdk.py
+  s_a28614c6f51110::t_76db64ecafba8c 398-399,402-408,411-414
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f563d0d51ae1a903fc182ea6a821d97d5b0ceea9",
+  "prompts": {},
+  "sessions": {
+    "s_a28614c6f51110": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1427e-91fa-78a2-955d-0217d4497e8f",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
