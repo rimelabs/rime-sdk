@@ -6,6 +6,7 @@ import struct
 import time
 import weakref
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 
 import grpc
@@ -40,6 +41,8 @@ async def collect(stream):
     + [
         float("inf"),
         float("nan"),
+        timedelta(0),
+        timedelta(microseconds=-1),
         pytest.param(10**1000, id="oversized-positive-integer"),
         pytest.param(-(10**1000), id="oversized-negative-integer"),
     ],
@@ -396,7 +399,10 @@ async def test_python_task_cancellation(setup):
 
 
 @pytest.mark.parametrize("startup_delay", [0, 0.06])
-async def test_timeout_inheritance_and_explicit_disablement(setup, monkeypatch, startup_delay):
+@pytest.mark.parametrize("timeout", [0.03, timedelta(milliseconds=30)])
+async def test_timeout_inheritance_and_explicit_disablement(
+    setup, monkeypatch, startup_delay, timeout
+):
     service, _ = setup
     service.mode = "burst"
     exchange = _auth.exchange_key
@@ -406,7 +412,7 @@ async def test_timeout_inheritance_and_explicit_disablement(setup, monkeypatch, 
         return await exchange(key, policy)
 
     monkeypatch.setattr(_auth, "exchange_key", delayed_exchange)
-    async with Rime(api_key="test", timeout=0.03) as client:
+    async with Rime(api_key="test", timeout=timeout) as client:
         async with client.tts.synthesize("Hi.") as a:
             # The overall deadline can expire before the first audio arrives.
             with pytest.raises(RimeTimeoutError, match="Overall synthesis deadline expired"):
@@ -417,6 +423,57 @@ async def test_timeout_inheritance_and_explicit_disablement(setup, monkeypatch, 
             await anext(b)
             await asyncio.sleep(0.06)
             assert await anext(b)
+
+
+@pytest.mark.parametrize("method", ["synthesize", "stream", "synthesize_to_buffer"])
+async def test_synthesis_timedelta_overrides_client_timeout(setup, method):
+    async def source():
+        yield "Hello."
+
+    async with Rime(api_key="test", timeout=timedelta(microseconds=1)) as client:
+        text = source() if method == "stream" else "Hello."
+        result = getattr(client.tts, method)(text, timeout=timedelta(seconds=1))
+        if method == "synthesize_to_buffer":
+            assert await result
+        else:
+            async with result:
+                assert await collect(result)
+
+
+@pytest.mark.parametrize("operation", ["voices", "languages"])
+@pytest.mark.parametrize("override", [False, True])
+async def test_discovery_accepts_timedelta_timeout(setup, operation, override):
+    timeout = timedelta(seconds=1)
+    default = timedelta(microseconds=1) if override else timeout
+    async with Rime(api_key="test", timeout=default) as client:
+        options = {"timeout": timeout} if override else {}
+        assert await getattr(client, operation).list(**options)
+
+
+@pytest.mark.parametrize("timeout", [timedelta(0), timedelta(microseconds=-1)])
+async def test_operations_reject_nonpositive_timedelta_before_network(setup, timeout):
+    service, client = setup
+
+    async def text():
+        yield "Hello."
+
+    async def audio():
+        yield b"\0\0"
+
+    with pytest.raises(RimeInputError):
+        client.tts.synthesize("Hello.", timeout=timeout)
+    with pytest.raises(RimeInputError):
+        client.tts.stream(text(), timeout=timeout)
+    with pytest.raises(RimeInputError):
+        await client.tts.synthesize_to_buffer("Hello.", timeout=timeout)
+    for operation in (client.voices, client.languages):
+        with pytest.raises(RimeInputError):
+            await operation.list(timeout=timeout)
+    with pytest.raises(RimeInputError):
+        client.stt.stream(audio(), language="en", timeout=timeout)
+    assert not service.calls
+    assert service.discovery_calls == 0
+    assert not client.stt._streams
 
 
 async def test_concurrent_operations_have_no_fixed_cap(setup):

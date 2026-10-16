@@ -120,7 +120,7 @@ These optional `Rime(...)` arguments configure TTS. They do not configure STT or
 | --- | --- | --- | --- |
 | `model` | Select `"coda"` or `"mistv3"`. | No | `"coda"` |
 | `endpoint` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
-| `timeout` | Overall TTS timeout in positive seconds, such as `60`; `None` disables it. | No | `None` |
+| `timeout` | Overall TTS timeout as positive numeric seconds or `datetime.timedelta`; `None` disables it. | No | `None` |
 
 ### Synthesis options
 
@@ -136,12 +136,12 @@ and `PronunciationEntry` from `rimelabs_sdk` when using those options.
 | `time_scale_factor` | Duration multiplier from `0.4` to `2.5`; below `1` speeds speech up, above `1` slows it down. | No | Omitted; normal duration (`1`). |
 | `timestamps` | `True` requests word timings; supported only with Mist v3. | No | `False` |
 | `custom_lexicon` | Sequence of `PronunciationEntry(spelling, pronunciation)` values for Coda; pronunciations use space-separated X-SAMPA. | No | Empty sequence. |
-| `timeout` | Override the overall timeout with positive seconds, or `None` to disable it. | No | Inherits the client timeout. |
+| `timeout` | Override the overall timeout with positive numeric seconds or `datetime.timedelta`, or `None` to disable it. | No | Inherits the client timeout. |
 
 Discover valid values with `await client.voices.list(language="en")` and
 `await client.languages.list()`. Omit the voice language filter to list all voices
-for the selected model. Both calls accept a `timeout` in seconds; discovery has
-an additional ten-second maximum.
+for the selected model. Both calls accept a `timeout` as positive numeric seconds
+or `datetime.timedelta`; discovery has an additional ten-second maximum.
 
 ### Example: save an IVR greeting
 
@@ -219,7 +219,7 @@ Import `PCMFormat` and `TranscriptionMode` from `rimelabs_sdk` when using those 
 | `mode` | `TranscriptionMode.WRITTEN` normalizes written text; `.VERBATIM` prefers spoken wording. | No | `WRITTEN` |
 | `context_terms` | Sequence of recognition hints, such as `["Rime"]`; hints do not force a match. | No | Empty sequence. |
 | `input_format` | `PCMFormat(sample_rate=16000, channels=1)`: rates `8000`, `16000`, `24000`, `48000`; channels `1` or `2`; encoding only `"pcm_s16le"`. | No | 16 kHz mono PCM16. |
-| `timeout` | Overall timeout in positive seconds, including source/consumer pauses; `None` disables it. | No | `None`; independent of the client timeout. |
+| `timeout` | Overall timeout as positive numeric seconds or `datetime.timedelta`, including source/consumer pauses; `None` disables it. | No | `None`; independent of the client timeout. |
 
 ### Example: transcribe a recording
 

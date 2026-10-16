@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterable, Sequence
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 import grpc
@@ -33,13 +34,14 @@ class STT:
         mode: TranscriptionMode = TranscriptionMode.WRITTEN,
         context_terms: Sequence[str] = (),
         input_format: PCMFormat | None = None,
-        timeout: float | None = None,
+        timeout: float | timedelta | None = None,
     ) -> TranscriptStream:
         """Transcribe one caller-ended utterance; source exhaustion commits input.
 
         Audio is headerless PCM16 little-endian, mono 16 kHz by default. Partial
         results replace prior text. Language and recognition terms pass unchanged
-        to the service. Timeout is an optional overall deadline in seconds.
+        to the service. Timeout is an optional positive overall duration, given
+        as seconds or a datetime.timedelta. None disables the overall deadline.
         """
         self._client._check_open()
         if not hasattr(audio, "__aiter__"):
