@@ -90,6 +90,13 @@ export class RimeRealtimeError extends RimeError {
 export interface InputReady {
   readonly kind: "input.ready";
 }
+/** The user may have started speaking over a playing reply. Prism sends it
+ * before `speech.started` when it may interrupt the reply; it can be a false
+ * alarm, so lower playback on it rather than stopping. */
+export interface SpeechHint {
+  readonly kind: "speech.hint";
+  readonly audioStartMs: number;
+}
 export interface SpeechStarted {
   readonly kind: "speech.started";
   readonly itemId: string;
@@ -175,6 +182,7 @@ export interface FaultEvent {
 }
 export type InputEvent =
   | InputReady
+  | SpeechHint
   | SpeechStarted
   | SpeechStopped
   | InputCommitted

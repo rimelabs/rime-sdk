@@ -321,6 +321,10 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         )
     elif kind == "prism.typed_input.ready":
         payload = t.InputReady()
+    elif kind == "prism.input_audio_buffer.speech_hint":
+        payload = t.SpeechHint(
+            audio_start_ms=_integer(event.get("audio_start_ms"), "audio_start_ms"),
+        )
     elif kind == "input_audio_buffer.speech_started":
         payload = t.SpeechStarted(
             item_id=_id(event.get("item_id"), "item_id"),

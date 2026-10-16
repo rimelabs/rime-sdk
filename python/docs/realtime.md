@@ -129,6 +129,7 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | Payload | Fields to use |
 | --- | --- |
 | `InputReady` | No data fields; `send_text` and `request_reply` handle this wait for you. |
+| `SpeechHint` | `audio_start_ms`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `SpeechStarted`, `SpeechStopped` | `item_id` and `audio_start_ms` or `audio_end_ms` |
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |

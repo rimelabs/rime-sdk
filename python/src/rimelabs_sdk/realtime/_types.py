@@ -109,6 +109,18 @@ class InputReady:
 
 
 @dataclass(frozen=True, kw_only=True)
+class SpeechHint:
+    """The user may have started speaking over a playing reply.
+
+    Prism sends it before ``SpeechStarted`` when it may interrupt the reply. It
+    can be a false alarm, so lower playback on it rather than stopping.
+    """
+
+    audio_start_ms: int
+    kind: Literal["speech.hint"] = field(default="speech.hint", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
 class SpeechStarted:
     item_id: str
     audio_start_ms: int
@@ -228,6 +240,7 @@ class FaultEvent:
 
 InputEvent: TypeAlias = (
     InputReady
+    | SpeechHint
     | SpeechStarted
     | SpeechStopped
     | InputCommitted

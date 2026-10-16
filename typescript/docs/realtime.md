@@ -130,6 +130,7 @@ are exported from `@rimelabs/sdk`.
 | Kind | Payload fields |
 | --- | --- |
 | `input.ready` | No data fields. Turn methods handle the readiness wait. |
+| `speech.hint` | `audioStartMs`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `speech.started`, `speech.stopped` | `itemId` and `audioStartMs` or `audioEndMs` |
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
