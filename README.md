@@ -6,7 +6,12 @@ Both methods return streaming audio. Go uses `Synthesize` and `Stream`.
 The SDK handles API-key authentication, gRPC, conversion, and cancellation.
 Rime automatically combines streamed text fragments into sentences for speech.
 
-All four SDKs support streaming speech recognition: `client.stt.stream` in
+All four SDKs support whole-recording speech recognition: `client.stt.transcribe`
+in Python/Node.js, `client.STT.Transcribe` in Go, and `client.stt().transcribe` in
+Rust. Pass complete WAV bytes (PCM16 mono 16 kHz, at most 16 MiB) to receive final
+text, resolved language, and request ID when available.
+
+They also support streaming speech recognition: `client.stt.stream` in
 Python/Node.js, `client.STT.Stream` in Go, and `client.stt().stream` in Rust. Supply a spoken language and a
 streaming audio source; updates replace the current
 transcript and source exhaustion ends the utterance.

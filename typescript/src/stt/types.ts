@@ -37,3 +37,13 @@ export interface TranscriptionFinal {
 }
 
 export type TranscriptionUpdate = TranscriptionPartial | TranscriptionFinal;
+
+/** Options for a complete WAV recording. Audio is sent unchanged. */
+export type TranscribeOptions = Omit<TranscriptionOptions, "inputFormat">;
+
+/** A successful whole-recording transcription. Silence may produce empty text. */
+export interface Transcription {
+  readonly text: string;
+  readonly language: string;
+  readonly requestId: string | null;
+}

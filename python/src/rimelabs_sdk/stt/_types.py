@@ -37,3 +37,12 @@ class TranscriptionFinal:
 
 
 TranscriptionUpdate: TypeAlias = TranscriptionPartial | TranscriptionFinal
+
+
+@dataclass(frozen=True, kw_only=True)
+class Transcription:
+    """Completed WAV transcription, including the service request identity."""
+
+    text: str
+    language: str
+    request_id: str | None = None

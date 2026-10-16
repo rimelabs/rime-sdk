@@ -1,6 +1,6 @@
 # Rime SDK for Go
 
-Generate speech with Coda or Mist v3 and transcribe audio with streaming STT
+Generate speech with Coda or Mist v3 and transcribe audio with STT
 through the `rime.Client`. Your application handles audio capture and playback.
 
 ## Installation
@@ -146,13 +146,52 @@ model/language support.
 
 ## STT
 
+### Transcribe a complete WAV recording
+
+For a complete recording, use the native unary `Transcribe` RPC through the SDK.
+Pass **complete WAV bytes, including the header**, up to **16 MiB (16,777,216
+bytes)**. PCM16 mono 16 kHz WAV is the portable format. The SDK sends the file
+unchanged; it does not decode, resample, or add a header. The service validates
+its encoding and the supplied language and recognition hints.
+
+The result is a `Transcription` containing final text, resolved language, and a
+request ID when available. Silence may return empty text. There are no partial
+updates or automatic retries. TTS client settings do not apply. An optional
+overall timeout includes connection and upload; the SDK also bounds connection
+time and the unary request (120 seconds). Timeout, cancellation, and service
+errors use the existing SDK error categories. A request ID is included when the
+transport has made it available.
+
+```go
+audio, err := os.ReadFile("utterance.wav")
+if err != nil {
+    return err
+}
+result, err := client.STT.Transcribe(ctx, audio, rime.TranscribeOptions{
+    Language: "en",
+    Mode: rime.TranscriptionWritten,
+    ContextTerms: []string{"Super-G", "USOC"},
+})
+if err != nil {
+    return err
+}
+fmt.Println(result.Text, result.Language, result.RequestID)
+```
+
+This fragment assumes an existing client and context, inside a function returning
+`error`. Cancel the context or close the client to cancel the request. The
+optional `TranscribeOptions.Timeout` is an overall `*time.Duration`; nil or zero
+disables that budget. Keep the audio slice unchanged until the call returns.
+
+### Stream an utterance
+
 Use `client.STT.Stream(ctx, source, options)` to transcribe one utterance.
 The required `rime.AudioSource` is a `func(context.Context) ([]byte, error)`
 supplying headerless signed PCM16 little-endian audio. Return `io.EOF` to end
 the utterance; bytes returned with `io.EOF` are sent first. Your application
 decides when to stop.
 
-STT uses streaming gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
+STT uses gRPC over TLS to `stt.api.rime.ai:443`, with the client's API
 key. There is no STT model, endpoint, or protocol selector. TTS client settings,
 including its timeout, do not apply to STT.
 

@@ -36,6 +36,7 @@ __all__ = [
     "TimestampResult",
     "TimestampStatus",
     "TranscriptStream",
+    "Transcription",
     "TranscriptionFinal",
     "TranscriptionMode",
     "TranscriptionPartial",
@@ -44,6 +45,7 @@ __all__ = [
 ]
 
 from .stt import (
+    Transcription,
     TranscriptionFinal,
     TranscriptionMode,
     TranscriptionPartial,

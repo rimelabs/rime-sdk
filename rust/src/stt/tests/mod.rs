@@ -3,6 +3,7 @@ mod audio;
 mod lifecycle;
 mod protocol;
 mod transport;
+mod unary;
 
 use super::{Limits, TranscriptStream, TranscriptionOptions, TranscriptionUpdate};
 use crate::{Client, Error};
@@ -85,6 +86,7 @@ struct Service {
     calls: Arc<AtomicUsize>,
     configs: Arc<Mutex<Vec<pb::StreamingConfig>>>,
     audio: Arc<Mutex<Vec<u8>>>,
+    recordings: Arc<Mutex<Vec<pb::TranscriptionRequest>>>,
     eof: Arc<AtomicBool>,
     completed: Arc<Notify>,
     cancelled: Arc<Notify>,
@@ -94,9 +96,49 @@ impl SpeechToText for Service {
     type TranscribeStreamingStream = Responses;
     async fn transcribe(
         &self,
-        _: Request<pb::TranscriptionRequest>,
+        request: Request<pb::TranscriptionRequest>,
     ) -> Result<Response<pb::TranscriptionResponse>, Status> {
-        Err(Status::unimplemented("streaming only"))
+        assert_eq!(
+            request.metadata().get("authorization").unwrap(),
+            "Bearer test-key"
+        );
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.recordings.lock().unwrap().push(request.into_inner());
+        self.completed.notify_one();
+        if let Mode::Reject(code) = self.mode {
+            let mut error = Status::new(code, "test rejection");
+            error
+                .metadata_mut()
+                .insert("x-request-id", "rejected-stt".parse().unwrap());
+            return Err(error);
+        }
+        if matches!(self.mode, Mode::NeverComplete) {
+            struct Cancelled(Arc<Notify>);
+            impl Drop for Cancelled {
+                fn drop(&mut self) {
+                    self.0.notify_one();
+                }
+            }
+            let _guard = Cancelled(self.cancelled.clone());
+            std::future::pending::<()>().await;
+        }
+        let mut response = Response::new(pb::TranscriptionResponse {
+            text: if matches!(self.mode, Mode::EarlyFinal) {
+                ""
+            } else {
+                "Ice cream"
+            }
+            .into(),
+            language: if matches!(self.mode, Mode::MissingFinal) {
+                None
+            } else {
+                language()
+            },
+        });
+        response
+            .metadata_mut()
+            .insert("x-request-id", "test-stt".parse().unwrap());
+        Ok(response)
     }
     async fn transcribe_streaming(
         &self,
@@ -211,6 +253,7 @@ impl Harness {
             calls: Arc::default(),
             configs: Arc::default(),
             audio: Arc::default(),
+            recordings: Arc::default(),
             eof: Arc::default(),
             completed: Arc::default(),
             cancelled: Arc::default(),

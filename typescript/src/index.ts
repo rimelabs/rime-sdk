@@ -20,6 +20,8 @@ export * from "./realtime/types.js";
 export { TranscriptStream } from "./stt/stream.js";
 export type {
   AudioSource,
+  TranscribeOptions,
+  Transcription,
   TranscriptionOptions,
   TranscriptionMode,
   TranscriptionPartial,

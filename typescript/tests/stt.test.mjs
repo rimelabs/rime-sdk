@@ -42,15 +42,124 @@ async function setup(t) {
     cleanupTimeout: 0.05,
   });
   t.after(() => Object.assign(policy, before));
-  t.mock.method(
-    transport,
-    "makeClient",
-    (target) => new grpc.Client(target, grpc.credentials.createInsecure()),
+  // Keep production message limits and retry policy while using local plaintext.
+  t.mock.method(grpc.credentials, "createSsl", () =>
+    grpc.credentials.createInsecure(),
   );
   const client = new sdk.Rime({ apiKey: "test-key" });
   t.after(() => client.close());
   return { service, client };
 }
+
+test("transcribe sends a full-size recording on the unary RPC", async (t) => {
+  const { service, client } = await setup(t);
+  policy.completionTimeout = 3;
+  const audio = Buffer.alloc(16 * 1024 * 1024);
+  audio.write("RIFF");
+  const result = await client.stt.transcribe(audio, {
+    language: "en-GB",
+    mode: "verbatim",
+    contextTerms: [" Super-G ", "uno,dos", "Español"],
+  });
+  assert.deepEqual(result, {
+    text: "Ice cream",
+    language: "en",
+    requestId: "stt-request",
+  });
+  assert.deepEqual(service.calls, []);
+  assert.equal(service.unaryCalls.length, 1);
+  const request = service.unaryCalls[0];
+  assert.deepEqual(Buffer.from(request.audio), audio);
+  assert.equal(request.options.language, "en-GB");
+  assert.equal(request.options.mode, schema.TranscriptionMode.VERBATIM);
+  assert.deepEqual(request.options.contextTerms, [
+    " Super-G ",
+    "uno,dos",
+    "Español",
+  ]);
+  assert.equal(service.metadata[0].get("authorization")[0], "Bearer test-key");
+});
+
+for (const [mode, ErrorType] of [
+  ["reject", sdk.RimeUnavailableError],
+  ["missing_language", sdk.RimeStreamError],
+  ["no_completion", sdk.RimeTimeoutError],
+])
+  test(`transcribe ${mode} preserves request identity without retry`, async (t) => {
+    const { service, client } = await setup(t);
+    service.mode = mode;
+    await assert.rejects(
+      client.stt.transcribe(Buffer.from("wav"), { language: "en" }),
+      (error) =>
+        error instanceof ErrorType &&
+        error.requestId ===
+          (mode === "reject" ? "stt-rejected" : "stt-request"),
+    );
+    assert.equal(service.unaryCalls.length, 1);
+  });
+
+test("transcribe accepts silence and defaults to written", async (t) => {
+  const { service, client } = await setup(t);
+  service.mode = "silence";
+  assert.equal(
+    (await client.stt.transcribe(Buffer.from("wav"), { language: "en" })).text,
+    "",
+  );
+  assert.equal(
+    service.unaryCalls[0].options.mode,
+    schema.TranscriptionMode.WRITTEN,
+  );
+});
+
+for (const action of ["caller", "close", "deadline"])
+  test(`transcribe cancels on ${action}`, async (t) => {
+    const { service, client } = await setup(t);
+    service.mode = "no_completion";
+    const controller = new AbortController();
+    const result = watch(
+      client.stt.transcribe(Buffer.from("wav"), {
+        language: "en",
+        signal: controller.signal,
+        timeout: action === "deadline" ? 0.08 : undefined,
+      }),
+    );
+    await service.configSeen;
+    await sleep(10);
+    if (action === "close") await client.close();
+    else if (action === "caller") controller.abort();
+    await assert.rejects(
+      result,
+      (error) =>
+        error instanceof
+          (action === "deadline"
+            ? sdk.RimeTimeoutError
+            : sdk.RimeCancelledError) && error.requestId === "stt-request",
+    );
+    await service.cancelled;
+  });
+
+test("transcribe rejects invalid input before making a request", async (t) => {
+  const { service, client } = await setup(t);
+  for (const [audio, ErrorType] of [
+    [Buffer.alloc(0), sdk.RimeAudioFormatError],
+    ["wav", sdk.RimeAudioFormatError],
+    [Buffer.alloc(16 * 1024 * 1024 + 1), sdk.RimeResourceLimitError],
+  ]) {
+    assert.throws(
+      () => client.stt.transcribe(audio, { language: "en" }),
+      ErrorType,
+    );
+  }
+  assert.throws(
+    () =>
+      client.stt.transcribe(Buffer.from("wav"), {
+        language: "en",
+        mode: "other",
+      }),
+    sdk.RimeInputError,
+  );
+  assert.deepEqual(service.unaryCalls, []);
+});
 
 for (const item of cases)
   test(`shared transcript contract: ${item.name}`, () => {

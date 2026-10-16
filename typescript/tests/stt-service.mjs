@@ -6,6 +6,7 @@ export class RecognitionService {
   mode = "normal";
   rejection = grpc.status.UNAVAILABLE;
   calls = [];
+  unaryCalls = [];
   metadata = [];
   inputFinished = false;
   configSeen = new Promise((resolve) => {
@@ -16,10 +17,22 @@ export class RecognitionService {
   });
   release = () => {};
   async start() {
-    this.server = new grpc.Server();
+    this.server = new grpc.Server({
+      "grpc.max_receive_message_length": 17 * 1024 * 1024,
+    });
     const method = schema.SpeechToText.method.transcribeStreaming;
+    const unary = schema.SpeechToText.method.transcribe;
     this.server.addService(
       {
+        transcribe: {
+          path: `/${schema.SpeechToText.typeName}/${unary.name}`,
+          requestStream: false,
+          responseStream: false,
+          requestSerialize: (m) => Buffer.from(toBinary(unary.input, m)),
+          requestDeserialize: (b) => fromBinary(unary.input, b),
+          responseSerialize: (m) => Buffer.from(toBinary(unary.output, m)),
+          responseDeserialize: (b) => fromBinary(unary.output, b),
+        },
         streaming: {
           path: `/${schema.SpeechToText.typeName}/${method.name}`,
           requestStream: true,
@@ -31,6 +44,38 @@ export class RecognitionService {
         },
       },
       {
+        transcribe: (call, callback) => {
+          this.unaryCalls.push(call.request);
+          this.metadata.push(call.metadata);
+          this.markConfig();
+          call.on("cancelled", () => this.markCancelled());
+          const metadata = new grpc.Metadata();
+          metadata.set(
+            "x-request-id",
+            this.mode === "reject" ? "stt-rejected" : "stt-request",
+          );
+          if (this.mode === "reject") {
+            callback(
+              Object.assign(new Error("deliberate rejection"), {
+                code: this.rejection,
+                metadata,
+              }),
+            );
+            return;
+          }
+          call.sendMetadata(metadata);
+          if (this.mode === "no_completion") return;
+          callback(
+            null,
+            create(unary.output, {
+              text: this.mode === "silence" ? "" : "Ice cream",
+              language:
+                this.mode === "missing_language"
+                  ? undefined
+                  : { tag: "en", source: schema.LanguageSource.SELECTED },
+            }),
+          );
+        },
         streaming: (call) => {
           const messages = [];
           this.calls.push(messages);

@@ -22,7 +22,8 @@ pub use error::{Error, ErrorKind};
 pub use lexicon::PronunciationEntry;
 pub use stream::AudioStream;
 pub use stt::{
-    PcmFormat, Stt, TranscriptStream, TranscriptionMode, TranscriptionOptions, TranscriptionUpdate,
+    PcmFormat, Stt, TranscribeOptions, TranscriptStream, Transcription, TranscriptionMode,
+    TranscriptionOptions, TranscriptionUpdate,
 };
 pub use timestamps::{TimestampResult, TimestampStatus, WordTimestamp};
 
