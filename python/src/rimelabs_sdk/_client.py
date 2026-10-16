@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import timedelta
 from typing import Self
 
 from ._auth import Credentials
@@ -22,7 +23,7 @@ class Rime:
         api_key: str | None = None,
         model: str = "coda",
         endpoint: str | None = None,
-        timeout: float | None = None,
+        timeout: float | timedelta | None = None,
     ):
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():

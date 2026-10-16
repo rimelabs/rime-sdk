@@ -3,6 +3,7 @@
 import asyncio
 import json
 from dataclasses import asdict, replace
+from datetime import timedelta
 from pathlib import Path
 
 import grpc
@@ -353,6 +354,28 @@ async def test_cancelling_slow_source_cleanup_releases_its_task(stt_setup):
         for task in cleanup_tasks:
             task.cancel()
         await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+
+
+@pytest.mark.parametrize("timeout", [timedelta(seconds=1), timedelta.max])
+async def test_timedelta_timeout_is_independent_of_tts_default(stt_setup, timeout):
+    async with Rime(api_key="test", timeout=timedelta(microseconds=1)) as client:
+        async with client.stt.stream(source(), language="en", timeout=timeout) as stream:
+            updates = [update async for update in stream]
+        assert updates[-1] == TranscriptionFinal(text="Ice cream", language="en")
+
+
+async def test_timedelta_deadline_expires_while_waiting_for_source(stt_setup):
+    _, client = stt_setup
+
+    async def blocked():
+        await asyncio.Event().wait()
+        yield b"\0\0"
+
+    async with client.stt.stream(
+        blocked(), language="en", timeout=timedelta(milliseconds=30)
+    ) as stream:
+        with pytest.raises(RimeTimeoutError, match="Overall transcription deadline expired"):
+            await anext(stream)
 
 
 async def test_overall_deadline_runs_while_consumer_is_paused(stt_setup):
