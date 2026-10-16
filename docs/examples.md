@@ -39,7 +39,7 @@ With `RIME_API_KEY` set and SoX installed (`brew install sox` on macOS), run:
 uv run --directory python/examples --locked -m tts.coda_ws
 ```
 
-This connects directly to `wss://api.rime.ai/coda/ws`.
+This connects directly to Coda at `wss://coda.api.rime.ai/ws`.
 
 Enter complete sentences or stable clauses, one per line. Each line becomes a
 `text` message in the same synthesis context, and audio plays as it arrives.
