@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0-alpha.17](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.16...python-v0.1.0-alpha.17) (2026-10-19)
+
+
+### Features
+
+* **python:** accept timedelta timeouts for STT and TTS ([#81](https://github.com/rimelabs/rime-sdk/issues/81)) ([f74ce18](https://github.com/rimelabs/rime-sdk/commit/f74ce182d7c20444cf2ed4879eae5201acc6a50b))
+
+
+### Bug Fixes
+
+* **examples:** use model-specific WebSocket endpoints ([#64](https://github.com/rimelabs/rime-sdk/issues/64)) ([5f6d5aa](https://github.com/rimelabs/rime-sdk/commit/5f6d5aa7d532142b4de9503bf38dd847f28af197))
+
 ## [0.1.0-alpha.16](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.15...python-v0.1.0-alpha.16) (2026-10-16)
 
 
