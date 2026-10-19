@@ -1,4 +1,4 @@
-"""Stream text chunks to Coda and play audio on a persistent WebSocket."""
+"""Stream text chunks to Coda or Mist v3 and play audio on a persistent WebSocket."""
 
 import argparse
 import asyncio
@@ -17,7 +17,10 @@ from pathlib import Path
 from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
-URL = "wss://api.rime.ai/coda/ws"
+MODELS = {
+    "coda": ("wss://coda.api.rime.ai/ws", "lyra"),
+    "mistv3": ("wss://mist.api.rime.ai/ws", "astra"),
+}
 RATE = 24000
 
 
@@ -36,7 +39,7 @@ async def receive(connection):
     if not isinstance(event, dict):
         raise TypeError("Expected a JSON event object")
     if "error" in event:
-        raise RuntimeError(f"Coda error: {redact(json.dumps(event['error']))}")
+        raise RuntimeError(f"Synthesis error: {redact(json.dumps(event['error']))}")
     return event
 
 
@@ -129,12 +132,12 @@ async def synthesize(connection, chunks, options, destination):
                         ) from exc
             elif "done" in event:
                 if not input_ended:
-                    raise RuntimeError("Coda ended the context before text input finished")
+                    raise RuntimeError("Server ended the context before text input finished")
                 if remainder or not received:
-                    raise RuntimeError("Coda returned incomplete or empty PCM audio")
+                    raise RuntimeError("Server returned incomplete or empty PCM audio")
                 return
             elif "cancelled" in event:
-                raise RuntimeError("Coda cancelled synthesis")
+                raise RuntimeError("Server cancelled synthesis")
 
     start = {
         "speaker": options.voice,
@@ -142,7 +145,8 @@ async def synthesize(connection, chunks, options, destination):
         "text": "",
         "audioParameters": {"audioFormat": "audio/pcm", "samplingRate": RATE},
     }
-    start["codaParameters"] = {"textLookaheadTokens": options.lookahead_tokens}
+    if options.model == "coda":
+        start["codaParameters"] = {"textLookaheadTokens": options.lookahead_tokens}
     message = json.dumps({"contextId": context_id, "start": start})
     if len(message.encode()) > 64 * 1024:
         raise ValueError("Start request exceeds the 64 KiB message limit")
@@ -190,7 +194,7 @@ async def main(options):
         raise RuntimeError("Set RIME_API_KEY in your environment")
     if not options.no_playback and not shutil.which("sox"):
         raise RuntimeError("Install SoX (brew install sox), or pass --no-playback")
-    directory = options.output_dir or Path(tempfile.mkdtemp(prefix="rime-coda-"))
+    directory = options.output_dir or Path(tempfile.mkdtemp(prefix=f"rime-{options.model}-"))
     directory.mkdir(parents=True, exist_ok=True)
     headers = {"Authorization": f"Bearer {key}"}
     transport = None
@@ -206,11 +210,13 @@ async def main(options):
                 raise RuntimeError("Server did not negotiate rime.v1.json")
             ready = (await asyncio.wait_for(receive(connection), 15)).get("ready", {})
             if ready.get("protocol") != 1:
-                raise RuntimeError("Expected Coda WebSocket protocol v1 readiness")
+                raise RuntimeError("Expected TTS WebSocket protocol v1 readiness")
             if options.language not in ready.get("languages", []):
                 raise ValueError(f"Unsupported language. Available: {ready.get('languages')}")
             print(f"Connected: {options.url} | voice={options.voice}")
-            print(f"Input: streaming text | lookahead={options.lookahead_tokens} tokens")
+            print(f"Input: streaming text | model={options.model}")
+            if options.model == "coda":
+                print(f"Lookahead: {options.lookahead_tokens} tokens")
             if options.text:
                 await synthesize(
                     connection,
@@ -228,7 +234,7 @@ async def main(options):
                 print("Enter a complete turn per line. Enter finishes its input; /quit exits.")
             else:
                 print("Enter a sentence/clause per line. /end finishes a turn; /quit exits.")
-                print("Coda can pause mid-sentence while awaiting more text or /end.")
+                print("Synthesis can pause while waiting for more text or /end.")
                 print("Use --auto-end to finish input automatically after each entered line.")
             print("The WebSocket stays open between turns. Ctrl+C stops everything.")
             quitting = False
@@ -268,9 +274,10 @@ async def main(options):
 
 def arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--voice", default="lyra")
+    parser.add_argument("--model", choices=MODELS, default="coda", help="TTS model (default: coda)")
+    parser.add_argument("--voice", help="Voice name (default: lyra for Coda, astra for Mist v3)")
     parser.add_argument("--language", default="en")
-    parser.add_argument("--url", default=URL)
+    parser.add_argument("--url", help="Override the selected model's WebSocket URL")
     parser.add_argument(
         "--auto-end",
         action="store_true",
@@ -285,7 +292,7 @@ def arguments(argv=None):
         "--lookahead-tokens",
         type=int,
         default=0,
-        help="Leading text tokens to prefill for streaming input (default: 0)",
+        help="Coda only: leading text tokens to prefill for streaming input (default: 0)",
     )
     parser.add_argument(
         "--chunk-delay",
@@ -308,6 +315,13 @@ def arguments(argv=None):
         parser.error("--text must include non-whitespace text")
     if result.lookahead_tokens < 0:
         parser.error("--lookahead-tokens must be non-negative")
+    if result.model != "coda" and result.lookahead_tokens:
+        parser.error("--lookahead-tokens is supported only for Coda")
+    url, voice = MODELS[result.model]
+    if result.url is None:
+        result.url = url
+    if result.voice is None:
+        result.voice = voice
     return result
 
 
