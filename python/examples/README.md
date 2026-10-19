@@ -12,6 +12,11 @@ The workspace installs the SDK from `python/src/` in editable mode. For audio
 playback, add `--extra audio` to `uv sync` and `uv run`. See the
 [example guide](../../docs/examples.md) for device setup and Prism configuration.
 
+For direct WebSocket TTS, run `uv run -m tts.coda_ws` from this directory.
+Add `--model mistv3` to connect to `wss://mist.api.rime.ai/ws`; the default is
+Coda at `wss://coda.api.rime.ai/ws`. Playback requires SoX, or use `--no-playback`
+to save audio only.
+
 To use published packages, copy this whole directory outside the repository:
 
 ```sh

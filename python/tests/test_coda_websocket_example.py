@@ -85,7 +85,9 @@ async def test_audio_plays_before_next_text_and_connection_survives_turns(
         await asyncio.wait_for(played.wait(), 2)
         yield "Second sentence."
 
-    options = SimpleNamespace(voice="lyra", language="en", no_playback=False, lookahead_tokens=0)
+    options = SimpleNamespace(
+        model="coda", voice="lyra", language="en", no_playback=False, lookahead_tokens=0
+    )
     async with serve(peer, "127.0.0.1", 0, subprotocols=["rime.v1.json"]) as server:
         url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
         async with connect(url, subprotocols=["rime.v1.json"]) as connection:
@@ -124,8 +126,9 @@ async def test_incomplete_audio_never_saved_as_success(example, monkeypatch, tmp
     assert not list(tmp_path.iterdir())
 
 
+@pytest.mark.parametrize("model", ["coda", "mistv3"])
 async def test_auto_end_finishes_before_next_line_and_reuses_connection(
-    example, monkeypatch, tmp_path
+    example, monkeypatch, tmp_path, model
 ):
     monkeypatch.setenv("RIME_API_KEY", "test-key")
     first_finished = asyncio.Event()
@@ -140,6 +143,8 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
             context_id = start["contextId"]
             contexts.append(context_id)
             assert start["start"]["text"] == ""
+            assert start["start"]["speaker"] == ("astra" if model == "mistv3" else "lyra")
+            assert ("codaParameters" in start["start"]) == (model == "coda")
             assert json.loads(await socket.recv()) == {"contextId": context_id, "text": text}
             # The client must send end without waiting for another line or audio.
             assert json.loads(await socket.recv()) == {"contextId": context_id, "end": {}}
@@ -152,6 +157,8 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             example.__file__,
+            "--model",
+            model,
             "--url",
             url,
             "--auto-end",
@@ -181,7 +188,16 @@ async def test_auto_end_finishes_before_next_line_and_reuses_connection(
     assert sorted(path.name for path in tmp_path.iterdir()) == ["turn-001.wav", "turn-002.wav"]
 
 
-async def test_streaming_lookahead_reaches_start_message(example, monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    ("model", "url", "voice", "lookahead"),
+    [
+        ("coda", "wss://coda.api.rime.ai/ws", "lyra", 8),
+        ("mistv3", "wss://mist.api.rime.ai/ws", "astra", 0),
+    ],
+)
+async def test_model_endpoint_and_parameters_reach_connection(
+    example, monkeypatch, tmp_path, model, url, voice, lookahead
+):
     monkeypatch.setenv("RIME_API_KEY", "test-key")
     requests = []
 
@@ -196,13 +212,43 @@ async def test_streaming_lookahead_reaches_start_message(example, monkeypatch, t
         await socket.send(json.dumps({"contextId": context_id, "done": {}}))
 
     async with serve(peer, "127.0.0.1", 0, subprotocols=["rime.v1.json"]) as server:
-        url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
-        args = ["--url", url, "--text", "Hello.", "--no-playback", "--output-dir", str(tmp_path)]
-        args.extend(["--lookahead-tokens", "8"])
+        local_url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+
+        def local_connect(target, **kwargs):
+            assert target == url
+            assert kwargs["additional_headers"] == {"Authorization": "Bearer test-key"}
+            return connect(local_url, **kwargs)
+
+        monkeypatch.setattr(example, "connect", local_connect)
+        args = ["--text", "Hello.", "--no-playback", "--output-dir", str(tmp_path)]
+        if model != "coda":
+            args.extend(["--model", model])
+        args.extend(["--lookahead-tokens", str(lookahead)])
         await asyncio.wait_for(example.main(example.arguments(args)), 5)
     start = requests[0]["start"]
     assert start["text"] == ""
-    assert start["codaParameters"] == {"textLookaheadTokens": 8}
+    assert start["speaker"] == voice
+    assert start["audioParameters"] == {"audioFormat": "audio/pcm", "samplingRate": 24000}
+    if model == "coda":
+        assert start["codaParameters"] == {"textLookaheadTokens": lookahead}
+    else:
+        assert "codaParameters" not in start
     assert requests[1]["text"] == "Hello. "
     assert "end" in requests[2]
     assert (tmp_path / "turn-001.wav").exists()
+
+
+def test_mist_rejects_coda_lookahead(example, capsys):
+    with pytest.raises(SystemExit) as error:
+        example.arguments(["--model", "mistv3", "--lookahead-tokens", "8"])
+    assert error.value.code == 2
+    assert "--lookahead-tokens is supported only for Coda" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("model", ["coda", "mistv3"])
+def test_model_keeps_explicit_url_and_voice(example, model):
+    options = example.arguments(
+        ["--model", model, "--url", "ws://localhost:8080/ws", "--voice", "custom-voice"]
+    )
+    assert options.url == "ws://localhost:8080/ws"
+    assert options.voice == "custom-voice"

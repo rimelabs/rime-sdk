@@ -31,7 +31,7 @@ transcripts, and hear the final text through TTS in Python, JavaScript or Go.
 It uses Enter to start/end a turn and requires only a Rime API key and SoX.
 The guide includes setup and device checks.
 
-## Coda WebSocket streaming from the terminal
+## Coda and Mist WebSocket streaming from the terminal
 
 With `RIME_API_KEY` set and SoX installed (`brew install sox` on macOS), run:
 
@@ -40,6 +40,16 @@ uv run --directory python/examples --locked -m tts.coda_ws
 ```
 
 This connects directly to Coda at `wss://coda.api.rime.ai/ws`.
+For Mist v3, add `--model mistv3`:
+
+```sh
+uv run --directory python/examples --locked -m tts.coda_ws --model mistv3
+```
+
+This connects to `wss://mist.api.rime.ai/ws` with voice `astra`. Coda uses voice
+`lyra` by default. Both models use the same JSON WebSocket protocol and support
+the input and playback options below. Use `--url URL` to override the selected
+model's address.
 
 Enter complete sentences or stable clauses, one per line. Each line becomes a
 `text` message in the same synthesis context, and audio plays as it arrives.
@@ -76,7 +86,7 @@ uv run --directory python/examples --locked -m tts.coda_ws \
 The tester prints each sent chunk, the request ID, and elapsed time from `start`
 to the first received audio byte. This timing excludes speaker buffering.
 
-To compare initial text lookahead, use the same text and voice:
+For Coda, compare initial text lookahead with the same text and voice:
 
 ```sh
 # Streaming input: empty start, one text message, then immediate end.
@@ -87,7 +97,7 @@ uv run --directory python/examples --locked -m tts.coda_ws \
   --lookahead-tokens 8 --text "Your appointment is confirmed for tomorrow at ten."
 ```
 
-`--lookahead-tokens` defaults to zero. More lookahead can trade
+`--lookahead-tokens` applies only to Coda and defaults to zero. More lookahead can trade
 first-audio latency for additional text context. Compare saved WAVs for speech
 quality and live playback for delivery gaps, and repeat samples because model
 generation can vary between requests.
