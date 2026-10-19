@@ -1,0 +1,25 @@
+python/examples/README.md
+  s_5d80da98c08bd1::t_bd06a5d86e8d3e 15-19
+python/tests/test_coda_websocket_example.py
+  s_5d80da98c08bd1::t_e5a4c32e854ae4 88-90,129,131,146-147,160-161,191-200,215-226,230-235,239-254
+python/examples/tts/coda_ws.py
+  s_5d80da98c08bd1::t_bd06a5d86e8d3e 1,20-23,42,135,137,140,148-149,197,213,217-219,237,277-278,280,295,318-324
+docs/examples.md
+  s_5d80da98c08bd1::t_bd06a5d86e8d3e 34,43-52,89,100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "78fd33fe779773de917ab4b31794548bf361d14d",
+  "prompts": {},
+  "sessions": {
+    "s_5d80da98c08bd1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a154d6-e309-77b1-8ade-d9e92754c73c",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
