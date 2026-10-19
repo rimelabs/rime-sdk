@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterable, Sequence
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import grpc
@@ -27,7 +28,9 @@ if TYPE_CHECKING:
 
 
 class _TTS:
-    def __init__(self, client: Rime, *, model: str, endpoint: str | None, timeout: float | None):
+    def __init__(
+        self, client: Rime, *, model: str, endpoint: str | None, timeout: float | timedelta | None
+    ):
         self._client = client
         self._model = model
         self._timeout = _policy.timeout(timeout)
@@ -53,7 +56,7 @@ class _TTS:
         time_scale_factor: float | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
-        timeout: float | None | object = _policy.INHERIT,
+        timeout: float | timedelta | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Synthesize complete text and return an audio stream. Do not await this call."""
         self._check_open()
@@ -88,7 +91,7 @@ class _TTS:
         time_scale_factor: float | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
-        timeout: float | None | object = _policy.INHERIT,
+        timeout: float | timedelta | None | object = _policy.INHERIT,
     ) -> bytes:
         """Await complete audio, finalizing WAV lengths. Never returns partial audio.
 
@@ -132,7 +135,7 @@ class _TTS:
         time_scale_factor: float | None = None,
         timestamps: bool = False,
         custom_lexicon: Sequence[PronunciationEntry] = (),
-        timeout: float | None | object = _policy.INHERIT,
+        timeout: float | timedelta | None | object = _policy.INHERIT,
     ) -> AudioStream:
         """Stream text chunks into synthesis and return an audio stream. Do not await this call."""
         self._check_open()
@@ -236,7 +239,12 @@ class _Voices:
     def __init__(self, client):
         self._client = client
 
-    async def list(self, language: str | None = None, *, timeout=_policy.INHERIT) -> list[str]:
+    async def list(
+        self,
+        language: str | None = None,
+        *,
+        timeout: float | timedelta | None | object = _policy.INHERIT,
+    ) -> list[str]:
         if language is not None:
             _policy.nonempty(language, "language")
         return await self._client._discover(
@@ -248,7 +256,9 @@ class _Languages:
     def __init__(self, client):
         self._client = client
 
-    async def list(self, *, timeout=_policy.INHERIT) -> list[str]:
+    async def list(
+        self, *, timeout: float | timedelta | None | object = _policy.INHERIT
+    ) -> list[str]:
         return await self._client._discover(
             "languages", None, _policy.timeout(timeout, self._client._timeout)
         )

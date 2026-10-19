@@ -2,6 +2,7 @@
 
 import math
 import re
+from datetime import timedelta
 
 from ._errors import RimeInputError
 
@@ -31,6 +32,8 @@ def endpoint_address(endpoint):
 def timeout(value, inherited=None):
     if value is INHERIT:
         return inherited
+    if isinstance(value, timedelta):
+        value = value.total_seconds()
     try:
         valid = value is None or (
             not isinstance(value, bool)
@@ -41,5 +44,7 @@ def timeout(value, inherited=None):
     except OverflowError:
         valid = False
     if not valid:
-        raise RimeInputError("timeout must be finite positive seconds or None")
+        raise RimeInputError(
+            "timeout must be finite positive seconds, a positive timedelta, or None"
+        )
     return value

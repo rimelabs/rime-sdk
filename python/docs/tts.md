@@ -48,7 +48,7 @@ Select Mist v3 with `Rime(model="mistv3")`. Mist v1 and v2 are not supported.
 | `api_key` | `RIME_API_KEY` | API key; an explicit value overrides the environment |
 | `model` | `"coda"` | Model for speech and discovery |
 | `endpoint` | Model's standard endpoint | Custom hostname and optional port for speech and discovery |
-| `timeout` | `None` | Positive seconds for an overall deadline; `None` disables it |
+| `timeout` | `None` | Positive numeric seconds or `datetime.timedelta` for an overall deadline; `None` disables it |
 
 Authentication uses bearer tokens over TLS. The SDK does not load `.env` files.
 
@@ -69,7 +69,7 @@ an async iterable of strings. All three accept the following settings:
 | `time_scale_factor` | Omitted (normal duration) | Duration multiplier from `0.4` to `2.5`; below 1 is faster, above 1 is slower |
 | `timestamps` | `False` | Request final word timestamps; requires `model="mistv3"` |
 | `custom_lexicon` | `()` | Sequence of `PronunciationEntry` overrides for this request; requires Coda |
-| `timeout` | Client setting | Seconds; pass `None` to disable the overall deadline |
+| `timeout` | Client setting | Positive numeric seconds or `datetime.timedelta`; pass `None` to disable the overall deadline |
 
 ### Audio formats
 
@@ -238,7 +238,8 @@ async with Rime(model="mistv3") as client:
     print(voices, languages)
 ```
 
-Both return string lists and accept `timeout`. Omit `language` to disable filtering.
+Both return string lists and accept `timeout` as positive numeric seconds or
+`datetime.timedelta`. Omit `language` to disable filtering.
 
 ## Errors and cancellation
 

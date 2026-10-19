@@ -45,6 +45,7 @@ ends by exhausting the source.
 
 ```python
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 from rimelabs_sdk import PCMFormat, Rime, TranscriptionMode
 
@@ -63,7 +64,7 @@ async def transcribe():
             input_format=PCMFormat(sample_rate=16000, channels=1),
             mode=TranscriptionMode.WRITTEN,
             context_terms=["Super-G", "USOC"],
-            timeout=120,
+            timeout=timedelta(minutes=2),
         ) as transcript:
             async for update in transcript:
                 if update.kind == "partial":
@@ -85,7 +86,7 @@ using `asyncio.to_thread`, as in the runnable
 | `mode` | `TranscriptionMode.WRITTEN` (default) or `.VERBATIM`. Formatting intent, not a guarantee of exact tokens. |
 | `context_terms` | Sequence of recognition hints, copied unchanged and in order. The service validates terms and prompt budgets. |
 | `input_format` | `PCMFormat`: signed little-endian PCM16 at 8, 16, 24 or 48 kHz, mono or interleaved stereo. Defaults to 16 kHz mono. |
-| `timeout` | Optional positive overall timeout in seconds. Includes connection time, source pauses and consumer pauses. `None` disables this SDK deadline, but not internal or server deadlines. |
+| `timeout` | Optional positive overall timeout as numeric seconds or `datetime.timedelta`. Includes connection time, source pauses and consumer pauses. `None` disables this SDK deadline, but not internal or server deadlines. |
 
 Input contains raw samples, with no WAV header or compressed codec. Chunks may
 split sample frames; the SDK carries incomplete bytes into the next chunk. A
