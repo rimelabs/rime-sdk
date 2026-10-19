@@ -1,0 +1,19 @@
+docs/examples.md
+  s_3334d6f33a9904::t_cbe67294e05077 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f2fb270fd7775f82a789a9c917914f5a74eb00d5",
+  "prompts": {},
+  "sessions": {
+    "s_3334d6f33a9904": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a130fa-1aa1-7fe1-81dd-b1a54e13669e",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
