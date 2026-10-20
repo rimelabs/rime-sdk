@@ -80,7 +80,9 @@ class Realtime:
             raise RimeInputError("The realtime model must be prism")
         if eagerness not in (None, *get_args(Eagerness)):
             raise RimeInputError('eagerness must be "low", "medium", "high" or "auto"')
-        if end_of_turn_timeout_s is not None and not 1 <= end_of_turn_timeout_s <= 10:
+        if end_of_turn_timeout_s is not None and (
+            type(end_of_turn_timeout_s) not in (int, float) or not 1 <= end_of_turn_timeout_s <= 10
+        ):
             raise RimeInputError("end_of_turn_timeout_s must be from 1 to 10")
         turn_detection: _TurnDetection = {"interrupt_response": interrupt_on_speech}
         if eagerness is not None:

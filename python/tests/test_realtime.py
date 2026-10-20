@@ -185,6 +185,8 @@ async def test_turn_settings_go_in_the_session_s_turn_detection(monkeypatch):
         {"end_of_turn_timeout_s": 0.5},
         {"end_of_turn_timeout_s": 11},
         {"end_of_turn_timeout_s": float("nan")},
+        {"end_of_turn_timeout_s": True},
+        {"end_of_turn_timeout_s": "5"},
     ],
 )
 async def test_turn_settings_out_of_range_are_refused(monkeypatch, option):
@@ -197,6 +199,7 @@ async def test_configuration_and_typed_events(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
         assert current.info.voice == "test"
         assert "tool_choice" not in peer.settings
+        assert peer.settings["turn_detection"] == {"interrupt_response": True}
         ref = await accepted_turn(current, peer)
         peer.emit(
             "response.output_item.added",

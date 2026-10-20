@@ -109,7 +109,11 @@ export class Realtime {
       );
     if (
       endOfTurnTimeoutS !== undefined &&
-      !(endOfTurnTimeoutS >= 1 && endOfTurnTimeoutS <= 10)
+      !(
+        typeof endOfTurnTimeoutS === "number" &&
+        endOfTurnTimeoutS >= 1 &&
+        endOfTurnTimeoutS <= 10
+      )
     )
       throw new RimeInputError("endOfTurnTimeoutS must be from 1 to 10");
     const names = new Set<string>();
