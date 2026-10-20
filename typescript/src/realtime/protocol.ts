@@ -6,7 +6,11 @@ import * as t from "./types.js";
 export interface SessionSettings {
   modalities: ("text" | "audio")[];
   input_audio_format: "pcm16";
-  turn_detection: { interrupt_response: boolean };
+  turn_detection: {
+    interrupt_response: boolean;
+    eagerness?: t.Eagerness;
+    prism_end_of_turn_timeout_ms?: number;
+  };
   tools: {
     type: "function";
     function: { name: string; description: string; parameters: t.JsonObject };

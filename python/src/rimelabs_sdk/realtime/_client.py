@@ -7,7 +7,7 @@ import copy
 import json
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, get_args
 from urllib.parse import urlsplit
 
 from websockets.asyncio.client import connect
@@ -19,9 +19,9 @@ from .._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
-from ._protocol import SessionSettings
+from ._protocol import SessionSettings, _TurnDetection
 from ._session import RealtimeSession
-from ._types import RealtimeTimeouts, ToolDefinition
+from ._types import Eagerness, RealtimeTimeouts, ToolDefinition
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -48,13 +48,17 @@ class Realtime:
         instructions: str | None = None,
         tools: Sequence[ToolDefinition] = (),
         interrupt_on_speech: bool = True,
+        eagerness: Eagerness | None = None,
+        end_of_turn_timeout_s: float | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
     ) -> AsyncIterator[RealtimeSession]:
         """Open and initialize a session. Supply the full /v1/realtime WebSocket URL.
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
-        Settings are fixed for the lifetime of the session.
+        Settings are fixed for the lifetime of the session. ``eagerness``: see
+        ``Eagerness``. ``end_of_turn_timeout_s``, 1 to 10, is the silence after
+        which the caller's turn ends anyway; the server's default is 5.
         """
         self._client._check_loop()
         self._client._check_open()
@@ -74,10 +78,19 @@ class Realtime:
             raise RimeInputError("Use wss:// outside localhost to protect credentials")
         if model != "prism":
             raise RimeInputError("The realtime model must be prism")
+        if eagerness not in (None, *get_args(Eagerness)):
+            raise RimeInputError('eagerness must be "low", "medium", "high" or "auto"')
+        if end_of_turn_timeout_s is not None and not 1 <= end_of_turn_timeout_s <= 10:
+            raise RimeInputError("end_of_turn_timeout_s must be from 1 to 10")
+        turn_detection: _TurnDetection = {"interrupt_response": interrupt_on_speech}
+        if eagerness is not None:
+            turn_detection["eagerness"] = eagerness
+        if end_of_turn_timeout_s is not None:
+            turn_detection["prism_end_of_turn_timeout_ms"] = round(end_of_turn_timeout_s * 1000)
         settings: SessionSettings = {
             "modalities": ["text", "audio"],
             "input_audio_format": "pcm16",
-            "turn_detection": {"interrupt_response": interrupt_on_speech},
+            "turn_detection": turn_detection,
             "tools": [
                 {
                     "type": "function",

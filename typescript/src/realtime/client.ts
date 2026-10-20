@@ -12,6 +12,7 @@ import type {
   RealtimeConnectOptions,
   RealtimeTimeouts,
   JsonValue,
+  Eagerness,
 } from "./types.js";
 import type { SessionSettings } from "./protocol.js";
 
@@ -100,11 +101,32 @@ export class Realtime {
       typeof options.interruptOnSpeech !== "boolean"
     )
       throw new RimeInputError("interruptOnSpeech must be a boolean");
+    const { eagerness, endOfTurnTimeoutS } = options;
+    const levels: readonly Eagerness[] = ["low", "medium", "high", "auto"];
+    if (eagerness !== undefined && !levels.includes(eagerness))
+      throw new RimeInputError(
+        'eagerness must be "low", "medium", "high" or "auto"',
+      );
+    if (
+      endOfTurnTimeoutS !== undefined &&
+      !(endOfTurnTimeoutS >= 1 && endOfTurnTimeoutS <= 10)
+    )
+      throw new RimeInputError("endOfTurnTimeoutS must be from 1 to 10");
     const names = new Set<string>();
     const settings: SessionSettings = {
       modalities: ["text", "audio"],
       input_audio_format: "pcm16",
-      turn_detection: { interrupt_response: options.interruptOnSpeech ?? true },
+      turn_detection: {
+        interrupt_response: options.interruptOnSpeech ?? true,
+        ...(eagerness === undefined ? {} : { eagerness }),
+        ...(endOfTurnTimeoutS === undefined
+          ? {}
+          : {
+              prism_end_of_turn_timeout_ms: Math.round(
+                endOfTurnTimeoutS * 1000,
+              ),
+            }),
+      },
       tools: (options.tools ?? []).map((tool) => {
         if (
           typeof tool.name !== "string" ||

@@ -27,6 +27,8 @@ new session to change them.
 | `instructions` | No | Omitted or `null` uses server defaults. Supplied strings must be nonblank. |
 | `tools` | No | `[]`. Each tool requires `name` and a JSON Schema `parameters` object. `description` defaults to `""`. |
 | `interruptOnSpeech` | No | `true`. Requests interruption when the server confirms user speech. |
+| `eagerness` | No | How readily Prism decides the caller has finished: `"low"` waits longer and cuts in less, `"high"` answers sooner. The server's default, `"auto"`, is the same as `"medium"`. |
+| `endOfTurnTimeoutS` | No | Seconds of silence, 1 to 10, after which the caller's turn ends anyway. The server's default is 5. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |

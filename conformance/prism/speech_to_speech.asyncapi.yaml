@@ -380,11 +380,20 @@ components:
         interrupt_response:
           type: boolean
           default: true
+        eagerness:
+          type: string
+          enum: [low, medium, high, auto]
+          default: auto
+        prism_end_of_turn_timeout_ms:
+          type: integer
+          minimum: 1000
+          maximum: 10000
+          default: 5000
     turnDetectionView:
       allOf:
         - $ref: '#/components/schemas/turnDetection'
         - type: object
-          required: [interrupt_response]
+          required: [interrupt_response, eagerness, prism_end_of_turn_timeout_ms]
 
     clientSessionSettings:
       type: object

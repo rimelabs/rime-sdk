@@ -96,7 +96,7 @@ class Peer:
 
 
 @asynccontextmanager
-async def session(monkeypatch, *, timeouts=None):
+async def session(monkeypatch, *, timeouts=None, **options):
     peer = Peer()
 
     async def connect(endpoint, **kwargs):
@@ -112,6 +112,7 @@ async def session(monkeypatch, *, timeouts=None):
                 r.ToolDefinition(name="lookup", parameters={"type": "object", "properties": {}})
             ],
             timeouts=timeouts or r.RealtimeTimeouts(request_s=0.2, ready_s=0.4),
+            **options,
         ) as current,
     ):
         yield current, peer, client
@@ -166,6 +167,30 @@ async def test_client_close_stops_tts_and_realtime(setup, monkeypatch):
             await client.voices.list()
         with pytest.raises(RimeInputError, match="closed"):
             await current.send_text("After close.")
+
+
+async def test_turn_settings_go_in_the_session_s_turn_detection(monkeypatch):
+    async with session(monkeypatch, eagerness="high", end_of_turn_timeout_s=2.5) as (_, peer, _):
+        assert peer.settings["turn_detection"] == {
+            "interrupt_response": True,
+            "eagerness": "high",
+            "prism_end_of_turn_timeout_ms": 2500,
+        }
+
+
+@pytest.mark.parametrize(
+    "option",
+    [
+        {"eagerness": "fast"},
+        {"end_of_turn_timeout_s": 0.5},
+        {"end_of_turn_timeout_s": 11},
+        {"end_of_turn_timeout_s": float("nan")},
+    ],
+)
+async def test_turn_settings_out_of_range_are_refused(monkeypatch, option):
+    with pytest.raises(RimeInputError):
+        async with session(monkeypatch, **option):
+            pass
 
 
 async def test_configuration_and_typed_events(monkeypatch):

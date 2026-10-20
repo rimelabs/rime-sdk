@@ -22,6 +22,12 @@ export interface ToolDefinition {
   readonly parameters: JsonObject;
   readonly description?: string;
 }
+/**
+ * How readily Prism decides the caller has finished: "low" waits longer and
+ * cuts in less, "high" answers sooner. "auto", the server's default, is the
+ * same as "medium".
+ */
+export type Eagerness = "low" | "medium" | "high" | "auto";
 export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly endpoint: string;
   readonly model?: "prism";
@@ -29,6 +35,9 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly instructions?: string | null;
   readonly tools?: readonly ToolDefinition[];
   readonly interruptOnSpeech?: boolean;
+  readonly eagerness?: Eagerness;
+  /** Seconds of silence, 1 to 10, after which the caller's turn ends anyway. The server's default is 5. */
+  readonly endOfTurnTimeoutS?: number;
   readonly timeouts?: RealtimeTimeouts;
 }
 export interface ReplyOptions extends RealtimeOperationOptions {

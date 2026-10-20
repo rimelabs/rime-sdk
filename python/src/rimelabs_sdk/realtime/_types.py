@@ -16,6 +16,9 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
 
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
+Eagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
+"""How readily Prism decides the caller has finished: "low" waits longer and cuts in
+less, "high" answers sooner. "auto", the server's default, is the same as "medium"."""
 
 
 @dataclass(frozen=True, kw_only=True)

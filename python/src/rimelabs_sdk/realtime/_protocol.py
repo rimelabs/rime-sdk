@@ -16,6 +16,8 @@ from . import _types as t
 
 class _TurnDetection(TypedDict):
     interrupt_response: bool
+    eagerness: NotRequired[t.Eagerness]
+    prism_end_of_turn_timeout_ms: NotRequired[int]
 
 
 class _Function(TypedDict):

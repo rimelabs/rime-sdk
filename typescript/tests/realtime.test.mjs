@@ -71,6 +71,18 @@ async function round(session, peer, events) {
   return { ref, call };
 }
 
+test("Turn settings go in the session's turn detection", async (t) => {
+  const { peer } = await setup(t, {
+    eagerness: "high",
+    endOfTurnTimeoutS: 2.5,
+  });
+  assert.deepEqual(peer.settings.turn_detection, {
+    interrupt_response: true,
+    eagerness: "high",
+    prism_end_of_turn_timeout_ms: 2500,
+  });
+});
+
 test("Prism config, direct credentials, typed output and large incoming audio", async (t) => {
   const { session, peer, events } = await setup(t, {
     voice: "test",
@@ -612,6 +624,10 @@ test("input validation rejects invalid configuration before a socket is opened",
       { model: "coda" },
       { voice: " " },
       { interruptOnSpeech: 1 },
+      { eagerness: "fast" },
+      { endOfTurnTimeoutS: 0.5 },
+      { endOfTurnTimeoutS: 11 },
+      { endOfTurnTimeoutS: NaN },
       { tools: [tool, tool] },
       { tools: [{ name: "bad", parameters: { x: Infinity } }] },
       { timeouts: { readyS: 0 } },

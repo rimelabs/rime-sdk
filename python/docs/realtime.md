@@ -27,6 +27,8 @@ open a new session to change them.
 | `instructions: str \| None` | No | `None` uses server defaults. A supplied string must be nonblank. |
 | `tools: Sequence[ToolDefinition]` | No | `()`. Sends an empty tool list when omitted. |
 | `interrupt_on_speech: bool` | No | `True`. Requests interruption when the server confirms user speech. |
+| `eagerness: str` | No | How readily Prism decides the caller has finished: `"low"` waits longer and cuts in less, `"high"` answers sooner. The server's default, `"auto"`, is the same as `"medium"`. |
+| `end_of_turn_timeout_s: float` | No | Seconds of silence, 1 to 10, after which the caller's turn ends anyway. The server's default is 5. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
 
