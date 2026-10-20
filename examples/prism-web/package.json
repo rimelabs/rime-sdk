@@ -1,0 +1,16 @@
+{
+  "name": "prism-web",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node check.mjs"
+  },
+  "dependencies": {
+    "@rimelabs/sdk": "0.1.0-alpha.19",
+    "ws": "8.22.0"
+  }
+}

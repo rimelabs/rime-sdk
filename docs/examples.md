@@ -19,6 +19,12 @@ default voice. The endpoint and voice are optional overrides.
 | Prism: voice with tools | [voice_tools.py](../python/examples/realtime/voice_tools.py) | [voice-tools.ts](../typescript/examples/realtime/voice-tools.ts) | | |
 
 Blank cells mean that this repository has no example for that combination.
+
+The Prism browser starter in [`examples/prism-web/`](../examples/prism-web/) is
+the exception to the layout above. It stands alone and pins the published Python
+and Node.js packages, because the Prism SDK quickstart asks readers to copy it
+and run it outside this repository. Its [README](../examples/prism-web/README.md)
+has the run commands.
 Shared recordings live in [`fixtures/audio/`](../fixtures/audio/).
 
 The live audio paths have automated device simulations and protocol tests.
