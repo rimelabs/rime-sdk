@@ -7,9 +7,14 @@ type transcriptState struct {
 	revision       uint64
 	final          *TranscriptionFinal
 	textLimit      int
+	outputContract pb.StreamingOutputContract
 }
 
-func (state *transcriptState) accept(message *pb.StreamingTranscriptionResponse, inputDone bool) (*TranscriptionPartial, error) {
+func (state *transcriptState) accept(message *pb.StreamingTranscriptionResponse, inputDone bool) (TranscriptionUpdate, error) {
+	contract := state.outputContract
+	if contract == 0 {
+		contract = pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES
+	}
 	if message.GetPayload() == nil {
 		return nil, nil
 	}
@@ -20,7 +25,7 @@ func (state *transcriptState) accept(message *pb.StreamingTranscriptionResponse,
 		if state.language != "" {
 			return nil, failure(ErrStream, "received duplicate transcription acceptance")
 		}
-		if accepted.GetOutputContract() != pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES {
+		if accepted.GetOutputContract() != contract {
 			return nil, failure(ErrStream, "the service accepted a different transcript contract")
 		}
 		language := accepted.GetLanguage()
@@ -32,6 +37,18 @@ func (state *transcriptState) accept(message *pb.StreamingTranscriptionResponse,
 	}
 	if state.language == "" {
 		return nil, failure(ErrStream, "received a transcript before acceptance")
+	}
+	appendFragments := contract == pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS
+	if delta := message.GetDelta(); delta != nil && appendFragments {
+		text := delta.GetText()
+		if len(state.text)+len(text) > state.textLimit {
+			return nil, failure(ErrResourceLimit, "the transcript exceeds the SDK text limit")
+		}
+		state.text += text
+		return TranscriptionDelta{Text: text}, nil
+	}
+	if message.GetHypothesis() != nil && appendFragments {
+		return nil, failure(ErrStream, "received an unexpected transcription response")
 	}
 	var text string
 	switch payload := message.GetPayload().(type) {
@@ -50,14 +67,14 @@ func (state *transcriptState) accept(message *pb.StreamingTranscriptionResponse,
 			return nil, failure(ErrStream, "transcript revisions are not increasing from one")
 		}
 		state.revision, state.text = hypothesis.Revision, text
-		return &TranscriptionPartial{Text: text}, nil
+		return TranscriptionPartial{Text: text}, nil
 	}
 	if !inputDone {
 		return nil, failure(ErrStream, "the service completed before input finished")
 	}
 	done := message.GetDone()
 	if done.GetRevision() != state.revision || text != state.text {
-		return nil, failure(ErrStream, "final transcript does not match the last hypothesis")
+		return nil, failure(ErrStream, "final transcript does not match prior updates")
 	}
 	if done.GetLanguage().GetTag() != state.language || done.GetLanguage().GetSource() == 0 {
 		return nil, failure(ErrStream, "final language does not match the accepted language")

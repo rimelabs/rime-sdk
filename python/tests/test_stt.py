@@ -26,6 +26,7 @@ from rimelabs_sdk import (
     RimeUnavailableError,
     TranscriptionFinal,
     TranscriptionMode,
+    TranscriptionOutputContract,
 )
 from rimelabs_sdk.stt import _policy, _transport
 from rimelabs_sdk.stt._protocol import TranscriptState
@@ -152,7 +153,11 @@ async def source(*chunks):
 
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["name"])
 def test_shared_transcript_contract(case):
-    state = TranscriptState(proto, 65536)
+    state = TranscriptState(
+        proto,
+        1048576,
+        TranscriptionOutputContract(case.get("outputContract", "revised_hypotheses")),
+    )
     actual = []
 
     def run():
@@ -710,3 +715,112 @@ async def test_stt_file_example(stt_setup, monkeypatch, tmp_path, capsys):
     assert "final: Ice cream" in output
     assert "request_id: stt-request" in output
     assert service.input_finished.is_set()
+
+
+@pytest.mark.parametrize(
+    "mode",
+    ["normal", "large", "burst", "silence", "done_then_error", "missing_final", "no_completion"],
+)
+async def test_append_grpc_preserves_fragments_and_requires_success(stt_setup, mode):
+    service, client = stt_setup
+    service.mode = mode
+    release = asyncio.Event()
+
+    async def live():
+        yield b"\0\0"
+        await release.wait()
+
+    stream = client.stt.stream(
+        live(), language="en", output_contract=TranscriptionOutputContract.APPEND_FRAGMENTS
+    )
+    fragments = []
+    try:
+        if mode != "silence":
+            first = await anext(stream)
+            assert first.kind == "delta"
+            fragments.append(first.text)
+            assert not service.input_finished.is_set()
+        release.set()
+        expected_error = {
+            "done_then_error": RimeUnavailableError,
+            "missing_final": RimeStreamError,
+            "no_completion": RimeTimeoutError,
+        }.get(mode)
+        final = None
+        try:
+            async for update in stream:
+                if update.kind == "delta":
+                    fragments.append(update.text)
+                    if mode == "burst":
+                        await asyncio.sleep(0.001)  # exercise bounded-queue backpressure
+                else:
+                    assert update.kind == "final"
+                    final = update
+        except (RimeUnavailableError, RimeStreamError, RimeTimeoutError) as error:
+            assert expected_error and isinstance(error, expected_error)
+            assert error.request_id == "stt-request"
+        else:
+            assert expected_error is None
+            assert final is not None and final.text == "".join(fragments)
+            assert stream.request_id == "stt-request"
+            if mode == "large":
+                assert len(final.text.encode()) > 262144
+            if mode == "burst":
+                assert len(fragments) == 100
+        assert (
+            service.calls[0][0].config.output_contract
+            == proto.STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS
+        )
+    finally:
+        release.set()
+        await stream.cancel()
+
+
+async def test_append_cancel_does_not_emit_final(stt_setup):
+    service, client = stt_setup
+
+    async def live():
+        yield b"\0\0"
+        await asyncio.Event().wait()
+
+    stream = client.stt.stream(
+        live(), language="en", output_contract=TranscriptionOutputContract.APPEND_FRAGMENTS
+    )
+    assert (await anext(stream)).kind == "delta"
+    await stream.cancel()
+    with pytest.raises(RimeCancelledError):
+        await anext(stream)
+    await asyncio.wait_for(service.cancelled.wait(), 1)
+
+
+def test_append_limit_counts_cumulative_utf8_bytes():
+    state = TranscriptState(proto, 4, TranscriptionOutputContract.APPEND_FRAGMENTS)
+    state.accept(
+        proto.StreamingTranscriptionResponse(
+            accepted=proto.StreamingAccepted(
+                output_contract=proto.STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS,
+                language=proto.ResolvedLanguage(tag="en", source=1),
+            )
+        ),
+        input_done=False,
+    )
+    for _ in range(2):
+        assert (
+            state.accept(
+                proto.StreamingTranscriptionResponse(delta=proto.TranscriptionDelta(text="é")),
+                input_done=False,
+            ).text
+            == "é"
+        )
+    with pytest.raises(RimeResourceLimitError):
+        state.accept(
+            proto.StreamingTranscriptionResponse(delta=proto.TranscriptionDelta(text="x")),
+            input_done=False,
+        )
+
+
+async def test_invalid_output_contract_does_not_open_rpc(stt_setup):
+    service, client = stt_setup
+    with pytest.raises(RimeInputError):
+        client.stt.stream(source(), language="en", output_contract="append_fragments")
+    assert not service.calls

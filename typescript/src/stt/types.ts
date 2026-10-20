@@ -5,7 +5,19 @@ export type TranscriptionMode = "written" | "verbatim";
 /** One caller-ended utterance of headerless signed PCM16 little-endian audio. */
 export type AudioSource = AsyncIterable<Uint8Array>;
 
+/** Select replacement hypotheses (default) or permanent append fragments. */
+export type TranscriptionOutputContract =
+  "revised_hypotheses" | "append_fragments";
+
+export interface TranscriptionDelta {
+  readonly kind: "delta";
+  /** Append exactly, preserving the server's newline separators. */
+  readonly text: string;
+}
+
 export interface TranscriptionOptions {
+  /** Defaults to revised_hypotheses. Each stream uses one fixed contract. */
+  outputContract?: TranscriptionOutputContract;
   /** Required BCP-47 tag, passed unchanged to the service (for example "en"). */
   language: string;
   /** Formatting intent; defaults to written and does not guarantee exact tokens. */
@@ -36,10 +48,14 @@ export interface TranscriptionFinal {
   readonly language: string;
 }
 
-export type TranscriptionUpdate = TranscriptionPartial | TranscriptionFinal;
+export type TranscriptionUpdate =
+  TranscriptionPartial | TranscriptionDelta | TranscriptionFinal;
 
 /** Options for a complete WAV recording. Audio is sent unchanged. */
-export type TranscribeOptions = Omit<TranscriptionOptions, "inputFormat">;
+export type TranscribeOptions = Omit<
+  TranscriptionOptions,
+  "inputFormat" | "outputContract"
+>;
 
 /** A successful whole-recording transcription. Silence may produce empty text. */
 export interface Transcription {

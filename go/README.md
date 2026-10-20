@@ -146,6 +146,32 @@ model/language support.
 
 ## STT
 
+### Append-fragment streaming
+
+Both contracts use gRPC. The default returns replacement partials. Append mode
+returns permanent deltas from independent five-second audio windows, useful for
+long recordings or consumers that cannot replace text. Append each delta exactly,
+including its newline separators. The final transcript equals their concatenation
+and is emitted only after `done` and successful gRPC completion. Silence can
+produce an empty final with no deltas. Cancellation and failures never produce a
+successful final. `Transcribe` is unchanged and takes no output contract.
+
+```go
+stream, err := client.STT.Stream(ctx, source, rime.TranscriptionOptions{
+    Language: "en", OutputContract: rime.TranscriptionAppendFragments,
+})
+// Handle rime.TranscriptionDelta by appending Text exactly.
+// Handle rime.TranscriptionPartial by replacing text (default contract).
+// Handle rime.TranscriptionFinal as the confirmed complete transcript.
+```
+
+The SDK caps cumulative transcript text at 1 MiB. Send recordings faster than
+real time and split them to respect the service's 16 MiB audio and 120-second
+call limits. Append mode does not remove those limits. Live voice agents usually
+prefer revised hypotheses for provisional text and cross-window corrections.
+
+
+
 ### Transcribe a complete WAV recording
 
 For a complete recording, use the native unary `Transcribe` RPC through the SDK.

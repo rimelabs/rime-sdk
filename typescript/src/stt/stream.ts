@@ -161,7 +161,10 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
     }
   }
   private async read() {
-    const state = new TranscriptState(policy.transcriptBytes);
+    const state = new TranscriptState(
+      policy.transcriptBytes,
+      this.options.outputContract,
+    );
     for await (const message of this.call!.responses()) {
       const update = state.accept(message, this.inputDone);
       if (state.language !== null) {
@@ -190,6 +193,7 @@ export class TranscriptStream implements AsyncIterableIterator<TranscriptionUpda
         this.options.language,
         this.options.mode ?? "written",
         this.options.contextTerms ?? [],
+        this.options.outputContract,
       );
       const producer = this.produce(),
         reader = this.read();

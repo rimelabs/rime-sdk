@@ -5,7 +5,7 @@ export const policy = {
   acceptanceTimeout: 10,
   completionTimeout: 120,
   cleanupTimeout: 2,
-  receiveBytes: 262144,
-  transcriptBytes: 65536,
+  receiveBytes: 1048576 + 65536,
+  transcriptBytes: 1048576,
   queuedUpdates: 16,
 };

@@ -76,6 +76,37 @@ without loading it all into memory. Use Node.js 22 or later; browsers are not su
 Open files inside the async generator so file errors are reported through the
 SDK and resources are opened only after the service accepts the utterance.
 
+## Append-fragment streaming
+
+Choose `outputContract: "append_fragments"` on
+`client.stt.stream`. The default is `"revised_hypotheses"`; `transcribe()` does not
+accept an output contract. Both streaming modes use gRPC only.
+
+```javascript
+let text = "";
+const transcript = client.stt.stream(audioChunks(), {
+  language: "en", outputContract: "append_fragments",
+});
+for await (const update of transcript) {
+  if (update.kind === "delta") text += update.text;
+  else if (update.kind === "final") console.log(update.text);
+}
+```
+
+`TranscriptionDelta` is a permanent fragment, not a replacement partial. The
+server recognizes independent five-second audio windows; fragments after the
+first include newline separators. Do not strip, add separators, or drop deltas.
+The final text must match their concatenation. Empty speech can produce no
+updates before an empty final. A final is delivered only after `done` and an OK
+gRPC status, so a connection failure never promotes accumulated fragments to a
+successful result.
+
+Append mode suits longer recordings and consumers that cannot revise text. Send
+recordings as fast as backpressure permits. It does not enable unlimited-length
+streams: the service's 16 MiB audio and 120-second total-call limits still apply.
+Split larger recordings into separate streams. Live voice agents usually prefer
+revised hypotheses for earlier provisional text and corrections across windows.
+
 ## Options
 
 | Option | Meaning |
@@ -83,6 +114,7 @@ SDK and resources are opened only after the service accepts the utterance.
 | `language` | Required spoken BCP-47 tag. Passed unchanged to the service; no detection or SDK language allowlist. The deployed catalog currently supports English and Spanish. |
 | `mode` | `"written"` (default) or `"verbatim"`. Formatting intent, not a guarantee of exact tokens. |
 | `contextTerms` | Sequence of recognition hints, copied unchanged and in order. The service validates terms and prompt budgets. |
+| `outputContract` | `"revised_hypotheses"` (default) or `"append_fragments"`. Streaming only. |
 | `inputFormat` | `PCMFormat`: signed little-endian PCM16 at 8, 16, 24 or 48 kHz, mono or interleaved stereo. Defaults to 16 kHz mono. |
 | `timeout` | Optional positive overall timeout in seconds. Includes connection time, source pauses and consumer pauses. `null` disables this SDK deadline, but not internal or server deadlines. |
 
@@ -98,7 +130,7 @@ There is no STT voice/model selector; the service selects its recognizer.
 
 ## Results and completion
 
-`TranscriptionPartial` and `TranscriptionFinal` are discriminated TypeScript types, exported from `@rimelabs/sdk`. Every update contains the complete current `text`.
+`TranscriptionPartial`, `TranscriptionDelta`, and `TranscriptionFinal` are discriminated types exported from `@rimelabs/sdk`. In the default revised-hypotheses mode, every update contains the complete current `text`.
 **Replace the previous transcript. Do not concatenate partials.** Later partials
 can change earlier words. `TranscriptionFinal.language` is the canonical language
 selected by the service.
@@ -122,8 +154,8 @@ Pass an `AbortSignal` through the stream's `signal` option to cancel just that
 utterance. Client close cancels all STT, TTS and realtime operations; cancelling
 one stream leaves its siblings running.
 
-The SDK bounds the transcript queue to 16 updates, each with at most 64 KiB of
-UTF-8 text, and bounds gRPC responses to 256 KiB. Slow consumers apply backpressure.
+The SDK bounds the transcript queue to 16 updates, with at most 1 MiB of UTF-8 text per transcript (cumulative across deltas),
+and bounds gRPC responses to 1 MiB plus 64 KiB for the protobuf envelope. Slow consumers apply backpressure.
 Internal connection and acceptance waits are 10 seconds; completion after source
 exhaustion is bounded to 120 seconds. The completion timer stops after successful
 gRPC completion. The optional overall timeout remains active until the final

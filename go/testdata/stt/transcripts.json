@@ -558,6 +558,343 @@
       ],
       "error": "RimeStreamError",
       "inputDone": false
+    },
+    {
+      "name": "append_preserves_separators_and_unicode",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "delta": {
+            "text": "Hola"
+          }
+        },
+        {
+          "delta": {
+            "text": "\n café."
+          }
+        },
+        {
+          "done": {
+            "text": "Hola\n café.",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "expected": [
+        {
+          "kind": "delta",
+          "text": "Hola"
+        },
+        {
+          "kind": "delta",
+          "text": "\n café."
+        },
+        {
+          "kind": "final",
+          "text": "Hola\n café.",
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "name": "append_silence",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "expected": [
+        {
+          "kind": "final",
+          "text": "",
+          "language": "en"
+        }
+      ]
+    },
+    {
+      "name": "append_wrong_contract",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_hypothesis_rejected",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "hypothesis": {
+            "text": "hello",
+            "revision": "1"
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_delta_before_acceptance",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "delta": {
+            "text": "hello"
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_final_mismatch",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "delta": {
+            "text": "hello"
+          }
+        },
+        {
+          "done": {
+            "text": "other",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_nonzero_revision",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "1",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_missing_done",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "delta": {
+            "text": "hello"
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_early_final",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": false,
+      "error": "stream"
+    },
+    {
+      "name": "append_delta_after_done",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "delta": {
+            "text": "late"
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_duplicate_done",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "text": "",
+            "revision": "0",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
+    },
+    {
+      "name": "append_wrong_language",
+      "outputContract": "append_fragments",
+      "messages": [
+        {
+          "accepted": {
+            "outputContract": "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+            "language": {
+              "tag": "en",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        },
+        {
+          "done": {
+            "language": {
+              "tag": "es",
+              "source": "LANGUAGE_SOURCE_SELECTED"
+            }
+          }
+        }
+      ],
+      "inputDone": true,
+      "error": "stream"
     }
   ]
 }

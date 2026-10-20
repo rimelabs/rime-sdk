@@ -126,7 +126,7 @@ class TranscriptionCall:
             await self._status()
             raise RimeStreamError("The service completed before input finished") from None
 
-    async def start(self, language, mode, context_terms):
+    async def start(self, language, mode, context_terms, output_contract):
         proto = self.proto
         await self._write(
             proto.StreamingTranscriptionRequest(
@@ -138,7 +138,9 @@ class TranscriptionCall:
                         else proto.TRANSCRIPTION_MODE_WRITTEN
                     ),
                     context_terms=context_terms,
-                    output_contract=proto.STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES,
+                    output_contract=getattr(
+                        proto, "STREAMING_OUTPUT_CONTRACT_" + output_contract.value.upper()
+                    ),
                 )
             )
         )

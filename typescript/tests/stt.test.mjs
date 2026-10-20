@@ -163,7 +163,7 @@ test("transcribe rejects invalid input before making a request", async (t) => {
 
 for (const item of cases)
   test(`shared transcript contract: ${item.name}`, () => {
-    const state = new TranscriptState(65536),
+    const state = new TranscriptState(1048576, item.outputContract),
       actual = [];
     const run = () => {
       for (const raw of item.messages) {
@@ -773,3 +773,98 @@ for (const mode of ["normal", "no_acceptance"])
     );
     assert.equal(service.inputFinished, false);
   });
+
+for (const mode of [
+  "normal",
+  "large",
+  "burst",
+  "silence",
+  "done_then_error",
+  "missing_final",
+  "no_completion",
+])
+  test(`append gRPC preserves fragments: ${mode}`, async (t) => {
+    const { service, client } = await setup(t);
+    service.mode = mode;
+    const release = deferred();
+    async function* live() {
+      yield Buffer.alloc(2);
+      await release.promise;
+    }
+    const stream = client.stt.stream(live(), {
+      language: "en",
+      outputContract: "append_fragments",
+    });
+    const fragments = [];
+    try {
+      if (mode !== "silence") {
+        const first = (await stream.next()).value;
+        assert.equal(first.kind, "delta");
+        fragments.push(first.text);
+        assert.equal(service.inputFinished, false);
+      }
+      release.resolve();
+      const expected = {
+        done_then_error: sdk.RimeUnavailableError,
+        missing_final: sdk.RimeStreamError,
+        no_completion: sdk.RimeTimeoutError,
+      }[mode];
+      const collect = async () => {
+        let final;
+        for await (const update of stream) {
+          if (update.kind === "delta") {
+            fragments.push(update.text);
+            if (mode === "burst") await sleep(1);
+          } else {
+            assert.equal(update.kind, "final");
+            final = update;
+          }
+        }
+        assert.ok(final);
+        assert.equal(final.text, fragments.join(""));
+        if (mode === "large") assert.ok(Buffer.byteLength(final.text) > 262144);
+        if (mode === "burst") assert.equal(fragments.length, 100);
+      };
+      if (expected) await assert.rejects(collect(), expected);
+      else await collect();
+      assert.equal(stream.requestId, "stt-request");
+      assert.equal(
+        service.calls[0][0].payload.value.outputContract,
+        schema.StreamingOutputContract.APPEND_FRAGMENTS,
+      );
+    } finally {
+      release.resolve();
+      await stream.cancel();
+    }
+  });
+
+test("append cumulative UTF8 limit", () => {
+  const state = new TranscriptState(4, "append_fragments");
+  const accept = (raw) =>
+    state.accept(
+      fromJson(schema.StreamingTranscriptionResponseSchema, raw),
+      false,
+    );
+  accept({
+    accepted: {
+      outputContract: "STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS",
+      language: { tag: "en", source: "LANGUAGE_SOURCE_SELECTED" },
+    },
+  });
+  accept({ delta: { text: "é" } });
+  accept({ delta: { text: "é" } });
+  assert.throws(
+    () => accept({ delta: { text: "x" } }),
+    sdk.RimeResourceLimitError,
+  );
+});
+
+test("invalid contract does not open an RPC", async (t) => {
+  const { service, client } = await setup(t);
+  assert.throws(
+    () =>
+      client.stt.stream(source(), { language: "en", outputContract: "other" }),
+    sdk.RimeInputError,
+  );
+  assert.equal(service.calls.length, 0);
+});

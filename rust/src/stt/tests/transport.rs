@@ -258,3 +258,46 @@ fn stt_uses_fixed_tls_endpoint_and_requires_runtime() {
         ErrorKind::Input
     );
 }
+
+#[tokio::test]
+async fn append_stream_emits_delta_before_eof_and_requires_ok_status() {
+    for mode in [Mode::Echo, Mode::ErrorAfterDone] {
+        let h = Harness::new(mode).await;
+        let (send, source) = mpsc::channel(1);
+        let mut stream = h
+            .client
+            .stt()
+            .stream(
+                ReceiverStream::new(source),
+                TranscriptionOptions::new("en")
+                    .output_contract(crate::TranscriptionOutputContract::AppendFragments),
+            )
+            .unwrap();
+        send.send(Ok(Bytes::from_static(&[0, 0]))).await.unwrap();
+        assert_eq!(
+            next(&mut stream).await.unwrap().unwrap(),
+            TranscriptionUpdate::Delta { text: "Ice".into() }
+        );
+        assert!(!h.service.eof.load(Ordering::SeqCst));
+        drop(send);
+        let result = collect(&mut stream).await;
+        if matches!(mode, Mode::ErrorAfterDone) {
+            assert_eq!(result.unwrap_err().kind(), ErrorKind::Unavailable);
+        } else {
+            assert_eq!(
+                result.unwrap(),
+                vec![
+                    TranscriptionUpdate::Delta {
+                        text: "\n cream".into()
+                    },
+                    TranscriptionUpdate::Final {
+                        text: "Ice\n cream".into(),
+                        language: "en".into()
+                    }
+                ]
+            );
+        }
+        assert!(stream.request_id().is_some());
+        h.client.close().await;
+    }
+}

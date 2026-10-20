@@ -11,8 +11,7 @@ use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::StreamExt;
 use rimelabs_api::{
-    streaming_transcription_request::Payload, StreamingConfig, StreamingOutputContract,
-    StreamingTranscriptionRequest,
+    streaming_transcription_request::Payload, StreamingConfig, StreamingTranscriptionRequest,
 };
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -47,7 +46,7 @@ where
                 TranscriptionMode::Verbatim => rimelabs_api::TranscriptionMode::Verbatim as i32,
             },
             context_terms: options.context_terms,
-            output_contract: StreamingOutputContract::RevisedHypotheses as i32,
+            output_contract: options.output_contract.wire(),
         };
         send(&requests, Payload::Config(config)).await?;
         // If the reader fails, try_join returns that error and drops this wait.
@@ -85,7 +84,7 @@ where
             shared.set_request_id(id);
         }
         let mut responses = response.into_inner();
-        let mut state = TranscriptState::default();
+        let mut state = TranscriptState::new(options.output_contract);
         let mut accepted = Some(accepted);
         loop {
             let message = if state.language.is_none() {

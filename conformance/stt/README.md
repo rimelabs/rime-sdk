@@ -6,8 +6,11 @@ Python and Node.js test suites. The Go and Rust suites read synchronized copies 
 update all three files when changing these cases.
 CI checks that the copies are identical.
 
-Each partial is a replacement snapshot. A final requires source exhaustion,
-matching text/revision/language, and successful gRPC completion.
+The optional `outputContract` case field selects append fragments; omitted means
+revised hypotheses. Each partial is a replacement snapshot. Each delta is a
+permanent fragment appended exactly, including whitespace and separators. A final requires source exhaustion,
+matching concatenated fragments with revision zero (append), or matching the
+last hypothesis and revision (revised), matching language, and successful gRPC completion.
 Unknown future payloads are ignored; known messages in an invalid order fail.
 
 Shared PCM vectors are in `../pcm-input.json`. Language-specific audio tests also
@@ -64,3 +67,14 @@ These are individual smoke-test observations under the same qualifications above
 That qualification used bundled protocol code generated from canonical schema
 commit `ac3dea5644d5b14c6ceefc9bb2d4b6fa2fd26c5f`. The Go SDK now consumes the
 versioned `github.com/rimelabs/rime-api/go` dependency for both services.
+
+## Append-fragment live qualification: 2026-10-20 (America/Los_Angeles)
+
+Python, Node.js, Go, and Rust streaming examples passed against
+`stt.api.rime.ai:443` with TLS and append fragments selected. Input was the
+public documentation's synthetic `audio/stt/flight.wav` recording, decoded to
+mono PCM16 at 16 kHz and uploaded without real-time pacing. Each SDK returned
+two deltas, preserved the second fragment's leading newline, and returned a
+matching final transcript with a request ID. These checks demonstrate deployed
+compatibility; controlled gRPC tests separately verify delivery before input EOF,
+protocol failures, and successful terminal status before final delivery.

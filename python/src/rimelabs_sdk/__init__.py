@@ -37,8 +37,10 @@ __all__ = [
     "TimestampStatus",
     "TranscriptStream",
     "Transcription",
+    "TranscriptionDelta",
     "TranscriptionFinal",
     "TranscriptionMode",
+    "TranscriptionOutputContract",
     "TranscriptionPartial",
     "TranscriptionUpdate",
     "WordTimestamp",
@@ -46,8 +48,10 @@ __all__ = [
 
 from .stt import (
     Transcription,
+    TranscriptionDelta,
     TranscriptionFinal,
     TranscriptionMode,
+    TranscriptionOutputContract,
     TranscriptionPartial,
     TranscriptionUpdate,
     TranscriptStream,

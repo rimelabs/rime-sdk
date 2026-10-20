@@ -105,6 +105,14 @@ export class STT {
         "audio must be an async iterable of Uint8Array chunks",
       );
     validateOptions(options);
+    const outputContract = options.outputContract ?? "revised_hypotheses";
+    if (
+      outputContract !== "revised_hypotheses" &&
+      outputContract !== "append_fragments"
+    )
+      throw new RimeInputError(
+        "outputContract must be revised_hypotheses or append_fragments",
+      );
     const mode = options.mode ?? "written";
     const terms = options.contextTerms ?? [];
     const format = resolvePCMFormat(options.inputFormat);
@@ -118,6 +126,7 @@ export class STT {
       source,
       {
         language: options.language,
+        outputContract,
         mode,
         contextTerms: [...terms],
         inputFormat: format,

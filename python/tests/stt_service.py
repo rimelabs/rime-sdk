@@ -70,7 +70,7 @@ class RecognitionService:
             language = proto.ResolvedLanguage(tag="en", source=proto.LANGUAGE_SOURCE_SELECTED)
             yield proto.StreamingTranscriptionResponse(
                 accepted=proto.StreamingAccepted(
-                    output_contract=proto.STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES,
+                    output_contract=config.config.output_contract,
                     language=language,
                 )
             )
@@ -87,6 +87,18 @@ class RecognitionService:
                 if self.mode == "silence":
                     continue
                 for index in range(100 if self.mode == "burst" else 2):
+                    if (
+                        config.config.output_contract
+                        == proto.STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS
+                    ):
+                        fragment = ("\n" if text else "") + (
+                            "é" * 200000 if self.mode == "large" else f"fragment {index}"
+                        )
+                        text += fragment
+                        yield proto.StreamingTranscriptionResponse(
+                            delta=proto.TranscriptionDelta(text=fragment)
+                        )
+                        continue
                     revision += 1
                     text = "I scream" if index == 0 else "Ice cream"
                     yield proto.StreamingTranscriptionResponse(

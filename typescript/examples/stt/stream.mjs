@@ -13,11 +13,13 @@ export async function main(
   language,
   mode = "written",
   client = new Rime(),
+  outputContract = "revised_hypotheses",
 ) {
   try {
     const stream = client.stt.stream(audioChunks(path), {
       language,
       mode,
+      outputContract,
       timeout: 120,
     });
     for await (const update of stream)
@@ -36,12 +38,19 @@ if (
     allowPositionals: true,
     options: {
       language: { type: "string" },
+      "output-contract": { type: "string", default: "revised_hypotheses" },
       mode: { type: "string", default: "written" },
     },
   });
   if (positionals.length !== 1 || !values.language)
     throw new Error(
-      "Usage: stream.mjs audio.pcm --language en [--mode written|verbatim]",
+      "Usage: stream.mjs audio.pcm --language en [--mode written|verbatim] [--output-contract revised_hypotheses|append_fragments]",
     );
-  await main(positionals[0], values.language, values.mode);
+  await main(
+    positionals[0],
+    values.language,
+    values.mode,
+    undefined,
+    values["output-contract"],
+  );
 }

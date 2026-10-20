@@ -1,10 +1,12 @@
-"""Streaming speech recognition and replacement transcript values."""
+"""Streaming speech recognition and typed transcript updates."""
 
 from ._stream import TranscriptStream
 from ._types import (
     Transcription,
+    TranscriptionDelta,
     TranscriptionFinal,
     TranscriptionMode,
+    TranscriptionOutputContract,
     TranscriptionPartial,
     TranscriptionUpdate,
 )
@@ -12,8 +14,10 @@ from ._types import (
 __all__ = [
     "TranscriptStream",
     "Transcription",
+    "TranscriptionDelta",
     "TranscriptionFinal",
     "TranscriptionMode",
+    "TranscriptionOutputContract",
     "TranscriptionPartial",
     "TranscriptionUpdate",
 ]

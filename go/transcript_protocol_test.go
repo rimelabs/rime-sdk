@@ -19,10 +19,10 @@ func TestSharedTranscripts(t *testing.T) {
 	}
 	var fixture struct {
 		Cases []struct {
-			Name, Error string
-			Messages    []json.RawMessage
-			InputDone   *bool
-			Expected    []map[string]string
+			Name, Error, OutputContract string
+			Messages                    []json.RawMessage
+			InputDone                   *bool
+			Expected                    []map[string]string
 		}
 	}
 	if err := json.Unmarshal(data, &fixture); err != nil {
@@ -30,7 +30,11 @@ func TestSharedTranscripts(t *testing.T) {
 	}
 	for _, test := range fixture.Cases {
 		t.Run(test.Name, func(t *testing.T) {
-			state := transcriptState{textLimit: 65536}
+			contract, contractErr := transcriptionContract(TranscriptionOutputContract(test.OutputContract))
+			if contractErr != nil {
+				t.Fatal(contractErr)
+			}
+			state := transcriptState{textLimit: 1048576, outputContract: contract}
 			inputDone := test.InputDone == nil || *test.InputDone
 			var actual []map[string]string
 			var err error
@@ -39,13 +43,20 @@ func TestSharedTranscripts(t *testing.T) {
 				if err = (protojson.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(raw, message); err != nil {
 					t.Fatal(err)
 				}
-				var update *TranscriptionPartial
+				var update TranscriptionUpdate
 				update, err = state.accept(message, inputDone)
 				if err != nil {
 					break
 				}
 				if update != nil {
-					actual = append(actual, map[string]string{"kind": "partial", "text": update.Text})
+					switch value := update.(type) {
+					case TranscriptionPartial:
+						actual = append(actual, map[string]string{"kind": "partial", "text": value.Text})
+					case TranscriptionDelta:
+						actual = append(actual, map[string]string{"kind": "delta", "text": value.Text})
+					default:
+						t.Fatalf("unexpected update %T", update)
+					}
 				}
 			}
 			if err == nil {
@@ -72,6 +83,21 @@ func TestTranscriptLimitCountsUTF8Bytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := state.accept(hypothesis(2, strings.Repeat("é", 32769)), false); !errors.Is(err, ErrResourceLimit) {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestAppendCumulativeUTF8Limit(t *testing.T) {
+	state := transcriptState{language: "en", textLimit: 4, outputContract: pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS}
+	message := func(text string) *pb.StreamingTranscriptionResponse {
+		return &pb.StreamingTranscriptionResponse{Payload: &pb.StreamingTranscriptionResponse_Delta{Delta: &pb.TranscriptionDelta{Text: text}}}
+	}
+	for i := 0; i < 2; i++ {
+		if _, err := state.accept(message("é"), false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := state.accept(message("x"), false); !errors.Is(err, ErrResourceLimit) {
 		t.Fatalf("%v", err)
 	}
 }

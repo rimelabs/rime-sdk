@@ -20,7 +20,7 @@ from .._pcm import PCMFormat
 from .._validation import timeout as validate_timeout
 from . import _policy, _transport
 from ._stream import TranscriptStream
-from ._types import Transcription, TranscriptionMode
+from ._types import Transcription, TranscriptionMode, TranscriptionOutputContract
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -97,13 +97,15 @@ class STT:
         language: str,
         mode: TranscriptionMode = TranscriptionMode.WRITTEN,
         context_terms: Sequence[str] = (),
+        output_contract: TranscriptionOutputContract = TranscriptionOutputContract.REVISED_HYPOTHESES,
         input_format: PCMFormat | None = None,
         timeout: float | timedelta | None = None,
     ) -> TranscriptStream:
         """Transcribe one caller-ended utterance; source exhaustion commits input.
 
         Audio is headerless PCM16 little-endian, mono 16 kHz by default. Partial
-        results replace prior text. Language and recognition terms pass unchanged
+        results replace prior text by default; APPEND_FRAGMENTS emits permanent
+        deltas. Language and recognition terms pass unchanged
         to the service. Timeout is an optional positive overall duration, given
         as seconds or a datetime.timedelta. None disables the overall deadline.
         """
@@ -111,6 +113,8 @@ class STT:
         if not hasattr(audio, "__aiter__"):
             raise RimeInputError("audio must be an async iterable of bytes")
         _validate_options(language, mode, context_terms)
+        if not isinstance(output_contract, TranscriptionOutputContract):
+            raise RimeInputError("output_contract must be a TranscriptionOutputContract")
         if input_format is not None and not isinstance(input_format, PCMFormat):
             raise RimeAudioFormatError("input_format must be a PCMFormat")
         operation = TranscriptStream(
@@ -122,6 +126,7 @@ class STT:
             input_format or PCMFormat(),
             validate_timeout(timeout),
             _policy.POLICY,
+            output_contract,
         )
         self._streams.add(operation)
         return operation

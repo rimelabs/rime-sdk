@@ -116,7 +116,7 @@ impl Stt<'_> {
                     )
                     .with_request_id(identity.as_deref())
                 })?;
-            if result.text.len() > 65536 {
+            if result.text.len() > super::MAX_TRANSCRIPT_BYTES {
                 return Err(Error::new(
                     ErrorKind::ResourceLimit,
                     "the transcript exceeds the SDK text limit",
