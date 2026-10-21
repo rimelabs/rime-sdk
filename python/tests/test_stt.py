@@ -758,6 +758,7 @@ async def test_append_grpc_preserves_fragments_and_requires_success(stt_setup, m
                     final = update
         except (RimeUnavailableError, RimeStreamError, RimeTimeoutError) as error:
             assert expected_error and isinstance(error, expected_error)
+            assert final is None, "final transcript emitted before failure"
             assert error.request_id == "stt-request"
         else:
             assert expected_error is None

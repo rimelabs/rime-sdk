@@ -63,7 +63,8 @@ try {
   });
   for await (const update of transcript) {
     if (update.kind === "partial") console.log("Current transcript:", update.text);
-    else console.log("Final:", update.text, "Language:", update.language);
+    else if (update.kind === "final")
+      console.log("Final:", update.text, "Language:", update.language);
   }
   console.log("Request:", transcript.requestId);
 } finally {
@@ -134,6 +135,13 @@ There is no STT voice/model selector; the service selects its recognizer.
 **Replace the previous transcript. Do not concatenate partials.** Later partials
 can change earlier words. `TranscriptionFinal.language` is the canonical language
 selected by the service.
+
+When upgrading, `TranscriptionUpdate` now includes `TranscriptionDelta`. Update
+exhaustive handlers to handle `kind: "delta"`, even if you keep the default
+revised-hypotheses contract. Only finals have `language`: check
+`update.kind === "final"` before reading it, rather than assuming every
+non-partial update is final. Append deltas exactly; replace text with partials
+or the confirmed final.
 
 The source is not consumed until the server accepts the configuration. Audio
 upload and transcript reading run concurrently. Decoding currently uses cumulative

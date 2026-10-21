@@ -809,8 +809,8 @@ for (const mode of [
         missing_final: sdk.RimeStreamError,
         no_completion: sdk.RimeTimeoutError,
       }[mode];
+      let final;
       const collect = async () => {
-        let final;
         for await (const update of stream) {
           if (update.kind === "delta") {
             fragments.push(update.text);
@@ -825,8 +825,14 @@ for (const mode of [
         if (mode === "large") assert.ok(Buffer.byteLength(final.text) > 262144);
         if (mode === "burst") assert.equal(fragments.length, 100);
       };
-      if (expected) await assert.rejects(collect(), expected);
-      else await collect();
+      if (expected) {
+        await assert.rejects(collect(), expected);
+        assert.equal(
+          final,
+          undefined,
+          "final transcript emitted before failure",
+        );
+      } else await collect();
       assert.equal(stream.requestId, "stt-request");
       assert.equal(
         service.calls[0][0].payload.value.outputContract,
