@@ -464,7 +464,13 @@ test("response faults do not end generation; unknown enum values stay explicit",
 test("speech.stopped says what ended the turn", async (t) => {
   const { peer, events } = await setup(t);
   for (const [reason, expected] of [
-    ["timeout", "timeout"],
+    ...[
+      "semantic",
+      "timeout",
+      "silence",
+      "max_duration",
+      "detector_changed",
+    ].map((known) => [known, known]),
     ["future_reason", "unknown"],
     [undefined, null],
   ]) {

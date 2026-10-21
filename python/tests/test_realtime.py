@@ -278,7 +278,10 @@ async def test_unknown_server_enum_values_are_explicit(monkeypatch, metadata, ex
 @pytest.mark.parametrize(
     ("fields", "expected"),
     [
-        ({"prism_end_reason": "timeout"}, "timeout"),
+        *(
+            ({"prism_end_reason": reason}, reason)
+            for reason in ("semantic", "timeout", "silence", "max_duration", "detector_changed")
+        ),
         ({"prism_end_reason": "future_reason"}, "unknown"),
         ({}, None),
     ],

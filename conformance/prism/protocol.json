@@ -336,6 +336,16 @@
     "expected_kind": "speech.stopped"
   },
   {
+    "name": "null speech end reason",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": null
+    },
+    "invalid": true
+  },
+  {
     "name": "nonstring speech end reason",
     "event": {
       "type": "input_audio_buffer.speech_stopped",

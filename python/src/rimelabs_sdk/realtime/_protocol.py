@@ -355,9 +355,11 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             audio_start_ms=_integer(event.get("audio_start_ms"), "audio_start_ms"),
         )
     elif kind == "input_audio_buffer.speech_stopped":
-        reason = event.get("prism_end_reason")
-        if reason is not None:
-            reason = _string(reason, "prism_end_reason")
+        reason = (
+            _string(event["prism_end_reason"], "prism_end_reason")
+            if "prism_end_reason" in event
+            else None
+        )
         payload = t.SpeechStopped(
             item_id=_id(event.get("item_id"), "item_id"),
             audio_end_ms=_integer(event.get("audio_end_ms"), "audio_end_ms"),
