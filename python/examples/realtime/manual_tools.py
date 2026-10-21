@@ -63,7 +63,8 @@ class ManualTools:
                 state.continuation = asyncio.create_task(self.session.continue_reply(response))
                 await state.continuation
             except asyncio.CancelledError:
-                if not state.abandoned:
+                # Abandonment cancels the continuation; caller cancellation must propagate.
+                if not state.abandoned or asyncio.current_task().cancelling():
                     raise
             except RimeInputError:
                 if epoch == self.epoch and not state.abandoned:
