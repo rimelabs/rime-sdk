@@ -66,7 +66,7 @@ start.onclick = async () => {
     // The player measures how much of each reply you heard from the output clock.
     if (typeof context.getOutputTimestamp !== "function")
       throw new Error(
-        "This page needs a browser with AudioContext.getOutputTimestamp, such as Chrome.",
+        "This browser cannot measure audio playback. Use a current version of Chrome, Edge, Firefox, or Safari.",
       );
     await context.resume();
     await context.audioWorklet.addModule("/capture.js");
