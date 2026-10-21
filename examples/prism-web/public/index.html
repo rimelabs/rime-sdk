@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Talk to Prism</title>
+    <style>
+      body {
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        max-width: 44rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: #18181b;
+        background: #fff;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin: 1rem 0 0.25rem;
+      }
+      textarea {
+        width: 100%;
+        min-height: 9rem;
+        font: inherit;
+        padding: 0.5rem;
+        box-sizing: border-box;
+      }
+      select,
+      button {
+        font: inherit;
+        padding: 0.4rem 0.9rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-top: 1rem;
+      }
+      #log {
+        white-space: pre-wrap;
+        background: #f4f4f5;
+        padding: 0.75rem;
+        min-height: 8rem;
+        margin-top: 1rem;
+        border-radius: 6px;
+      }
+      .hint {
+        color: #52525b;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Talk to Prism</h1>
+    <p class="hint">
+      Press Start and talk. Talk over Prism at any time to interrupt it.
+    </p>
+
+    <label for="instructions">Instructions (the system prompt)</label>
+    <textarea id="instructions">
+You answer the phone for Juniper Cafe. It's open from 8 a.m. to 4 p.m. every day. The menu has a latte for 5 dollars, a cold brew for 4 dollars, and a blueberry muffin for 3 dollars. Answer in one or two short sentences.</textarea>
+
+    <div class="row">
+      <label for="voice" style="margin: 0">Voice</label>
+      <select id="voice">
+        <option>astra</option>
+        <option>aurora</option>
+        <option>brando</option>
+        <option>wawona</option>
+      </select>
+      <button id="start">Start</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+
+    <div id="log" role="log" aria-live="polite"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

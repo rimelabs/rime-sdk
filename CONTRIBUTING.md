@@ -161,6 +161,8 @@ and option tables consistent while preserving their different API conventions.
 Each package README contains installation and quick starts. Detailed API guides
 live in `python/docs/` and `typescript/docs/`; Go documents both APIs in
 `go/README.md`. Examples live under each SDK directory. The shared index is `docs/examples.md`.
+The one exception is `examples/prism-web/`, the browser starter for the Prism SDK quickstart.
+It pins published packages so readers can run it outside this repository.
 Use absolute repository URLs in package READMEs so guide links work on PyPI and
 npm. The Python source distribution and npm package include their guides.
 

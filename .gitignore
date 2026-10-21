@@ -16,3 +16,4 @@ coverage/
 /python/examples/*.wav
 /rust/target/
 /.rust-api/
+/examples/prism-web/reply.wav
