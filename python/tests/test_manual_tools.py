@@ -64,4 +64,5 @@ async def test_abandonment_prevents_or_cancels_tool_continuation(monkeypatch, st
         release.set()
     assert not continued
     assert len(executed) == (stage in ("working", "continuing"))
+    assert results == (["{}"] if stage in ("working", "continuing") else [])
     assert len(cancelled) == (stage == "continuing")

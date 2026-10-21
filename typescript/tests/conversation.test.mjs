@@ -99,102 +99,106 @@ class Playback {
 }
 
 for (const trigger of ["speech", "abandoned"]) {
-  test(`interruption batches dependencies and preserves other turns: ${trigger}`, async () => {
-    const refs = Object.fromEntries(
-      ["root", "child", "other", "grandchild", "late", "new"].map(
-        (responseId) => [responseId, { sessionId: "s", responseId }],
-      ),
-    );
-    const source = new Source(),
-      playback = new Playback(),
-      consumed = deferred(),
-      closed = deferred();
-    const session = {
-      info: { interruptOnSpeech: true },
-      async close() {
-        closed.resolve();
-      },
-      events: (async function* () {
-        for (const [name, parent] of [
-          ["root"],
-          ["child", "root"],
-          ["other"],
-          ["grandchild", "child"],
-        ]) {
-          yield {
-            payload: {
-              kind: "response.started",
-              response: refs[name],
-              parent: refs[parent],
-            },
-          };
-          yield {
-            payload: {
-              kind: "message.started",
-              output: {
+  test(
+    `interruption batches dependencies and preserves other turns: ${trigger}`,
+    { timeout: 4000 },
+    async () => {
+      const refs = Object.fromEntries(
+        ["root", "child", "other", "grandchild", "late", "new"].map(
+          (responseId) => [responseId, { sessionId: "s", responseId }],
+        ),
+      );
+      const source = new Source(),
+        playback = new Playback(),
+        consumed = deferred(),
+        closed = deferred();
+      const session = {
+        info: { interruptOnSpeech: true },
+        async close() {
+          closed.resolve();
+        },
+        events: (async function* () {
+          for (const [name, parent] of [
+            ["root"],
+            ["child", "root"],
+            ["other"],
+            ["grandchild", "child"],
+          ]) {
+            yield {
+              payload: {
+                kind: "response.started",
                 response: refs[name],
-                itemId: name,
-                outputIndex: 0,
-                contentIndex: 0,
+                parent: refs[parent],
               },
-            },
-          };
-        }
-        yield {
-          payload:
-            trigger === "speech"
-              ? { kind: "speech.started" }
-              : { kind: "response.abandoned", response: refs.root },
-        };
-        for (const [name, parent] of [["late", "grandchild"], ["new"]]) {
+            };
+            yield {
+              payload: {
+                kind: "message.started",
+                output: {
+                  response: refs[name],
+                  itemId: name,
+                  outputIndex: 0,
+                  contentIndex: 0,
+                },
+              },
+            };
+          }
           yield {
-            payload: {
-              kind: "response.started",
+            payload:
+              trigger === "speech"
+                ? { kind: "speech.started" }
+                : { kind: "response.abandoned", response: refs.root },
+          };
+          for (const [name, parent] of [["late", "grandchild"], ["new"]]) {
+            yield {
+              payload: {
+                kind: "response.started",
+                response: refs[name],
+                parent: refs[parent],
+              },
+            };
+            const output = {
               response: refs[name],
-              parent: refs[parent],
-            },
-          };
-          const output = {
-            response: refs[name],
-            itemId: name,
-            outputIndex: 0,
-            contentIndex: 0,
-          };
-          yield { payload: { kind: "message.started", output } };
-          yield {
-            payload: {
-              kind: "audio.delta",
-              output,
-              audio: { data: new Uint8Array(960) },
-            },
-          };
-        }
-        consumed.resolve();
-        await closed.promise;
-      })(),
-    };
-    const running = runConversation(session, { source, playback });
-    try {
-      await consumed.promise;
-      const expected =
-        trigger === "speech"
-          ? ["root", "child", "other", "grandchild"]
-          : ["root", "child", "grandchild"];
-      assert.deepEqual(
-        playback.batches.map((batch) => batch.map((ref) => ref.itemId)),
-        [expected, ["late"]],
-      );
-      assert.equal(
-        playback.outputs.get("other").interrupted,
-        trigger === "speech",
-      );
-      assert.equal(playback.outputs.get("late").writes.length, 0);
-      assert.equal(playback.outputs.get("new").writes.length, 1);
-    } finally {
-      source.next.resolve(null);
-      await running;
-    }
-  });
+              itemId: name,
+              outputIndex: 0,
+              contentIndex: 0,
+            };
+            yield { payload: { kind: "message.started", output } };
+            yield {
+              payload: {
+                kind: "audio.delta",
+                output,
+                audio: { data: new Uint8Array(960) },
+              },
+            };
+          }
+          consumed.resolve();
+          await closed.promise;
+        })(),
+      };
+      const running = runConversation(session, { source, playback });
+      try {
+        await consumed.promise;
+        const expected =
+          trigger === "speech"
+            ? ["root", "child", "other", "grandchild"]
+            : ["root", "child", "grandchild"];
+        assert.deepEqual(
+          playback.batches.map((batch) => batch.map((ref) => ref.itemId)),
+          [expected, ["late"]],
+        );
+        assert.equal(
+          playback.outputs.get("other").interrupted,
+          trigger === "speech",
+        );
+        assert.equal(playback.outputs.get("late").writes.length, 0);
+        assert.equal(playback.outputs.get("new").writes.length, 1);
+      } finally {
+        source.next.resolve(null);
+        await running;
+      }
+    },
+  );
 }
 async function until(condition) {
   const deadline = Date.now() + 1500;
