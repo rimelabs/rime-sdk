@@ -186,27 +186,25 @@ const server = createServer(async (request, response) => {
   response.end(await readFile(new URL(`./public/${file[0]}`, import.meta.url)));
 });
 
-// Accept only this page, from this computer, one conversation at a time.
+// Accept only this page, from this computer, one conversation at a time. A new
+// conversation can start as soon as the page closes the old one's connection.
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 192000 });
-let busy = false;
+let current; // The page connection that holds the conversation
 server.on("upgrade", (request, socket, head) => {
   const host = request.headers.host;
   const local = host === `localhost:${PORT}` || host === `127.0.0.1:${PORT}`;
   if (
-    busy ||
+    current?.readyState <= 1 || // CONNECTING or OPEN
     request.url !== "/audio" ||
     !local ||
     request.headers.origin !== `http://${host}`
   )
     return void socket.destroy();
-  busy = true;
+  const placeholder = (current = { readyState: 0 });
+  socket.once("close", () => current === placeholder && (current = undefined));
   sockets.handleUpgrade(request, socket, head, (ws) => {
-    let started = false;
-    ws.once("close", () => started || (busy = false));
-    ws.once("message", (data) => {
-      started = true;
-      void talk(ws, JSON.parse(data.toString())).finally(() => (busy = false));
-    });
+    current = ws;
+    ws.once("message", (data) => void talk(ws, JSON.parse(data.toString())));
   });
 });
 

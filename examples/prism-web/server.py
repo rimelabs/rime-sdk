@@ -179,18 +179,19 @@ async def talk(ws, start):
             task.cancel()
 
 
-busy = False
+current = None  # The page connection that holds the conversation
 
 
 async def audio_socket(request):
-    """Accept only this page, from this computer, one conversation at a time."""
-    global busy
+    """Accept only this page, from this computer, one conversation at a time. A new
+    conversation can start as soon as the page closes the old one's connection."""
+    global current
     host = request.headers.get("Host", "")
     local = host in (f"localhost:{PORT}", f"127.0.0.1:{PORT}")
-    if busy or not local or request.headers.get("Origin") != f"http://{host}":
+    in_use = current is not None and not current.closed
+    if in_use or not local or request.headers.get("Origin") != f"http://{host}":
         raise web.HTTPForbidden()
-    busy = True
-    ws = web.WebSocketResponse(max_msg_size=192000)
+    ws = current = web.WebSocketResponse(max_msg_size=192000)
     await ws.prepare(request)
     try:
         start = json.loads(await ws.receive_str())
@@ -199,7 +200,6 @@ async def audio_socket(request):
         # The page closed, or sent something other than its start message.
         print(f"Ignored a connection without a start message: {error}", file=sys.stderr)
     finally:
-        busy = False
         await ws.close()
     return ws
 
