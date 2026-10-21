@@ -16,6 +16,8 @@ from . import _types as t
 
 class _TurnDetection(TypedDict):
     interrupt_response: bool
+    eagerness: NotRequired[t.TurnEagerness]
+    prism_end_of_turn_timeout_ms: NotRequired[int]
 
 
 class _Function(TypedDict):
@@ -45,6 +47,7 @@ class SessionView:
     interrupt_on_speech: bool | None
     tool_result_timeout_s: float | None
     tool_continuation_timeout_s: float | None
+    turn_detection: t.TurnDetectionInfo
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -200,6 +203,23 @@ def _duration(value: object, name: str) -> float | None:
 
 def _session(value: object) -> SessionView:
     view = _object(value, "session")
+    detection = (
+        _object(view["turn_detection"], "session.turn_detection")
+        if "turn_detection" in view
+        else {}
+    )
+    eagerness = None
+    if "eagerness" in detection:
+        value = _string(detection["eagerness"], "session.turn_detection.eagerness")
+        eagerness = value if value in ("low", "medium", "high", "auto") else "unknown"
+    end_timeout = None
+    if "prism_end_of_turn_timeout_ms" in detection:
+        end_timeout = _integer(
+            detection["prism_end_of_turn_timeout_ms"],
+            "session.turn_detection.prism_end_of_turn_timeout_ms",
+        )
+        if not 1000 <= end_timeout <= 10000:
+            _invalid("session.turn_detection.prism_end_of_turn_timeout_ms")
     waits = (
         _object(view["prism_tool_waits"], "session.prism_tool_waits")
         if "prism_tool_waits" in view
@@ -218,6 +238,10 @@ def _session(value: object) -> SessionView:
         id=_id(view.get("id"), "session.id"),
         voice=_string(view.get("voice", ""), "session.voice"),
         interrupt_on_speech=interrupt,
+        turn_detection=t.TurnDetectionInfo(
+            eagerness=cast(t.TurnEagerness | Literal["unknown"] | None, eagerness),
+            end_of_turn_timeout_ms=end_timeout,
+        ),
         tool_result_timeout_s=_duration(waits.get("result_timeout_s"), "result_timeout_s"),
         tool_continuation_timeout_s=_duration(
             waits.get("continuation_timeout_s"), "continuation_timeout_s"

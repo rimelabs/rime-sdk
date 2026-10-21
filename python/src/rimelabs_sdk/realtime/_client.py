@@ -21,13 +21,14 @@ from .._errors import (
 )
 from ._protocol import SessionSettings
 from ._session import RealtimeSession
-from ._types import RealtimeTimeouts, ToolDefinition
+from ._types import RealtimeTimeouts, ToolDefinition, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
 
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
+_DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
 
 
 class Realtime:
@@ -42,15 +43,19 @@ class Realtime:
     async def connect(
         self,
         *,
-        endpoint: str,
+        endpoint: str | None = None,
         model: Literal["prism"] = "prism",
         voice: str | None = None,
         instructions: str | None = None,
         tools: Sequence[ToolDefinition] = (),
         interrupt_on_speech: bool = True,
+        turn_detection: TurnDetection | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
     ) -> AsyncIterator[RealtimeSession]:
-        """Open and initialize a session. Supply the full /v1/realtime WebSocket URL.
+        """Open and initialize a session on the public Prism endpoint.
+
+        Override endpoint with a full /v1/realtime WebSocket URL for another deployment.
+        Omitted turn timing settings use the server defaults.
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
@@ -58,6 +63,7 @@ class Realtime:
         """
         self._client._check_loop()
         self._client._check_open()
+        endpoint = _DEFAULT_ENDPOINT if endpoint is None else endpoint
         url = urlsplit(endpoint)
         if (
             url.scheme not in ("ws", "wss")
@@ -90,6 +96,15 @@ class Realtime:
                 for tool in tools
             ],
         }
+        if turn_detection is not None:
+            if not isinstance(turn_detection, TurnDetection):
+                raise RimeInputError("turn_detection must be a TurnDetection value")
+            if turn_detection.eagerness is not None:
+                settings["turn_detection"]["eagerness"] = turn_detection.eagerness
+            if turn_detection.end_of_turn_timeout_ms is not None:
+                settings["turn_detection"]["prism_end_of_turn_timeout_ms"] = (
+                    turn_detection.end_of_turn_timeout_ms
+                )
         for name, value in (("voice", voice), ("instructions", instructions)):
             if value is not None:
                 if not isinstance(value, str) or not value.strip():

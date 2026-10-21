@@ -7,15 +7,19 @@ import {
   type AudioChunk,
   type PlaybackReport,
   type SessionEvent,
+  type TurnDetection,
+  type TurnDetectionInfo,
 } from "../../dist/index.js";
 
 const tool: ToolDefinition = { name: "lookup", parameters: { type: "object" } };
 const options: RealtimeConnectOptions = {
-  endpoint: "wss://example.com/v1/realtime",
   tools: [tool],
   timeouts: { readyS: 10 },
+  turnDetection: { eagerness: "low", endOfTurnTimeoutMs: 2000 },
 };
 async function useSession(session: RealtimeSession) {
+  const timing: TurnDetectionInfo = session.info.turnDetection;
+  void timing;
   const ref: ResponseRef = await session.sendText("Hello");
   const input: AudioChunk = { data: new Uint8Array(2) };
   await session.sendAudio(input);
@@ -57,8 +61,13 @@ const client = new Rime({ apiKey: "test" });
 const connected: Promise<RealtimeSession> = client.realtime.connect(options);
 void connected;
 void useSession;
-// @ts-expect-error Endpoint is required.
 client.realtime.connect({});
+client.realtime.connect();
+const invalidTiming: TurnDetection = {
+  // @ts-expect-error Eagerness is a closed set of input values.
+  eagerness: "future",
+};
+void invalidTiming;
 
 // Internal request descriptors must retain their specific result types.
 import { requests, type Acknowledgment } from "../../dist/realtime/protocol.js";

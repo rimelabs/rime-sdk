@@ -92,6 +92,7 @@ test("Prism config, direct credentials, typed output and large incoming audio", 
     interruptOnSpeech: false,
     toolResultTimeoutS: 20,
     toolContinuationTimeoutS: 5,
+    turnDetection: { eagerness: null, endOfTurnTimeoutMs: null },
   });
   const ref = await turn(session, peer);
   const start = await payload(events, "response.started");

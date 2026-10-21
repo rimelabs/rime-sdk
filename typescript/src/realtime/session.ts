@@ -133,6 +133,7 @@ export class RealtimeSession {
         view.interruptOnSpeech ?? settings.turn_detection.interrupt_response,
       toolResultTimeoutS: view.toolResultTimeoutS ?? null,
       toolContinuationTimeoutS: view.toolContinuationTimeoutS ?? null,
+      turnDetection: view.turnDetection,
     });
   }
 

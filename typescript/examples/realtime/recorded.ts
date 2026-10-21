@@ -14,10 +14,6 @@ const data = readSpeech(
     new URL("../../../fixtures/audio/france.wav", import.meta.url),
 );
 const endpoint = process.env.PRISM_URL;
-if (!endpoint)
-  throw new Error(
-    "Set PRISM_URL to your deployment's /v1/realtime WebSocket URL",
-  );
 const client = new Rime();
 const stop = new AbortController();
 const deadline = setTimeout(() => {

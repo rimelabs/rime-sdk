@@ -154,10 +154,6 @@ export async function converse(
 
 export function voice(tools: ToolDefinition[] = [], executeTool?: ExecuteTool) {
   const endpoint = process.env.PRISM_URL;
-  if (!endpoint)
-    throw new Error(
-      "Set PRISM_URL to your deployment's /v1/realtime WebSocket URL",
-    );
   return serve("prism", async (audio) => {
     const client = new Rime();
     try {

@@ -22,13 +22,28 @@ export interface ToolDefinition {
   readonly parameters: JsonObject;
   readonly description?: string;
 }
+export type TurnEagerness = "low" | "medium" | "high" | "auto";
+/** Omitted fields use the server's turn timing defaults. */
+export interface TurnDetection {
+  /** How readily Prism decides that the user has finished speaking. */
+  readonly eagerness?: TurnEagerness;
+  /** Maximum silence before ending a turn: an integer from 1000 to 10000 ms. */
+  readonly endOfTurnTimeoutMs?: number;
+}
+/** Effective server settings. Null means the server did not publish the field. */
+export interface TurnDetectionInfo {
+  readonly eagerness: TurnEagerness | "unknown" | null;
+  readonly endOfTurnTimeoutMs: number | null;
+}
 export interface RealtimeConnectOptions extends RealtimeOperationOptions {
-  readonly endpoint: string;
+  /** Defaults to wss://prism.api.rime.ai/v1/realtime. */
+  readonly endpoint?: string;
   readonly model?: "prism";
   readonly voice?: string | null;
   readonly instructions?: string | null;
   readonly tools?: readonly ToolDefinition[];
   readonly interruptOnSpeech?: boolean;
+  readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
 }
 export interface ReplyOptions extends RealtimeOperationOptions {
@@ -63,6 +78,7 @@ export interface SessionInfo {
   readonly interruptOnSpeech: boolean;
   readonly toolResultTimeoutS: number | null;
   readonly toolContinuationTimeoutS: number | null;
+  readonly turnDetection: TurnDetectionInfo;
 }
 export interface RealtimeFault {
   readonly code: string;

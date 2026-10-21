@@ -15,6 +15,8 @@ import type {
 } from "./types.js";
 import type { SessionSettings } from "./protocol.js";
 
+const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
+
 function endpoint(value: string): string {
   let url: URL;
   try {
@@ -89,9 +91,13 @@ export class Realtime {
     private readonly checkOpen: () => void,
   ) {}
 
-  async connect(options: RealtimeConnectOptions): Promise<RealtimeSession> {
+  async connect(
+    options: RealtimeConnectOptions = {},
+  ): Promise<RealtimeSession> {
     this.checkOpen();
-    const address = endpoint(options.endpoint);
+    const address = endpoint(
+      options.endpoint === undefined ? DEFAULT_ENDPOINT : options.endpoint,
+    );
     const limits = timeouts(options.timeouts);
     if ((options.model ?? "prism") !== "prism")
       throw new RimeInputError("The realtime model must be prism");
@@ -147,6 +153,30 @@ export class Realtime {
         };
       }),
     };
+    if (options.turnDetection !== undefined) {
+      const detection = options.turnDetection;
+      if (
+        !detection ||
+        typeof detection !== "object" ||
+        Array.isArray(detection)
+      )
+        throw new RimeInputError("turnDetection must be an object");
+      if (detection.eagerness !== undefined) {
+        if (!["low", "medium", "high", "auto"].includes(detection.eagerness))
+          throw new RimeInputError(
+            "Turn eagerness must be low, medium, high, or auto",
+          );
+        settings.turn_detection.eagerness = detection.eagerness;
+      }
+      if (detection.endOfTurnTimeoutMs !== undefined) {
+        const value = detection.endOfTurnTimeoutMs;
+        if (!Number.isInteger(value) || value < 1000 || value > 10000)
+          throw new RimeInputError(
+            "End-of-turn timeout must be an integer from 1000 to 10000 ms",
+          );
+        settings.turn_detection.prism_end_of_turn_timeout_ms = value;
+      }
+    }
     for (const name of ["voice", "instructions"] as const) {
       const value = options[name];
       if (value !== undefined && value !== null) {
