@@ -53,6 +53,8 @@ async def main(path):
         ):
             raise SystemExit(f"{path} must be 16 kHz mono 16-bit PCM WAV")
         question = recording.readframes(recording.getnframes())
+    if not question:
+        raise SystemExit(f"{path} has no audio")
     async with (
         asyncio.timeout(60),
         Rime() as client,

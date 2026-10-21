@@ -14,6 +14,7 @@ function message(text) {
 }
 
 async function close() {
+  stop.disabled = true;
   generation++;
   clearInterval(timer);
   capture?.disconnect();
@@ -25,7 +26,6 @@ async function close() {
   context = undefined;
   await closing?.close();
   start.disabled = instructions.disabled = voice.disabled = false;
-  stop.disabled = true;
 }
 
 // The browser cancels echo, so Prism does not hear itself through laptop speakers.
@@ -77,7 +77,14 @@ start.onclick = async () => {
         connection.send(JSON.stringify(value));
     };
     player = new Player(context, send);
-    timer = setInterval(() => player.poll(), 20);
+    timer = setInterval(() => {
+      try {
+        player.poll();
+      } catch (error) {
+        message(String(error));
+        void close();
+      }
+    }, 20);
     message("Connecting to Prism...");
     connection.onopen = () =>
       send({

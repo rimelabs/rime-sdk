@@ -11,19 +11,42 @@ const INSTRUCTIONS =
   "every day. Answer in one short sentence.";
 const FRAME = 1280; // 40 ms of 16 kHz mono PCM16
 
-// The samples of a 16 kHz mono 16-bit PCM WAV file, found by its "data" chunk.
+// The samples of a 16 kHz mono 16-bit PCM WAV file. Reads the "fmt " and "data" chunks.
 function readWav(path) {
   const file = readFileSync(path);
-  const ok =
-    file.toString("ascii", 0, 4) === "RIFF" &&
-    file.readUInt32LE(24) === 16000 &&
-    file.readUInt16LE(22) === 1 &&
-    file.readUInt16LE(34) === 16;
-  if (!ok) throw new Error(`${path} must be 16 kHz mono 16-bit PCM WAV`);
-  for (let at = 12; at + 8 <= file.length; at += 8 + file.readUInt32LE(at + 4))
-    if (file.toString("ascii", at, at + 4) === "data")
-      return file.subarray(at + 8, at + 8 + file.readUInt32LE(at + 4));
-  throw new Error(`${path} has no audio data`);
+  const fail = (why) => new Error(`${path}: ${why}`);
+  if (
+    file.toString("ascii", 0, 4) !== "RIFF" ||
+    file.toString("ascii", 8, 12) !== "WAVE"
+  )
+    throw fail("not a WAV file");
+  let format;
+  for (let at = 12; at + 8 <= file.length;) {
+    const id = file.toString("ascii", at, at + 4);
+    const size = file.readUInt32LE(at + 4);
+    const body = at + 8;
+    if (body + size > file.length) throw fail("the file is cut short");
+    if (id === "fmt ")
+      format = {
+        pcm: file.readUInt16LE(body) === 1,
+        channels: file.readUInt16LE(body + 2),
+        rate: file.readUInt32LE(body + 4),
+        bits: file.readUInt16LE(body + 14),
+      };
+    if (id === "data") {
+      if (
+        !format?.pcm ||
+        format.channels !== 1 ||
+        format.rate !== 16000 ||
+        format.bits !== 16
+      )
+        throw fail("must be 16 kHz mono 16-bit PCM");
+      if (size === 0) throw fail("has no audio");
+      return file.subarray(body, body + size);
+    }
+    at = body + size + (size % 2); // chunks are padded to an even length
+  }
+  throw fail("has no audio data");
 }
 
 async function sendCallAudio(session, question, signal) {

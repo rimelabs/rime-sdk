@@ -49,6 +49,9 @@ class Output:
         self.browser = browser
         self.id = output_id
         self.receipt = asyncio.get_running_loop().create_future()
+        self.receipt.add_done_callback(
+            lambda f: f.cancelled() or f.exception()
+        )  # no unretrieved warnings
 
     def write(self, chunk):
         data = base64.b64encode(chunk.data).decode()
@@ -92,29 +95,50 @@ class Browser:
             self.closed.set()
 
     async def receive(self):
-        async for message in self.ws:
-            if message.type == WSMsgType.BINARY:
-                if not self.frames.full():
-                    self.frames.put_nowait(message.data)  # 40 ms of 48 kHz mono PCM16
-            elif message.type == WSMsgType.TEXT:
-                report = json.loads(message.data)
-                output = self.outputs.get(report.get("id"))
-                if report.get("type") == "played" and output and not output.receipt.done():
-                    output.receipt.set_result(float(report["playedMs"]))
-                if report.get("type") == "stopped" and self.stopping:
-                    stop_id, confirmed = self.stopping
-                    if report.get("id") == stop_id and not confirmed.done():
-                        confirmed.set_result(None)
-        # The page closed: end the input, and fail a stop that can no longer be confirmed.
+        try:
+            async for message in self.ws:
+                if message.type == WSMsgType.BINARY:
+                    # 40 ms of 48 kHz mono PCM16. Dropping audio would lose the caller's words,
+                    # so a full queue ends the conversation instead.
+                    if self.frames.full():
+                        print("The microphone queue is full", file=sys.stderr)
+                        break
+                    self.frames.put_nowait(message.data)
+                elif message.type == WSMsgType.TEXT:
+                    self.on_report(json.loads(message.data))
+        except (TypeError, ValueError) as error:
+            print(f"The page sent a message that was not understood: {error}", file=sys.stderr)
+        finally:
+            await self.ws.close()
+            self.close()
+
+    def on_report(self, report):
+        output = self.outputs.get(report.get("id"))
+        played = report.get("playedMs")
+        if report.get("type") == "played" and output and not output.receipt.done():
+            output.receipt.set_result(
+                float(played)
+            )  # ValueError or TypeError if it is not a number
+        if report.get("type") == "stopped" and self.stopping:
+            stop_id, confirmed = self.stopping
+            if report.get("id") == stop_id and not confirmed.done():
+                confirmed.set_result(None)
+
+    def close(self):
+        """The page is gone: end the input, and fail what can no longer be confirmed."""
         self.closed.set()
         if not self.frames.full():
-            self.frames.put_nowait(None)
+            self.frames.put_nowait(None)  # wakes a pending read
+        gone = ConnectionError("The browser disconnected")
+        for output in self.outputs.values():
+            if not output.receipt.done():
+                output.receipt.set_exception(gone)
         if self.stopping and not self.stopping[1].done():
-            self.stopping[1].set_exception(ConnectionError("The browser closed during shutdown"))
+            self.stopping[1].set_exception(gone)
 
     # Source: the next microphone frame, or None when the page closes.
     async def read(self):
-        if self.closed.is_set() and self.frames.empty():
+        if self.closed.is_set():
             return None
         frame = await self.frames.get()
         return None if frame is None else r.AudioChunk(data=frame, format=MIC_FORMAT)
@@ -134,6 +158,7 @@ class Browser:
     async def stop(self):
         stop_id = str(next(self.stop_ids))
         confirmed = asyncio.get_running_loop().create_future()
+        confirmed.add_done_callback(lambda f: f.cancelled() or f.exception())
         self.stopping = (stop_id, confirmed)
         self.send({"type": "stop", "id": stop_id})
         await confirmed
@@ -192,15 +217,18 @@ async def audio_socket(request):
     if in_use or not local or request.headers.get("Origin") != f"http://{host}":
         raise web.HTTPForbidden()
     ws = current = web.WebSocketResponse(max_msg_size=192000)
-    await ws.prepare(request)
     try:
+        await ws.prepare(request)
         start = json.loads(await ws.receive_str())
         await talk(ws, start)
     except (TypeError, ValueError) as error:
         # The page closed, or sent something other than its start message.
         print(f"Ignored a connection without a start message: {error}", file=sys.stderr)
     finally:
-        await ws.close()
+        if ws.prepared:
+            await ws.close()
+        if current is ws:
+            current = None  # free the server for the next conversation, even if setup failed
     return ws
 
 

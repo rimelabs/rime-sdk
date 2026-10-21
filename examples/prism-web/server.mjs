@@ -42,17 +42,27 @@ class Browser {
     this.closed = false;
     socket.on("message", (data, binary) => {
       if (binary) {
-        if (this.frames.length < 100) this.frames.push(Buffer.from(data)); // 40 ms of 48 kHz mono PCM16
+        // 40 ms of 48 kHz mono PCM16. Dropping audio would lose the caller's words, so a full
+        // queue ends the conversation instead.
+        if (this.frames.length >= 100)
+          return this.fail(new Error("The microphone queue is full"));
+        this.frames.push(Buffer.from(data));
         this.wake?.();
         return;
       }
-      const report = JSON.parse(data.toString());
-      if (report.type === "played")
+      let report;
+      try {
+        report = JSON.parse(data.toString());
+      } catch {
+        return this.fail(new Error("The page sent a message that is not JSON"));
+      }
+      if (report.type === "played" && Number.isFinite(report.playedMs))
         this.receipts.get(report.id)?.resolve(report.playedMs);
       if (report.type === "stopped" && report.id === this.stopping?.id)
         this.stopping.resolve();
     });
     socket.on("close", () => this.close());
+    socket.on("error", (error) => this.fail(error));
   }
 
   send(value) {
@@ -84,9 +94,13 @@ class Browser {
   // Playback: one output per reply. The page plays outputs in order, one at a time.
   open(output) {
     const id = outputId(output);
-    let resolve;
-    const receipt = new Promise((accept) => (resolve = accept));
-    this.receipts.set(id, { resolve });
+    let resolve, reject;
+    const receipt = new Promise((accept, refuse) => {
+      resolve = accept;
+      reject = refuse;
+    });
+    receipt.catch(() => {}); // A disconnect can reject it before the runner waits.
+    this.receipts.set(id, { resolve, reject });
     this.send({ type: "begin", id });
     return {
       write: (chunk) =>
@@ -103,7 +117,7 @@ class Browser {
             signal.addEventListener("abort", () => reject(signal.reason), {
               once: true,
             });
-            receipt.then(accept);
+            receipt.then(accept, reject);
           });
         } finally {
           this.receipts.delete(id);
@@ -121,7 +135,7 @@ class Browser {
   async stop(signal) {
     const id = String(++this.stops);
     await new Promise((resolve, reject) => {
-      this.stopping = { id, resolve };
+      this.stopping = { id, resolve, reject };
       signal.addEventListener("abort", () => reject(signal.reason), {
         once: true,
       });
@@ -129,9 +143,21 @@ class Browser {
     });
   }
 
+  // The page is gone: end the input, and fail what can no longer be confirmed.
   close() {
+    if (this.closed) return;
     this.closed = true;
     this.wake?.();
+    const gone = new Error("The browser disconnected");
+    for (const receipt of this.receipts.values()) receipt.reject(gone);
+    this.receipts.clear();
+    this.stopping?.reject(gone);
+  }
+
+  fail(error) {
+    console.error(error.message);
+    this.socket.close();
+    this.close();
   }
 }
 
@@ -204,7 +230,16 @@ server.on("upgrade", (request, socket, head) => {
   socket.once("close", () => current === placeholder && (current = undefined));
   sockets.handleUpgrade(request, socket, head, (ws) => {
     current = ws;
-    ws.once("message", (data) => void talk(ws, JSON.parse(data.toString())));
+    ws.on("error", () => ws.close());
+    ws.once("message", (data) => {
+      let start;
+      try {
+        start = JSON.parse(data.toString());
+      } catch {
+        return void ws.close();
+      }
+      void talk(ws, start);
+    });
   });
 });
 

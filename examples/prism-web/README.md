@@ -21,7 +21,7 @@ uv run server.py                 # Python 3.11+, with uv
 npm install && node server.mjs   # or Node.js 22+
 ```
 
-Open http://localhost:3000 in your browser, edit the instructions, choose a voice, and
+Open the address the server prints (http://localhost:3000 unless you set `PORT`) in your browser, edit the instructions, choose a voice, and
 press **Start**. `PORT` changes the port and `PRISM_URL` the Prism address.
 
 ## Without a microphone
