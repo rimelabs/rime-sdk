@@ -1,0 +1,70 @@
+python/examples/audio_devices.py
+  s_b9bcf190f73c60::t_da502fb0400df7 14,74,127-132,134-135,238
+  s_b9bcf190f73c60::t_03814e27990601 133,143,239-244,246-252,261-263
+typescript/tests/conversation.test.mjs
+  s_b9bcf190f73c60::t_7890b64487f696 100-105,107-108,110-122,124-139,146,177,188,194,197
+  s_b9bcf190f73c60::t_9372968639aa1f 106,109,123
+  s_b9bcf190f73c60::t_c35ad54a44d09e 84,90-92
+  s_b9bcf190f73c60::t_bd46ef4ad40c52 93,140-145,147-176,178-187,189-193,195-196,198
+typescript/examples/tests/audio.test.mjs
+  s_b9bcf190f73c60::t_c35ad54a44d09e 150,218,228,233
+  s_b9bcf190f73c60::t_534b49ff2940a4 268,281,283-288,321-323
+  s_b9bcf190f73c60::t_4a4bd41e75a7f6 6,282,289,293,295,298-300,306,313-316,324,329
+  s_b9bcf190f73c60::t_b1d82c4e1d1ec2 290-292,294,296-297,301-305,307-312,317-320,325-328
+python/src/rimelabs_sdk/realtime/_conversation.py
+  s_b9bcf190f73c60::t_fe147be4f023f0 8-9,50-58,113-114,157-166,207-222,225-229,231-233,250,265-274,284,286-290
+  s_b9bcf190f73c60::t_03814e27990601 223-224
+python/examples/realtime/manual_tools.py
+  s_b9bcf190f73c60::t_ec5f2d94251591 3-5,10-16,20,28-36,38,40,42-44,47,50-52,54-57,61,63-67,69
+typescript/src/realtime/conversation.ts
+  s_b9bcf190f73c60::t_75e09baf1c52ff 37-41,90-91,205-218,220-225,245-248,265,270-279,282,287,301,304-305
+  s_b9bcf190f73c60::t_03814e27990601 219
+  s_b9bcf190f73c60::t_87b0ffc773833f 306-310
+python/tests/test_manual_tools.py
+  s_b9bcf190f73c60::t_2055a6db5f8b8f 1-61
+  s_b9bcf190f73c60::t_e8374097d6f03d 62-67
+typescript/examples/common/browser-audio.ts
+  s_b9bcf190f73c60::t_da502fb0400df7 11-19,113,206-207
+typescript/examples/realtime/manual-tools.ts
+  s_b9bcf190f73c60::t_ec5f2d94251591 11-16,18,30,32-46,48-51,54,56-62,65,68-71,74,78,81,83,95
+  s_b9bcf190f73c60::t_2a0c95f9eedc90 84,89-90,92-94,96-97,99-100
+python/docs/realtime.md
+  s_b9bcf190f73c60::t_1b1abaf00e3108 43-44,53,71-76,117-120
+typescript/examples/tests/tools.test.mjs
+  s_b9bcf190f73c60::t_c5a651fe338fcb 9-63,74,80-81,90
+  s_b9bcf190f73c60::t_f40300a4b8c013 64-73,75-79,82-89,91-93
+typescript/examples/browser/player.js
+  s_b9bcf190f73c60::t_da502fb0400df7 67,112-113,115,131
+python/tests/test_conversation.py
+  s_b9bcf190f73c60::t_534b49ff2940a4 403
+  s_b9bcf190f73c60::t_7890b64487f696 7,91-134
+  s_b9bcf190f73c60::t_c35ad54a44d09e 69,78-81
+  s_b9bcf190f73c60::t_5f210b0cccd914 82,135-170,402,404,430,435,440
+typescript/examples/tests/realtime.test.mjs
+  s_b9bcf190f73c60::t_a0bef99597b45c 287-288
+typescript/docs/realtime.md
+  s_b9bcf190f73c60::t_1b1abaf00e3108 47-48,58,76-81,121-124
+typescript/examples/browser/app.js
+  s_b9bcf190f73c60::t_da502fb0400df7 112
+python/tests/test_voice_examples.py
+  s_b9bcf190f73c60::t_c35ad54a44d09e 106,147,151,156,467,471
+  s_b9bcf190f73c60::t_a0bef99597b45c 476,478-483,485-486,488,504-507,510
+  s_b9bcf190f73c60::t_b1d82c4e1d1ec2 501-503
+  s_b9bcf190f73c60::t_2055a6db5f8b8f 474-475,477,484,487,489-500,508-509
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e19b39cc2d0a5cf2a4044d2f319537461df88c82",
+  "prompts": {},
+  "sessions": {
+    "s_b9bcf190f73c60": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15d19-cc51-74b3-b3b6-61db75658170",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
