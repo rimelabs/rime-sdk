@@ -17,6 +17,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Literal, TypeVar
+from weakref import WeakSet
 
 from websockets.exceptions import ConnectionClosed
 
@@ -36,6 +37,16 @@ _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
 _NOT_READY = {"typed_turn_busy", "instructions_busy", "proactive_unavailable"}
 _LIMIT = 128
+_close_errors: WeakSet[RimeError] = WeakSet()
+
+
+def _is_session_close_error(error: BaseException) -> bool:
+    """Recognize the exact errors created by intentional session closure."""
+    try:
+        return error in _close_errors
+    except TypeError:
+        # Adapter and callback exceptions need not be hashable.
+        return False
 
 
 @dataclass
@@ -150,7 +161,11 @@ class RealtimeSession:
         if self._failure:
             raise self._failure
         if self._closed:
-            raise RimeInputError("The realtime session is closed")
+            error = RimeInputError("The realtime session is closed")
+            # Reports can start after intentional close, before runner cleanup.
+            # Failed sessions retain _failure and take the branch above.
+            _close_errors.add(error)
+            raise error
 
     def _response(self, ref: t.ResponseRef | t.ToolCallRef) -> _Response:
         self._check()
@@ -738,7 +753,9 @@ class RealtimeSession:
 
     async def _shutdown(self) -> None:
         if not self._closed:
-            self._fail(RimeStreamError("Realtime session closed"))
+            error = RimeStreamError("Realtime session closed")
+            _close_errors.add(error)
+            self._fail(error)
             self._failure = None  # explicit close ends the iterator normally
         try:
             await self._socket.close()

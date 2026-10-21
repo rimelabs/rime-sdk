@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EventEmitter } from "node:events";
+import { EventEmitter, getEventListeners } from "node:events";
 import { WavWriter, readSpeech } from "../common/wav.ts";
 import { BrowserAudio } from "../common/browser-audio.ts";
 import { Player } from "../browser/player.js";
@@ -137,4 +137,194 @@ test("browser disconnect releases waiting capture and playback; input is bounded
   for (let i = 0; i < 101; i++)
     second.emit("message", Buffer.alloc(3840), true);
   await assert.rejects(bounded.frames().next(), /queue exceeded/);
+});
+
+test("interrupting one output preserves newer scheduled audio", () => {
+  const context = new Context();
+  const player = new Player(context, () => {});
+  player.begin("old");
+  player.write("old", new Uint8Array(960));
+  player.end("old");
+  player.begin("new");
+  player.write("new", new Uint8Array(960));
+  player.interrupt(["old"]);
+  assert.equal(context.sources[0].stopAt, 0);
+  assert.equal(context.sources[1].stopAt, undefined);
+  assert.equal(player.replies.get("new").interrupted, undefined);
+});
+
+test("invalid browser clock fails instead of returning a duration", () => {
+  const context = new Context();
+  context.outputTime = NaN;
+  const player = new Player(context, () =>
+    assert.fail("No receipt is possible"),
+  );
+  player.begin("bad-clock");
+  player.end("bad-clock");
+  assert.throws(() => player.poll(), /Invalid playback clock/);
+});
+
+test("later output audio waits for all earlier output chunks before scheduling", () => {
+  const context = new Context(),
+    reports = [];
+  const player = new Player(context, (report) => reports.push(report));
+  player.begin("first");
+  player.begin("second");
+  player.write("second", new Uint8Array(96000));
+  player.end("second");
+  player.poll();
+  assert.equal(context.sources.length, 0);
+  assert.deepEqual(reports, []);
+  player.write("first", new Uint8Array(48000));
+  player.write("first", new Uint8Array(48000));
+  assert.equal(context.sources.length, 2);
+  player.end("first");
+  assert.equal(context.sources.length, 3);
+  assert.equal(context.sources[1].startAt, context.sources[0].startAt + 1);
+  assert.equal(context.sources[2].startAt, context.sources[1].startAt + 1);
+  context.currentTime = context.outputTime = 0.42;
+  player.interrupt();
+  player.poll();
+  const heard = Object.fromEntries(
+    reports.map((report) => [report.id, report.playedMs]),
+  );
+  assert.ok(Math.abs(heard.first - 400) < 1e-6);
+  assert.equal(heard.second, 0);
+});
+
+test("queued later output is discarded on interruption and still counts toward the queue limit", () => {
+  const context = new Context(),
+    reports = [];
+  const player = new Player(context, (report) => reports.push(report));
+  player.begin("first");
+  player.begin("second");
+  player.write("second", new Uint8Array(48000 * 30));
+  assert.throws(
+    () => player.write("second", new Uint8Array(960)),
+    /queue exceeded/,
+  );
+  player.interrupt();
+  player.end("first");
+  player.end("second");
+  player.poll();
+  assert.equal(context.sources.length, 0);
+  assert.equal(reports.length, 2);
+  assert.ok(reports.every((report) => report.playedMs === 0));
+  player.begin("third");
+  player.write("third", new Uint8Array(960));
+  assert.equal(context.sources.length, 1);
+});
+
+test("a batch interrupts queued output before it can start", () => {
+  const context = new Context(),
+    reports = [];
+  const player = new Player(context, (report) => reports.push(report));
+  player.begin("first");
+  player.write("first", new Uint8Array(96000));
+  player.begin("second");
+  player.write("second", new Uint8Array(96000));
+  player.end("second");
+  context.currentTime = context.outputTime = 0.42;
+  player.interrupt(["first", "second"]);
+  player.end("first");
+  assert.equal(context.sources.length, 1);
+  // A delayed stop of the second output must still report nothing heard.
+  context.currentTime = context.outputTime = 0.82;
+  player.interrupt(["second"]);
+  player.poll();
+  assert.equal(reports.find((report) => report.id === "second").playedMs, 0);
+});
+
+test("remote shutdown acknowledges only after the output clock passes the stop point", () => {
+  const context = new Context(),
+    reports = [];
+  const player = new Player(context, (report) => reports.push(report));
+  player.begin("active");
+  player.write("active", new Uint8Array(48000));
+  context.currentTime = 0.5;
+  context.outputTime = 0.4;
+  player.stop("stop-1");
+  assert.equal(context.sources[0].stopAt, 0.5);
+  assert.deepEqual(reports, []);
+  context.outputTime = 0.5;
+  player.poll();
+  assert.equal(reports[0].type, "played");
+  assert.deepEqual(reports[1], { type: "stopped", id: "stop-1" });
+  assert.equal(player.replies.size, 0);
+});
+
+test("disconnect during remote shutdown rejects the pending confirmation", async () => {
+  const socket = new Socket(),
+    audio = new BrowserAudio(socket);
+  const stopping = audio.stop(new AbortController().signal);
+  const failed = assert.rejects(
+    stopping,
+    /Browser disconnected before shutdown confirmation/,
+  );
+  socket.close();
+  await failed;
+});
+
+test("aborted remote shutdown releases its wait and keeps the caller socket open", async () => {
+  const socket = new Socket(),
+    audio = new BrowserAudio(socket);
+  const controller = new AbortController();
+  let closed = false;
+  socket.on("close", () => {
+    closed = true;
+  });
+  const reason = new Error("shutdown deadline");
+  const stopped = audio.stop(controller.signal);
+  const rejected = assert.rejects(stopped, (error) => error === reason);
+  controller.abort(reason);
+  await rejected;
+  assert.equal(closed, false);
+  assert.equal(getEventListeners(controller.signal, "abort").length, 0);
+  const retry = audio.stop(new AbortController().signal);
+  socket.report({ type: "stopped", id: socket.sent.at(-1).id });
+  await retry;
+  audio.close();
+});
+
+test("browser transport interrupts a batch and completes remaining queued audio", async () => {
+  const context = new Context(),
+    socket = new Socket();
+  const player = new Player(context, (report) => socket.report(report));
+  const audio = new BrowserAudio(socket);
+  socket.on("sent", (message) => {
+    if (message.type === "begin") player.begin(message.id);
+    else if (message.type === "audio")
+      player.write(message.id, Buffer.from(message.data, "base64"));
+    else if (message.type === "end") player.end(message.id);
+    else if (message.type === "interrupt") player.interrupt(message.ids);
+  });
+  const refs = ["old", "dependent", "next-turn"].map((id) => ({
+    response: { sessionId: "s", responseId: id },
+    itemId: id,
+    outputIndex: 0,
+    contentIndex: 0,
+  }));
+  const outputs = refs.map((ref) => audio.open(ref));
+  for (const output of outputs)
+    output.write({
+      data: new Uint8Array(960),
+      format: { sampleRate: 24000, channels: 1 },
+    });
+  outputs[1].end();
+  outputs[2].end();
+  audio.interrupt(refs.slice(0, 2));
+  outputs[0].end();
+  assert.equal(
+    socket.sent.filter((message) => message.type === "interrupt").length,
+    1,
+  );
+  assert.equal(context.sources.length, 2);
+  context.currentTime = context.outputTime = 1;
+  player.poll();
+  const signal = new AbortController().signal;
+  assert.deepEqual(
+    await Promise.all(outputs.map((output) => output.completion(signal))),
+    [0, 0, 20],
+  );
+  audio.close();
 });

@@ -2,9 +2,95 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
-import { RimeRealtimeError } from "@rimelabs/sdk";
+import { Rime, RimeRealtimeError } from "@rimelabs/sdk";
+import { Peer } from "../../tests/realtime-peer.mjs";
 import { BrowserAudio } from "../common/browser-audio.ts";
 import { converse } from "../realtime/conversation.ts";
+import { ManualTools } from "../realtime/manual-tools.ts";
+
+for (const stage of ["before_call", "before_end", "working", "continuing"]) {
+  test(
+    `abandonment prevents or cancels tool continuation: ${stage}`,
+    { timeout: 1500 },
+    async () => {
+      let release, started, continuing;
+      const work = new Promise((resolve) => {
+        release = resolve;
+      });
+      const working = new Promise((resolve) => {
+        started = resolve;
+      });
+      const continuationStarted = new Promise((resolve) => {
+        continuing = resolve;
+      });
+      const executed = [],
+        results = [],
+        cancelled = [];
+      const controller = new AbortController();
+      const session = {
+        async submitToolResult(call, output) {
+          results.push(output);
+        },
+        async continueReply(response, { signal }) {
+          continuing();
+          signal.throwIfAborted();
+          await new Promise((resolve, reject) =>
+            signal.addEventListener(
+              "abort",
+              () => {
+                cancelled.push(response);
+                reject(signal.reason);
+              },
+              { once: true },
+            ),
+          );
+        },
+      };
+      const tools = new ManualTools(session, controller, async (call) => {
+        executed.push(call);
+        started();
+        await work;
+        return "{}";
+      });
+      const response = { sessionId: "s", responseId: "tools" };
+      const emit = (payload) => tools.onEvent({ payload });
+      try {
+        emit({ kind: "response.started", response });
+        if (stage === "before_call")
+          emit({ kind: "response.abandoned", response });
+        emit({
+          kind: "tool.call",
+          call: { ...response, callId: "c" },
+          name: "test",
+          arguments: {},
+        });
+        if (stage === "before_end")
+          emit({ kind: "response.abandoned", response });
+        emit({ kind: "response.ended", response, status: "completed" });
+        if (["working", "continuing"].includes(stage)) {
+          await working;
+          if (stage === "continuing") {
+            release();
+            await continuationStarted;
+          }
+          emit({ kind: "response.abandoned", response });
+        }
+        release();
+        await tools.settled();
+        assert.equal(controller.signal.aborted, false);
+        assert.equal(
+          executed.length,
+          ["working", "continuing"].includes(stage) ? 1 : 0,
+        );
+        assert.equal(cancelled.length, stage === "continuing" ? 1 : 0);
+      } finally {
+        release();
+        controller.abort();
+        await tools.settled();
+      }
+    },
+  );
+}
 
 for (const scenario of ["completed", "superseded", "refused"]) {
   test(`tool continuation: ${scenario}`, { timeout: 3000 }, async () => {
@@ -132,7 +218,66 @@ for (const scenario of ["completed", "superseded", "refused"]) {
       assert.equal(continuations.length, superseded ? 0 : 1);
     } finally {
       audio.close();
-      await running;
+      await assert.rejects(
+        running,
+        /Browser disconnected before shutdown confirmation/,
+      );
     }
   });
 }
+
+test(
+  "tool failure during playback shutdown reaches the caller",
+  { timeout: 3000 },
+  async (t) => {
+    function deferred() {
+      let resolve, reject;
+      const promise = new Promise((accept, refuse) => {
+        resolve = accept;
+        reject = refuse;
+      });
+      return { promise, resolve, reject };
+    }
+    const peer = await new Peer().start();
+    const client = new Rime({ apiKey: "test" });
+    const session = await client.realtime.connect({ endpoint: peer.endpoint });
+    const eof = deferred(),
+      stopping = deferred(),
+      confirmed = deferred();
+    const started = deferred(),
+      tool = deferred();
+    const audio = {
+      read() {
+        return eof.promise;
+      },
+      async stop() {
+        stopping.resolve();
+        await confirmed.promise;
+      },
+    };
+    const failure = new Error("tool failed during playback shutdown");
+    const running = converse(session, audio, async () => {
+      started.resolve();
+      return await tool.promise;
+    });
+    const result = assert.rejects(running, (error) => error === failure);
+    t.after(async () => {
+      eof.resolve(null);
+      confirmed.resolve();
+      tool.resolve("{}");
+      await client.close();
+      await running.catch(() => {});
+      await peer.close();
+    });
+    peer.emit("response.created", { response: { id: "reply-1" } });
+    peer.tool();
+    peer.ended();
+    await started.promise;
+    eof.resolve(null);
+    await stopping.promise;
+    tool.reject(failure);
+    await sleep(0);
+    confirmed.resolve();
+    await result;
+  },
+);

@@ -10,9 +10,144 @@ microphone capture, tool execution, and playback.
 Start with the [recorded-speech quick start](../README.md#prism-send-recorded-speech)
 to save a spoken reply without audio hardware.
 
-For live conversations, keep the session open after normal cancellation and
-report playback from the output clock. Saving a file is not playback.
+For live conversations, keep the session open after a response is cancelled.
+Report playback from the output clock. Saving a file is not playback.
 Typed turns also support mixed text and voice applications.
+
+## Optional conversation runner
+
+Use `runConversation` to connect your audio adapters once. It sends input,
+queues output, handles interruption, reports measured playback, and stops its
+operations when the conversation ends. The direct session methods remain available.
+
+```ts
+import { Rime, runConversation } from "@rimelabs/sdk";
+
+const client = new Rime();
+const controller = new AbortController();
+try {
+  const session = await client.realtime.connect();
+  // microphone and speaker are adapters owned by your application.
+  await runConversation(session, {
+    source: microphone,
+    playback: speaker,
+    onEvent(event) {
+      if (event.payload.kind === "transcript.final")
+        console.log(event.payload.text);
+    },
+    signal: controller.signal,
+  });
+} finally {
+  await client.close();
+}
+```
+
+The input adapter implements `ConversationSource`.
+`read(signal: AbortSignal): Promise<AudioChunk | null>` returns one chunk,
+with an optional format, or `null` at EOF. An omitted format uses 16 kHz mono
+PCM16. Abort must reject and release a pending
+read. The runner awaits each `session.sendAudio` call before reading again. It
+uses the session's existing PCM conversion and transport backpressure. Input
+continues during output playback.
+
+The playback adapter implements `ConversationPlayback`:
+
+| Method | Contract |
+| --- | --- |
+| `open(output: OutputRef): ConversationOutput` | Queue this output after previously opened outputs. It can be opened before the first audio chunk. |
+| `interrupt(outputs: readonly OutputRef[]): void` | Stop the selected outputs as one batch, discard their unplayed audio, then resume remaining output in queue order. |
+| `stop(signal: AbortSignal): Promise<void>` | Confirm all playback has stopped and queued audio is discarded. Keep caller-owned resources open. |
+
+Each `ConversationOutput` implements:
+
+| Method | Contract |
+| --- | --- |
+| `write(chunk: AudioChunk): void` | Queue 24 kHz mono PCM16 without blocking. Bound the queue and throw on overflow. |
+| `end(): void` | Accept no more audio. Let queued and device audio drain. |
+| `completion(signal: AbortSignal): Promise<number>` | Return actual played milliseconds after drain or interruption. Reject if measurement fails or the signal aborts. |
+
+All synchronous adapter methods must return promptly. Completion can be awaited
+before `end()`. Keep receipts separate for each `OutputRef`, even when a new
+response starts before an old receipt completes. Play outputs in the order they
+were opened, using one FIFO audio queue. Do not mix outputs, interleave their
+audio, or play later outputs before earlier outputs finish or are interrupted.
+Prism assumes that interrupting a partially played reply leaves later replies
+in the same turn unheard. Independent concurrent playback violates that assumption.
+The runner passes all affected output references in one `interrupt` call. Stop
+them and discard their queued audio before starting any remaining output. Then
+resume valid output in queue order, without waiting for another chunk or event.
+Interruption must work after `end()` and tolerate repeated calls. A remote
+adapter must preserve the batch, for example with one message containing all
+selected output IDs. Shutdown stops all output and must not resume playback.
+Receipt delivery can be delayed or arrive out of order; audible playback cannot.
+A receipt includes the device buffer where device timing is available. Bytes
+received or queued do not measure playback. Zero is valid for an output that
+played no audio.
+
+Abort must release each pending adapter operation and remove its listeners.
+Cancellation of a completion wait must not cancel the device receipt. The runner
+stops input, event processing, and report submission on exit. It then awaits
+`stop(signal)` before aborting remaining receipt waits. The stop signal is
+independent of caller cancellation and has a five-second deadline. `stop` must
+resolve only after local or remote playback has stopped, including device
+buffers. Sending a stop command is not confirmation. It must reject and release
+its wait when the stop signal aborts. The runner awaits this cancellation cleanup
+before it returns, so cleanup can extend beyond the deadline. A missing confirmation raises
+`RimeTimeoutError`; disconnects and other shutdown failures must reject too.
+The caller opens and closes the adapter resources. The runner does not open
+audio devices or host a browser.
+
+`onEvent` is optional. It receives every event read from `session.events`, in
+order, after the runner applies audio coordination. It must be synchronous and
+nonblocking. Returning a promise is rejected. Callback exceptions reach the
+caller. The callback can schedule application work. Continue to use
+`submitToolResult` and `continueReply`; the runner neither registers nor executes
+tools. The application must cancel and await its own tool tasks. Response
+failures and nonterminal faults are forwarded for application handling. Session
+failures reject the runner promise.
+
+The runner is the only event reader. Do not consume `session.events` at the same
+time, call `reportPlayback` independently, or send a second audio source. Other
+session methods remain available for manual tools and application actions.
+
+On confirmed `speech.started`, the runner uses the effective
+`session.info.interruptOnSpeech` setting. It stops affected output, waits for the
+interrupted receipt, and reports the measured position. It ignores late audio
+for that response. A `speech.hint` alone does not stop playback. A server
+`truncate_not_current` refusal is forwarded as an event; it does not stop a newer
+response. Finished reports wait for generation completion and every output
+receipt, including outstanding playback from earlier responses. Prism treats
+the latest drain token as confirmation that all earlier playback has stopped.
+An abandoned response also stops its dependent tool continuations, identified
+by response parent references. Unrelated later turns remain eligible to play.
+Late audio from an interrupted response or its continuations is discarded.
+The runner retains at most 128 response parent references.
+A report retains the measured duration of its own response. Waiting for earlier
+playback does not block events or input, and does not wait for later responses.
+
+Once called, the runner owns the session's active lifetime. Input EOF, explicit
+session closure, abort, or failure stops all runner operations and closes the
+session. EOF stops remaining playback and waits for shutdown confirmation.
+Abort, including an abort received during cleanup, waits for playback shutdown
+confirmation or its five-second deadline, then awaits adapter cancellation cleanup
+before rejecting with `signal.reason`.
+Explicit session closure ends normally even with playback reports pending;
+remote connection failures reject with the session error.
+Expected cancellation errors during cleanup are ignored. Other cleanup errors
+reach the caller if there is no original failure. They do not replace an
+existing failure or caller abort. The signal is optional. Use
+an application deadline if an adapter can wait indefinitely.
+
+The runner adds no input or callback queue. It retains at most 64 responses,
+128 output streams, and 256 pending operations. Exceeding a limit throws
+`RimeResourceLimitError`. The adapters must also bound their audio queues.
+
+The [live voice example](https://github.com/rimelabs/rime-sdk/blob/main/typescript/examples/realtime/conversation.ts) supplies the
+[browser audio adapter](https://github.com/rimelabs/rime-sdk/blob/main/typescript/examples/common/browser-audio.ts). Browser hosting
+stays in the example. Its player uses `AudioContext.getOutputTimestamp()` for
+receipts and shutdown confirmation. A disconnect cannot confirm a remote stop.
+The [manual tool example](https://github.com/rimelabs/rime-sdk/blob/main/typescript/examples/realtime/manual-tools.ts) keeps
+tool execution outside the runner.
 
 ## Connect
 
