@@ -125,6 +125,16 @@ for user-visible package changes, and describe breaking changes in the PR body.
 
 ## Published example checks
 
+When a release first includes an API used by the examples, update the copied
+examples' minimum SDK requirements in `python/examples/pyproject.toml` and
+`typescript/examples/package.json`, and the Rust README installation requirement,
+to the corresponding release versions. Refresh affected lockfiles and remove
+the examples' unreleased-feature notes. For append-fragment STT, these updates
+are pending the first release containing `TranscriptionOutputContract` / the
+`outputContract` option; do not substitute an older release or guess a future
+version while the feature is still under review. Verify the release version
+satisfies the declared minimum before running the published-example checks.
+
 After Python or TypeScript publication succeeds, the release workflow runs
 **Check published SDK examples**. It copies examples from the release tag into
 a temporary directory outside the workspace, installs the exact published SDK,

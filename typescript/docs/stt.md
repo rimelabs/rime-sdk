@@ -162,8 +162,12 @@ Pass an `AbortSignal` through the stream's `signal` option to cancel just that
 utterance. Client close cancels all STT, TTS and realtime operations; cancelling
 one stream leaves its siblings running.
 
-The SDK bounds the transcript queue to 16 updates, with at most 1 MiB of UTF-8 text per transcript (cumulative across deltas),
-and bounds gRPC responses to 1 MiB plus 64 KiB for the protobuf envelope. Slow consumers apply backpressure.
+The SDK bounds the transcript queue to 16 updates. In revised-hypotheses mode,
+each replacement update is limited to 1 MiB of UTF-8 text; sizes are not summed
+across revisions. In append-fragments mode, the concatenated text across all
+deltas is limited to 1 MiB. The final transcript is also limited to 1 MiB in both
+modes. gRPC responses are bounded to 1 MiB plus 64 KiB for the protobuf envelope.
+Slow consumers apply backpressure.
 Internal connection and acceptance waits are 10 seconds; completion after source
 exhaustion is bounded to 120 seconds. The completion timer stops after successful
 gRPC completion. The optional overall timeout remains active until the final

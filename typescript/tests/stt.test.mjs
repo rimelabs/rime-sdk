@@ -177,8 +177,15 @@ for (const item of cases)
       }
       actual.push(state.finish());
     };
-    if (item.error) assert.throws(run, sdk[item.error]);
-    else {
+    if (item.error) {
+      const ErrorType = sdk[item.error];
+      assert.equal(
+        typeof ErrorType,
+        "function",
+        `Unknown SDK error class in shared transcript case: ${item.error}`,
+      );
+      assert.throws(run, ErrorType);
+    } else {
       run();
       assert.deepEqual(actual, item.expected);
     }

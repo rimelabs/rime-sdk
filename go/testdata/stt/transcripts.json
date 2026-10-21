@@ -656,7 +656,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_hypothesis_rejected",
@@ -679,7 +679,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_delta_before_acceptance",
@@ -692,7 +692,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_final_mismatch",
@@ -724,7 +724,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_nonzero_revision",
@@ -751,7 +751,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_missing_done",
@@ -773,7 +773,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_early_final",
@@ -800,7 +800,7 @@
         }
       ],
       "inputDone": false,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_delta_after_done",
@@ -832,7 +832,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_duplicate_done",
@@ -869,7 +869,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     },
     {
       "name": "append_wrong_language",
@@ -894,7 +894,7 @@
         }
       ],
       "inputDone": true,
-      "error": "stream"
+      "error": "RimeStreamError"
     }
   ]
 }

@@ -25,6 +25,19 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "fs", "io-util"] }
 ```
 
+The STT streaming examples below use the unreleased `TranscriptionOutputContract`
+and `TranscriptionUpdate::Delta` APIs. Published crates through `0.1.0-alpha.7`
+do not contain them. Until append support is released, run the example from this
+source checkout's `rust/` directory:
+
+```sh
+cargo run --example transcribe -- utterance.pcm en append_fragments
+```
+
+The installation requirement above must be raised to the first release containing
+these APIs when that release is prepared; it does not currently cover these STT
+streaming examples.
+
 Get an API key from the [Rime dashboard](https://app.rime.ai/). A key is required:
 `Client::builder().build()` reads `RIME_API_KEY`, or you can use
 `Client::builder().api_key("...").build()` to override it. The SDK does not load
