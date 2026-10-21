@@ -1,0 +1,21 @@
+python/tests/test_manual_tools.py
+  s_157ff4e5551e67::t_50e918b4aa40f7 11-22,27,71,75-76,78-79,85-86
+python/examples/realtime/manual_tools.py
+  s_157ff4e5551e67::t_c467864c20d14f 66-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "143e72a1cfe206bce7f04ab321ad7bd131059c6e",
+  "prompts": {},
+  "sessions": {
+    "s_157ff4e5551e67": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15d5c-8a46-7cf3-ba11-57b36974fc23",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
