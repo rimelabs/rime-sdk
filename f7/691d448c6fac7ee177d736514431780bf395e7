@@ -1,0 +1,21 @@
+typescript/tests/conversation.test.mjs
+  s_157ff4e5551e67::t_944dfd4feac047 102-145,147-150,152-155,157,159-160,162-201
+python/tests/test_manual_tools.py
+  s_157ff4e5551e67::t_33e319cd3a672f 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f7691d448c6fac7ee177d736514431780bf395e7",
+  "prompts": {},
+  "sessions": {
+    "s_157ff4e5551e67": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a15d5c-8a46-7cf3-ba11-57b36974fc23",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
