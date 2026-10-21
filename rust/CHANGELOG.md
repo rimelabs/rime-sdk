@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.8](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.7...rust-v0.1.0-alpha.8) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rust TranscriptionUpdate and TypeScript TranscriptionUpdate include Delta/delta; exhaustive handlers must handle the new variant.
+
+### Features
+
+* add append-fragment STT streaming across SDKs ([369f04d](https://github.com/rimelabs/rime-sdk/commit/369f04dadfea9d3d8593d14283d64e3a1f36e4d1))
+
 ## [0.1.0-alpha.7](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.6...rust-v0.1.0-alpha.7) (2026-10-16)
 
 
