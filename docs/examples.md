@@ -5,7 +5,8 @@ examples use the local SDK. Python and TypeScript declare separate example
 dependencies and share their SDK's workspace installation.
 
 Run the commands below from the repository root. Live examples need a Rime API
-key. Prism also needs a deployment URL and voice.
+key. Prism requires only the API key and uses the public endpoint and server
+default voice. The endpoint and voice are optional overrides.
 
 | Use case | Python | TypeScript | Go | Rust |
 | --- | --- | --- | --- | --- |
