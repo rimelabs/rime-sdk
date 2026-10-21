@@ -16,17 +16,18 @@ Typed turns also support mixed text and voice applications.
 
 ## Connect
 
-Use `await client.realtime.connect(options)`. It opens a WebSocket, initializes
-one conversation, and returns a `RealtimeSession`. Settings apply once. Open a
-new session to change them.
+Use `await client.realtime.connect()` with `RIME_API_KEY` set. It opens a WebSocket,
+initializes one conversation, and returns a `RealtimeSession`. Settings apply
+once. Open a new session to change them.
 
 | Option | Required? | Default and behavior |
 | --- | --- | --- |
-| `endpoint` | Yes | Full `wss://host/v1/realtime` URL. Plain `ws://` is allowed only for localhost. |
+| `endpoint` | No | Defaults to `wss://prism.api.rime.ai/v1/realtime`. Overrides must be full URLs; plain `ws://` is allowed only for localhost. |
 | `voice` | If the server has no default voice | Omitted or `null` uses the server default. Supplied strings must be nonblank. |
 | `instructions` | No | Omitted or `null` uses server defaults. Supplied strings must be nonblank. |
 | `tools` | No | `[]`. Each tool requires `name` and a JSON Schema `parameters` object. `description` defaults to `""`. |
 | `interruptOnSpeech` | No | `true`. Requests interruption when the server confirms user speech. |
+| `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
@@ -36,7 +37,8 @@ Credentials come from `new Rime({ apiKey: "..." })` or `RIME_API_KEY`. Prism use
 voice, and timeout settings do not apply to Realtime.
 
 After connection, `session.info` contains `sessionId`, `model`, `voice`,
-`interruptOnSpeech`, `toolResultTimeoutS`, and `toolContinuationTimeoutS`.
+`interruptOnSpeech`, `turnDetection`, `toolResultTimeoutS`, and
+`toolContinuationTimeoutS`.
 Check the effective interruption setting there. Tool wait durations are total
 server deadlines, not remaining time. A `null` duration can mean an omitted
 field; it does not prove that no deadline exists.
@@ -44,6 +46,39 @@ field; it does not prove that no deadline exists.
 Close the session in `finally` with `await session.close()`. Closing the parent
 client closes all its TTS and Realtime operations. Both objects also support
 `Symbol.asyncDispose`. Repeated close calls are safe.
+
+## Optional turn timing
+
+Pass a `TurnDetection` object to override how readily Prism ends a spoken turn.
+Each field is optional; omitted fields use server defaults.
+
+| Field | Values | Current server default |
+| --- | --- | --- |
+| `eagerness` | `"low"`, `"medium"`, `"high"`, `"auto"` | `"auto"`, equivalent to `"medium"` |
+| `endOfTurnTimeoutMs` | Integer from 1,000 through 10,000 | 5,000 ms |
+
+`"low"` waits for more certainty that the user has finished. `"high"` answers
+sooner, with more risk of cutting in. The timeout is a maximum silence limit,
+not a fixed delay before each reply. If the server falls back to its local
+voice activity detector, it ends turns after 500 ms of silence instead.
+
+```typescript
+const session = await client.realtime.connect({
+  turnDetection: { eagerness: "low", endOfTurnTimeoutMs: 5000 },
+});
+try {
+  console.log(session.info.turnDetection);
+  // Send input and consume session.events here.
+} finally {
+  await session.close();
+}
+```
+
+`session.info.turnDetection` is a `TurnDetectionInfo` with the settings the
+server reported in its initialization acknowledgment. A missing field is
+`null`; the SDK does not substitute a requested value or assume a server
+default. An unrecognized server eagerness becomes `"unknown"`.
+`interruptOnSpeech` remains a separate connection option.
 
 ## Choose an operation
 

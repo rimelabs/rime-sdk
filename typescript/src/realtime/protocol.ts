@@ -6,7 +6,11 @@ import * as t from "./types.js";
 export interface SessionSettings {
   modalities: ("text" | "audio")[];
   input_audio_format: "pcm16";
-  turn_detection: { interrupt_response: boolean };
+  turn_detection: {
+    interrupt_response: boolean;
+    eagerness?: t.TurnEagerness;
+    prism_end_of_turn_timeout_ms?: number;
+  };
   tools: {
     type: "function";
     function: { name: string; description: string; parameters: t.JsonObject };
@@ -20,6 +24,7 @@ export interface SessionView {
   interruptOnSpeech: boolean | null;
   toolResultTimeoutS: number | null;
   toolContinuationTimeoutS: number | null;
+  turnDetection: t.TurnDetectionInfo;
 }
 export interface SessionCreated {
   kind: "session.created";
@@ -168,6 +173,36 @@ function duration(value: unknown, field: string): number | null {
 }
 function session(value: unknown): SessionView {
   const view = object(value, "session");
+  const detection =
+    view.turn_detection === undefined
+      ? {}
+      : object(view.turn_detection, "session.turn_detection");
+  let eagerness: t.TurnDetectionInfo["eagerness"] = null;
+  if (detection.eagerness !== undefined) {
+    const value = string(
+      detection.eagerness,
+      "session.turn_detection.eagerness",
+    );
+    eagerness =
+      value === "low" ||
+      value === "medium" ||
+      value === "high" ||
+      value === "auto"
+        ? value
+        : "unknown";
+  }
+  let endOfTurnTimeoutMs: number | null = null;
+  if (detection.prism_end_of_turn_timeout_ms !== undefined) {
+    const value = detection.prism_end_of_turn_timeout_ms;
+    if (
+      typeof value !== "number" ||
+      !Number.isInteger(value) ||
+      value < 1000 ||
+      value > 10000
+    )
+      invalid("session.turn_detection.prism_end_of_turn_timeout_ms");
+    endOfTurnTimeoutMs = value;
+  }
   const waits =
     view.prism_tool_waits === undefined
       ? {}
@@ -184,6 +219,7 @@ function session(value: unknown): SessionView {
     id: id(view.id, "session.id"),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
+    turnDetection: Object.freeze({ eagerness, endOfTurnTimeoutMs }),
     toolResultTimeoutS: duration(waits.result_timeout_s, "result_timeout_s"),
     toolContinuationTimeoutS: duration(
       waits.continuation_timeout_s,

@@ -17,7 +17,8 @@ streaming audio source; updates replace the current
 transcript and source exhaustion ends the utterance.
 
 Python and Node.js support Prism speech-to-speech sessions through
-`client.realtime.connect`. Prism requires an explicit realtime endpoint.
+`client.realtime.connect`. Prism defaults to `wss://prism.api.rime.ai/v1/realtime`
+and the server's default voice. An endpoint override is optional.
 
 Coda is the default TTS model. Select `mistv3` to use Mist v3:
 `Rime(model="mistv3")` in Python or `new Rime({ model: "mistv3" })` in Node.js.

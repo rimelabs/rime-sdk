@@ -28,16 +28,10 @@ STT use the SDK and Node.js built-ins.
 
 ## Prism: send recorded speech
 
-Prism needs a deployment that serves its realtime API. Obtain the endpoint,
-credentials, and voice from your deployment operator. The TTS endpoint does not serve Prism.
-Set `RIME_API_KEY` to the credential for that deployment if it differs from your TTS key.
+With `RIME_API_KEY` set, the SDK connects to
+`wss://prism.api.rime.ai/v1/realtime` and uses the server's default voice.
+Pass `endpoint` or `voice` to select another deployment or voice.
 
-```sh
-export PRISM_URL="wss://your-prism-host/v1/realtime"
-export PRISM_VOICE="your-deployment-voice"
-```
-
-You can omit `PRISM_VOICE` if the deployment has a default voice.
 Record a short question and export it as `question.wav`, using **16 kHz, mono, signed 16-bit PCM WAV**.
 Save the following as `prism.mjs` beside that file. It sends the recording at capture speed,
 then sends silence so Prism can detect the end of speech. The spoken reply goes to `reply.wav`.
@@ -61,9 +55,6 @@ if (
 const data = Buffer.from(input.data.samples);
 if (!data.length || data.length % 2)
   throw new Error("question.wav has no complete PCM16 audio");
-const endpoint = process.env.PRISM_URL;
-if (!endpoint)
-  throw new Error("Set PRISM_URL to your deployment's /v1/realtime URL");
 
 const client = new Rime();
 const stop = new AbortController();
@@ -75,8 +66,6 @@ let sending;
 let reading;
 try {
   const session = await client.realtime.connect({
-    endpoint,
-    voice: process.env.PRISM_VOICE,
     instructions: "Give short, clear answers.",
   });
   sending = (async () => {

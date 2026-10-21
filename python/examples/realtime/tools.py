@@ -73,7 +73,7 @@ async def main() -> None:
         asyncio.timeout(60),
         Rime() as client,
         client.realtime.connect(
-            endpoint=os.environ["PRISM_URL"],
+            endpoint=os.getenv("PRISM_URL"),
             voice=os.getenv("PRISM_VOICE"),
             instructions="Use lookup_order for order questions. Keep the answer short.",
             tools=[LOOKUP_ORDER],

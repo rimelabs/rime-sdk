@@ -41,6 +41,9 @@ from ._types import (
     TranscriptDelta,
     TranscriptFailed,
     TranscriptFinal,
+    TurnDetection,
+    TurnDetectionInfo,
+    TurnEagerness,
 )
 
 __all__ = [
@@ -84,4 +87,7 @@ __all__ = [
     "TranscriptDelta",
     "TranscriptFailed",
     "TranscriptFinal",
+    "TurnDetection",
+    "TurnDetectionInfo",
+    "TurnEagerness",
 ]

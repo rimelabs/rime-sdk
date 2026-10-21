@@ -16,17 +16,18 @@ Typed turns also support mixed text and voice applications.
 
 ## Connect
 
-Use `async with client.realtime.connect(...) as session`. The context opens the
-WebSocket, initializes the session, and closes it on exit. Settings apply once;
-open a new session to change them.
+Use `async with client.realtime.connect() as session` with `RIME_API_KEY` set.
+The context opens the WebSocket, initializes the session, and closes it on exit.
+Settings apply once; open a new session to change them.
 
 | Argument | Required? | Default and behavior |
 | --- | --- | --- |
-| `endpoint: str` | Yes | Full `wss://host/v1/realtime` URL. Plain `ws://` is allowed only for localhost. |
+| `endpoint: str \| None` | No | Omitted or `None` uses `wss://prism.api.rime.ai/v1/realtime`. Overrides must be full URLs; plain `ws://` is allowed only for localhost. |
 | `voice: str \| None` | If the server has no default voice | `None` uses the server default. A supplied string must be nonblank. |
 | `instructions: str \| None` | No | `None` uses server defaults. A supplied string must be nonblank. |
 | `tools: Sequence[ToolDefinition]` | No | `()`. Sends an empty tool list when omitted. |
 | `interrupt_on_speech: bool` | No | `True`. Requests interruption when the server confirms user speech. |
+| `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
 
@@ -35,9 +36,42 @@ All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or
 that handshake. TTS model, endpoint, voice, and timeout settings do not apply.
 
 Once connected, `session.info` gives the session ID, voice, model, effective
-interruption setting, and any published tool wait durations. Check
+interruption setting, turn timing, and any published tool wait durations. Check
 `session.info.interrupt_on_speech` for the setting the server actually applied.
 Prism sessions always request both text and audio output.
+
+## Optional turn timing
+
+Use `TurnDetection` to override how readily Prism ends a spoken turn.
+Each field is optional; `None` leaves that field to the server.
+
+| Field | Values | Current server default |
+| --- | --- | --- |
+| `eagerness` | `"low"`, `"medium"`, `"high"`, `"auto"` | `"auto"`, equivalent to `"medium"` |
+| `end_of_turn_timeout_ms` | Integer from 1,000 through 10,000 | 5,000 ms |
+
+`"low"` waits for more certainty that the user has finished. `"high"` answers
+sooner, with more risk of cutting in. The timeout is a maximum silence limit,
+not a fixed delay before each reply. If the server falls back to its local
+voice activity detector, it ends turns after 500 ms of silence instead.
+
+```python
+from rimelabs_sdk import Rime
+from rimelabs_sdk.realtime import TurnDetection
+
+async with Rime() as client:
+    async with client.realtime.connect(
+        turn_detection=TurnDetection(eagerness="low", end_of_turn_timeout_ms=5000),
+    ) as session:
+        print(session.info.turn_detection)
+        # Send input and consume session.events here.
+```
+
+`session.info.turn_detection` is a `TurnDetectionInfo` with the settings the
+server reported in its initialization acknowledgment. A missing field is
+`None`; the SDK does not substitute a requested value or assume a server
+default. An unrecognized server eagerness becomes `"unknown"`.
+`interrupt_on_speech` remains a separate connection option.
 
 ## Choose an operation
 

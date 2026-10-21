@@ -16,6 +16,36 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
 
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
+TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
+
+
+@dataclass(frozen=True, kw_only=True)
+class TurnDetection:
+    """Optional turn timing overrides. None leaves a setting to the server.
+
+    Eagerness controls how readily Prism ends a turn. The silence limit is
+    an integer from 1,000 to 10,000 milliseconds, for example 2,000.
+    """
+
+    eagerness: TurnEagerness | None = None
+    end_of_turn_timeout_ms: int | None = None
+
+    def __post_init__(self):
+        if self.eagerness is not None and self.eagerness not in ("low", "medium", "high", "auto"):
+            raise RimeInputError("Turn eagerness must be low, medium, high, or auto")
+        value = self.end_of_turn_timeout_ms
+        if value is not None and (
+            isinstance(value, bool) or not isinstance(value, int) or not 1000 <= value <= 10000
+        ):
+            raise RimeInputError("End-of-turn timeout must be an integer from 1000 to 10000 ms")
+
+
+@dataclass(frozen=True, kw_only=True)
+class TurnDetectionInfo:
+    """Server-reported timing. None means the server did not publish the field."""
+
+    eagerness: TurnEagerness | Literal["unknown"] | None = None
+    end_of_turn_timeout_ms: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -82,6 +112,7 @@ class SessionInfo:
     interrupt_on_speech: bool
     tool_result_timeout_s: float | None = None
     tool_continuation_timeout_s: float | None = None
+    turn_detection: TurnDetectionInfo = field(default_factory=TurnDetectionInfo)
 
 
 @dataclass(frozen=True, kw_only=True)
