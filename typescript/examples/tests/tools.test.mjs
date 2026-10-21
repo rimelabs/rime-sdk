@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { setTimeout as sleep } from "node:timers/promises";
-import { RimeRealtimeError } from "@rimelabs/sdk";
+import { Rime, RimeRealtimeError } from "@rimelabs/sdk";
+import { Peer } from "../../tests/realtime-peer.mjs";
 import { BrowserAudio } from "../common/browser-audio.ts";
 import { converse } from "../realtime/conversation.ts";
 
@@ -132,7 +133,66 @@ for (const scenario of ["completed", "superseded", "refused"]) {
       assert.equal(continuations.length, superseded ? 0 : 1);
     } finally {
       audio.close();
-      await running;
+      await assert.rejects(
+        running,
+        /Browser disconnected before shutdown confirmation/,
+      );
     }
   });
 }
+
+test(
+  "tool failure during playback shutdown reaches the caller",
+  { timeout: 3000 },
+  async (t) => {
+    function deferred() {
+      let resolve, reject;
+      const promise = new Promise((accept, refuse) => {
+        resolve = accept;
+        reject = refuse;
+      });
+      return { promise, resolve, reject };
+    }
+    const peer = await new Peer().start();
+    const client = new Rime({ apiKey: "test" });
+    const session = await client.realtime.connect({ endpoint: peer.endpoint });
+    const eof = deferred(),
+      stopping = deferred(),
+      confirmed = deferred();
+    const started = deferred(),
+      tool = deferred();
+    const audio = {
+      read() {
+        return eof.promise;
+      },
+      async stop() {
+        stopping.resolve();
+        await confirmed.promise;
+      },
+    };
+    const failure = new Error("tool failed during playback shutdown");
+    const running = converse(session, audio, async () => {
+      started.resolve();
+      return await tool.promise;
+    });
+    const result = assert.rejects(running, (error) => error === failure);
+    t.after(async () => {
+      eof.resolve(null);
+      confirmed.resolve();
+      tool.resolve("{}");
+      await client.close();
+      await running.catch(() => {});
+      await peer.close();
+    });
+    peer.emit("response.created", { response: { id: "reply-1" } });
+    peer.tool();
+    peer.ended();
+    await started.promise;
+    eof.resolve(null);
+    await stopping.promise;
+    tool.reject(failure);
+    await sleep(0);
+    confirmed.resolve();
+    await result;
+  },
+);

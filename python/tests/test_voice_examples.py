@@ -29,9 +29,10 @@ class Stream:
     def __init__(self, **kwargs):
         self.aborted = False
         self.closed = False
+        self.starts = 0
 
     def start(self):
-        pass
+        self.starts += 1
 
     def abort(self):
         self.aborted = True
@@ -110,6 +111,61 @@ async def test_output_waits_for_device_tail_and_excludes_unplayed_audio(devices,
     assert speaker.stream.closed
 
 
+@pytest.mark.parametrize("interrupted", [False, True])
+async def test_speaker_keeps_outputs_fifo_even_when_later_audio_arrives_first(
+    devices, monkeypatch, interrupted
+):
+    clock = DeviceClock()
+    monkeypatch.setattr(devices, "time", clock)
+    with devices.Speaker() as speaker:
+        speaker.loop = clock
+
+        def output(name):
+            return speaker.open(
+                r.OutputRef(
+                    response=r.ResponseRef(session_id="s", response_id=name),
+                    item_id=name,
+                    output_index=0,
+                    content_index=0,
+                )
+            )
+
+        first, second = output("first"), output("second")
+        first_pcm, second_pcm = b"\x01\0" * 480, b"\x02\0" * 480
+        second.write(r.AudioChunk(data=second_pcm, format=r.PCMFormat(sample_rate=24000)))
+        second.end()
+        rendered = bytearray(960)
+        device_time = SimpleNamespace(outputBufferDacTime=1.0, currentTime=1.0)
+        speaker._render(rendered, 480, device_time, None)
+        assert rendered == bytes(960)
+        first.write(r.AudioChunk(data=first_pcm, format=r.PCMFormat(sample_rate=24000)))
+        first.end()
+        speaker._render(rendered, 480, device_time, None)
+        assert rendered == first_pcm
+        clock.advance(0.01)
+        if interrupted:
+            first.interrupt()
+            starts = speaker.stream.starts
+            first.end()
+            assert speaker.stream.starts == starts
+            second.interrupt()
+            assert await first.completion() == pytest.approx(10)
+            assert await second.completion() == 0
+            third = output("third")
+            assert speaker.stream.starts == starts + 1
+            third.interrupt()
+        else:
+            # The device has not yet finished first, so second must stay queued.
+            speaker._render(rendered, 480, device_time, None)
+            assert rendered == bytes(960)
+            clock.advance(0.011)
+            assert await first.completion() == pytest.approx(20)
+            speaker._render(rendered, 480, device_time, None)
+            assert rendered == second_pcm
+            clock.advance(0.021)
+            assert await second.completion() == pytest.approx(20)
+
+
 @pytest.mark.parametrize("status", ["output underflow", "priming output"])
 async def test_output_callback_flags_do_not_stop_playback(devices, monkeypatch, status):
     clock = DeviceClock()
@@ -132,9 +188,9 @@ async def test_input_overflow_does_not_stop_capture(devices):
     with devices.Microphone() as microphone:
         frame = b"\x01\0" * 640
         microphone._capture(frame, 640, None, "input overflow")
-        assert await asyncio.wait_for(microphone.read(), 1) == frame
+        assert (await asyncio.wait_for(microphone.read(), 1)).data == frame
         microphone._capture(frame, 640, None, None)
-        assert await asyncio.wait_for(microphone.read(), 1) == frame
+        assert (await asyncio.wait_for(microphone.read(), 1)).data == frame
 
 
 async def test_microphone_continues_during_playback_and_has_a_bound(devices):
@@ -142,7 +198,7 @@ async def test_microphone_continues_during_playback_and_has_a_bound(devices):
         speaker.begin()
         frame = b"\1\0" * 640
         microphone._capture(frame, 640, None, None)
-        assert await microphone.read() == frame
+        assert (await microphone.read()).data == frame
         for _ in range(101):
             microphone._offer(frame)
         assert microphone.queue.qsize() == 100
@@ -209,6 +265,9 @@ class Session:
                 yield SimpleNamespace(payload=await self.queue.get())
 
         return read()
+
+    async def close(self):
+        pass
 
     async def send_audio(self, chunk):
         pass
@@ -372,3 +431,43 @@ async def test_tool_continuation_refusal_keeps_next_turn_open(examples, devices,
         finally:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_speaker_disconnect_fails_receipt(devices):
+    with devices.Speaker() as speaker:
+        output = speaker.open(None)
+        waiting = asyncio.create_task(output.completion())
+        speaker._finished()
+        with pytest.raises(RuntimeError, match="stopped before playback"):
+            await waiting
+
+
+async def test_speaker_queue_limit_through_public_runner(devices, monkeypatch):
+    from test_conversation import audio, begin, until
+    from test_realtime import session as connected
+
+    async with connected(monkeypatch) as (session, peer, _):
+        with devices.Microphone() as microphone, devices.Speaker() as speaker:
+            task = asyncio.create_task(
+                r.run_conversation(session, source=microphone, playback=speaker)
+            )
+            begin(peer)
+            await until(lambda: speaker.current is not None)
+            speaker.current.buffer.extend(bytes(48000 * 30))
+            audio(peer)
+            with pytest.raises(RuntimeError, match="Speaker queue exceeded"):
+                await task
+            assert speaker.stream.aborted
+            assert not speaker.current.buffer
+
+
+async def test_old_device_interruption_does_not_abort_new_playback(devices):
+    with devices.Speaker() as speaker:
+        old = speaker.begin()
+        speaker.interrupt(old)
+        new = speaker.begin()
+        speaker.stream.aborted = False
+        speaker.write(new, bytes(960))
+        speaker.interrupt(old)
+        assert not speaker.stream.aborted
+        assert not new.interrupted and len(new.buffer) == 960

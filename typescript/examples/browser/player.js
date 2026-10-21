@@ -5,39 +5,75 @@ export class Player {
     this.report = report;
     this.replies = new Map();
     this.tail = 0;
+    this.queuedSeconds = 0;
+    this.stopping = undefined;
   }
   begin(id) {
-    this.replies.set(id, { runs: [], ended: false, reported: false });
+    if (this.stopping) throw new Error("Playback shutdown is pending");
+    this.replies.set(id, {
+      runs: [],
+      queued: [],
+      ended: false,
+      reported: false,
+    });
   }
   write(id, bytes) {
     const reply = this.replies.get(id);
     if (!reply || reply.reported || reply.interrupted) return;
+    if (reply.ended) throw new Error("Audio arrived after playback was sealed");
     const context = this.context;
     const frames = bytes.length / 2;
-    if (Math.max(0, this.tail - context.currentTime) + frames / 24000 > 30)
+    if (
+      Math.max(0, this.tail - context.currentTime) +
+        this.queuedSeconds +
+        frames / 24000 >
+      30
+    )
       throw new Error("Playback queue exceeded 30 seconds");
     const buffer = context.createBuffer(1, frames, 24000);
     const values = buffer.getChannelData(0);
     const pcm = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     for (let i = 0; i < frames; i++)
       values[i] = pcm.getInt16(i * 2, true) / 32768;
-    const source = context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(context.destination);
-    const start = Math.max(this.tail, context.currentTime + 0.02);
-    this.tail = start + buffer.duration;
-    reply.runs.push({ source, start, duration: buffer.duration });
-    source.start(start);
+    reply.queued.push(buffer);
+    this.queuedSeconds += buffer.duration;
+    this.schedule();
+  }
+  schedule() {
+    const context = this.context;
+    // Later outputs can arrive before earlier ones finish generating. Hold
+    // their audio until the earlier output is sealed, then schedule at its tail.
+    for (const reply of this.replies.values()) {
+      if (reply.reported || reply.interrupted) continue;
+      for (const buffer of reply.queued) {
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        const start = Math.max(this.tail, context.currentTime + 0.02);
+        this.tail = start + buffer.duration;
+        reply.runs.push({ source, start, duration: buffer.duration });
+        source.start(start);
+        this.queuedSeconds = Math.max(0, this.queuedSeconds - buffer.duration);
+      }
+      reply.queued = [];
+      if (!reply.ended) break;
+    }
   }
   end(id) {
     const reply = this.replies.get(id);
     if (reply) {
       reply.ended = true;
       if (reply.reported) this.replies.delete(id);
+      // The runner may still be interrupting later outputs in this turn.
+      // Ending an interrupted output must not start queued audio behind it.
+      if (!reply.interrupted) this.schedule();
     }
   }
   outputTime() {
-    return this.context.getOutputTimestamp().contextTime;
+    const value = this.context.getOutputTimestamp().contextTime;
+    if (!Number.isFinite(value) || value < 0)
+      throw new Error("Invalid playback clock");
+    return value;
   }
   finish(id, reply, interrupted) {
     if (reply.reported) return;
@@ -59,19 +95,39 @@ export class Player {
       else if (
         !reply.interrupted &&
         reply.ended &&
+        !reply.queued.length &&
         (!last || this.outputTime() >= last.start + last.duration)
       )
         this.finish(id, reply, false);
     }
+    if (this.stopping && this.outputTime() >= this.stopping.cutoff) {
+      this.report({ type: "stopped", id: this.stopping.id });
+      this.stopping = undefined;
+    }
   }
-  interrupt() {
-    for (const reply of this.replies.values()) {
+  stop(id) {
+    this.interrupt();
+    this.stopping = { id, cutoff: this.context.currentTime };
+    for (const key of this.replies.keys()) this.end(key);
+    this.poll();
+  }
+  interrupt(id) {
+    for (const [key, reply] of this.replies) {
+      if (id !== undefined && key !== id) continue;
       if (reply.reported || reply.interrupted) continue;
       reply.interrupted = true;
+      for (const buffer of reply.queued)
+        this.queuedSeconds = Math.max(0, this.queuedSeconds - buffer.duration);
+      reply.queued = [];
       // Samples already rendered into the device buffer can still be heard.
       reply.cutoff = this.context.currentTime;
       for (const run of reply.runs) run.source.stop(reply.cutoff);
     }
     this.tail = this.context.currentTime;
+    for (const reply of this.replies.values()) {
+      const last = reply.runs.at(-1);
+      if (last && !reply.interrupted && !reply.reported)
+        this.tail = Math.max(this.tail, last.start + last.duration);
+    }
   }
 }

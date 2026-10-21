@@ -109,7 +109,10 @@ start.onclick = async () => {
             player.end(value.id);
             break;
           case "interrupt":
-            player.interrupt();
+            player.interrupt(value.id);
+            break;
+          case "stop":
+            player.stop(value.id);
             break;
           case "text":
             if (value.text) message(`${value.role}: ${value.text}`);

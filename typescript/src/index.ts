@@ -28,3 +28,10 @@ export type {
   TranscriptionFinal,
   TranscriptionUpdate,
 } from "./stt/types.js";
+export { runConversation } from "./realtime/conversation.js";
+export type {
+  ConversationSource,
+  ConversationOutput,
+  ConversationPlayback,
+  ConversationOptions,
+} from "./realtime/conversation.js";

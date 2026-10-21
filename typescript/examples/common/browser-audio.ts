@@ -1,3 +1,4 @@
+import type { AudioChunk, ConversationOutput, OutputRef } from "@rimelabs/sdk";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { WebSocketServer, WebSocket } from "ws";
@@ -13,6 +14,10 @@ export class BrowserAudio {
   private wake: (() => void) | undefined;
   private ended = false;
   private error: Error | undefined;
+  private stopSequence = 0;
+  private stopping:
+    | { id: string; resolve: () => void; reject: (error: unknown) => void }
+    | undefined;
   private playbacks = new Map<
     string,
     {
@@ -34,6 +39,11 @@ export class BrowserAudio {
           this.wake?.();
         } else {
           const report = JSON.parse(data.toString());
+          if (report.type === "stopped" && typeof report.id === "string") {
+            const stopping = this.stopping;
+            if (stopping && report.id === stopping.id) stopping.resolve();
+            return;
+          }
           if (
             report.type !== "played" ||
             typeof report.id !== "string" ||
@@ -68,6 +78,101 @@ export class BrowserAudio {
     }
     if (this.error) throw this.error;
   }
+  async read(signal: AbortSignal): Promise<AudioChunk | null> {
+    while (!this.ended) {
+      signal.throwIfAborted();
+      const data = this.queue.shift();
+      if (data) return { data, format: { sampleRate: 48000, channels: 1 } };
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => {
+          signal.removeEventListener("abort", abort);
+          this.wake = undefined;
+          reject(signal.reason);
+        };
+        this.wake = () => {
+          signal.removeEventListener("abort", abort);
+          this.wake = undefined;
+          resolve();
+        };
+        signal.addEventListener("abort", abort, { once: true });
+      });
+    }
+    if (this.error) throw this.error;
+    return null;
+  }
+  open(output: OutputRef): ConversationOutput {
+    const id = JSON.stringify([
+      output.response.responseId,
+      output.itemId,
+      output.outputIndex,
+      output.contentIndex,
+    ]);
+    this.begin(id);
+    const entry = this.playbacks.get(id)!;
+    return {
+      write: (chunk) => {
+        if (
+          chunk.format?.sampleRate !== 24000 ||
+          (chunk.format.channels ?? 1) !== 1
+        )
+          throw new Error("Browser playback requires mono 24 kHz PCM16");
+        this.write(id, chunk.data);
+      },
+      end: () => this.send({ type: "end", id }),
+      interrupt: () => this.send({ type: "interrupt", id }),
+      completion: async (signal) => {
+        signal.throwIfAborted();
+        try {
+          const receipt = await new Promise<Playback>((resolve, reject) => {
+            const abort = () => {
+              signal.removeEventListener("abort", abort);
+              reject(signal.reason);
+            };
+            signal.addEventListener("abort", abort, { once: true });
+            entry.done.then(
+              (value) => {
+                signal.removeEventListener("abort", abort);
+                resolve(value);
+              },
+              (error) => {
+                signal.removeEventListener("abort", abort);
+                reject(error);
+              },
+            );
+          });
+          return receipt.playedMs;
+        } finally {
+          this.playbacks.delete(id);
+        }
+      },
+    };
+  }
+  async stop(signal: AbortSignal): Promise<void> {
+    if (this.ended)
+      throw (
+        this.error ??
+        new Error("Browser disconnected before shutdown confirmation")
+      );
+    signal.throwIfAborted();
+    if (this.stopping) throw new Error("Playback shutdown already pending");
+    const id = String(++this.stopSequence);
+    let abort!: () => void;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.stopping = { id, resolve, reject };
+        abort = () => reject(signal.reason);
+        signal.addEventListener("abort", abort, { once: true });
+        this.send({ type: "stop", id });
+      });
+    } catch (error) {
+      // A disconnect requests browser context cleanup, but is not an ACK.
+      this.close(error as Error);
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", abort);
+      this.stopping = undefined;
+    }
+  }
   begin(id: string) {
     let resolve!: (value: Playback) => void;
     let reject!: (error: Error) => void;
@@ -77,6 +182,8 @@ export class BrowserAudio {
     });
     // Disconnect can occur before generation ends and finish() starts waiting.
     void done.catch(() => {});
+    if (this.playbacks.size >= 128)
+      throw new Error("Browser playback limit exceeded");
     this.playbacks.set(id, { done, resolve, reject });
     this.send({ type: "begin", id });
   }
@@ -106,9 +213,13 @@ export class BrowserAudio {
     this.ended = true;
     this.queue = [];
     this.wake?.();
+    this.stopping?.reject(
+      error ?? new Error("Browser disconnected before shutdown confirmation"),
+    );
     // A lost connection gives no measurement of the device's playback position.
     for (const playback of this.playbacks.values())
       playback.reject(error ?? new Error("Browser disconnected"));
+    this.playbacks.clear();
     this.socket.close();
   }
 }

@@ -10,9 +10,129 @@ The SDK handles protocol state; your application handles those external actions.
 Start with the [recorded-speech quick start](../README.md#prism-send-recorded-speech)
 to save a spoken reply without audio hardware.
 
-For live conversations, keep the session open after normal cancellation and
-report playback from the output clock. Saving a file is not playback.
+For live conversations, keep the session open after a response is cancelled.
+Report playback from the output clock. Saving a file is not playback.
 Typed turns also support mixed text and voice applications.
+
+## Optional conversation runner
+
+Use `run_conversation` to connect your audio adapters once. It sends input,
+queues output, handles interruption, reports measured playback, and stops its
+operations when the conversation ends. The direct session methods remain available.
+
+```python
+from rimelabs_sdk import Rime
+from rimelabs_sdk.realtime import TranscriptFinal, run_conversation
+
+def show_transcript(event):
+    if isinstance(event.payload, TranscriptFinal):
+        print(event.payload.text)
+
+# microphone and speaker are adapters owned by your application.
+async with Rime() as client:
+    async with client.realtime.connect() as session:
+        await run_conversation(
+            session,
+            source=microphone,
+            playback=speaker,
+            on_event=show_transcript,
+        )
+```
+
+The input adapter implements `ConversationSource`. Its async `read()` returns
+one `AudioChunk`, including its format, or `None` at EOF. The runner awaits each
+`session.send_audio` call before reading again. It uses the session's existing
+PCM conversion and transport backpressure. Input continues during output playback.
+
+The playback adapter implements `ConversationPlayback`:
+
+| Method | Contract |
+| --- | --- |
+| `open(output: OutputRef) -> ConversationOutput` | Queue this output after previously opened outputs. It can be opened before the first audio chunk. |
+| `await stop() -> None` | Confirm all playback has stopped and queued audio is discarded. Keep caller-owned resource contexts open. |
+
+Each `ConversationOutput` implements:
+
+| Method | Contract |
+| --- | --- |
+| `write(chunk: AudioChunk) -> None` | Queue 24 kHz mono PCM16 without blocking. Bound the queue and raise on overflow. |
+| `end() -> None` | Accept no more audio. Let queued and device audio drain. |
+| `interrupt() -> None` | Stop only this output and discard unplayed audio. This must also work during drain, after `end()`. |
+| `await completion() -> float` | Return actual played milliseconds after drain or interruption. Raise if the device cannot measure playback. |
+
+All synchronous adapter methods must return promptly. Completion can be awaited
+before `end()`. Keep receipts separate for each `OutputRef`, even when a new
+response starts before an old receipt completes. Play outputs in the order they
+were opened, using one FIFO audio queue. Do not mix outputs, interleave their
+audio, or play later outputs before earlier outputs finish or are interrupted.
+Prism assumes that interrupting a partially played reply leaves later replies
+in the same turn unheard. Independent concurrent playback violates that assumption.
+Interrupting an output, including calling `end()` afterward, must not start
+later queued audio as a side effect.
+Receipt delivery can be delayed or arrive out of order; audible playback cannot.
+A receipt includes the device buffer where device timing is available. Bytes
+received or queued do not measure playback. Zero is valid for an output that
+played no audio.
+
+Pending `read()` and `completion()` calls must release their waits on normal
+Python task cancellation. Cancellation of a completion wait must not cancel the
+device receipt. For an adapter backed by a shared future, use
+`await asyncio.shield(receipt)`. If an adapter cancels a receipt independently,
+the runner raises `RimeStreamError` and shuts down; this is not caller cancellation.
+The runner stops input, event processing, and
+report submission on exit. It then awaits `stop()` for up to five seconds before
+cancelling remaining receipt waits. `stop()` must return only after local or
+remote playback has stopped, including device buffers. Sending a stop command
+is not confirmation. It must release its wait on cancellation. The runner awaits
+this cancellation cleanup before it returns, so cleanup can extend beyond the deadline. A missing
+confirmation raises `RimeTimeoutError`; disconnects and other shutdown failures
+must raise an error. The runner does not enter or close adapter resource contexts.
+
+`on_event` is optional. It receives every event read from `session.events`, in
+order, after the runner applies audio coordination. It must be synchronous and
+nonblocking. An async callback is rejected. Callback exceptions reach the caller.
+The callback can schedule tool work in an application-owned task group. Continue
+to use `submit_tool_result` and `continue_reply`; the runner neither registers
+nor executes tools. The application must cancel and await its own tool tasks.
+Response failures and nonterminal faults are forwarded for application handling.
+Session failures raise from the runner.
+
+The runner is the only event reader. Do not consume `session.events` at the same
+time, call `report_playback` independently, or send a second audio source. Other
+session methods remain available for manual tools and application actions.
+
+On confirmed `SpeechStarted`, the runner uses the effective
+`session.info.interrupt_on_speech` setting. It stops affected output, waits for
+the interrupted receipt, and reports the measured position. It ignores late
+audio for that response. A `SpeechHint` alone does not stop playback. A server
+`truncate_not_current` refusal is forwarded as an event; it does not stop a newer
+response. Finished reports wait for generation completion and every output
+receipt, including outstanding playback from earlier responses. Prism treats
+the latest drain token as confirmation that all earlier playback has stopped.
+A report retains the measured duration of its own response. Waiting for earlier
+playback does not block events or input, and does not wait for later responses.
+
+Once called, the runner owns the session's active lifetime. Input EOF, explicit
+session closure, cancellation, or failure stops all runner operations and closes
+the session. EOF stops remaining playback and waits for shutdown confirmation.
+Cancellation, including repeated cancellation during cleanup, waits for playback
+shutdown confirmation or its five-second deadline before raising
+`asyncio.CancelledError`. Explicit session closure ends normally even with playback
+reports pending; remote connection failures raise the session error.
+Cleanup errors reach the caller if there is no original failure. They
+do not replace an existing failure or cancellation. Use
+`asyncio.timeout(...)` to limit the run; playback cleanup can add five seconds
+plus the time needed for adapter cancellation cleanup.
+
+The runner adds no input or callback queue. It retains at most 64 responses,
+128 output streams, and 256 pending operations. Exceeding a limit raises
+`RimeResourceLimitError`. The adapters must also bound their audio queues.
+
+The [live voice example](https://github.com/rimelabs/rime-sdk/blob/main/python/examples/realtime/voice.py) supplies the
+[PortAudio adapters](https://github.com/rimelabs/rime-sdk/blob/main/python/examples/audio_devices.py). They keep microphone capture
+active during playback and use the DAC clock for receipts. Device libraries stay
+in the examples. The [manual tool example](https://github.com/rimelabs/rime-sdk/blob/main/python/examples/realtime/manual_tools.py)
+keeps tool execution outside the runner.
 
 ## Connect
 

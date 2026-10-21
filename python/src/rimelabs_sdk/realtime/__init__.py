@@ -1,6 +1,12 @@
 """Prism speech-to-speech sessions and typed events."""
 
 from ._client import Realtime
+from ._conversation import (
+    ConversationOutput,
+    ConversationPlayback,
+    ConversationSource,
+    run_conversation,
+)
 from ._session import RealtimeSession
 from ._types import (
     AudioChunk,
@@ -50,6 +56,9 @@ __all__ = [
     "AudioChunk",
     "AudioDelta",
     "AudioDone",
+    "ConversationOutput",
+    "ConversationPlayback",
+    "ConversationSource",
     "FaultEvent",
     "InputCommitted",
     "InputEvent",
@@ -90,4 +99,5 @@ __all__ = [
     "TurnDetection",
     "TurnDetectionInfo",
     "TurnEagerness",
+    "run_conversation",
 ]

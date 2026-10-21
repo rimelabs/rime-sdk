@@ -24,6 +24,12 @@ const NOT_READY = new Set([
   "proactive_unavailable",
 ]);
 const LIMIT = 128;
+const closeErrors = new WeakSet<object>();
+
+/** @internal Recognize only failures created by intentional session closure. */
+export function isSessionCloseError(error: unknown): boolean {
+  return error instanceof Error && closeErrors.has(error);
+}
 interface Pending {
   request: p.Request<p.Acknowledgment>;
   result: Deferred<p.Acknowledgment>;
@@ -173,7 +179,13 @@ export class RealtimeSession {
   }
   private check() {
     if (this.failure) throw this.failure;
-    if (this.closed) throw new RimeInputError("The realtime session is closed");
+    if (this.closed) {
+      // Reports can start after intentional close, before runner cleanup.
+      // Failed sessions retain failure and take the branch above.
+      const error = new RimeInputError("The realtime session is closed");
+      closeErrors.add(error);
+      throw error;
+    }
   }
   private response(ref: t.ResponseRef | t.ToolCallRef): ResponseState {
     this.check();
@@ -896,7 +908,9 @@ export class RealtimeSession {
     if (!this.closing) {
       this.closing = (async () => {
         if (!this.closed) {
-          this.fail(new RimeStreamError("Realtime session closed"));
+          const error = new RimeStreamError("Realtime session closed");
+          closeErrors.add(error);
+          this.fail(error);
           this.failure = null;
         }
         await this.socket.close();
