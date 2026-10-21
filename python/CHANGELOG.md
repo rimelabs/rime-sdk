@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.19](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.18...python-v0.1.0-alpha.19) (2026-10-21)
+
+
+### Features
+
+* add realtime conversation runners ([#89](https://github.com/rimelabs/rime-sdk/issues/89)) ([5447be7](https://github.com/rimelabs/rime-sdk/commit/5447be7713896ac8f68191cc957d82c58228296c))
+
 ## [0.1.0-alpha.18](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.17...python-v0.1.0-alpha.18) (2026-10-21)
 
 
