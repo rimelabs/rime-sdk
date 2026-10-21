@@ -25,9 +25,6 @@ export interface ConversationOutput {
   write(chunk: AudioChunk): void;
   /** Seal this output; completion still waits for the device to drain. */
   end(): void;
-  /** Stop this output and discard unplayed audio. Also works after end().
-   * Do not start later queued outputs as a side effect. */
-  interrupt(): void;
   /** Measured played milliseconds. Reject on measurement failure or abort.
    * Abort stops the wait, without cancelling the device receipt. */
   completion(signal: AbortSignal): Promise<number>;
@@ -37,6 +34,11 @@ export interface ConversationPlayback {
    * Keep completion and interruption state separate for each output.
    * Do not mix outputs or play a later output ahead of an earlier one. */
   open(output: OutputRef): ConversationOutput;
+  /** Stop selected outputs as one batch, including outputs after end().
+   * Discard their unplayed audio before starting any remaining output.
+   * Resume remaining outputs in FIFO order without waiting for new audio.
+   * Repeated interruptions are harmless; each receipt remains independent. */
+  interrupt(outputs: readonly OutputRef[]): void;
   /** Confirm all playback has stopped and queued audio is discarded.
    * Caller resources stay open. Reject and release the wait on abort.
    * The runner supplies a separate signal with a five-second deadline and
@@ -85,6 +87,8 @@ export async function runConversation(
   if (signal?.aborted) abort();
   else signal?.addEventListener("abort", abort, { once: true });
   const replies = new Map<string, Reply>();
+  const parents = new Map<string, string | undefined>();
+  const interrupted = new Set<string>();
   const tasks = new Set<Promise<unknown>>();
   let fail!: (error: unknown) => void;
   let failed = false;
@@ -138,7 +142,6 @@ export async function runConversation(
   }
   function cut(output: Output) {
     if (output.report) return;
-    output.stream.interrupt();
     end(output);
     output.report = start(async () => {
       const played = await output.receipt;
@@ -199,12 +202,27 @@ export async function runConversation(
       }
     }, finishing.signal);
   }
-  function interrupt(reply: Reply) {
-    if (reply.interrupted) return;
-    reply.interrupted = true;
-    reply.finish?.abort();
-    for (const output of reply.outputs.values()) cut(output);
-    if (reply.ended) finish(reply);
+  function wasInterrupted(responseId: string): boolean {
+    let current: string | undefined = responseId;
+    // The session retains at most 128 response references.
+    for (let count = 0; current !== undefined && count < 128; count++) {
+      if (interrupted.has(current)) return true;
+      current = parents.get(current);
+    }
+    return false;
+  }
+  function interrupt(selected: Reply[]) {
+    const affected = selected.filter((reply) => !reply.interrupted);
+    const outputs = affected.flatMap((reply) => [...reply.outputs.values()]);
+    for (const reply of affected) {
+      reply.interrupted = true;
+      if (parents.has(reply.ref.responseId))
+        interrupted.add(reply.ref.responseId);
+      reply.finish?.abort();
+    }
+    if (outputs.length) playback.interrupt(outputs.map((output) => output.ref));
+    for (const output of outputs) cut(output);
+    for (const reply of affected) if (reply.ended) finish(reply);
   }
   function outputFor(ref: OutputRef) {
     const reply = replies.get(ref.response.responseId);
@@ -224,7 +242,10 @@ export async function runConversation(
         sealed: false,
       };
       reply.outputs.set(key, output);
-      if (reply.interrupted) cut(output);
+      if (reply.interrupted) {
+        playback.interrupt([ref]);
+        cut(output);
+      }
     }
     return output;
   }
@@ -241,19 +262,29 @@ export async function runConversation(
       running.throwIfAborted();
       const payload = event.payload;
       switch (payload.kind) {
-        case "response.started":
+        case "response.started": {
           if (replies.size >= 64)
             throw new RimeResourceLimitError(
               "Conversation response limit exceeded",
             );
-          replies.set(payload.response.responseId, {
+          const id = payload.response.responseId;
+          parents.set(id, payload.parent?.responseId);
+          if (parents.size > 128) {
+            const expired = parents.keys().next().value!;
+            parents.delete(expired);
+            interrupted.delete(expired);
+          }
+          const blocked = wasInterrupted(id);
+          if (blocked) interrupted.add(id);
+          replies.set(id, {
             ref: payload.response,
             outputs: new Map(),
-            interrupted: false,
+            interrupted: blocked,
             ended: false,
             drained: new Deferred<void>(),
           });
           break;
+        }
         case "message.started":
         case "audio.delta":
         case "audio.done": {
@@ -267,12 +298,16 @@ export async function runConversation(
           break;
         }
         case "speech.started":
-          if (session.info.interruptOnSpeech)
-            for (const reply of replies.values()) interrupt(reply);
+          if (session.info.interruptOnSpeech) interrupt([...replies.values()]);
           break;
         case "response.abandoned": {
-          const reply = replies.get(payload.response.responseId);
-          if (reply) interrupt(reply);
+          if (parents.has(payload.response.responseId))
+            interrupted.add(payload.response.responseId);
+          interrupt(
+            [...replies.values()].filter((reply) =>
+              wasInterrupted(reply.ref.responseId),
+            ),
+          );
           break;
         }
         case "response.ended": {

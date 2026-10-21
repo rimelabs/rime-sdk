@@ -8,6 +8,15 @@ export interface Playback {
   playedMs: number;
 }
 
+function outputId(output: OutputRef): string {
+  return JSON.stringify([
+    output.response.responseId,
+    output.itemId,
+    output.outputIndex,
+    output.contentIndex,
+  ]);
+}
+
 /** Local demo transport. The browser owns microphone capture and the output clock. */
 export class BrowserAudio {
   private queue: Buffer[] = [];
@@ -101,12 +110,7 @@ export class BrowserAudio {
     return null;
   }
   open(output: OutputRef): ConversationOutput {
-    const id = JSON.stringify([
-      output.response.responseId,
-      output.itemId,
-      output.outputIndex,
-      output.contentIndex,
-    ]);
+    const id = outputId(output);
     this.begin(id);
     const entry = this.playbacks.get(id)!;
     return {
@@ -119,7 +123,6 @@ export class BrowserAudio {
         this.write(id, chunk.data);
       },
       end: () => this.send({ type: "end", id }),
-      interrupt: () => this.send({ type: "interrupt", id }),
       completion: async (signal) => {
         signal.throwIfAborted();
         try {
@@ -164,10 +167,6 @@ export class BrowserAudio {
         signal.addEventListener("abort", abort, { once: true });
         this.send({ type: "stop", id });
       });
-    } catch (error) {
-      // A disconnect requests browser context cleanup, but is not an ACK.
-      this.close(error as Error);
-      throw error;
     } finally {
       signal.removeEventListener("abort", abort);
       this.stopping = undefined;
@@ -204,8 +203,8 @@ export class BrowserAudio {
       this.playbacks.delete(id);
     }
   }
-  interrupt() {
-    this.send({ type: "interrupt" });
+  interrupt(outputs: readonly OutputRef[]) {
+    this.send({ type: "interrupt", ids: outputs.map(outputId) });
   }
   close(error?: Error) {
     if (this.ended) return;

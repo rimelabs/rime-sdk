@@ -11,7 +11,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from rimelabs_sdk.realtime import AudioChunk, PCMFormat
+from rimelabs_sdk.realtime import AudioChunk, OutputRef, PCMFormat
 
 
 def sounddevice():
@@ -71,6 +71,7 @@ class Microphone:
 @dataclass(eq=False)
 class Playback:
     done: asyncio.Future
+    output: OutputRef | None = None
     buffer: bytearray = field(default_factory=bytearray)
     runs: list[tuple[float, float]] = field(default_factory=list)
     sealed: bool = False
@@ -123,7 +124,15 @@ class Speaker:
                     playback.done.set_exception(error)
 
     def open(self, output):
-        return DeviceOutput(self, self.begin())
+        playback = self.begin()
+        playback.output = output
+        return DeviceOutput(self, playback)
+
+    def interrupt(self, outputs):
+        selected = set(outputs)
+        self._interrupt_playbacks([item for item in self.pending if item.output in selected])
+        if any(not item.done.done() and not item.interrupted for item in self.pending):
+            self._resume()
 
     async def stop(self):
         # PortAudio abort returns after the device stops; no remote ACK is needed.
@@ -131,8 +140,7 @@ class Speaker:
 
     def _stop(self):
         try:
-            for playback in list(self.pending):
-                self.interrupt(playback)
+            self._interrupt_playbacks(list(self.pending))
         finally:
             # Also stop the device if a failed receipt no longer has a pending wait.
             self.stopping = True
@@ -227,17 +235,22 @@ class Speaker:
                     self._schedule_completion, playback, max(0, finish - now), duration
                 )
 
-    def interrupt(self, playback=None):
+    def _interrupt(self, playback=None):
+        playback = playback or self.current
+        if playback is not None:
+            self._interrupt_playbacks([playback])
+        return playback
+
+    def _interrupt_playbacks(self, playbacks):
         with self.lock:
-            playback = playback or self.current
-            if playback is None or playback.done.done() or playback.interrupted:
-                return None
-            playback.interrupted = True
-            playback.buffer.clear()
-            if playback.timer:
-                playback.timer.cancel()
+            affected = [item for item in playbacks if not item.done.done() and not item.interrupted]
+            for playback in affected:
+                playback.interrupted = True
+                playback.buffer.clear()
+                if playback.timer:
+                    playback.timer.cancel()
+            active = self.current in affected
         # Abort discards device buffers as well as our Python queue.
-        active = playback is self.current
         if active:
             self.stopping = True
             try:
@@ -245,11 +258,9 @@ class Speaker:
                 self.paused = True
             finally:
                 self.stopping = False
-        position = playback.played(time.monotonic())
-        self._complete(playback, position)
-        # The runner may still be stopping later outputs. Resume only when new
-        # output is opened or written, not as a side effect of interruption.
-        return playback
+        now = time.monotonic()
+        for playback in affected:
+            self._complete(playback, playback.played(now))
 
     def __enter__(self):
         self.stream.start()
@@ -275,9 +286,6 @@ class DeviceOutput:
 
     def end(self):
         self.speaker.end(self.playback)
-
-    def interrupt(self):
-        self.speaker.interrupt(self.playback)
 
     async def completion(self):
         return 1000 * await asyncio.shield(self.playback.done)

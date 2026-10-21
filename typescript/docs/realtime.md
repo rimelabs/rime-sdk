@@ -44,7 +44,8 @@ try {
 
 The input adapter implements `ConversationSource`.
 `read(signal: AbortSignal): Promise<AudioChunk | null>` returns one chunk,
-including its format, or `null` at EOF. Abort must reject and release a pending
+with an optional format, or `null` at EOF. An omitted format uses 16 kHz mono
+PCM16. Abort must reject and release a pending
 read. The runner awaits each `session.sendAudio` call before reading again. It
 uses the session's existing PCM conversion and transport backpressure. Input
 continues during output playback.
@@ -54,6 +55,7 @@ The playback adapter implements `ConversationPlayback`:
 | Method | Contract |
 | --- | --- |
 | `open(output: OutputRef): ConversationOutput` | Queue this output after previously opened outputs. It can be opened before the first audio chunk. |
+| `interrupt(outputs: readonly OutputRef[]): void` | Stop the selected outputs as one batch, discard their unplayed audio, then resume remaining output in queue order. |
 | `stop(signal: AbortSignal): Promise<void>` | Confirm all playback has stopped and queued audio is discarded. Keep caller-owned resources open. |
 
 Each `ConversationOutput` implements:
@@ -62,7 +64,6 @@ Each `ConversationOutput` implements:
 | --- | --- |
 | `write(chunk: AudioChunk): void` | Queue 24 kHz mono PCM16 without blocking. Bound the queue and throw on overflow. |
 | `end(): void` | Accept no more audio. Let queued and device audio drain. |
-| `interrupt(): void` | Stop only this output and discard unplayed audio. This must also work during drain, after `end()`. |
 | `completion(signal: AbortSignal): Promise<number>` | Return actual played milliseconds after drain or interruption. Reject if measurement fails or the signal aborts. |
 
 All synchronous adapter methods must return promptly. Completion can be awaited
@@ -72,8 +73,12 @@ were opened, using one FIFO audio queue. Do not mix outputs, interleave their
 audio, or play later outputs before earlier outputs finish or are interrupted.
 Prism assumes that interrupting a partially played reply leaves later replies
 in the same turn unheard. Independent concurrent playback violates that assumption.
-Interrupting an output, including calling `end()` afterward, must not start
-later queued audio as a side effect.
+The runner passes all affected output references in one `interrupt` call. Stop
+them and discard their queued audio before starting any remaining output. Then
+resume valid output in queue order, without waiting for another chunk or event.
+Interruption must work after `end()` and tolerate repeated calls. A remote
+adapter must preserve the batch, for example with one message containing all
+selected output IDs. Shutdown stops all output and must not resume playback.
 Receipt delivery can be delayed or arrive out of order; audible playback cannot.
 A receipt includes the device buffer where device timing is available. Bytes
 received or queued do not measure playback. Zero is valid for an output that
@@ -113,6 +118,10 @@ for that response. A `speech.hint` alone does not stop playback. A server
 response. Finished reports wait for generation completion and every output
 receipt, including outstanding playback from earlier responses. Prism treats
 the latest drain token as confirmation that all earlier playback has stopped.
+An abandoned response also stops its dependent tool continuations, identified
+by response parent references. Unrelated later turns remain eligible to play.
+Late audio from an interrupted response or its continuations is discarded.
+The runner retains at most 128 response parent references.
 A report retains the measured duration of its own response. Waiting for earlier
 playback does not block events or input, and does not wait for later responses.
 

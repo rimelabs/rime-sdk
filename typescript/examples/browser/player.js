@@ -64,9 +64,7 @@ export class Player {
     if (reply) {
       reply.ended = true;
       if (reply.reported) this.replies.delete(id);
-      // The runner may still be interrupting later outputs in this turn.
-      // Ending an interrupted output must not start queued audio behind it.
-      if (!reply.interrupted) this.schedule();
+      this.schedule();
     }
   }
   outputTime() {
@@ -111,9 +109,10 @@ export class Player {
     for (const key of this.replies.keys()) this.end(key);
     this.poll();
   }
-  interrupt(id) {
+  interrupt(ids) {
+    const selected = ids === undefined ? undefined : new Set(ids);
     for (const [key, reply] of this.replies) {
-      if (id !== undefined && key !== id) continue;
+      if (selected && !selected.has(key)) continue;
       if (reply.reported || reply.interrupted) continue;
       reply.interrupted = true;
       for (const buffer of reply.queued)
@@ -129,5 +128,6 @@ export class Player {
       if (last && !reply.interrupted && !reply.reported)
         this.tail = Math.max(this.tail, last.start + last.duration);
     }
+    this.schedule();
   }
 }

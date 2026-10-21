@@ -6,6 +6,91 @@ import { Rime, RimeRealtimeError } from "@rimelabs/sdk";
 import { Peer } from "../../tests/realtime-peer.mjs";
 import { BrowserAudio } from "../common/browser-audio.ts";
 import { converse } from "../realtime/conversation.ts";
+import { ManualTools } from "../realtime/manual-tools.ts";
+
+for (const stage of ["before_call", "before_end", "working", "continuing"]) {
+  test(
+    `abandonment prevents or cancels tool continuation: ${stage}`,
+    { timeout: 1500 },
+    async () => {
+      let release, started, continuing;
+      const work = new Promise((resolve) => {
+        release = resolve;
+      });
+      const working = new Promise((resolve) => {
+        started = resolve;
+      });
+      const continuationStarted = new Promise((resolve) => {
+        continuing = resolve;
+      });
+      const executed = [],
+        results = [],
+        cancelled = [];
+      const controller = new AbortController();
+      const session = {
+        async submitToolResult(call, output) {
+          results.push(output);
+        },
+        async continueReply(response, { signal }) {
+          continuing();
+          signal.throwIfAborted();
+          await new Promise((resolve, reject) =>
+            signal.addEventListener(
+              "abort",
+              () => {
+                cancelled.push(response);
+                reject(signal.reason);
+              },
+              { once: true },
+            ),
+          );
+        },
+      };
+      const tools = new ManualTools(session, controller, async (call) => {
+        executed.push(call);
+        started();
+        await work;
+        return "{}";
+      });
+      const response = { sessionId: "s", responseId: "tools" };
+      const emit = (payload) => tools.onEvent({ payload });
+      try {
+        emit({ kind: "response.started", response });
+        if (stage === "before_call")
+          emit({ kind: "response.abandoned", response });
+        emit({
+          kind: "tool.call",
+          call: { ...response, callId: "c" },
+          name: "test",
+          arguments: {},
+        });
+        if (stage === "before_end")
+          emit({ kind: "response.abandoned", response });
+        emit({ kind: "response.ended", response, status: "completed" });
+        if (["working", "continuing"].includes(stage)) {
+          await working;
+          if (stage === "continuing") {
+            release();
+            await continuationStarted;
+          }
+          emit({ kind: "response.abandoned", response });
+        }
+        release();
+        await tools.settled();
+        assert.equal(controller.signal.aborted, false);
+        assert.equal(
+          executed.length,
+          ["working", "continuing"].includes(stage) ? 1 : 0,
+        );
+        assert.equal(cancelled.length, stage === "continuing" ? 1 : 0);
+      } finally {
+        release();
+        controller.abort();
+        await tools.settled();
+      }
+    },
+  );
+}
 
 for (const scenario of ["completed", "superseded", "refused"]) {
   test(`tool continuation: ${scenario}`, { timeout: 3000 }, async () => {

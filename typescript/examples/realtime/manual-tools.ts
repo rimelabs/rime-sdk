@@ -8,8 +8,14 @@ import {
   type ToolCall,
 } from "@rimelabs/sdk";
 
+interface ToolRound {
+  calls: ToolCall[];
+  abandoned: boolean;
+  continuation?: AbortController;
+}
+
 export class ManualTools {
-  private calls = new Map<string, ToolCall[]>();
+  private rounds = new Map<string, ToolRound>();
   private pending = new Set<Promise<void>>();
   private epoch = 0;
   constructor(
@@ -21,51 +27,77 @@ export class ManualTools {
     if (
       payload.kind === "speech.started" ||
       payload.kind === "response.started"
-    )
+    ) {
       this.epoch++;
-    else if (payload.kind === "tool.call") {
+      if (payload.kind === "response.started") {
+        if (this.rounds.size >= 128)
+          throw new Error("Too many pending application tool rounds");
+        this.rounds.set(payload.response.responseId, {
+          calls: [],
+          abandoned: false,
+        });
+      }
+    } else if (payload.kind === "response.abandoned") {
+      const state = this.rounds.get(payload.response.responseId);
+      if (state) {
+        state.abandoned = true;
+        state.continuation?.abort();
+      }
+    } else if (payload.kind === "tool.call") {
       if (
-        [...this.calls.values()].reduce((n, calls) => n + calls.length, 0) >=
-        128
+        [...this.rounds.values()].reduce(
+          (n, state) => n + state.calls.length,
+          0,
+        ) >= 128
       )
         throw new Error("Too many pending application tool calls");
-      const id = payload.call.responseId;
-      const calls = this.calls.get(id) ?? [];
-      calls.push(payload);
-      this.calls.set(id, calls);
+      this.rounds.get(payload.call.responseId)!.calls.push(payload);
     } else if (payload.kind === "response.ended") {
-      const calls = this.calls.get(payload.response.responseId) ?? [];
-      this.calls.delete(payload.response.responseId);
-      if (calls.length && payload.status === "completed") {
+      const id = payload.response.responseId;
+      const state = this.rounds.get(id);
+      if (
+        state?.calls.length &&
+        !state.abandoned &&
+        payload.status === "completed"
+      ) {
         if (this.pending.size >= 64)
           throw new Error("Too many pending application tool tasks");
-        const task = this.finish(payload.response, calls, this.epoch);
+        const task = this.finish(payload.response, state, this.epoch);
         this.pending.add(task);
         void task.then(
-          () => this.pending.delete(task),
+          () => {
+            this.pending.delete(task);
+            this.rounds.delete(id);
+          },
           (error) => {
             this.pending.delete(task);
+            this.rounds.delete(id);
             this.controller.abort(error);
           },
         );
-      }
+      } else this.rounds.delete(id);
     }
   }
-  private async finish(
-    response: ResponseRef,
-    calls: ToolCall[],
-    epoch: number,
-  ) {
+  private async finish(response: ResponseRef, state: ToolRound, epoch: number) {
     const options = { signal: this.controller.signal };
-    for (const call of calls) {
+    for (const call of state.calls) {
+      if (state.abandoned) return;
       if (!this.execute) throw new Error("The example has no tool handler");
       const result = await this.execute(call, options.signal);
       await this.session.submitToolResult(call.call, result, options);
     }
-    if (epoch === this.epoch) {
+    if (epoch === this.epoch && !state.abandoned) {
+      state.continuation = new AbortController();
       try {
-        await this.session.continueReply(response, options);
+        await this.session.continueReply(response, {
+          signal: AbortSignal.any([
+            this.controller.signal,
+            state.continuation.signal,
+          ]),
+        });
       } catch (error) {
+        if (state.abandoned && error === state.continuation.signal.reason)
+          return;
         if (
           !(error instanceof RimeInputError && epoch !== this.epoch) &&
           (!(error instanceof RimeRealtimeError) ||

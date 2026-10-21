@@ -4,6 +4,7 @@ import asyncio
 import base64
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 from test_realtime import Peer
@@ -65,6 +66,7 @@ class Output:
 class Playback:
     def __init__(self):
         self.outputs = {}
+        self.batches = []
         self.stopped = False
         self.stop_error = None
 
@@ -73,12 +75,97 @@ class Playback:
         self.outputs[output.item_id] = result
         return result
 
+    def interrupt(self, outputs):
+        self.batches.append(list(outputs))
+        for ref in outputs:
+            self.outputs[ref.item_id].interrupt()
+
     async def stop(self):
         self.stopped = True
         for output in self.outputs.values():
             output.interrupt()
         if self.stop_error:
             raise self.stop_error
+
+
+@pytest.mark.parametrize("trigger", ["speech", "abandoned"])
+async def test_interruption_batches_dependencies_and_preserves_other_turns(trigger):
+    refs = {
+        name: r.ResponseRef(session_id="s", response_id=name)
+        for name in ("root", "child", "other", "grandchild", "late", "new")
+    }
+    source, playback = Source(), Playback()
+    consumed = asyncio.Event()
+
+    async def events():
+        for name, parent in [
+            ("root", None),
+            ("child", "root"),
+            ("other", None),
+            ("grandchild", "child"),
+        ]:
+            yield SimpleNamespace(
+                payload=r.ResponseStarted(
+                    response=refs[name],
+                    cause="tools" if parent else "text",
+                    parent=refs[parent] if parent else None,
+                )
+            )
+            yield SimpleNamespace(
+                payload=r.MessageStarted(
+                    output=r.OutputRef(
+                        response=refs[name], item_id=name, output_index=0, content_index=0
+                    )
+                )
+            )
+        yield SimpleNamespace(
+            payload=(
+                r.SpeechStarted(item_id="user", audio_start_ms=0)
+                if trigger == "speech"
+                else r.ResponseAbandoned(response=refs["root"])
+            )
+        )
+        # Late descendants must stay silent, while a new independent turn can play.
+        for name, parent in [("late", "grandchild"), ("new", None)]:
+            yield SimpleNamespace(
+                payload=r.ResponseStarted(
+                    response=refs[name],
+                    cause="tools" if parent else "text",
+                    parent=refs[parent] if parent else None,
+                )
+            )
+            output = r.OutputRef(response=refs[name], item_id=name, output_index=0, content_index=0)
+            yield SimpleNamespace(payload=r.MessageStarted(output=output))
+            yield SimpleNamespace(
+                payload=r.AudioDelta(output=output, audio=r.AudioChunk(data=bytes(960)))
+            )
+        consumed.set()
+        await asyncio.Event().wait()
+
+    async def close():
+        pass
+
+    session = SimpleNamespace(
+        info=SimpleNamespace(interrupt_on_speech=True), events=events(), close=close
+    )
+    task = asyncio.create_task(r.run_conversation(session, source=source, playback=playback))
+    try:
+        await asyncio.wait_for(consumed.wait(), 1)
+        expected = (
+            ["root", "child", "other", "grandchild"]
+            if trigger == "speech"
+            else ["root", "child", "grandchild"]
+        )
+        assert [[ref.item_id for ref in batch] for batch in playback.batches] == [
+            expected,
+            ["late"],
+        ]
+        assert playback.outputs["other"].interrupted is (trigger == "speech")
+        assert not playback.outputs["late"].writes
+        assert len(playback.outputs["new"].writes) == 1
+    finally:
+        source.queue.put_nowait(None)
+        await task
 
 
 async def until(condition):
@@ -312,7 +399,9 @@ async def test_shutdown_stops_pending_input_and_output(monkeypatch, mode):
             await task
 
 
-@pytest.mark.parametrize("mode", ["input", "write", "receipt", "invalid", "callback", "overflow"])
+@pytest.mark.parametrize(
+    "mode", ["input", "write", "receipt", "invalid", "huge", "callback", "overflow"]
+)
 async def test_failures_reach_caller_and_cleanup_does_not_replace_them(monkeypatch, mode):
     original = RuntimeError("original failure")
 
@@ -338,17 +427,17 @@ async def test_failures_reach_caller_and_cleanup_does_not_replace_them(monkeypat
                 elif mode == "receipt":
                     output.done.set_exception(original)
                 else:
-                    output.done.set_result(float("nan"))
+                    output.done.set_result(10**1000 if mode == "huge" else float("nan"))
         expected = (
             RimeResourceLimitError
             if mode == "overflow"
             else RimeInputError
-            if mode == "invalid"
+            if mode in ("invalid", "huge")
             else RuntimeError
         )
         with pytest.raises(expected) as caught:
             await asyncio.wait_for(task, 2)
-        if mode not in ("invalid", "overflow"):
+        if mode not in ("invalid", "huge", "overflow"):
             assert caught.value is original
         assert peer.sent.empty()  # Never manufacture a playback measurement.
 

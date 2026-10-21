@@ -109,7 +109,7 @@ start.onclick = async () => {
             player.end(value.id);
             break;
           case "interrupt":
-            player.interrupt(value.id);
+            player.interrupt(value.ids);
             break;
           case "stop":
             player.stop(value.id);

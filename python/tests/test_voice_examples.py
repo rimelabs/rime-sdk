@@ -103,7 +103,7 @@ async def test_output_waits_for_device_tail_and_excludes_unplayed_audio(devices,
         second = speaker.begin()
         second.runs.extend([(clock.now - 0.1, 0.05), (clock.now + 1, 0.02)])
         speaker.write(second, bytes(48000))
-        speaker.interrupt()
+        speaker._interrupt()
         assert await second.done == pytest.approx(0.05)
         assert speaker.stream.aborted and not second.buffer
         speaker.write(second, b"\0\0")
@@ -144,16 +144,16 @@ async def test_speaker_keeps_outputs_fifo_even_when_later_audio_arrives_first(
         assert rendered == first_pcm
         clock.advance(0.01)
         if interrupted:
-            first.interrupt()
+            speaker.interrupt([first.playback.output, second.playback.output])
             starts = speaker.stream.starts
             first.end()
             assert speaker.stream.starts == starts
-            second.interrupt()
+            speaker.interrupt([second.playback.output])
             assert await first.completion() == pytest.approx(10)
             assert await second.completion() == 0
             third = output("third")
             assert speaker.stream.starts == starts + 1
-            third.interrupt()
+            speaker.interrupt([third.playback.output])
         else:
             # The device has not yet finished first, so second must stay queued.
             speaker._render(rendered, 480, device_time, None)
@@ -464,10 +464,47 @@ async def test_speaker_queue_limit_through_public_runner(devices, monkeypatch):
 async def test_old_device_interruption_does_not_abort_new_playback(devices):
     with devices.Speaker() as speaker:
         old = speaker.begin()
-        speaker.interrupt(old)
+        speaker._interrupt(old)
         new = speaker.begin()
         speaker.stream.aborted = False
         speaker.write(new, bytes(960))
-        speaker.interrupt(old)
+        speaker._interrupt(old)
         assert not speaker.stream.aborted
         assert not new.interrupted and len(new.buffer) == 960
+
+
+async def test_device_interruption_batch_resumes_only_remaining_output(devices, monkeypatch):
+    def ref(name):
+        return r.OutputRef(
+            response=r.ResponseRef(session_id="s", response_id=name),
+            item_id=name,
+            output_index=0,
+            content_index=0,
+        )
+
+    clock = DeviceClock()
+    monkeypatch.setattr(devices, "time", clock)
+    with devices.Speaker() as speaker:
+        speaker.loop = clock
+        refs = [ref(name) for name in ("old", "dependent", "next")]
+        outputs = [speaker.open(item) for item in refs]
+        for output in outputs:
+            output.write(r.AudioChunk(data=bytes(960), format=r.PCMFormat(sample_rate=24000)))
+            output.end()
+        starts = speaker.stream.starts
+        speaker.interrupt(refs[:2])
+        assert speaker.stream.starts == starts + 1
+        assert await outputs[0].completion() == 0
+        assert await outputs[1].completion() == 0
+        assert len(outputs[2].playback.buffer) == 960
+        assert not outputs[2].playback.interrupted
+        speaker._render(
+            bytearray(960), 480, SimpleNamespace(outputBufferDacTime=1, currentTime=1), None
+        )
+        clock.advance(0.021)
+        assert await outputs[2].completion() == pytest.approx(20)
+        remaining = speaker.open(ref("shutdown"))
+        remaining.write(r.AudioChunk(data=bytes(960), format=r.PCMFormat(sample_rate=24000)))
+        await speaker.stop()
+        assert speaker.stream.starts == starts + 1
+        assert await remaining.completion() == 0

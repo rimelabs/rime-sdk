@@ -284,7 +284,8 @@ for (const queue of ["input", "output"]) {
         });
       }
       await failed;
-      assert.equal(closed, true);
+      // Invalid incoming audio closes the transport; failed stop() keeps ownership with the caller.
+      assert.equal(closed, queue === "input");
       assert.deepEqual(
         peer.requests.filter(
           (request) => request.type === "prism.playback.drained",

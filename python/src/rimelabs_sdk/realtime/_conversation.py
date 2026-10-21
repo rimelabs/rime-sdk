@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import inspect
 import math
-from collections.abc import Callable, Coroutine
+from collections import OrderedDict
+from collections.abc import Callable, Coroutine, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -29,13 +30,6 @@ class ConversationOutput(Protocol):
         """Seal this output. Completion waits for queued and device audio to drain."""
         ...
 
-    def interrupt(self) -> None:
-        """Stop this output and discard unplayed audio. Must also work after end().
-
-        Do not start later queued outputs as a side effect.
-        """
-        ...
-
     async def completion(self) -> float:
         """Return measured played milliseconds, or raise if measurement fails.
 
@@ -50,6 +44,15 @@ class ConversationPlayback(Protocol):
 
         Keep completion and interruption state separate for each output.
         Do not mix outputs or play a later output ahead of an earlier one.
+        """
+        ...
+
+    def interrupt(self, outputs: Sequence[t.OutputRef]) -> None:
+        """Stop all selected outputs as one batch, including outputs after end().
+
+        Discard their unplayed audio before starting any remaining output.
+        Resume remaining outputs in FIFO order without waiting for new audio.
+        Repeated interruptions are harmless; each receipt remains independent.
         """
         ...
 
@@ -107,6 +110,8 @@ async def run_conversation(
     operations are retained; excess work fails instead of dropping audio.
     """
     replies: dict[str, _Reply] = {}
+    parents: OrderedDict[str, str | None] = OrderedDict()
+    interrupted: set[str] = set()
     tasks: set[asyncio.Task[Any]] = set()
     cancelled_tasks: set[asyncio.Task[Any]] = set()
     receipts: set[asyncio.Task[Any]] = set()
@@ -149,12 +154,16 @@ async def run_conversation(
 
     async def measure(stream: ConversationOutput) -> float:
         value = await stream.completion()
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(value)
-            or value < 0
-        ):
+        try:
+            invalid = (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0
+            )
+        except OverflowError:
+            invalid = True
+        if invalid:
             raise RimeInputError("Playback measurement must be finite nonnegative milliseconds")
         return value
 
@@ -171,7 +180,6 @@ async def run_conversation(
 
     def cut(output: _Output) -> None:
         if output.report is None:
-            output.stream.interrupt()
             output.end()
             output.report = start(report_cut(output))
 
@@ -196,16 +204,33 @@ async def run_conversation(
             await session.report_playback(t.PlaybackFinished(response=reply.ref, played_ms=played))
         replies.pop(reply.ref.response_id, None)
 
-    def interrupt(reply: _Reply) -> None:
-        if reply.interrupted:
-            return
-        reply.interrupted = True
-        if reply.finish:
-            cancel(reply.finish)
-        for output in reply.outputs.values():
+    def was_interrupted(response_id: str) -> bool:
+        current: str | None = response_id
+        # The session retains at most 128 response references.
+        for _ in range(128):
+            if current is None:
+                return False
+            if current in interrupted:
+                return True
+            current = parents.get(current)
+        return False
+
+    def interrupt(selected: Sequence[_Reply]) -> None:
+        affected = [reply for reply in selected if not reply.interrupted]
+        outputs = [output for reply in affected for output in reply.outputs.values()]
+        for reply in affected:
+            reply.interrupted = True
+            if reply.ref.response_id in parents:
+                interrupted.add(reply.ref.response_id)
+            if reply.finish:
+                cancel(reply.finish)
+        if outputs:
+            playback.interrupt([output.ref for output in outputs])
+        for output in outputs:
             cut(output)
-        if reply.ended:
-            reply.finish = start(finish(reply))
+        for reply in affected:
+            if reply.ended:
+                reply.finish = start(finish(reply))
 
     def output_for(ref: t.OutputRef) -> _Output | None:
         reply = replies.get(ref.response.response_id)
@@ -222,6 +247,7 @@ async def run_conversation(
             output.receipt.add_done_callback(receipts.discard)
             reply.outputs[ref] = output
             if reply.interrupted:
+                playback.interrupt([ref])
                 cut(output)
         return reply.outputs[ref]
 
@@ -236,7 +262,16 @@ async def run_conversation(
             if isinstance(payload, t.ResponseStarted):
                 if len(replies) >= 64:
                     raise RimeResourceLimitError("Conversation response limit exceeded")
-                replies[payload.response.response_id] = _Reply(payload.response)
+                response_id = payload.response.response_id
+                parents[response_id] = payload.parent.response_id if payload.parent else None
+                if len(parents) > 128:
+                    expired, _ = parents.popitem(last=False)
+                    interrupted.discard(expired)
+                replies[response_id] = _Reply(
+                    payload.response, interrupted=was_interrupted(response_id)
+                )
+                if replies[response_id].interrupted:
+                    interrupted.add(response_id)
             elif isinstance(payload, (t.MessageStarted, t.AudioDelta, t.AudioDone)):
                 output = output_for(payload.output)
                 if output is not None:
@@ -246,12 +281,13 @@ async def run_conversation(
                     elif isinstance(payload, t.AudioDone):
                         output.end()
             elif isinstance(payload, t.SpeechStarted) and session.info.interrupt_on_speech:
-                for reply in list(replies.values()):
-                    interrupt(reply)
+                interrupt(list(replies.values()))
             elif isinstance(payload, t.ResponseAbandoned):
-                reply = replies.get(payload.response.response_id)
-                if reply:
-                    interrupt(reply)
+                if payload.response.response_id in parents:
+                    interrupted.add(payload.response.response_id)
+                interrupt(
+                    [reply for reply in replies.values() if was_interrupted(reply.ref.response_id)]
+                )
             elif isinstance(payload, t.ResponseEnded):
                 reply = replies.get(payload.response.response_id)
                 if reply:
