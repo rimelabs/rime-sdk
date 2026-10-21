@@ -1,6 +1,11 @@
 import * as schema from "@rimelabs/api";
 import { RimeStreamError, RimeResourceLimitError } from "../errors.js";
-import type { TranscriptionPartial, TranscriptionFinal } from "./types.js";
+import type {
+  TranscriptionPartial,
+  TranscriptionDelta,
+  TranscriptionFinal,
+  TranscriptionOutputContract,
+} from "./types.js";
 
 /** Validate the wire sequence before exposing any final result. */
 export class TranscriptState {
@@ -8,11 +13,14 @@ export class TranscriptState {
   private revision = 0n;
   private text = "";
   private final: TranscriptionFinal | null = null;
-  constructor(private readonly textLimit: number) {}
+  constructor(
+    private readonly textLimit: number,
+    private readonly outputContract: TranscriptionOutputContract = "revised_hypotheses",
+  ) {}
   accept(
     message: schema.StreamingTranscriptionResponse,
     inputDone: boolean,
-  ): TranscriptionPartial | null {
+  ): TranscriptionPartial | TranscriptionDelta | null {
     const payload = message.payload;
     if (payload.case === undefined) return null;
     if (this.final)
@@ -27,7 +35,9 @@ export class TranscriptState {
         );
       if (
         accepted.outputContract !==
-        schema.StreamingOutputContract.REVISED_HYPOTHESES
+        (this.outputContract === "append_fragments"
+          ? schema.StreamingOutputContract.APPEND_FRAGMENTS
+          : schema.StreamingOutputContract.REVISED_HYPOTHESES)
       )
         throw new RimeStreamError(
           "The service accepted a different transcript contract",
@@ -41,7 +51,24 @@ export class TranscriptState {
     }
     if (this.language === null)
       throw new RimeStreamError("Received a transcript before acceptance");
+    const append = this.outputContract === "append_fragments";
+    if (payload.case === "delta" && append) {
+      const text = payload.value.text;
+      if (
+        Buffer.byteLength(this.text) + Buffer.byteLength(text) >
+        this.textLimit
+      )
+        throw new RimeResourceLimitError(
+          "The transcript exceeds the SDK text limit",
+        );
+      this.text += text;
+      return { kind: "delta", text };
+    }
     if (payload.case !== "hypothesis" && payload.case !== "done")
+      throw new RimeStreamError(
+        "Received an unexpected transcription response",
+      );
+    if (payload.case === "hypothesis" && append)
       throw new RimeStreamError(
         "Received an unexpected transcription response",
       );
@@ -66,7 +93,7 @@ export class TranscriptState {
       throw new RimeStreamError("The service completed before input finished");
     if (value.revision !== this.revision || value.text !== this.text)
       throw new RimeStreamError(
-        "Final transcript does not match the last hypothesis",
+        "Final transcript does not match prior updates",
       );
     const language = payload.value.language;
     if (language?.tag !== this.language || !language.source)

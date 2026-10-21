@@ -17,7 +17,14 @@ Add `--model mistv3` to connect to `wss://mist.api.rime.ai/ws`; the default is
 Coda at `wss://coda.api.rime.ai/ws`. Playback requires SoX, or use `--no-playback`
 to save audio only.
 
-To use published packages, copy this whole directory outside the repository:
+The STT streaming example in this checkout imports the unreleased
+`TranscriptionOutputContract` API. Published `rimelabs-sdk` versions through
+`0.1.0a17` do not provide it, even though they satisfy the current example
+dependency range. Run this example inside the workspace until append support
+is released; the first release containing it must become the copied examples'
+minimum dependency version.
+
+To use published packages for the other examples, copy this whole directory outside the repository:
 
 ```sh
 cd path/to/copied-examples

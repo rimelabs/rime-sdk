@@ -134,6 +134,7 @@ export class TranscriptionCall extends BidiCall<
     language: string,
     mode: TranscriptionMode,
     contextTerms: readonly string[],
+    outputContract: import("./types.js").TranscriptionOutputContract = "revised_hypotheses",
   ) {
     return this.write(
       create(schema.StreamingTranscriptionRequestSchema, {
@@ -146,7 +147,10 @@ export class TranscriptionCall extends BidiCall<
                 ? schema.TranscriptionMode.VERBATIM
                 : schema.TranscriptionMode.WRITTEN,
             contextTerms: [...contextTerms],
-            outputContract: schema.StreamingOutputContract.REVISED_HYPOTHESES,
+            outputContract:
+              outputContract === "append_fragments"
+                ? schema.StreamingOutputContract.APPEND_FRAGMENTS
+                : schema.StreamingOutputContract.REVISED_HYPOTHESES,
           },
         },
       }),

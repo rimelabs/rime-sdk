@@ -1,13 +1,11 @@
-use super::TranscriptionUpdate;
+use super::{TranscriptionOutputContract, TranscriptionUpdate};
 use crate::{Error, ErrorKind};
-use rimelabs_api::{
-    streaming_transcription_response::Payload, StreamingOutputContract,
-    StreamingTranscriptionResponse,
-};
+use rimelabs_api::{streaming_transcription_response::Payload, StreamingTranscriptionResponse};
 
 #[derive(Default)]
 pub(super) struct TranscriptState {
     pub language: Option<String>,
+    output_contract: TranscriptionOutputContract,
     revision: u64,
     text: String,
     final_result: Option<TranscriptionUpdate>,
@@ -16,7 +14,7 @@ fn invalid(message: &'static str) -> Error {
     Error::new(ErrorKind::Stream, message)
 }
 fn check_text(text: &str) -> Result<(), Error> {
-    if text.len() > 65_536 {
+    if text.len() > super::MAX_TRANSCRIPT_BYTES {
         return Err(Error::new(
             ErrorKind::ResourceLimit,
             "transcript exceeds the SDK text limit",
@@ -25,6 +23,12 @@ fn check_text(text: &str) -> Result<(), Error> {
     Ok(())
 }
 impl TranscriptState {
+    pub fn new(output_contract: TranscriptionOutputContract) -> Self {
+        Self {
+            output_contract,
+            ..Self::default()
+        }
+    }
     pub fn accept(
         &mut self,
         message: StreamingTranscriptionResponse,
@@ -41,7 +45,7 @@ impl TranscriptState {
                 if self.language.is_some() {
                     return Err(invalid("duplicate transcription acceptance"));
                 }
-                if accepted.output_contract != StreamingOutputContract::RevisedHypotheses as i32 {
+                if accepted.output_contract != self.output_contract.wire() {
                     return Err(invalid("service accepted a different transcript contract"));
                 }
                 let language = accepted
@@ -52,7 +56,21 @@ impl TranscriptState {
                 Ok(None)
             }
             _ if self.language.is_none() => Err(invalid("transcript before acceptance")),
-            Payload::Hypothesis(value) => {
+            Payload::Delta(value)
+                if self.output_contract == TranscriptionOutputContract::AppendFragments =>
+            {
+                if self.text.len() + value.text.len() > super::MAX_TRANSCRIPT_BYTES {
+                    return Err(Error::new(
+                        ErrorKind::ResourceLimit,
+                        "transcript exceeds the SDK text limit",
+                    ));
+                }
+                self.text.push_str(&value.text);
+                Ok(Some(TranscriptionUpdate::Delta { text: value.text }))
+            }
+            Payload::Hypothesis(value)
+                if self.output_contract == TranscriptionOutputContract::RevisedHypotheses =>
+            {
                 check_text(&value.text)?;
                 if value.revision <= self.revision || (self.revision == 0 && value.revision != 1) {
                     return Err(invalid("transcript revisions must increase from one"));
@@ -67,9 +85,7 @@ impl TranscriptState {
                     return Err(invalid("service completed before input finished"));
                 }
                 if value.revision != self.revision || value.text != self.text {
-                    return Err(invalid(
-                        "final transcript does not match the last hypothesis",
-                    ));
+                    return Err(invalid("final transcript does not match prior updates"));
                 }
                 let language = value
                     .language

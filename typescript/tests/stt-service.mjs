@@ -80,6 +80,7 @@ export class RecognitionService {
           const messages = [];
           this.calls.push(messages);
           this.metadata.push(call.metadata);
+          let contract;
           let revision = 0n,
             text = "";
           const language = {
@@ -106,6 +107,7 @@ export class RecognitionService {
           call.on("data", (message) => {
             messages.push(message);
             if (message.payload.case === "config") {
+              contract = message.payload.value.outputContract;
               this.markConfig();
               if (this.mode === "reject") {
                 fail();
@@ -116,8 +118,7 @@ export class RecognitionService {
               call.sendMetadata(headers);
               if (this.mode === "no_acceptance") return;
               send("accepted", {
-                outputContract:
-                  schema.StreamingOutputContract.REVISED_HYPOTHESES,
+                outputContract: contract,
                 language,
               });
               if (this.mode === "early_final") {
@@ -132,6 +133,18 @@ export class RecognitionService {
               index < (this.mode === "burst" ? 100 : 2);
               index++
             ) {
+              if (
+                contract === schema.StreamingOutputContract.APPEND_FRAGMENTS
+              ) {
+                const fragment =
+                  (text ? "\n" : "") +
+                  (this.mode === "large"
+                    ? "é".repeat(200000)
+                    : `fragment ${index}`);
+                text += fragment;
+                send("delta", { text: fragment });
+                continue;
+              }
               revision++;
               text = index === 0 ? "I scream" : "Ice cream";
               send("hypothesis", { text, revision });

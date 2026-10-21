@@ -78,6 +78,42 @@ Run `asyncio.run(transcribe())` from a script. File reads run off the event loop
 using `asyncio.to_thread`, as in the runnable
 [example](../examples/stt/stream.py).
 
+## Append-fragment streaming
+
+Choose `output_contract=TranscriptionOutputContract.APPEND_FRAGMENTS` on
+`client.stt.stream`. The default is `REVISED_HYPOTHESES`; `transcribe()` does not
+accept an output contract. Both streaming modes use gRPC only.
+
+```python
+from rimelabs_sdk import TranscriptionOutputContract
+
+text = ""
+async with client.stt.stream(
+    audio_chunks(), language="en",
+    output_contract=TranscriptionOutputContract.APPEND_FRAGMENTS,
+) as transcript:
+    async for update in transcript:
+        if update.kind == "delta":
+            text += update.text  # preserve every separator exactly
+        elif update.kind == "final":
+            assert text == update.text
+            print(update.text)
+```
+
+`TranscriptionDelta` is a permanent fragment, not a replacement partial. The
+server recognizes independent five-second audio windows; fragments after the
+first include newline separators. Do not strip, add separators, or drop deltas.
+The final text must match their concatenation. Empty speech can produce no
+updates before an empty final. A final is delivered only after `done` and an OK
+gRPC status, so a connection failure never promotes accumulated fragments to a
+successful result.
+
+Append mode suits longer recordings and consumers that cannot revise text. Send
+recordings as fast as backpressure permits. It does not enable unlimited-length
+streams: the service's 16 MiB audio and 120-second total-call limits still apply.
+Split larger recordings into separate streams. Live voice agents usually prefer
+revised hypotheses for earlier provisional text and corrections across windows.
+
 ## Options
 
 | Option | Meaning |
@@ -85,6 +121,7 @@ using `asyncio.to_thread`, as in the runnable
 | `language` | Required spoken BCP-47 tag. Passed unchanged to the service; no detection or SDK language allowlist. The deployed catalog currently supports English and Spanish. |
 | `mode` | `TranscriptionMode.WRITTEN` (default) or `.VERBATIM`. Formatting intent, not a guarantee of exact tokens. |
 | `context_terms` | Sequence of recognition hints, copied unchanged and in order. The service validates terms and prompt budgets. |
+| `output_contract` | `TranscriptionOutputContract.REVISED_HYPOTHESES` (default) or `.APPEND_FRAGMENTS`. Streaming only. |
 | `input_format` | `PCMFormat`: signed little-endian PCM16 at 8, 16, 24 or 48 kHz, mono or interleaved stereo. Defaults to 16 kHz mono. |
 | `timeout` | Optional positive overall timeout as numeric seconds or `datetime.timedelta`. Includes connection time, source pauses and consumer pauses. `None` disables this SDK deadline, but not internal or server deadlines. |
 
@@ -100,8 +137,9 @@ There is no STT voice/model selector; the service selects its recognizer.
 
 ## Results and completion
 
-`TranscriptionPartial` and `TranscriptionFinal` are frozen values, also available
-from `rimelabs_sdk.stt`. Every update contains the complete current `text`.
+`TranscriptionPartial`, `TranscriptionDelta`, and `TranscriptionFinal` are frozen
+values, also available from `rimelabs_sdk.stt`. In the default revised-hypotheses
+mode, every update contains the complete current `text`.
 **Replace the previous transcript. Do not concatenate partials.** Later partials
 can change earlier words. `TranscriptionFinal.language` is the canonical language
 selected by the service.
@@ -125,8 +163,12 @@ early exit. Cancelling a task waiting for an update also cancels its stream.
 Client close cancels all its STT, TTS and realtime operations. Cancelling one
 stream leaves its siblings running.
 
-The SDK bounds the transcript queue to 16 updates, each with at most 64 KiB of
-UTF-8 text, and bounds gRPC responses to 256 KiB. Slow consumers apply backpressure.
+The SDK bounds the transcript queue to 16 updates. In revised-hypotheses mode,
+each replacement update is limited to 1 MiB of UTF-8 text; sizes are not summed
+across revisions. In append-fragments mode, the concatenated text across all
+deltas is limited to 1 MiB. The final transcript is also limited to 1 MiB in both
+modes. gRPC responses are bounded to 1 MiB plus 64 KiB for the protobuf envelope.
+Slow consumers apply backpressure.
 Internal connection and acceptance waits are 10 seconds; completion after source
 exhaustion is bounded to 120 seconds. The completion timer stops after successful
 gRPC completion. The optional overall timeout remains active until the final

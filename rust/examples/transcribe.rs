@@ -2,7 +2,9 @@
 //! Usage: cargo run --example transcribe -- utterance.pcm en
 use bytes::Bytes;
 use futures_util::{stream, StreamExt};
-use rimelabs_sdk::{Client, Error, TranscriptionOptions, TranscriptionUpdate};
+use rimelabs_sdk::{
+    Client, Error, TranscriptionOptions, TranscriptionOutputContract, TranscriptionUpdate,
+};
 use tokio::io::AsyncReadExt;
 
 #[tokio::main]
@@ -10,12 +12,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     let path = args
         .next()
-        .ok_or("usage: transcribe <file.pcm> <language>")?;
+        .ok_or("usage: transcribe <file.pcm> <language> [revised_hypotheses|append_fragments]")?;
     let language = args
         .next()
-        .ok_or("usage: transcribe <file.pcm> <language>")?;
+        .ok_or("usage: transcribe <file.pcm> <language> [revised_hypotheses|append_fragments]")?;
+    let contract = match args.next().as_deref() {
+        None | Some("revised_hypotheses") => TranscriptionOutputContract::RevisedHypotheses,
+        Some("append_fragments") => TranscriptionOutputContract::AppendFragments,
+        Some(_) => return Err("unknown output contract".into()),
+    };
     if args.next().is_some() {
-        return Err("usage: transcribe <file.pcm> <language>".into());
+        return Err(
+            "usage: transcribe <file.pcm> <language> [revised_hypotheses|append_fragments]".into(),
+        );
     }
     let client = Client::builder().build()?;
     // Defer file access until service acceptance. Source errors cancel the RPC.
@@ -34,12 +43,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         data.truncate(count);
         Ok(Some((Bytes::from(data), (None, Some(file)))))
     });
-    let mut transcript = client
-        .stt()
-        .stream(source, TranscriptionOptions::new(language))?;
+    let mut transcript = client.stt().stream(
+        source,
+        TranscriptionOptions::new(language).output_contract(contract),
+    )?;
     let result = async {
         while let Some(update) = transcript.next().await {
             match update? {
+                TranscriptionUpdate::Delta { text } => println!("delta: {text}"),
                 TranscriptionUpdate::Partial { text } => println!("partial: {text}"),
                 TranscriptionUpdate::Final { text, language } => {
                     println!("final ({language}): {text}")

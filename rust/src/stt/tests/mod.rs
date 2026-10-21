@@ -56,6 +56,11 @@ fn partial(text: String, revision: u64) -> pb::StreamingTranscriptionResponse {
         })),
     }
 }
+fn delta(text: String) -> pb::StreamingTranscriptionResponse {
+    pb::StreamingTranscriptionResponse {
+        payload: Some(Payload::Delta(pb::TranscriptionDelta { text })),
+    }
+}
 fn done(text: &str, revision: u64) -> pb::StreamingTranscriptionResponse {
     pb::StreamingTranscriptionResponse {
         payload: Some(Payload::Done(pb::TranscriptionDone {
@@ -162,6 +167,7 @@ impl SpeechToText for Service {
         else {
             panic!("configuration must be first")
         };
+        let append = config.output_contract == pb::StreamingOutputContract::AppendFragments as i32;
         self.configs.lock().unwrap().push(config);
         if matches!(self.mode, Mode::DelayedHeaders) {
             std::future::pending::<()>().await;
@@ -173,7 +179,13 @@ impl SpeechToText for Service {
                 if matches!(service.mode, Mode::NoAcceptance) {
                     std::future::pending::<()>().await;
                 }
-                sender.send(Ok(accepted())).await.ok()?;
+                let mut acceptance = accepted();
+                if let Some(Payload::Accepted(value)) = &mut acceptance.payload {
+                    if append {
+                        value.output_contract = pb::StreamingOutputContract::AppendFragments as i32;
+                    }
+                }
+                sender.send(Ok(acceptance)).await.ok()?;
                 if matches!(service.mode, Mode::EarlyFinal) {
                     sender.send(Ok(done("", 0))).await.ok()?;
                     return Some(());
@@ -194,7 +206,14 @@ impl SpeechToText for Service {
                     assert_eq!(bytes.len() % 2, 0);
                     service.audio.lock().unwrap().extend(bytes);
                     if !has_audio {
-                        sender.send(Ok(partial("I scream".into(), 1))).await.ok()?;
+                        sender
+                            .send(Ok(if append {
+                                delta("Ice".into())
+                            } else {
+                                partial("I scream".into(), 1)
+                            }))
+                            .await
+                            .ok()?;
                         has_audio = true;
                     }
                 }
@@ -202,9 +221,24 @@ impl SpeechToText for Service {
                 if matches!(service.mode, Mode::MissingFinal) {
                     return Some(());
                 }
-                let (text, revision) = if has_audio { ("Ice cream", 2) } else { ("", 0) };
+                let (text, revision) = if has_audio {
+                    if append {
+                        ("Ice\n cream", 0)
+                    } else {
+                        ("Ice cream", 2)
+                    }
+                } else {
+                    ("", 0)
+                };
                 if has_audio {
-                    sender.send(Ok(partial(text.into(), revision))).await.ok()?;
+                    sender
+                        .send(Ok(if append {
+                            delta("\n cream".into())
+                        } else {
+                            partial(text.into(), revision)
+                        }))
+                        .await
+                        .ok()?;
                 }
                 sender.send(Ok(done(text, revision))).await.ok()?;
                 if matches!(service.mode, Mode::ErrorAfterDone) {

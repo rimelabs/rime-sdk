@@ -1,4 +1,4 @@
-// Command transcribe prints replacement transcript snapshots for a raw PCM file.
+// Command transcribe prints transcript updates for a raw PCM file.
 package main
 
 import (
@@ -22,6 +22,7 @@ func main() {
 
 func run() error {
 	language := flag.String("language", "", "spoken language, such as en or es (required)")
+	contract := flag.String("output-contract", "revised_hypotheses", "revised_hypotheses or append_fragments")
 	mode := flag.String("mode", "written", "written or verbatim")
 	sampleRate := flag.Int("sample-rate", 16000, "input frames per second: 8000, 16000, 24000 or 48000")
 	channels := flag.Int("channels", 1, "input channels: one or two")
@@ -67,7 +68,8 @@ func run() error {
 	budget := 120 * time.Second
 	stream, err := client.STT.Stream(ctx, source, rime.TranscriptionOptions{
 		Language: *language, Mode: rime.TranscriptionMode(*mode),
-		InputFormat: rime.PCMFormat{SampleRate: *sampleRate, Channels: *channels}, Timeout: &budget,
+		OutputContract: rime.TranscriptionOutputContract(*contract),
+		InputFormat:    rime.PCMFormat{SampleRate: *sampleRate, Channels: *channels}, Timeout: &budget,
 	})
 	if err != nil {
 		return err
@@ -84,6 +86,8 @@ func run() error {
 		switch value := update.(type) {
 		case rime.TranscriptionPartial:
 			fmt.Printf("partial: %s\n", value.Text)
+		case rime.TranscriptionDelta:
+			fmt.Printf("delta: %s\n", value.Text)
 		case rime.TranscriptionFinal:
 			fmt.Printf("final [%s]: %s\n", value.Language, value.Text)
 		}

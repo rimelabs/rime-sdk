@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"reflect"
@@ -39,7 +40,7 @@ func (service *recognitionService) TranscribeStreaming(rpc transcriptionRPC) err
 		return err
 	}
 	config := first.GetConfig()
-	if config == nil || config.Language == nil || config.OutputContract != pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES {
+	if config == nil || config.Language == nil || (config.OutputContract != pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_REVISED_HYPOTHESES && config.OutputContract != pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS) {
 		return status.Error(codes.InvalidArgument, "bad config")
 	}
 	return service.handle(rpc, config)
@@ -564,7 +565,7 @@ func TestTranscriptionValidationAndEndpoint(t *testing.T) {
 }
 
 func TestTranscriptionOversizeResponse(t *testing.T) {
-	for _, size := range []int{65537, 300000} {
+	for _, size := range []int{1048577, 1200000} {
 		client, _ := setupRecognition(t, func(rpc transcriptionRPC, _ *pb.StreamingConfig) error {
 			if err := rpc.Send(acceptance("en")); err != nil {
 				return err
@@ -676,5 +677,88 @@ func TestTranscriptionClientCloseDuringConnectionAndSource(t *testing.T) {
 			}
 			awaitSignal(t, stream.workersDone)
 		})
+	}
+}
+
+func TestAppendFragmentsGRPC(t *testing.T) {
+	for _, failStatus := range []bool{false, true} {
+		t.Run(fmt.Sprint(failStatus), func(t *testing.T) {
+			release := make(chan struct{})
+			fragments := []string{strings.Repeat("é", 200000), "\n next"}
+			client, _ := setupRecognition(t, func(rpc transcriptionRPC, config *pb.StreamingConfig) error {
+				if config.OutputContract != pb.StreamingOutputContract_STREAMING_OUTPUT_CONTRACT_APPEND_FRAGMENTS {
+					t.Error("wrong output contract")
+				}
+				if err := rpc.SendHeader(metadata.Pairs("x-request-id", "append-test")); err != nil {
+					return err
+				}
+				accepted := acceptance("en")
+				accepted.GetAccepted().OutputContract = config.OutputContract
+				if err := rpc.Send(accepted); err != nil {
+					return err
+				}
+				if _, err := rpc.Recv(); err != nil {
+					return err
+				}
+				for _, text := range fragments {
+					if err := rpc.Send(&pb.StreamingTranscriptionResponse{Payload: &pb.StreamingTranscriptionResponse_Delta{Delta: &pb.TranscriptionDelta{Text: text}}}); err != nil {
+						return err
+					}
+				}
+				if _, err := readAudio(rpc); err != nil {
+					return err
+				}
+				if err := rpc.Send(completion(0, strings.Join(fragments, ""), "en")); err != nil {
+					return err
+				}
+				if failStatus {
+					return status.Error(codes.Unavailable, "after done")
+				}
+				return nil
+			})
+			first := true
+			source := func(ctx context.Context) ([]byte, error) {
+				if first {
+					first = false
+					return []byte{0, 0}, nil
+				}
+				select {
+				case <-release:
+					return nil, io.EOF
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				}
+			}
+			stream := mustTranscribe(t, client, source, TranscriptionOptions{Language: "en", OutputContract: TranscriptionAppendFragments})
+			for _, text := range fragments {
+				update, err := stream.Recv()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(update, TranscriptionDelta{Text: text}) {
+					t.Fatal("fragment differs")
+				}
+			}
+			close(release)
+			updates, err := drainTranscripts(stream)
+			if failStatus {
+				if !errors.Is(err, ErrUnavailable) || len(updates) != 0 {
+					t.Fatalf("final escaped failed status: %v %v", updates, err)
+				}
+			} else if err != nil || !reflect.DeepEqual(updates, []TranscriptionUpdate{TranscriptionFinal{Text: strings.Join(fragments, ""), Language: "en"}}) {
+				t.Fatalf("%v %v", updates, err)
+			}
+			if stream.RequestID() != "append-test" {
+				t.Fatal("missing request ID")
+			}
+		})
+	}
+}
+
+func TestInvalidAppendContract(t *testing.T) {
+	client, service := setupRecognition(t, recognizeSilence)
+	_, err := client.STT.Stream(context.Background(), emptyAudio, TranscriptionOptions{Language: "en", OutputContract: "other"})
+	if !errors.Is(err, ErrInput) || service.calls.Load() != 0 {
+		t.Fatalf("%v", err)
 	}
 }

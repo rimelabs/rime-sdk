@@ -25,6 +25,19 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "fs", "io-util"] }
 ```
 
+The STT streaming examples below use the unreleased `TranscriptionOutputContract`
+and `TranscriptionUpdate::Delta` APIs. Published crates through `0.1.0-alpha.7`
+do not contain them. Until append support is released, run the example from this
+source checkout's `rust/` directory:
+
+```sh
+cargo run --example transcribe -- utterance.pcm en append_fragments
+```
+
+The installation requirement above must be raised to the first release containing
+these APIs when that release is prepared; it does not currently cover these STT
+streaming examples.
+
 Get an API key from the [Rime dashboard](https://app.rime.ai/). A key is required:
 `Client::builder().build()` reads `RIME_API_KEY`, or you can use
 `Client::builder().api_key("...").build()` to override it. The SDK does not load
@@ -133,6 +146,34 @@ their entries, and the service validates pronunciations and model/language suppo
 
 ## STT
 
+### Append-fragment streaming
+
+Both contracts use gRPC. The default returns replacement partials. Append mode
+returns permanent deltas from independent five-second audio windows, useful for
+long recordings or consumers that cannot replace text. Append each delta exactly,
+including its newline separators. The final transcript equals their concatenation
+and is emitted only after `done` and successful gRPC completion. Silence can
+produce an empty final with no deltas. Cancellation and failures never produce a
+successful final. `Transcribe` is unchanged and takes no output contract.
+
+```rust
+use rimelabs_sdk::{TranscriptionOptions, TranscriptionOutputContract};
+let options = TranscriptionOptions::new("en")
+    .output_contract(TranscriptionOutputContract::AppendFragments);
+// Pass options to client.stt().stream(source, options).
+// Append TranscriptionUpdate::Delta { text } exactly.
+```
+
+When upgrading, exhaustive matches on `TranscriptionUpdate` must include the
+`Delta` variant, even if the application keeps the default revised contract.
+
+The SDK caps cumulative transcript text at 1 MiB. Send recordings faster than
+real time and split them to respect the service's 16 MiB audio and 120-second
+call limits. Append mode does not remove those limits. Live voice agents usually
+prefer revised hypotheses for provisional text and cross-window corrections.
+
+
+
 ### Transcribe a complete WAV recording
 
 For a complete recording, use the native unary `Transcribe` RPC through the SDK.
@@ -228,6 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = async {
         while let Some(update) = transcript.next().await {
             match update? {
+                TranscriptionUpdate::Delta { text } => println!("delta: {text}"),
                 TranscriptionUpdate::Partial { text } => println!("partial: {text}"),
                 TranscriptionUpdate::Final { text, language } => {
                     println!("final ({language}): {text}")

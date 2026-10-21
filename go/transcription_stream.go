@@ -244,7 +244,7 @@ func (stream *TranscriptionStream) receive(rpc grpc.BidiStreamingClient[pb.Strea
 	if err != nil {
 		return TranscriptionFinal{}, err
 	}
-	state := transcriptState{textLimit: stream.limits.transcriptBytes}
+	state := transcriptState{textLimit: stream.limits.transcriptBytes, outputContract: stream.config.OutputContract}
 	for {
 		message, err := rpc.Recv()
 		if err == io.EOF {
@@ -266,7 +266,7 @@ func (stream *TranscriptionStream) receive(rpc grpc.BidiStreamingClient[pb.Strea
 			close(stream.accepted)
 		}
 		if partial != nil {
-			if err := stream.queue.put(stream.op.ctx, *partial); err != nil {
+			if err := stream.queue.put(stream.op.ctx, partial); err != nil {
 				return TranscriptionFinal{}, err
 			}
 		}

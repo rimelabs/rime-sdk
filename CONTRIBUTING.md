@@ -43,8 +43,8 @@ Prism retains its complete-frame input requirement, 192,000-byte send limit,
 40 ms wire appends, and cancellation rollback behavior.
 
 STT owns its independent gRPC connection, recognition operations, and typed
-transcript queue. The queue preserves atomic snapshots; it cannot use the audio
-byte queue, which splits data. TTS and STT share gRPC status mapping and endpoint
+transcript queue. The queue preserves atomic snapshots and every append fragment; it cannot use
+the audio byte queue, which splits data. TTS and STT share gRPC status mapping and endpoint
 validation; Node also shares bidirectional call completion handling.
 
 Shared STT protocol cases live in `conformance/stt/transcripts.json`. Local gRPC

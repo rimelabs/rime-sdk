@@ -4,7 +4,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from rimelabs_sdk import Rime, TranscriptionMode
+from rimelabs_sdk import Rime, TranscriptionMode, TranscriptionOutputContract
 
 
 async def chunks(path: Path):
@@ -13,10 +13,17 @@ async def chunks(path: Path):
             yield data
 
 
-async def main(path: Path, language: str, mode: TranscriptionMode = TranscriptionMode.WRITTEN):
+async def main(
+    path: Path,
+    language: str,
+    mode: TranscriptionMode = TranscriptionMode.WRITTEN,
+    output_contract: TranscriptionOutputContract = TranscriptionOutputContract.REVISED_HYPOTHESES,
+):
     async with (
         Rime() as client,
-        client.stt.stream(chunks(path), language=language, mode=mode, timeout=120) as stream,
+        client.stt.stream(
+            chunks(path), language=language, mode=mode, output_contract=output_contract, timeout=120
+        ) as stream,
     ):
         async for update in stream:
             print(f"{update.kind}: {update.text}")
@@ -32,5 +39,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode", choices=[mode.value for mode in TranscriptionMode], default="written"
     )
+    parser.add_argument(
+        "--output-contract",
+        choices=[value.value for value in TranscriptionOutputContract],
+        default="revised_hypotheses",
+    )
     args = parser.parse_args()
-    asyncio.run(main(args.audio, args.language, TranscriptionMode(args.mode)))
+    asyncio.run(
+        main(
+            args.audio,
+            args.language,
+            TranscriptionMode(args.mode),
+            TranscriptionOutputContract(args.output_contract),
+        )
+    )

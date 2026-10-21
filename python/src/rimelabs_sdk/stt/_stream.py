@@ -28,11 +28,14 @@ class TranscriptStream:
     final transcript. Breaking iteration alone requires ``cancel`` or a context.
     """
 
-    def __init__(self, owner, source, language, mode, terms, format, timeout, policy):
+    def __init__(
+        self, owner, source, language, mode, terms, format, timeout, policy, output_contract
+    ):
         self._owner = owner
         self._source = source
         self._language = language
         self._mode = mode
+        self._output_contract = output_contract
         self._terms = terms
         self._format = format
         self._timeout = timeout
@@ -132,7 +135,9 @@ class TranscriptStream:
 
     async def _read(self):
         assert self._call is not None and self._admission_timer is not None
-        state = TranscriptState(self._call.proto, self._policy.transcript_bytes)
+        state = TranscriptState(
+            self._call.proto, self._policy.transcript_bytes, self._output_contract
+        )
         async for message in self._call.responses():
             update = state.accept(message, input_done=self._input_done)
             if state.language is not None and not self._accepted.is_set():
@@ -150,7 +155,7 @@ class TranscriptStream:
             self._admission_timer = self._deadline(
                 self._policy.acceptance_timeout, "Transcription acceptance timed out"
             )
-            await self._call.start(self._language, self._mode, self._terms)
+            await self._call.start(self._language, self._mode, self._terms, self._output_contract)
             producer = asyncio.create_task(self._produce(), name="rime:stt-input")
             reader = asyncio.create_task(self._read(), name="rime:stt-results")
             tasks = [producer, reader]

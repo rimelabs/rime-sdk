@@ -1,4 +1,6 @@
 //! Streaming speech recognition for one caller-ended utterance.
+pub(crate) const MAX_TRANSCRIPT_BYTES: usize = 1024 * 1024;
+
 mod audio;
 mod protocol;
 mod queue;
@@ -26,10 +28,31 @@ pub enum TranscriptionMode {
     Verbatim,
 }
 
+/// Meaning of streaming text updates. Fixed for each utterance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TranscriptionOutputContract {
+    /// Replace provisional text with each partial snapshot.
+    #[default]
+    RevisedHypotheses,
+    /// Append permanent fragments exactly, including server separators.
+    AppendFragments,
+}
+impl TranscriptionOutputContract {
+    pub(super) fn wire(self) -> i32 {
+        match self {
+            Self::RevisedHypotheses => {
+                rimelabs_api::StreamingOutputContract::RevisedHypotheses as i32
+            }
+            Self::AppendFragments => rimelabs_api::StreamingOutputContract::AppendFragments as i32,
+        }
+    }
+}
+
 /// Options for one utterance. TTS client defaults do not apply.
 #[derive(Clone, Debug)]
 pub struct TranscriptionOptions {
     language: String,
+    output_contract: TranscriptionOutputContract,
     mode: TranscriptionMode,
     context_terms: Vec<String>,
     input_format: PcmFormat,
@@ -40,11 +63,17 @@ impl TranscriptionOptions {
     pub fn new(language: impl Into<String>) -> Self {
         Self {
             language: language.into(),
+            output_contract: TranscriptionOutputContract::default(),
             mode: TranscriptionMode::Written,
             context_terms: Vec::new(),
             input_format: PcmFormat::default(),
             timeout: None,
         }
+    }
+    /// Select replacement hypotheses (default) or permanent append fragments.
+    pub fn output_contract(mut self, contract: TranscriptionOutputContract) -> Self {
+        self.output_contract = contract;
+        self
     }
     /// Select written or verbatim formatting intent.
     pub fn mode(mut self, mode: TranscriptionMode) -> Self {
@@ -69,12 +98,17 @@ impl TranscriptionOptions {
     }
 }
 
-/// A complete replacement transcript. Never append partials to previous text.
+/// Transcript updates: replace partials, append deltas, and confirm with the final.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TranscriptionUpdate {
     /// A revisable snapshot.
     Partial {
         /// Complete current text.
+        text: String,
+    },
+    /// A permanent fragment to append, including server newline separators.
+    Delta {
+        /// Exact fragment text.
         text: String,
     },
     /// A confirmed result after successful protocol and gRPC completion.

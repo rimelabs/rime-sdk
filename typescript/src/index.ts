@@ -25,6 +25,8 @@ export type {
   TranscriptionOptions,
   TranscriptionMode,
   TranscriptionPartial,
+  TranscriptionDelta,
+  TranscriptionOutputContract,
   TranscriptionFinal,
   TranscriptionUpdate,
 } from "./stt/types.js";

@@ -318,7 +318,7 @@ impl Inner {
             })
             .await?;
         Ok(SpeechToTextClient::new(channel.clone())
-            .max_decoding_message_size(262_144)
+            .max_decoding_message_size(crate::stt::MAX_TRANSCRIPT_BYTES + 65_536)
             .max_encoding_message_size(131_072))
     }
     pub(crate) fn spawn<F>(&self, future: F) -> Result<tokio::task::JoinHandle<F::Output>, Error>

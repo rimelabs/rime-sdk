@@ -12,8 +12,8 @@ class Policy:
     acceptance_timeout: float = 10
     completion_timeout: float = 120
     cleanup_timeout: float = 2
-    receive_bytes: int = 262144
-    transcript_bytes: int = 65536
+    receive_bytes: int = 1048576 + 65536
+    transcript_bytes: int = 1048576
     queued_updates: int = 16
 
 

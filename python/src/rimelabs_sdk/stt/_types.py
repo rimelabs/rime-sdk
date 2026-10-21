@@ -1,8 +1,23 @@
-"""Public transcription options and replacement transcript snapshots."""
+"""Public transcription options, replacement snapshots, and append fragments."""
 
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Literal, TypeAlias
+
+
+class TranscriptionOutputContract(str, Enum):
+    """Whether updates replace provisional text or append permanent fragments."""
+
+    REVISED_HYPOTHESES = "revised_hypotheses"
+    APPEND_FRAGMENTS = "append_fragments"
+
+
+@dataclass(frozen=True, kw_only=True)
+class TranscriptionDelta:
+    """A permanent fragment. Append text exactly, including server separators."""
+
+    text: str
+    kind: Literal["delta"] = field(default="delta", init=False)
 
 
 class TranscriptionMode(str, Enum):
@@ -36,7 +51,7 @@ class TranscriptionFinal:
     """Discriminator for a successfully completed utterance."""
 
 
-TranscriptionUpdate: TypeAlias = TranscriptionPartial | TranscriptionFinal
+TranscriptionUpdate: TypeAlias = TranscriptionPartial | TranscriptionDelta | TranscriptionFinal
 
 
 @dataclass(frozen=True, kw_only=True)
