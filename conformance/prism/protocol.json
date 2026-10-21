@@ -316,6 +316,36 @@
     "invalid": true
   },
   {
+    "name": "speech end reason",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "timeout"
+    },
+    "expected_kind": "speech.stopped"
+  },
+  {
+    "name": "future speech end reason",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "future_reason"
+    },
+    "expected_kind": "speech.stopped"
+  },
+  {
+    "name": "nonstring speech end reason",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": 1
+    },
+    "invalid": true
+  },
+  {
     "name": "metadata array",
     "event": {
       "type": "response.created",

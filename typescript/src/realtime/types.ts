@@ -118,10 +118,18 @@ export interface SpeechStarted {
   readonly itemId: string;
   readonly audioStartMs: number;
 }
+/** What ended the user's turn: Flux judged it finished (`semantic`), its
+ * end-of-turn timeout passed (`timeout`), the fallback detector heard
+ * silence (`silence`), the user spoke for 55 s (`max_duration`), or turn
+ * detection switched while they spoke (`detector_changed`). */
+export type SpeechEndReason =
+  "semantic" | "timeout" | "silence" | "max_duration" | "detector_changed";
 export interface SpeechStopped {
   readonly kind: "speech.stopped";
   readonly itemId: string;
   readonly audioEndMs: number;
+  /** Null means the server did not publish the field. */
+  readonly endReason: SpeechEndReason | "unknown" | null;
 }
 export interface InputCommitted {
   readonly kind: "input.committed";

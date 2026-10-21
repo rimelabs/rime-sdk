@@ -293,7 +293,8 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | --- | --- |
 | `InputReady` | No data fields; `send_text` and `request_reply` handle this wait for you. |
 | `SpeechHint` | `audio_start_ms`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
-| `SpeechStarted`, `SpeechStopped` | `item_id` and `audio_start_ms` or `audio_end_ms` |
+| `SpeechStarted` | `item_id`, `audio_start_ms` |
+| `SpeechStopped` | `item_id`, `audio_end_ms`, `end_reason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or None from a server that does not send it |
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |
 | `TranscriptFailed` | `item_id`, `error` |

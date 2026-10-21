@@ -17,6 +17,13 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
+# What ended the user's turn: Flux judged it finished (semantic), its end-of-turn
+# timeout passed (timeout), the fallback detector heard silence (silence), the user
+# spoke for 55 s (max_duration), or turn detection switched while they spoke
+# (detector_changed).
+SpeechEndReason: TypeAlias = Literal[
+    "semantic", "timeout", "silence", "max_duration", "detector_changed"
+]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -160,8 +167,11 @@ class SpeechStarted:
 
 @dataclass(frozen=True, kw_only=True)
 class SpeechStopped:
+    """None in end_reason means the server did not publish the field."""
+
     item_id: str
     audio_end_ms: int
+    end_reason: SpeechEndReason | Literal["unknown"] | None = None
     kind: Literal["speech.stopped"] = field(default="speech.stopped", init=False)
 
 
