@@ -139,6 +139,7 @@ class RealtimeSession:
                 else settings["turn_detection"]["interrupt_response"],
                 tool_result_timeout_s=view.tool_result_timeout_s,
                 tool_continuation_timeout_s=view.tool_continuation_timeout_s,
+                turn_detection=view.turn_detection,
             )
         except TimeoutError:
             raise RimeTimeoutError("No session.created event arrived") from None

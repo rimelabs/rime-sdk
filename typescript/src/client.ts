@@ -51,7 +51,7 @@ export class Rime {
   };
   private readonly realtimeClient: Realtime;
   readonly realtime: {
-    connect: (options: RealtimeConnectOptions) => Promise<RealtimeSession>;
+    connect: (options?: RealtimeConnectOptions) => Promise<RealtimeSession>;
   };
   private closed = false;
   private closing: Promise<void> | null = null;

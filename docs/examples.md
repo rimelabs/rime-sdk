@@ -5,7 +5,8 @@ examples use the local SDK. Python and TypeScript declare separate example
 dependencies and share their SDK's workspace installation.
 
 Run the commands below from the repository root. Live examples need a Rime API
-key. Prism also needs a deployment URL and voice.
+key. Prism requires only the API key and uses the public endpoint and server
+default voice. The endpoint and voice are optional overrides.
 
 | Use case | Python | TypeScript | Go | Rust |
 | --- | --- | --- | --- | --- |
@@ -127,17 +128,18 @@ The audio extra uses PortAudio through `sounddevice`. If PortAudio is missing,
 follow the [sounddevice installation instructions](https://python-sounddevice.readthedocs.io/en/latest/installation.html).
 Device support depends on your OS. Grant microphone access to your terminal.
 
-Configure Prism with values from your deployment operator. The TTS endpoint and
-voice catalog do not supply these values:
+Prism examples use the public endpoint and server default voice. With
+`RIME_API_KEY` set, run:
 
 ```sh
-export PRISM_URL="wss://your-prism-host/v1/realtime"
-export PRISM_VOICE="your-deployment-voice"
 uv run --directory python/examples --locked -m realtime.recorded
 uv run --directory python/examples --locked --extra audio -m realtime.voice
 # After stopping that conversation:
 uv run --directory python/examples --locked --extra audio -m realtime.voice_tools
 ```
+
+Set `PRISM_URL` or `PRISM_VOICE` only to override the endpoint or voice in these
+examples. The SDK itself does not read these two environment variables.
 
 Use headphones. The Python example does not remove speaker echo. Keep the
 microphone active during replies so Prism can hear interruptions. Ctrl-C closes
@@ -160,7 +162,8 @@ npm --prefix typescript/examples run tts:play
 For playback, open `http://127.0.0.1:3000` in a browser and press **Start**.
 **Stop** cancels the request and clears playback. Ctrl-C stops the local server.
 
-Set `PRISM_URL` and `PRISM_VOICE` as above, then run one example at a time:
+With `RIME_API_KEY` set, run one Prism example at a time. `PRISM_URL` and
+`PRISM_VOICE` are optional overrides:
 
 ```sh
 npm --prefix typescript/examples run prism:recorded

@@ -27,7 +27,7 @@ async def main(source=FIXTURE, output=Path("reply.wav")):
         asyncio.timeout(60),
         Rime() as client,
         client.realtime.connect(
-            endpoint=os.environ["PRISM_URL"],
+            endpoint=os.getenv("PRISM_URL"),
             voice=os.getenv("PRISM_VOICE"),
             instructions="Give short, clear answers.",
         ) as session,

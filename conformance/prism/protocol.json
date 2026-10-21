@@ -566,9 +566,7 @@
         "message": "message",
         "scope": "event",
         "owner": {
-          "call_ids": [
-            1
-          ]
+          "call_ids": [1]
         }
       }
     },
@@ -753,6 +751,119 @@
       "response_id": "reply-1",
       "item_id": "message-1",
       "output_index": 0
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: null turn detection",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: nonobject turn detection",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": []
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: null eagerness",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "eagerness": null
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: nonstring eagerness",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "eagerness": 1
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: null silence",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "prism_end_of_turn_timeout_ms": null
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: boolean silence",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "prism_end_of_turn_timeout_ms": true
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: fractional silence",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "prism_end_of_turn_timeout_ms": 1000.5
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: short silence",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "prism_end_of_turn_timeout_ms": 999
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session timing: long silence",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "turn_detection": {
+          "prism_end_of_turn_timeout_ms": 10001
+        }
+      }
     },
     "invalid": true
   }

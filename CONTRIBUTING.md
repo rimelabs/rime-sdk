@@ -165,9 +165,9 @@ Use absolute repository URLs in package READMEs so guide links work on PyPI and
 npm. The Python source distribution and npm package include their guides.
 
 Prism example tests use a controlled WebSocket peer and require no credentials
-or audio hardware. The example scripts themselves connect to the endpoint the
-reader configures. A microphone example still needs validation of capture,
-playback, interruption, and cleanup on real devices before it is added.
+or audio hardware. The example scripts connect to the public Prism endpoint,
+with an optional `PRISM_URL` override. A microphone example still needs validation
+of capture, playback, interruption, and cleanup on real devices before it is added.
 
 See [RELEASING.md](RELEASING.md) for release PRs, registry setup, and recovery.
 

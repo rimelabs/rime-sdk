@@ -115,5 +115,85 @@
       }
     },
     "valid": false
+  },
+  {
+    "name": "turn detection: omitted timing",
+    "schema": "turnDetection",
+    "value": {},
+    "valid": true
+  },
+  {
+    "name": "turn detection: complete timing",
+    "schema": "turnDetection",
+    "value": {
+      "interrupt_response": true,
+      "eagerness": "auto",
+      "prism_end_of_turn_timeout_ms": 5000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: minimum silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 1000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: maximum silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 10000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: unknown eagerness",
+    "schema": "turnDetection",
+    "value": {
+      "eagerness": "future"
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: null eagerness",
+    "schema": "turnDetection",
+    "value": {
+      "eagerness": null
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: short silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 999
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: long silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 10001
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: fractional silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 1000.5
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: boolean silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": true
+    },
+    "valid": false
   }
 ]

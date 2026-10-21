@@ -123,7 +123,7 @@ async def main(args, *, tools=(), execute_tool=None):
     async with (
         Rime() as client,
         client.realtime.connect(
-            endpoint=os.environ["PRISM_URL"],
+            endpoint=os.getenv("PRISM_URL"),
             voice=os.getenv("PRISM_VOICE"),
             instructions=(
                 "Give short answers in English. Use lookup_order for order questions."
