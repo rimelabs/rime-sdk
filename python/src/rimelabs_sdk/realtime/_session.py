@@ -15,7 +15,7 @@ import os
 import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, TypeVar
 from weakref import WeakSet
 
@@ -151,6 +151,8 @@ class RealtimeSession:
                 tool_result_timeout_s=view.tool_result_timeout_s,
                 tool_continuation_timeout_s=view.tool_continuation_timeout_s,
                 turn_detection=view.turn_detection,
+                request_id=view.request_id,
+                response_metadata=view.response_metadata,
             )
         except TimeoutError:
             raise RimeTimeoutError("No session.created event arrived") from None
@@ -469,6 +471,20 @@ class RealtimeSession:
                 await self._request(
                     p.CANCEL, {"response_id": response.response_id}, response.response_id
                 )
+
+    async def set_response_metadata(self, metadata: t.JsonObject) -> None:
+        """Replace the labels later replies carry; a reply already started keeps its own.
+
+        Returns once Prism confirms the change.
+        """
+        labels = p.response_metadata(metadata)
+        event = await self._request(p.UPDATE, {"session": {"prism_response_metadata": labels}})
+        self._info = replace(
+            self.info,
+            response_metadata=event.session.response_metadata
+            if event.session.response_metadata is not None
+            else labels,
+        )
 
     async def clear_audio(self) -> None:
         async with self._audio_lock, self._clear_lock:

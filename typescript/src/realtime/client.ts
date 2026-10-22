@@ -14,6 +14,7 @@ import type {
   JsonValue,
   PrismFiller,
 } from "./types.js";
+import { copyJson, responseMetadata } from "./protocol.js";
 import type { SessionSettings } from "./protocol.js";
 
 const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
@@ -65,21 +66,6 @@ function timeouts(options: RealtimeTimeouts = {}): Required<RealtimeTimeouts> {
 }
 
 /** Reject values that JSON.stringify would silently drop or change. */
-function copyJson(value: unknown): JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean")
-    return value;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (Array.isArray(value)) return Array.from(value, copyJson);
-  if (
-    value &&
-    typeof value === "object" &&
-    [Object.prototype, null].includes(Object.getPrototypeOf(value))
-  )
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, copyJson(item)]),
-    );
-  throw new RimeInputError("Tool schemas must contain finite JSON values");
-}
 
 function fillerSettings(value: PrismFiller): PrismFiller {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -220,6 +206,16 @@ export class Realtime {
         settings.turn_detection.prism_end_of_turn_timeout_ms = value;
       }
     }
+    if (options.responseMetadata !== undefined)
+      settings.prism_response_metadata = responseMetadata(
+        options.responseMetadata,
+      );
+    const requestId = options.requestId;
+    if (
+      requestId !== undefined &&
+      (typeof requestId !== "string" || !requestId.trim())
+    )
+      throw new RimeInputError("requestId must be nonblank");
     for (const name of ["voice", "instructions"] as const) {
       const value = options[name];
       if (value !== undefined && value !== null) {
@@ -240,6 +236,7 @@ export class Realtime {
           socket = new RealtimeConnection(
             address,
             this.credentials.realtimeAuthorization(),
+            requestId,
           );
         } catch {
           throw new RimeUnavailableError("Realtime handshake failed");

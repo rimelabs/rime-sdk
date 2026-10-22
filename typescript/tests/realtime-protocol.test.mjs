@@ -68,6 +68,41 @@ async function toolCall(session, peer) {
     if (payload.kind === "tool.call") return { parent, call: payload.call };
   throw new Error("No tool call");
 }
+test("a started reply shows the client's own metadata", () => {
+  const started = (metadata) =>
+    decode(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "reply-1", metadata },
+      }),
+      "session-1",
+    ).payload;
+  assert.deepEqual(
+    started({ prism_cause: "user_text", step: "3", nested: { a: 1 } }).metadata,
+    { step: "3", nested: { a: 1 } },
+  );
+  assert.deepEqual(started(undefined).metadata, {});
+});
+test("a started reply names the user items it answers", () => {
+  const started = (metadata) =>
+    decode(
+      JSON.stringify({
+        type: "response.created",
+        response: { id: "reply-1", metadata },
+      }),
+      "session-1",
+    ).payload;
+  assert.deepEqual(
+    started({ prism_input_item_ids: ["item-1", "item-2"] }).inputItemIds,
+    ["item-1", "item-2"],
+  );
+  assert.deepEqual(
+    started({ prism_cause: "user_text", prism_input_item_id: "item-3" })
+      .inputItemIds,
+    ["item-3"],
+  );
+  assert.deepEqual(started(undefined).inputItemIds, []);
+});
 for (const item of cases) {
   test(`shared protocol: ${item.name}`, () => {
     const raw = JSON.stringify(item.event);

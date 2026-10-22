@@ -133,6 +133,8 @@ export class RealtimeSession {
     const view = event.session;
     this.sessionInfo = Object.freeze({
       sessionId: this.id(),
+      requestId: view.requestId,
+      responseMetadata: view.responseMetadata,
       model: "prism",
       voice: view.voice ?? "",
       interruptOnSpeech:
@@ -589,6 +591,25 @@ export class RealtimeSession {
           );
       }),
     );
+  }
+  /** Replaces the labels later replies carry; a reply already started keeps
+   * its own. Resolves once Prism confirms the change. */
+  async setResponseMetadata(
+    metadata: t.JsonObject,
+    options: t.RealtimeOperationOptions = {},
+  ): Promise<void> {
+    const labels = p.responseMetadata(metadata);
+    return this.operation(options, async (signal) => {
+      const event = await this.request(
+        p.requests.update,
+        { session: { prism_response_metadata: labels } },
+        signal,
+      );
+      this.sessionInfo = Object.freeze({
+        ...this.info,
+        responseMetadata: event.session.responseMetadata ?? labels,
+      });
+    });
   }
   async clearAudio(options: t.RealtimeOperationOptions = {}): Promise<void> {
     return this.operation(options, (signal) =>

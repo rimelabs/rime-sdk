@@ -457,6 +457,9 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/clientCapability'
+        prism_response_metadata:
+          type: object
+          additionalProperties: true
 
     sessionView:
       type: object
@@ -475,6 +478,11 @@ components:
       properties:
         id:
           type: string
+        prism_request_id:
+          type: string
+        prism_response_metadata:
+          type: object
+          additionalProperties: true
         object:
           const: realtime.session
         model:
@@ -576,6 +584,10 @@ components:
       properties:
         prism_input_item_id:
           type: string
+        prism_input_item_ids:
+          type: array
+          items:
+            type: string
         prism_call_id:
           type: string
         prism_drain_token:

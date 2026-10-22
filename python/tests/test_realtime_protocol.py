@@ -174,3 +174,30 @@ async def test_unknown_events_and_stale_acknowledgments_do_not_consume_request(m
             future={"ignored": True},
         )
         assert (await pending).item_id == "history-1"
+
+
+def test_a_started_reply_names_the_user_items_it_answers():
+    def started(metadata):
+        event = {"type": "response.created", "response": {"id": "reply-1", "metadata": metadata}}
+        return protocol.decode(json.dumps(event), "session-1").payload
+
+    assert started({"prism_input_item_ids": ["item-1", "item-2"]}).input_item_ids == (
+        "item-1",
+        "item-2",
+    )
+    assert started(
+        {"prism_cause": "user_text", "prism_input_item_id": "item-3"}
+    ).input_item_ids == ("item-3",)
+    assert started(None).input_item_ids == ()
+
+
+def test_a_started_reply_shows_the_clients_own_metadata():
+    def started(metadata):
+        event = {"type": "response.created", "response": {"id": "reply-1", "metadata": metadata}}
+        return protocol.decode(json.dumps(event), "session-1").payload
+
+    assert started({"prism_cause": "user_text", "step": "3", "nested": {"a": 1}}).metadata == {
+        "step": "3",
+        "nested": {"a": 1},
+    }
+    assert started(None).metadata == {}

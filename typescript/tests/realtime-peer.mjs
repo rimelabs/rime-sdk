@@ -29,6 +29,7 @@ export class Peer {
   sockets = [];
   invalid = [];
   settings = null;
+  sessionFields = {};
   autoInitialize = true;
   autoCreate = true;
   onRequest = null;
@@ -42,6 +43,7 @@ export class Peer {
       this.socket = socket;
       this.sockets.push(socket);
       this.authorization = request.headers.authorization;
+      this.requestId = request.headers["x-request-id"];
       socket.on("message", (raw) => {
         const event = JSON.parse(raw.toString());
         const validate = validators.get(event.type);
@@ -62,6 +64,13 @@ export class Peer {
                   result_timeout_s: 20,
                   continuation_timeout_s: 5,
                 },
+                ...(event.session.prism_response_metadata === undefined
+                  ? {}
+                  : {
+                      prism_response_metadata:
+                        event.session.prism_response_metadata,
+                    }),
+                ...this.sessionFields,
               },
             },
             socket,

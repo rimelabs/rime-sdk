@@ -174,6 +174,12 @@ class SessionInfo:
     tool_result_timeout_s: float | None = None
     tool_continuation_timeout_s: float | None = None
     turn_detection: TurnDetectionInfo = field(default_factory=TurnDetectionInfo)
+    # The x-request-id Prism's logs name this session by; None when the server does not
+    # publish it.
+    request_id: str | None = None
+    # The labels replies carry, as Prism last confirmed them; None when the server does not
+    # publish them.
+    response_metadata: JsonObject | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -272,6 +278,12 @@ class ResponseStarted:
     cause: Literal["speech", "text", "proactive", "tools", "unknown"]
     parent: ResponseRef | None = None
     input_item_id: str | None = None
+    # The client's own metadata keys: the session's labels, with the request's own over
+    # them. Prism's prism_ keys are left out.
+    metadata: JsonObject = field(default_factory=dict)
+    # The user items the reply answers: a spoken reply's committed turns, or a typed
+    # turn's item. Empty when the server names none.
+    input_item_ids: tuple[str, ...] = ()
     kind: Literal["response.started"] = field(default="response.started", init=False)
 
 

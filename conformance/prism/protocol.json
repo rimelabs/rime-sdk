@@ -906,5 +906,66 @@
       }
     },
     "invalid": true
+  },
+  {
+    "name": "nonstring request ID",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prism_request_id": 123
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "input item IDs not a list",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prism_input_item_ids": "item-1"
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring input item ID",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prism_input_item_ids": [1]
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "speech response naming its input items",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-2",
+        "metadata": {
+          "prism_input_item_ids": ["item-1"]
+        }
+      }
+    },
+    "expected_kind": "response.started"
+  },
+  {
+    "name": "session response metadata not an object",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "prism_response_metadata": []
+      }
+    },
+    "invalid": true
   }
 ]

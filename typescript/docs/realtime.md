@@ -165,15 +165,19 @@ once. Open a new session to change them.
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
+| `requestId` | No | Your id for the session, sent as `x-request-id`. Prism uses it if it is 1 to 128 printable ASCII characters, else makes its own. |
+| `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`. Keys starting with `prism_` are refused. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
 
 Credentials come from `new Rime({ apiKey: "..." })` or `RIME_API_KEY`. Prism uses
 `Authorization: Bearer <key>`, without a TTS token exchange. TTS endpoint, model,
 voice, and timeout settings do not apply to Realtime.
 
-After connection, `session.info` contains `sessionId`, `model`, `voice`,
-`interruptOnSpeech`, `turnDetection`, `toolResultTimeoutS`, and
-`toolContinuationTimeoutS`.
+After connection, `session.info` contains `sessionId`, `requestId`, `model`,
+`voice`, `interruptOnSpeech`, `turnDetection`, `responseMetadata`,
+`toolResultTimeoutS`, and `toolContinuationTimeoutS`. `requestId` is the id
+Prism's logs use; include it when you report a problem. It is `null` on servers
+that do not send it.
 Check the effective interruption setting there. Tool wait durations are total
 server deadlines, not remaining time. A `null` duration can mean an omitted
 field; it does not prove that no deadline exists.
@@ -229,6 +233,7 @@ Every method returns a promise. Arguments without `?` are required.
 | `continueReply(parent, options?)` | Waits for parent completion and all tool result acknowledgments, then returns a new `ResponseRef`. |
 | `cancel(response, options?)` | Requests generation cancellation and waits for a terminal response or refusal. |
 | `clearAudio(options?)` | Clears buffered input and resets audio conversion after acknowledgment. |
+| `setResponseMetadata(metadata, options?)` | Replaces the labels for later replies once Prism confirms. |
 | `reportPlayback(report, options?)` | Reports interrupted or finished playback. |
 | `close()` | Closes the session and releases its resources. |
 
@@ -337,7 +342,7 @@ are exported from `@rimelabs/sdk`.
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
 | `transcript.failed` | `itemId`, `error` |
-| `response.started` | `response`, `cause`, nullable `parent` and `inputItemId` |
+| `response.started` | `response`, `cause`, nullable `parent` and `inputItemId`, `inputItemIds` (the user items it answers), `metadata` (your own keys) |
 | `message.started` | `output` |
 | `text.delta`, `text.done` | `output` and `delta` or `text` |
 | `audio.delta`, `audio.done` | `output`; a delta also has `audio.data` and a complete `audio.format` |

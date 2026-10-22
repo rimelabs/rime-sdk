@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Decode only the protocol fields the SDK uses. Unknown events and fields stay open. */
-import { RimeStreamError } from "../errors.js";
+import { RimeInputError, RimeStreamError } from "../errors.js";
 import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
 
@@ -19,9 +19,41 @@ export interface SessionSettings {
   }[];
   voice?: string;
   instructions?: string;
+  prism_response_metadata?: t.JsonObject;
+}
+export function copyJson(value: unknown): t.JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean")
+    return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) return Array.from(value, copyJson);
+  if (
+    value &&
+    typeof value === "object" &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value))
+  )
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, copyJson(item)]),
+    );
+  throw new RimeInputError("Tool schemas must contain finite JSON values");
+}
+/** A copy of the client's labels for every reply: a JSON object. */
+export function responseMetadata(value: unknown): t.JsonObject {
+  let copy: t.JsonValue;
+  try {
+    copy = copyJson(value);
+  } catch {
+    throw new RimeInputError(
+      "responseMetadata must contain finite JSON values",
+    );
+  }
+  if (copy === null || typeof copy !== "object" || Array.isArray(copy))
+    throw new RimeInputError("responseMetadata must be a JSON object");
+  return copy;
 }
 export interface SessionView {
   id: string;
+  requestId: string | null;
+  responseMetadata: t.JsonObject | null;
   voice: string;
   interruptOnSpeech: boolean | null;
   toolResultTimeoutS: number | null;
@@ -219,6 +251,19 @@ function session(value: unknown): SessionView {
     invalid("session.prism_effective_interrupt_response");
   return {
     id: id(view.id, "session.id"),
+    requestId: optionalString(
+      view.prism_request_id,
+      "session.prism_request_id",
+    ),
+    responseMetadata:
+      view.prism_response_metadata === undefined
+        ? null
+        : clientMetadata(
+            object(
+              view.prism_response_metadata,
+              "session.prism_response_metadata",
+            ),
+          ),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
     turnDetection: Object.freeze({ eagerness, endOfTurnTimeoutMs }),
@@ -228,6 +273,16 @@ function session(value: unknown): SessionView {
       "continuation_timeout_s",
     ),
   };
+}
+/** The client's own keys of `metadata`: all but Prism's `prism_` ones. */
+function clientMetadata(metadata: Record<string, unknown>): t.JsonObject {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(metadata)
+        .filter(([key]) => !key.startsWith("prism_"))
+        .map(([key, value]) => [key, json(value)]),
+    ),
+  );
 }
 function fault(value: unknown): t.NormalizedRealtimeFault {
   const error = object(value, "error");
@@ -434,6 +489,14 @@ function decodeValue(
         metadata.prism_parent_response_id,
         "prism_parent_response_id",
       );
+      const inputItemId = optionalString(
+        metadata.prism_input_item_id,
+        "prism_input_item_id",
+      );
+      const inputItemIds =
+        metadata.prism_input_item_ids ??
+        (inputItemId === null ? [] : [inputItemId]);
+      if (!Array.isArray(inputItemIds)) return invalid("prism_input_item_ids");
       payload = {
         kind: "response.started",
         response: ref(response.id),
@@ -448,9 +511,10 @@ function decodeValue(
                   ? "proactive"
                   : "unknown",
         parent: parent === null ? null : ref(parent),
-        inputItemId: optionalString(
-          metadata.prism_input_item_id,
-          "prism_input_item_id",
+        inputItemId,
+        metadata: clientMetadata(metadata),
+        inputItemIds: Object.freeze(
+          inputItemIds.map((value) => id(value, "prism_input_item_ids")),
         ),
       };
       break;

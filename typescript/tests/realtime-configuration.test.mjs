@@ -298,3 +298,73 @@ for (const eagerness of [undefined, "future"]) {
     });
   });
 }
+
+for (const [requestId, used] of [
+  ["client-7", "client-7"],
+  [undefined, "server-made"],
+]) {
+  test(`request id on the upgrade, and the one Prism used: ${requestId}`, async (t) => {
+    const peer = await new Peer().start();
+    peer.sessionFields = { prism_request_id: used };
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await peer.close();
+    });
+    const session = await client.realtime.connect({
+      endpoint: peer.endpoint,
+      requestId,
+    });
+    assert.equal(peer.requestId, requestId);
+    assert.equal(session.info.requestId, used);
+  });
+}
+
+test("invalid request ids fail before opening a socket", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const requestId of [123, "", "  "])
+    await assert.rejects(
+      client.realtime.connect({ requestId }),
+      RimeInputError,
+    );
+});
+
+test("response metadata is set on connect, changed mid-call, and shown in info", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  const first = { scenario: "refund", step: "1" };
+  const session = await client.realtime.connect({
+    endpoint: peer.endpoint,
+    responseMetadata: first,
+  });
+  assert.deepEqual(peer.settings.prism_response_metadata, first);
+  assert.deepEqual(session.info.responseMetadata, first);
+  const second = { scenario: "refund", step: "2" };
+  await session.setResponseMetadata(second);
+  assert.deepEqual(peer.settings, { prism_response_metadata: second });
+  assert.deepEqual(session.info.responseMetadata, second);
+  assert.deepEqual(peer.invalid, []);
+});
+
+test("invalid response metadata fails before it is sent", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const responseMetadata of [[], "step", { step: Number.NaN }])
+    await assert.rejects(
+      client.realtime.connect({ responseMetadata }),
+      RimeInputError,
+    );
+  const peer = await new Peer().start();
+  t.after(() => peer.close());
+  const session = await client.realtime.connect({ endpoint: peer.endpoint });
+  const sent = peer.requests.length;
+  await assert.rejects(session.setResponseMetadata([]), RimeInputError);
+  assert.equal(peer.requests.length, sent);
+});

@@ -242,3 +242,97 @@ async def test_unknown_or_missing_effective_turn_eagerness(monkeypatch, value):
     async with Rime(api_key="test") as client, client.realtime.connect() as session:
         assert session.info.turn_detection.eagerness == (None if value is None else "unknown")
         assert session.info.turn_detection.end_of_turn_timeout_ms is None
+
+
+@pytest.mark.parametrize(("request_id", "used"), [("client-7", "client-7"), (None, "server-made")])
+async def test_request_id_on_the_upgrade_and_the_one_prism_used(monkeypatch, request_id, used):
+    peer = Peer()
+
+    async def send(raw):
+        event = json.loads(raw)
+        peer.emit(
+            "session.updated",
+            prism_request_event_id=event["event_id"],
+            session={"id": "session-1", "prism_request_id": used},
+        )
+
+    async def connect(endpoint, **kwargs):
+        expected = {"Authorization": "Bearer test"}
+        if request_id is not None:
+            expected["x-request-id"] = request_id
+        assert kwargs["additional_headers"] == expected
+        return peer
+
+    monkeypatch.setattr(peer, "send", send)
+    monkeypatch.setattr(_client, "connect", connect)
+    async with (
+        Rime(api_key="test") as client,
+        client.realtime.connect(request_id=request_id) as session,
+    ):
+        assert session.info.request_id == used
+
+
+@pytest.mark.parametrize("value", [123, "", "  "])
+async def test_invalid_request_id_does_not_open_connection(monkeypatch, value):
+    async def connect(*args, **kwargs):
+        pytest.fail("Invalid settings must fail before opening a socket")
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with Rime(api_key="test") as client:
+        with pytest.raises(RimeInputError, match="request_id"):
+            async with client.realtime.connect(request_id=value):
+                pass
+
+
+class _LabelPeer(Peer):
+    """Echoes the labels an update names, as Prism does."""
+
+    async def send(self, raw):
+        event = json.loads(raw)
+        if event["type"] != "session.update":
+            return await super().send(raw)
+        _VALIDATORS[event["type"]].validate(event)
+        self.settings = event["session"]
+        session = {"id": "session-1", "voice": "test"}
+        if "prism_response_metadata" in event["session"]:
+            session["prism_response_metadata"] = event["session"]["prism_response_metadata"]
+        self.emit("session.updated", prism_request_event_id=event["event_id"], session=session)
+
+
+async def test_response_metadata_is_set_changed_and_shown(monkeypatch):
+    peer = _LabelPeer()
+
+    async def connect(endpoint, **kwargs):
+        return peer
+
+    monkeypatch.setattr(_client, "connect", connect)
+    first = {"scenario": "refund", "step": "1"}
+    async with (
+        Rime(api_key="test") as client,
+        client.realtime.connect(response_metadata=first) as session,
+    ):
+        assert peer.settings["prism_response_metadata"] == first
+        assert session.info.response_metadata == first
+        second = {"scenario": "refund", "step": "2"}
+        await session.set_response_metadata(second)
+        assert peer.settings == {"prism_response_metadata": second}
+        assert session.info.response_metadata == second
+
+
+@pytest.mark.parametrize("value", [[], "step", {"step": float("nan")}])
+async def test_invalid_response_metadata_is_not_sent(monkeypatch, value):
+    peer = _LabelPeer()
+
+    async def connect(endpoint, **kwargs):
+        return peer
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with Rime(api_key="test") as client:
+        with pytest.raises(RimeInputError, match="response_metadata"):
+            async with client.realtime.connect(response_metadata=value):
+                pass
+        async with client.realtime.connect() as session:
+            settings = peer.settings
+            with pytest.raises(RimeInputError, match="response_metadata"):
+                await session.set_response_metadata(value)
+            assert peer.settings is settings
