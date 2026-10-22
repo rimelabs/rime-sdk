@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.20](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.19...python-v0.1.0-alpha.20) (2026-10-22)
+
+
+### Features
+
+* add Prism tool filler controls for Python and TypeScript ([#93](https://github.com/rimelabs/rime-sdk/issues/93)) ([c6d1344](https://github.com/rimelabs/rime-sdk/commit/c6d13445b565cf62b4dd0e7e630c4b86182d6a82))
+* **realtime:** report what ended the user's turn ([#92](https://github.com/rimelabs/rime-sdk/issues/92)) ([88eb9f2](https://github.com/rimelabs/rime-sdk/commit/88eb9f20d9c9943a67b809452493cc27744b794e))
+
 ## [0.1.0-alpha.19](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.18...python-v0.1.0-alpha.19) (2026-10-21)
 
 
