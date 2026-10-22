@@ -3,6 +3,7 @@ import { Rime, RimeRealtimeError } from "@rimelabs/sdk";
 const lookupOrder = {
   name: "lookup_order",
   description: "Look up an order in the example store.",
+  prismFiller: { type: "text", text: "One moment while I check your order." },
   parameters: {
     type: "object",
     properties: { order_id: { type: "string" } },

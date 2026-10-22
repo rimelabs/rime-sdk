@@ -17,10 +17,31 @@ export interface RealtimeTimeouts {
 export interface RealtimeOperationOptions {
   readonly signal?: AbortSignal;
 }
+/** Speech while a tool runs. Text and instructions must be nonblank and at
+ * most 500 Unicode scalar values. Invalid UTF-8 is rejected.
+ * Omit the setting to use the server default. */
+export type PrismFiller =
+  | {
+      readonly type: "none";
+      readonly text?: never;
+      readonly instructions?: never;
+    }
+  | {
+      readonly type: "text";
+      readonly text: string;
+      readonly instructions?: never;
+    }
+  | {
+      readonly type: "auto";
+      readonly instructions?: string;
+      readonly text?: never;
+    };
+
 export interface ToolDefinition {
   readonly name: string;
   readonly parameters: JsonObject;
   readonly description?: string;
+  readonly prismFiller?: PrismFiller;
 }
 export type TurnEagerness = "low" | "medium" | "high" | "auto";
 /** Omitted fields use the server's turn timing defaults. */

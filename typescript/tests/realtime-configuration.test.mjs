@@ -4,6 +4,140 @@ import https from "node:https";
 import { Rime, RimeInputError, RimeUnavailableError } from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 
+for (const filler of [
+  undefined,
+  { type: "none" },
+  { type: "text", text: " One moment. " },
+  { type: "auto" },
+  { type: "auto", instructions: " Say you are checking. " },
+  { type: "text", text: "x" },
+  { type: "text", text: "😀".repeat(500) },
+  { type: "auto", instructions: "😀".repeat(500) },
+  ...[
+    "\ufeff",
+    "\u001c",
+    "\u001d",
+    "\u001e",
+    "\u001f",
+    "\u0085Hi\u0085",
+    "\ud800\udc00",
+  ].flatMap((value) => [
+    { type: "text", text: value },
+    { type: "auto", instructions: value },
+  ]),
+]) {
+  test(`tool filler serializes at tool level: ${JSON.stringify(filler)}`, async (t) => {
+    const peer = await new Peer().start();
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await peer.close();
+    });
+    await client.realtime.connect({
+      endpoint: peer.endpoint,
+      tools: [
+        {
+          name: "press_digits",
+          parameters: { type: "object" },
+          prismFiller: filler,
+        },
+        { name: "other", parameters: {} },
+      ],
+    });
+    const expected = {
+      type: "function",
+      function: {
+        name: "press_digits",
+        description: "",
+        parameters: { type: "object" },
+      },
+    };
+    if (filler !== undefined) expected.prism_filler = filler;
+    assert.deepEqual(peer.settings.tools[0], expected);
+    assert.equal("prism_filler" in peer.settings.tools[1], false);
+    assert.deepEqual(peer.invalid, []);
+  });
+}
+
+test("invalid Unicode filler fails before opening a socket", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const value of [
+    "\u0085",
+    "\ud800",
+    "\udfff",
+    "Hi\ud800",
+    "\udfffHi",
+    "\ud800\ud800",
+    "\udfff\udfff",
+  ]) {
+    for (const prismFiller of [
+      { type: "text", text: value },
+      { type: "auto", instructions: value },
+    ]) {
+      await assert.rejects(
+        client.realtime.connect({
+          tools: [{ name: "lookup", parameters: {}, prismFiller }],
+        }),
+        RimeInputError,
+      );
+    }
+  }
+});
+
+test("invalid tool filler fails before opening a socket", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const filler of [
+    null,
+    false,
+    [],
+    "none",
+    {},
+    { type: "future" },
+    { type: "text" },
+    { type: "none", text: "Hi" },
+    { type: "none", instructions: "Hi" },
+    { type: "none", extra: true },
+    { type: "auto", text: "Hi" },
+    { type: "text", text: "Hi", instructions: "Hi" },
+    ...[null, "", " \n\t", 1, [], "😀".repeat(501)].flatMap((value) => [
+      { type: "text", text: value },
+      { type: "auto", instructions: value },
+    ]),
+  ]) {
+    await assert.rejects(
+      client.realtime.connect({
+        tools: [{ name: "lookup", parameters: {}, prismFiller: filler }],
+      }),
+      RimeInputError,
+    );
+  }
+});
+
+test("filler settings are copied before opening a connection", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  const filler = { type: "text", text: "Original" };
+  const opening = client.realtime.connect({
+    endpoint: peer.endpoint,
+    tools: [{ name: "lookup", parameters: {}, prismFiller: filler }],
+  });
+  filler.text = "Changed";
+  await opening;
+  assert.deepEqual(peer.settings.tools[0].prism_filler, {
+    type: "text",
+    text: "Original",
+  });
+  assert.deepEqual(peer.invalid, []);
+});
+
 test("omitted endpoint uses public Prism with API key authentication", async (t) => {
   const requests = [];
   t.mock.method(https, "request", (options) => {

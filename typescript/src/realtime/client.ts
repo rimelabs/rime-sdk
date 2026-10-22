@@ -12,6 +12,7 @@ import type {
   RealtimeConnectOptions,
   RealtimeTimeouts,
   JsonValue,
+  PrismFiller,
 } from "./types.js";
 import type { SessionSettings } from "./protocol.js";
 
@@ -80,6 +81,41 @@ function copyJson(value: unknown): JsonValue {
   throw new RimeInputError("Tool schemas must contain finite JSON values");
 }
 
+function fillerSettings(value: PrismFiller): PrismFiller {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new RimeInputError("prismFiller must be a filler object");
+  const kind = value.type;
+  if (!["none", "text", "auto"].includes(kind))
+    throw new RimeInputError("Prism filler type must be none, text, or auto");
+  const field =
+    kind === "text" ? "text" : kind === "auto" ? "instructions" : null;
+  if (Object.keys(value).some((key) => key !== "type" && key !== field))
+    throw new RimeInputError(
+      "Prism filler has fields not allowed for its type",
+    );
+  const text = field === null ? undefined : value[field];
+  if (kind === "text" || text !== undefined) {
+    // Rust str::trim uses Unicode White_Space, which differs from JS trim.
+    if (
+      typeof text !== "string" ||
+      !/\P{White_Space}/u.test(text) ||
+      [...text].length > 500
+    )
+      throw new RimeInputError(
+        "Prism filler text must be nonblank and at most 500 characters",
+      );
+    // Unicode mode matches lone surrogates but preserves valid UTF-16 pairs.
+    if (/[\uD800-\uDFFF]/u.test(text))
+      throw new RimeInputError("Prism filler text must be valid UTF-8");
+  }
+  if (kind === "text") return { type: "text", text: text as string };
+  if (kind === "auto")
+    return text === undefined
+      ? { type: "auto" }
+      : { type: "auto", instructions: text };
+  return { type: "none" };
+}
+
 export class Realtime {
   private readonly sessions = new Set<RealtimeSession>();
   private readonly opening = new Map<
@@ -145,6 +181,9 @@ export class Realtime {
           throw new RimeInputError("Tool parameters must be an object");
         return {
           type: "function",
+          ...(tool.prismFiller === undefined
+            ? {}
+            : { prism_filler: fillerSettings(tool.prismFiller) }),
           function: {
             name: tool.name,
             description: tool.description ?? "",

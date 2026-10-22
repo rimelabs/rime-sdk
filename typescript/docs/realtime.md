@@ -275,6 +275,37 @@ Declare tools with plain `ToolDefinition` objects. Names must be nonblank and
 unique; schemas must contain finite JSON values. The SDK copies schemas before
 connection setup, so later caller changes cannot alter initialization.
 
+Set `prismFiller` to control what Prism says while the tool runs:
+
+```ts
+import type { ToolDefinition } from "@rimelabs/sdk";
+
+const pressDigits: ToolDefinition = {
+  name: "press_digits",
+  parameters: { type: "object", properties: { digits: { type: "string" } } },
+  prismFiller: { type: "none" },
+};
+```
+
+| Setting | Behavior |
+| --- | --- |
+| Omitted | Use the server default, currently `auto`. |
+| `{ type: "none" }` | Suppress filler for this tool. |
+| `{ type: "text", text: "One moment." }` | Speak the supplied text. |
+| `{ type: "auto" }` | Let Prism write a line from the tool description. |
+| `{ type: "auto", instructions: "Say you are checking the order." }` | Guide the generated line. |
+
+Text and instructions must be valid UTF-8, contain at most 500 Unicode scalar
+values, and contain a character outside the Unicode `White_Space` set. This
+matches the engine's validation. The SDK preserves the supplied text and copies
+filler settings before connection setup. Invalid settings raise `RimeInputError` before opening a
+connection, including for JavaScript callers. The exported `PrismFiller` union
+also checks TypeScript callers.
+
+Filler applies when the reply has said nothing before calling a tool. If a reply
+calls several tools, the first call's tool controls the filler. `none` suppresses
+filler only; it does not silence other speech. Settings are fixed for the session.
+
 Execute a tool once for each `tool.call` event. Validate its parsed `arguments`,
 then submit a string result with `submitToolResult(payload.call, output)`.
 Use `JSON.stringify(...)` for a structured result. Call

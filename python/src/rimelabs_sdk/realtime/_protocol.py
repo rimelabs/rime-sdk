@@ -29,6 +29,7 @@ class _Function(TypedDict):
 class _Tool(TypedDict):
     type: Literal["function"]
     function: _Function
+    prism_filler: NotRequired[t.JsonObject]
 
 
 class SessionSettings(TypedDict):

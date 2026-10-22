@@ -18,6 +18,14 @@ JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dic
 JsonObject: TypeAlias = dict[str, JsonValue]
 TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
 
+# Unicode White_Space, as used by Rust str::trim in the engine. Python's
+# default strip also removes U+001C–U+001F, which the engine accepts as text.
+_FILLER_WHITESPACE = (
+    "\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000"
+)
+
 
 @dataclass(frozen=True, kw_only=True)
 class TurnDetection:
@@ -71,10 +79,49 @@ class AudioChunk:
 
 
 @dataclass(frozen=True, kw_only=True)
+class PrismFiller:
+    """Speech while a tool runs. Omit the setting to use the server default.
+
+    ``none`` suppresses filler, ``text`` uses a fixed line, and ``auto`` lets
+    Prism write a line with optional instructions. Text must be nonblank and
+    contain at most 500 Unicode scalar values. Invalid UTF-8 is rejected.
+    """
+
+    type: Literal["none", "text", "auto"]
+    text: str | None = None
+    instructions: str | None = None
+
+    def __post_init__(self):
+        if self.type not in ("none", "text", "auto"):
+            raise RimeInputError("Prism filler type must be none, text, or auto")
+        if self.type == "text" and self.text is None:
+            raise RimeInputError("Prism text filler requires text")
+        if self.type != "text" and self.text is not None:
+            raise RimeInputError("Prism filler text is only allowed for type text")
+        if self.type != "auto" and self.instructions is not None:
+            raise RimeInputError("Prism filler instructions are only allowed for type auto")
+        for value in (self.text, self.instructions):
+            if value is not None and (
+                not isinstance(value, str)
+                or not value.strip(_FILLER_WHITESPACE)
+                or len(value) > 500
+            ):
+                raise RimeInputError(
+                    "Prism filler text must be nonblank and at most 500 characters"
+                )
+            if value is not None:
+                try:
+                    value.encode("utf-8")
+                except UnicodeEncodeError:
+                    raise RimeInputError("Prism filler text must be valid UTF-8") from None
+
+
+@dataclass(frozen=True, kw_only=True)
 class ToolDefinition:
     name: str
     parameters: JsonObject
     description: str = ""
+    prism_filler: PrismFiller | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

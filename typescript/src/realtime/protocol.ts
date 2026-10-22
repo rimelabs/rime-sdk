@@ -14,6 +14,7 @@ export interface SessionSettings {
   tools: {
     type: "function";
     function: { name: string; description: string; parameters: t.JsonObject };
+    prism_filler?: t.PrismFiller;
   }[];
   voice?: string;
   instructions?: string;
