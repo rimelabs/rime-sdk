@@ -121,10 +121,10 @@ export interface SpeechStarted {
 /** What ended the user's turn:
  * - `semantic`: Prism judged from the user's speech that they had finished;
  *   `eagerness` sets how readily it does.
- * - `timeout`: the user was silent for `endOfTurnTimeoutMs` before Prism
- *   judged that they had finished.
- * - `silence`: Prism was using its backup turn detection, which ends a turn
- *   at a short pause and ignores the session's turn detection settings.
+ * - `timeout`: the user was silent for `endOfTurnTimeoutMs`, and the timeout
+ *   ended the turn before Prism judged that they had finished.
+ * - `silence`: Prism's backup turn detection ended the turn at a short pause;
+ *   it does not apply `eagerness` or `endOfTurnTimeoutMs`.
  * - `max_duration`: the user spoke for the longest turn Prism takes; what
  *   they say next starts a new turn.
  * - `detector_changed`: Prism switched between its main and backup turn
