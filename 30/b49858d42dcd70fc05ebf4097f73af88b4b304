@@ -1,0 +1,24 @@
+typescript/tests/fixtures/realtime.ts
+  s_334cc9132fba97::t_28df542d657566 21-23
+typescript/tests/realtime-configuration.test.mjs
+  s_334cc9132fba97::t_2c31c573424c27 63-78
+  s_334cc9132fba97::t_28df542d657566 62,79-95,138-141
+typescript/src/realtime/client.ts
+  s_334cc9132fba97::t_fddaad003c6711 92-96
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "30b49858d42dcd70fc05ebf4097f73af88b4b304",
+  "prompts": {},
+  "sessions": {
+    "s_334cc9132fba97": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a164a3-eb2b-7ab2-97f1-75345363aba9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
