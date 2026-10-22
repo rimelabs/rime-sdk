@@ -8,6 +8,12 @@ recognize the former `prsm` names.
 - `speech_to_speech.asyncapi.yaml` contains message shapes and validation rules.
   It is a test fixture. Descriptive annotations and server connection settings
   are omitted.
+  The tool filler rules follow `interfaces/speech_to_speech.asyncapi.yaml` in
+  `rimelabs/rime` at commit `e0ce7ac08`, which added per-tool filler controls.
+  The filler whitespace pattern spells out Unicode `White_Space` to match
+  the engine's Rust validation in both Python and JavaScript. Their `\S`
+  patterns use different whitespace sets. SDK tests also reject invalid UTF-8
+  before connection setup, as required by the engine's JSON parser.
 - `schema.json` checks whether values match the current protocol schema,
   including rejection of requests with the former prefix.
 - `protocol.json` checks both SDK decoders, including malformed messages,

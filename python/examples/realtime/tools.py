@@ -7,6 +7,7 @@ import os
 from rimelabs_sdk import Rime
 from rimelabs_sdk.realtime import (
     FaultEvent,
+    PrismFiller,
     RealtimeSession,
     ResponseEnded,
     RimeRealtimeError,
@@ -18,6 +19,7 @@ from rimelabs_sdk.realtime import (
 LOOKUP_ORDER = ToolDefinition(
     name="lookup_order",
     description="Look up an order in the example store.",
+    prism_filler=PrismFiller(type="text", text="One moment while I check your order."),
     parameters={
         "type": "object",
         "properties": {"order_id": {"type": "string"}},

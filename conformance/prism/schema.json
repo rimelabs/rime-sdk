@@ -1,5 +1,77 @@
 [
   {
+    "name": "filler rejects Unicode next-line whitespace",
+    "schema": "fillerText",
+    "value": "\u0085",
+    "valid": false
+  },
+  {
+    "name": "filler accepts byte-order mark as text",
+    "schema": "fillerText",
+    "value": "\ufeff",
+    "valid": true
+  },
+  {
+    "name": "filler accepts information separator as text",
+    "schema": "fillerText",
+    "value": "\u001c",
+    "valid": true
+  },
+  {
+    "name": "tool filler beside nested function",
+    "schema": "tool",
+    "value": { "type": "function", "function": { "name": "lookup" }, "prism_filler": { "type": "none" } },
+    "valid": true
+  },
+  {
+    "name": "tool filler inside function is invalid",
+    "schema": "tool",
+    "value": { "type": "function", "function": { "name": "lookup", "prism_filler": { "type": "none" } } },
+    "valid": false
+  },
+  {
+    "name": "auto filler without instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto" },
+    "valid": true
+  },
+  {
+    "name": "auto filler with instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto", "instructions": "Say you are checking." },
+    "valid": true
+  },
+  {
+    "name": "fixed filler",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "text", "text": "One moment." },
+    "valid": true
+  },
+  {
+    "name": "fixed filler requires text",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "text" },
+    "valid": false
+  },
+  {
+    "name": "silent filler rejects text",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "none", "text": "Hi" },
+    "valid": false
+  },
+  {
+    "name": "auto filler rejects blank instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto", "instructions": " \n\t" },
+    "valid": false
+  },
+  {
+    "name": "filler rejects unknown mode",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "future" },
+    "valid": false
+  },
+  {
     "name": "known response cause",
     "schema": "responseMetadata",
     "value": { "prism_cause": "user_text" },

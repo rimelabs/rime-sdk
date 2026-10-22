@@ -21,7 +21,7 @@ from .._errors import (
 )
 from ._protocol import SessionSettings
 from ._session import RealtimeSession
-from ._types import RealtimeTimeouts, ToolDefinition, TurnDetection
+from ._types import JsonObject, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -29,6 +29,17 @@ if TYPE_CHECKING:
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
 _DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
+
+
+def _filler_settings(filler: PrismFiller) -> JsonObject:
+    if not isinstance(filler, PrismFiller):
+        raise RimeInputError("prism_filler must be a PrismFiller value")
+    result: JsonObject = {"type": filler.type}
+    if filler.text is not None:
+        result["text"] = filler.text
+    if filler.instructions is not None:
+        result["instructions"] = filler.instructions
+    return result
 
 
 class Realtime:
@@ -96,6 +107,9 @@ class Realtime:
                 for tool in tools
             ],
         }
+        for tool, settings_tool in zip(tools, settings["tools"]):
+            if tool.prism_filler is not None:
+                settings_tool["prism_filler"] = _filler_settings(tool.prism_filler)
         if turn_detection is not None:
             if not isinstance(turn_detection, TurnDetection):
                 raise RimeInputError("turn_detection must be a TurnDetection value")

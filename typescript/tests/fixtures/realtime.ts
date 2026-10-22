@@ -4,6 +4,7 @@ import {
   type RealtimeSession,
   type ResponseRef,
   type ToolDefinition,
+  type PrismFiller,
   type AudioChunk,
   type PlaybackReport,
   type SessionEvent,
@@ -12,6 +13,28 @@ import {
 } from "../../dist/index.js";
 
 const tool: ToolDefinition = { name: "lookup", parameters: { type: "object" } };
+const fillers: PrismFiller[] = [
+  { type: "none" },
+  { type: "text", text: "One moment." },
+  { type: "auto" },
+  { type: "auto", instructions: "Say you are checking." },
+  { type: "none", text: undefined, instructions: undefined },
+  { type: "text", text: "Hi", instructions: undefined },
+  { type: "auto", text: undefined, instructions: undefined },
+  // @ts-expect-error Fixed filler requires text.
+  { type: "text" },
+  // @ts-expect-error Silent filler does not accept text.
+  { type: "none", text: "Hi" },
+  // @ts-expect-error Auto filler does not accept fixed text.
+  { type: "auto", text: "Hi" },
+  // @ts-expect-error Filler modes form a closed set.
+  { type: "future" },
+];
+const configuredTools: ToolDefinition[] = fillers.map((prismFiller) => ({
+  ...tool,
+  prismFiller,
+}));
+void configuredTools;
 const options: RealtimeConnectOptions = {
   tools: [tool],
   timeouts: { readyS: 10 },

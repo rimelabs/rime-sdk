@@ -10,6 +10,110 @@ from rimelabs_sdk import realtime as r
 from rimelabs_sdk.realtime import _client
 
 
+@pytest.mark.parametrize(
+    "filler",
+    [
+        None,
+        {"type": "none"},
+        {"type": "text", "text": " One moment. "},
+        {"type": "auto"},
+        {"type": "auto", "instructions": " Say you are checking. "},
+        {"type": "text", "text": "x"},
+        {"type": "text", "text": "😀" * 500},
+        {"type": "auto", "instructions": "😀" * 500},
+        *[
+            {"type": mode, field: value}
+            for mode, field in (("text", "text"), ("auto", "instructions"))
+            for value in ("\ufeff", "\u001c", "\u001d", "\u001e", "\u001f", "\u0085Hi\u0085")
+        ],
+    ],
+)
+async def test_tool_filler_serializes_at_tool_level(monkeypatch, filler):
+    peer = Peer()
+
+    async def connect(*args, **kwargs):
+        return peer
+
+    monkeypatch.setattr(_client, "connect", connect)
+    tool = r.ToolDefinition(
+        name="press_digits",
+        parameters={"type": "object"},
+        prism_filler=None if filler is None else r.PrismFiller(**filler),
+    )
+    async with (
+        Rime(api_key="test") as client,
+        client.realtime.connect(tools=[tool, r.ToolDefinition(name="other", parameters={})]),
+    ):
+        expected = {
+            "type": "function",
+            "function": {
+                "name": "press_digits",
+                "description": "",
+                "parameters": {"type": "object"},
+            },
+        }
+        if filler is not None:
+            expected["prism_filler"] = filler
+        assert peer.settings["tools"][0] == expected
+        assert "prism_filler" not in peer.settings["tools"][1]
+
+
+@pytest.mark.parametrize(
+    "filler",
+    [
+        {"type": "future"},
+        {"type": None},
+        {"type": []},
+        {"type": "text"},
+        {"type": "none", "text": "Hi"},
+        {"type": "none", "instructions": "Hi"},
+        {"type": "auto", "text": "Hi"},
+        {"type": "text", "text": "Hi", "instructions": "Hi"},
+        *[{"type": "text", "text": value} for value in ("", " \n\t", "\u0085", 1, [], "😀" * 501)],
+        *[
+            {"type": "auto", "instructions": value}
+            for value in ("", " \n\t", "\u0085", 1, [], "😀" * 501)
+        ],
+    ],
+)
+def test_invalid_tool_filler(filler):
+    with pytest.raises(RimeInputError, match="filler"):
+        r.PrismFiller(**filler)
+
+
+@pytest.mark.parametrize("mode,field", [("text", "text"), ("auto", "instructions")])
+@pytest.mark.parametrize(
+    "value",
+    [chr(0xD800), chr(0xDFFF), "Hi" + chr(0xD800), chr(0xDFFF) + "Hi", chr(0xD800) + chr(0xDC00)],
+)
+async def test_invalid_unicode_filler_does_not_open_connection(monkeypatch, mode, field, value):
+    async def connect(*args, **kwargs):
+        pytest.fail("Invalid Unicode must fail before opening a socket")
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with Rime(api_key="test") as client:
+        with pytest.raises(RimeInputError, match="UTF-8"):
+            filler = r.PrismFiller(type=mode, **{field: value})
+            async with client.realtime.connect(
+                tools=[r.ToolDefinition(name="lookup", parameters={}, prism_filler=filler)]
+            ):
+                pass
+
+
+@pytest.mark.parametrize("filler", [{"type": "none"}, "none", False, []])
+async def test_invalid_tool_filler_value_does_not_open_connection(monkeypatch, filler):
+    async def connect(*args, **kwargs):
+        pytest.fail("Invalid filler settings must fail before opening a socket")
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with Rime(api_key="test") as client:
+        with pytest.raises(RimeInputError, match="PrismFiller"):
+            async with client.realtime.connect(
+                tools=[r.ToolDefinition(name="lookup", parameters={}, prism_filler=filler)]
+            ):
+                pass
+
+
 @pytest.mark.parametrize("options", [{}, {"endpoint": None}])
 async def test_public_endpoint_and_server_defaults(monkeypatch, options):
     peer = Peer()

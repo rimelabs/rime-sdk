@@ -261,6 +261,35 @@ The name and JSON Schema object are required. Description defaults to `""`.
 Names must be nonblank and unique within the session; schemas must contain finite
 JSON values.
 
+Set `prism_filler` to control what Prism says while the tool runs:
+
+```python
+from rimelabs_sdk.realtime import PrismFiller, ToolDefinition
+
+press_digits = ToolDefinition(
+    name="press_digits",
+    parameters={"type": "object", "properties": {"digits": {"type": "string"}}},
+    prism_filler=PrismFiller(type="none"),
+)
+```
+
+| Setting | Behavior |
+| --- | --- |
+| Omitted or `None` | Use the server default, currently `auto`. |
+| `PrismFiller(type="none")` | Suppress filler for this tool. |
+| `PrismFiller(type="text", text="One moment.")` | Speak the supplied text. |
+| `PrismFiller(type="auto")` | Let Prism write a line from the tool description. |
+| `PrismFiller(type="auto", instructions="Say you are checking the order.")` | Guide the generated line. |
+
+Text and instructions must be valid UTF-8, contain at most 500 Unicode scalar
+values, and contain a character outside the Unicode `White_Space` set. This
+matches the engine's validation. The SDK preserves the supplied text.
+Invalid settings raise `RimeInputError` before opening a connection.
+
+Filler applies when the reply has said nothing before calling a tool. If a reply
+calls several tools, the first call's tool controls the filler. `none` suppresses
+filler only; it does not silence other speech. Settings are fixed for the session.
+
 Execution follows this order:
 
 1. Receive `ToolCall`. Its `arguments` are a parsed JSON object.

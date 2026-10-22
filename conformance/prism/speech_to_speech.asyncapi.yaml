@@ -373,6 +373,38 @@ components:
               type: object
               additionalProperties: true
 
+        prism_filler:
+          oneOf:
+            - type: object
+              required: [type]
+              additionalProperties: false
+              properties:
+                type:
+                  const: auto
+                instructions:
+                  $ref: '#/components/schemas/fillerText'
+            - type: object
+              required: [type, text]
+              additionalProperties: false
+              properties:
+                type:
+                  const: text
+                text:
+                  $ref: '#/components/schemas/fillerText'
+            - type: object
+              required: [type]
+              additionalProperties: false
+              properties:
+                type:
+                  const: none
+
+    fillerText:
+      type: string
+      minLength: 1
+      maxLength: 500
+      # Match Rust Unicode White_Space across Python and JavaScript validators.
+      pattern: '[^\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+
     turnDetection:
       type: object
       additionalProperties: false
