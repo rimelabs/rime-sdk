@@ -332,7 +332,8 @@ are exported from `@rimelabs/sdk`.
 | --- | --- |
 | `input.ready` | No data fields. Turn methods handle the readiness wait. |
 | `speech.hint` | `audioStartMs`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
-| `speech.started`, `speech.stopped` | `itemId` and `audioStartMs` or `audioEndMs` |
+| `speech.started` | `itemId`, `audioStartMs` |
+| `speech.stopped` | `itemId`, `audioEndMs`, `endReason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or null from a server that does not send it |
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
 | `transcript.failed` | `itemId`, `error` |

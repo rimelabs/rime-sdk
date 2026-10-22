@@ -139,10 +139,25 @@ export interface SpeechStarted {
   readonly itemId: string;
   readonly audioStartMs: number;
 }
+/** What ended the user's turn:
+ * - `semantic`: Prism judged from the user's speech that they had finished;
+ *   `eagerness` sets how readily it does.
+ * - `timeout`: the user was silent for `endOfTurnTimeoutMs`, and the timeout
+ *   ended the turn before Prism judged that they had finished.
+ * - `silence`: Prism's backup turn detection ended the turn at a short pause;
+ *   it does not apply `eagerness` or `endOfTurnTimeoutMs`.
+ * - `max_duration`: the user spoke for the longest turn Prism takes; what
+ *   they say next starts a new turn.
+ * - `detector_changed`: Prism switched between its main and backup turn
+ *   detection while the user spoke; nothing the user did ended the turn. */
+export type SpeechEndReason =
+  "semantic" | "timeout" | "silence" | "max_duration" | "detector_changed";
 export interface SpeechStopped {
   readonly kind: "speech.stopped";
   readonly itemId: string;
   readonly audioEndMs: number;
+  /** Null means the server did not publish the field. */
+  readonly endReason: SpeechEndReason | "unknown" | null;
 }
 export interface InputCommitted {
   readonly kind: "input.committed";

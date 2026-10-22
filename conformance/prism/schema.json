@@ -267,5 +267,23 @@
       "prism_end_of_turn_timeout_ms": true
     },
     "valid": false
+  },
+  {
+    "name": "known speech end reason",
+    "schema": "speechEndReason",
+    "value": "max_duration",
+    "valid": true
+  },
+  {
+    "name": "future speech end reason",
+    "schema": "speechEndReason",
+    "value": "future",
+    "valid": false
+  },
+  {
+    "name": "nonstring speech end reason",
+    "schema": "speechEndReason",
+    "value": 1,
+    "valid": false
   }
 ]

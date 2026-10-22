@@ -275,6 +275,24 @@ async def test_unknown_server_enum_values_are_explicit(monkeypatch, metadata, ex
         await iterator.aclose()
 
 
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        *(
+            ({"prism_end_reason": reason}, reason)
+            for reason in ("semantic", "timeout", "silence", "max_duration", "detector_changed")
+        ),
+        ({"prism_end_reason": "future_reason"}, "unknown"),
+        ({}, None),
+    ],
+)
+async def test_speech_stopped_says_what_ended_the_turn(monkeypatch, fields, expected):
+    async with session(monkeypatch) as (current, peer, _):
+        peer.emit("input_audio_buffer.speech_stopped", item_id="speech", audio_end_ms=50, **fields)
+        stopped = (await anext(current.events)).payload
+        assert isinstance(stopped, r.SpeechStopped) and stopped.end_reason == expected
+
+
 async def test_one_ready_admits_one_turn_and_busy_needs_next_ready(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
         peer.emit("prism.typed_input.ready")

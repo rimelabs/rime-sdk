@@ -364,13 +364,27 @@ function decodeValue(
         audioStartMs: integer(event.audio_start_ms, "audio_start_ms"),
       };
       break;
-    case "input_audio_buffer.speech_stopped":
+    case "input_audio_buffer.speech_stopped": {
+      const reason =
+        event.prism_end_reason === undefined
+          ? null
+          : string(event.prism_end_reason, "prism_end_reason");
       payload = {
         kind: "speech.stopped",
         itemId: id(event.item_id, "item_id"),
         audioEndMs: integer(event.audio_end_ms, "audio_end_ms"),
+        endReason:
+          reason === null ||
+          reason === "semantic" ||
+          reason === "timeout" ||
+          reason === "silence" ||
+          reason === "max_duration" ||
+          reason === "detector_changed"
+            ? reason
+            : "unknown",
       };
       break;
+    }
     case "input_audio_buffer.committed":
       payload = {
         kind: "input.committed",

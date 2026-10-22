@@ -461,6 +461,29 @@ test("response faults do not end generation; unknown enum values stay explicit",
   assert.equal((await payload(events, "error")).error.scope, "unknown");
 });
 
+test("speech.stopped says what ended the turn", async (t) => {
+  const { peer, events } = await setup(t);
+  for (const [reason, expected] of [
+    ...[
+      "semantic",
+      "timeout",
+      "silence",
+      "max_duration",
+      "detector_changed",
+    ].map((known) => [known, known]),
+    ["future_reason", "unknown"],
+    [undefined, null],
+  ]) {
+    peer.emit("input_audio_buffer.speech_stopped", {
+      item_id: "speech",
+      audio_end_ms: 50,
+      ...(reason === undefined ? {} : { prism_end_reason: reason }),
+    });
+    const stopped = await payload(events, "speech.stopped");
+    assert.equal(stopped.endReason, expected);
+  }
+});
+
 test("a speech hint is published and leaves a tool round open", async (t) => {
   const { session, peer, events } = await setup(t);
   const { ref } = await round(session, peer, events);

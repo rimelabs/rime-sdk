@@ -1082,7 +1082,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/serverEvent'
         - type: object
-          required: [type, item_id, audio_end_ms]
+          required: [type, item_id, audio_end_ms, prism_end_reason]
           properties:
             type:
               const: input_audio_buffer.speech_stopped
@@ -1091,6 +1091,11 @@ components:
             audio_end_ms:
               type: integer
               minimum: 0
+            prism_end_reason:
+              $ref: '#/components/schemas/speechEndReason'
+    speechEndReason:
+      type: string
+      enum: [semantic, timeout, silence, max_duration, detector_changed]
     inputAudioBufferCommittedEvent:
       allOf:
         - $ref: '#/components/schemas/serverEvent'

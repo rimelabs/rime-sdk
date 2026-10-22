@@ -17,6 +17,20 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
+# What ended the user's turn:
+# - semantic: Prism judged from the user's speech that they had finished;
+#   eagerness sets how readily it does.
+# - timeout: the user was silent for end_of_turn_timeout_ms, and the timeout ended the
+#   turn before Prism judged that they had finished.
+# - silence: Prism's backup turn detection ended the turn at a short pause; it does not
+#   apply eagerness or end_of_turn_timeout_ms.
+# - max_duration: the user spoke for the longest turn Prism takes; what they say next
+#   starts a new turn.
+# - detector_changed: Prism switched between its main and backup turn detection while
+#   the user spoke; nothing the user did ended the turn.
+SpeechEndReason: TypeAlias = Literal[
+    "semantic", "timeout", "silence", "max_duration", "detector_changed"
+]
 
 # Unicode White_Space, as used by Rust str::trim in the engine. Python's
 # default strip also removes U+001C–U+001F, which the engine accepts as text.
@@ -207,8 +221,11 @@ class SpeechStarted:
 
 @dataclass(frozen=True, kw_only=True)
 class SpeechStopped:
+    """None in end_reason means the server did not publish the field."""
+
     item_id: str
     audio_end_ms: int
+    end_reason: SpeechEndReason | Literal["unknown"] | None = None
     kind: Literal["speech.stopped"] = field(default="speech.stopped", init=False)
 
 
