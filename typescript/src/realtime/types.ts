@@ -118,10 +118,17 @@ export interface SpeechStarted {
   readonly itemId: string;
   readonly audioStartMs: number;
 }
-/** What ended the user's turn: Flux judged it finished (`semantic`), its
- * end-of-turn timeout passed (`timeout`), the fallback detector heard
- * silence (`silence`), the user spoke for 55 s (`max_duration`), or turn
- * detection switched while they spoke (`detector_changed`). */
+/** What ended the user's turn:
+ * - `semantic`: Prism judged from the user's speech that they had finished;
+ *   `eagerness` sets how readily it does.
+ * - `timeout`: the user was silent for `endOfTurnTimeoutMs` before Prism
+ *   judged that they had finished.
+ * - `silence`: Prism was using its backup turn detection, which ends a turn
+ *   at a short pause and ignores the session's turn detection settings.
+ * - `max_duration`: the user spoke for the longest turn Prism takes; what
+ *   they say next starts a new turn.
+ * - `detector_changed`: Prism switched between its main and backup turn
+ *   detection while the user spoke; nothing the user did ended the turn. */
 export type SpeechEndReason =
   "semantic" | "timeout" | "silence" | "max_duration" | "detector_changed";
 export interface SpeechStopped {
