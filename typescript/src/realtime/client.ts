@@ -89,7 +89,11 @@ function fillerSettings(value: PrismFiller): PrismFiller {
     throw new RimeInputError("Prism filler type must be none, text, or auto");
   const field =
     kind === "text" ? "text" : kind === "auto" ? "instructions" : null;
-  if (Object.keys(value).some((key) => key !== "type" && key !== field))
+  if (
+    Object.entries(value).some(
+      ([key, item]) => item !== undefined && key !== "type" && key !== field,
+    )
+  )
     throw new RimeInputError(
       "Prism filler has fields not allowed for its type",
     );

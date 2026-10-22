@@ -59,6 +59,40 @@ for (const filler of [
   });
 }
 
+for (const [prismFiller, expected] of [
+  [
+    { type: "none", text: undefined, instructions: undefined },
+    { type: "none" },
+  ],
+  [
+    { type: "text", text: "Hi", instructions: undefined },
+    { type: "text", text: "Hi" },
+  ],
+  [
+    { type: "auto", text: undefined, instructions: undefined },
+    { type: "auto" },
+  ],
+  [
+    { type: "auto", text: undefined, instructions: "Check the order." },
+    { type: "auto", instructions: "Check the order." },
+  ],
+]) {
+  test(`undefined filler fields are omitted: ${JSON.stringify(expected)}`, async (t) => {
+    const peer = await new Peer().start();
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await peer.close();
+    });
+    await client.realtime.connect({
+      endpoint: peer.endpoint,
+      tools: [{ name: "lookup", parameters: {}, prismFiller }],
+    });
+    assert.deepEqual(peer.settings.tools[0].prism_filler, expected);
+    assert.deepEqual(peer.invalid, []);
+  });
+}
+
 test("invalid Unicode filler fails before opening a socket", async (t) => {
   t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
   const client = new Rime({ apiKey: "test" });
@@ -101,6 +135,10 @@ test("invalid tool filler fails before opening a socket", async (t) => {
     { type: "none", text: "Hi" },
     { type: "none", instructions: "Hi" },
     { type: "none", extra: true },
+    { type: "none", text: null },
+    { type: "none", text: "" },
+    { type: "text", text: "Hi", instructions: null },
+    { type: "text", text: undefined },
     { type: "auto", text: "Hi" },
     { type: "text", text: "Hi", instructions: "Hi" },
     ...[null, "", " \n\t", 1, [], "😀".repeat(501)].flatMap((value) => [

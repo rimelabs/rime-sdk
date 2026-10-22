@@ -18,6 +18,9 @@ const fillers: PrismFiller[] = [
   { type: "text", text: "One moment." },
   { type: "auto" },
   { type: "auto", instructions: "Say you are checking." },
+  { type: "none", text: undefined, instructions: undefined },
+  { type: "text", text: "Hi", instructions: undefined },
+  { type: "auto", text: undefined, instructions: undefined },
   // @ts-expect-error Fixed filler requires text.
   { type: "text" },
   // @ts-expect-error Silent filler does not accept text.
