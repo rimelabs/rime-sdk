@@ -33,7 +33,29 @@ pub struct Error {
     source: Option<Arc<dyn StdError + Send + Sync>>,
 }
 
+#[derive(Debug)]
+struct RealtimeClosed;
+impl fmt::Display for RealtimeClosed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("realtime session closed")
+    }
+}
+impl StdError for RealtimeClosed {}
+
 impl Error {
+    /// Report cancellation from an application-owned adapter after its cancellation token fires.
+    pub fn cancelled() -> Self {
+        Self::new(ErrorKind::Cancelled, "operation cancelled")
+    }
+    pub(crate) fn realtime_closed() -> Self {
+        Self::new(ErrorKind::Cancelled, "realtime session closed").caused_by(RealtimeClosed)
+    }
+    pub(crate) fn is_realtime_closed(&self) -> bool {
+        self.source
+            .as_ref()
+            .is_some_and(|s| s.is::<RealtimeClosed>())
+    }
+
     /// Report a failure from an application-provided text or audio source.
     pub fn input(source: impl StdError + Send + Sync + 'static) -> Self {
         Self::new(ErrorKind::Input, "input source failed").caused_by(source)
@@ -58,6 +80,11 @@ impl Error {
             self.request_id = id.map(str::to_owned);
         }
         self
+    }
+
+    /// Structured Prism fault details, when supplied by the service.
+    pub fn realtime_fault(&self) -> Option<&crate::realtime::RealtimeFault> {
+        self.source.as_ref()?.downcast_ref()
     }
 
     /// The category of this failure.

@@ -1,0 +1,1400 @@
+# Prism realtime protocol validation fixture.
+asyncapi: 3.0.0
+
+info:
+  title: Rime Prism Realtime Speech-to-Speech WebSocket API
+  version: '1.0.0'
+defaultContentType: application/json
+
+channels:
+  realtime:
+    address: /v1/realtime
+    bindings:
+      ws:
+        method: GET
+    messages:
+      sessionUpdate:
+        $ref: '#/components/messages/sessionUpdate'
+      inputAudioBufferAppend:
+        $ref: '#/components/messages/inputAudioBufferAppend'
+      inputAudioBufferClear:
+        $ref: '#/components/messages/inputAudioBufferClear'
+      conversationItemCreate:
+        $ref: '#/components/messages/conversationItemCreate'
+      responseCreate:
+        $ref: '#/components/messages/responseCreate'
+      responseCancel:
+        $ref: '#/components/messages/responseCancel'
+      conversationItemTruncate:
+        $ref: '#/components/messages/conversationItemTruncate'
+      playbackDrained:
+        $ref: '#/components/messages/playbackDrained'
+      clientTurnMetrics:
+        $ref: '#/components/messages/clientTurnMetrics'
+      sessionCreated:
+        $ref: '#/components/messages/sessionCreated'
+      sessionUpdated:
+        $ref: '#/components/messages/sessionUpdated'
+      sessionIdleTimeout:
+        $ref: '#/components/messages/sessionIdleTimeout'
+      typedInputReady:
+        $ref: '#/components/messages/typedInputReady'
+      inputAudioBufferCleared:
+        $ref: '#/components/messages/inputAudioBufferCleared'
+      inputAudioBufferSpeechStarted:
+        $ref: '#/components/messages/inputAudioBufferSpeechStarted'
+      inputAudioBufferSpeechStopped:
+        $ref: '#/components/messages/inputAudioBufferSpeechStopped'
+      inputAudioBufferCommitted:
+        $ref: '#/components/messages/inputAudioBufferCommitted'
+      speechHint:
+        $ref: '#/components/messages/speechHint'
+      responseCreated:
+        $ref: '#/components/messages/responseCreated'
+      responseOutputItemAdded:
+        $ref: '#/components/messages/responseOutputItemAdded'
+      responseOutputItemDone:
+        $ref: '#/components/messages/responseOutputItemDone'
+      responseTextDelta:
+        $ref: '#/components/messages/responseTextDelta'
+      responseTextDone:
+        $ref: '#/components/messages/responseTextDone'
+      responseAudioDelta:
+        $ref: '#/components/messages/responseAudioDelta'
+      responseAudioDone:
+        $ref: '#/components/messages/responseAudioDone'
+      responseDone:
+        $ref: '#/components/messages/responseDone'
+      responseFunctionCallArgumentsDone:
+        $ref: '#/components/messages/responseFunctionCallArgumentsDone'
+      conversationItemCreated:
+        $ref: '#/components/messages/conversationItemCreated'
+      conversationItemTruncated:
+        $ref: '#/components/messages/conversationItemTruncated'
+      transcriptionDelta:
+        $ref: '#/components/messages/transcriptionDelta'
+      transcriptionCompleted:
+        $ref: '#/components/messages/transcriptionCompleted'
+      transcriptionFailed:
+        $ref: '#/components/messages/transcriptionFailed'
+      error:
+        $ref: '#/components/messages/error'
+
+operations:
+  # Actions are from the perspective of the server, the described
+  # application.
+  receiveClientEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/realtime'
+    messages:
+      - $ref: '#/channels/realtime/messages/sessionUpdate'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferAppend'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferClear'
+      - $ref: '#/channels/realtime/messages/conversationItemCreate'
+      - $ref: '#/channels/realtime/messages/responseCreate'
+      - $ref: '#/channels/realtime/messages/responseCancel'
+      - $ref: '#/channels/realtime/messages/conversationItemTruncate'
+      - $ref: '#/channels/realtime/messages/playbackDrained'
+      - $ref: '#/channels/realtime/messages/clientTurnMetrics'
+  sendServerEvent:
+    action: send
+    channel:
+      $ref: '#/channels/realtime'
+    messages:
+      - $ref: '#/channels/realtime/messages/sessionCreated'
+      - $ref: '#/channels/realtime/messages/sessionUpdated'
+      - $ref: '#/channels/realtime/messages/sessionIdleTimeout'
+      - $ref: '#/channels/realtime/messages/typedInputReady'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferCleared'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferSpeechStarted'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferSpeechStopped'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferCommitted'
+      - $ref: '#/channels/realtime/messages/speechHint'
+      - $ref: '#/channels/realtime/messages/responseCreated'
+      - $ref: '#/channels/realtime/messages/responseOutputItemAdded'
+      - $ref: '#/channels/realtime/messages/responseOutputItemDone'
+      - $ref: '#/channels/realtime/messages/responseTextDelta'
+      - $ref: '#/channels/realtime/messages/responseTextDone'
+      - $ref: '#/channels/realtime/messages/responseAudioDelta'
+      - $ref: '#/channels/realtime/messages/responseAudioDone'
+      - $ref: '#/channels/realtime/messages/responseDone'
+      - $ref: '#/channels/realtime/messages/responseFunctionCallArgumentsDone'
+      - $ref: '#/channels/realtime/messages/conversationItemCreated'
+      - $ref: '#/channels/realtime/messages/conversationItemTruncated'
+      - $ref: '#/channels/realtime/messages/transcriptionDelta'
+      - $ref: '#/channels/realtime/messages/transcriptionCompleted'
+      - $ref: '#/channels/realtime/messages/transcriptionFailed'
+      - $ref: '#/channels/realtime/messages/error'
+
+components:
+  messages:
+    sessionUpdate:
+      name: session.update
+      title: Initialize the session
+      payload:
+        $ref: '#/components/schemas/sessionUpdateEvent'
+    inputAudioBufferAppend:
+      name: input_audio_buffer.append
+      title: Append microphone audio
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferAppendEvent'
+    inputAudioBufferClear:
+      name: input_audio_buffer.clear
+      title: Clear microphone input
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferClearEvent'
+    conversationItemCreate:
+      name: conversation.item.create
+      title: Add a conversation item
+      payload:
+        $ref: '#/components/schemas/conversationItemCreateEvent'
+    responseCreate:
+      name: response.create
+      title: Request a response
+      payload:
+        $ref: '#/components/schemas/responseCreateEvent'
+    responseCancel:
+      name: response.cancel
+      title: Cancel a response
+      payload:
+        $ref: '#/components/schemas/responseCancelEvent'
+    conversationItemTruncate:
+      name: conversation.item.truncate
+      title: Report how much of a reply the user heard
+      payload:
+        $ref: '#/components/schemas/conversationItemTruncateEvent'
+    playbackDrained:
+      name: prism.playback.drained
+      title: Report that a reply finished playing
+      payload:
+        $ref: '#/components/schemas/playbackDrainedEvent'
+    clientTurnMetrics:
+      name: prism.client.turn_metrics
+      title: Report the client's own measurements of a turn
+      payload:
+        $ref: '#/components/schemas/clientTurnMetricsEvent'
+
+    sessionCreated:
+      name: session.created
+      title: Session created
+      payload:
+        $ref: '#/components/schemas/sessionCreatedEvent'
+    sessionUpdated:
+      name: session.updated
+      title: Session updated
+      payload:
+        $ref: '#/components/schemas/sessionUpdatedEvent'
+    sessionIdleTimeout:
+      name: session.idle_timeout
+      title: Session idle timeout
+      payload:
+        $ref: '#/components/schemas/sessionIdleTimeoutEvent'
+    typedInputReady:
+      name: prism.typed_input.ready
+      title: Typed input would be accepted
+      payload:
+        $ref: '#/components/schemas/typedInputReadyEvent'
+    inputAudioBufferCleared:
+      name: input_audio_buffer.cleared
+      title: Input buffer cleared
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferClearedEvent'
+    inputAudioBufferSpeechStarted:
+      name: input_audio_buffer.speech_started
+      title: User speech started
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferSpeechStartedEvent'
+    inputAudioBufferSpeechStopped:
+      name: input_audio_buffer.speech_stopped
+      title: User speech stopped
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferSpeechStoppedEvent'
+    inputAudioBufferCommitted:
+      name: input_audio_buffer.committed
+      title: User audio committed
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferCommittedEvent'
+    speechHint:
+      name: prism.input_audio_buffer.speech_hint
+      title: The user may have started speaking
+      payload:
+        $ref: '#/components/schemas/speechHintEvent'
+    responseCreated:
+      name: response.created
+      title: Response created
+      payload:
+        $ref: '#/components/schemas/responseCreatedEvent'
+    responseOutputItemAdded:
+      name: response.output_item.added
+      title: Response output item added
+      payload:
+        $ref: '#/components/schemas/responseOutputItemAddedEvent'
+    responseOutputItemDone:
+      name: response.output_item.done
+      title: Response output item done
+      payload:
+        $ref: '#/components/schemas/responseOutputItemDoneEvent'
+    responseTextDelta:
+      name: response.text.delta
+      title: Response text delta
+      payload:
+        $ref: '#/components/schemas/responseTextDeltaEvent'
+    responseTextDone:
+      name: response.text.done
+      title: Response text done
+      payload:
+        $ref: '#/components/schemas/responseTextDoneEvent'
+    responseAudioDelta:
+      name: response.audio.delta
+      title: Response audio delta
+      payload:
+        $ref: '#/components/schemas/responseAudioDeltaEvent'
+    responseAudioDone:
+      name: response.audio.done
+      title: Response audio done
+      payload:
+        $ref: '#/components/schemas/responseAudioDoneEvent'
+    responseDone:
+      name: response.done
+      title: Response done
+      payload:
+        $ref: '#/components/schemas/responseDoneEvent'
+    responseFunctionCallArgumentsDone:
+      name: response.function_call_arguments.done
+      title: Complete tool call
+      payload:
+        $ref: '#/components/schemas/responseFunctionCallArgumentsDoneEvent'
+    conversationItemCreated:
+      name: conversation.item.created
+      title: Conversation item added
+      payload:
+        $ref: '#/components/schemas/conversationItemCreatedEvent'
+    conversationItemTruncated:
+      name: conversation.item.truncated
+      title: Heard report recorded
+      payload:
+        $ref: '#/components/schemas/conversationItemTruncatedEvent'
+    transcriptionDelta:
+      name: conversation.item.input_audio_transcription.delta
+      title: More of what the user said
+      payload:
+        $ref: '#/components/schemas/transcriptionDeltaEvent'
+    transcriptionCompleted:
+      name: conversation.item.input_audio_transcription.completed
+      title: User transcription completed
+      payload:
+        $ref: '#/components/schemas/transcriptionCompletedEvent'
+    transcriptionFailed:
+      name: conversation.item.input_audio_transcription.failed
+      title: User transcription failed
+      payload:
+        $ref: '#/components/schemas/transcriptionFailedEvent'
+    error:
+      name: error
+      title: Error
+      payload:
+        $ref: '#/components/schemas/errorEvent'
+
+  schemas:
+    clientEventId:
+      type: string
+    requestEventIdEcho:
+      type: string
+    serverEvent:
+      type: object
+      required: [event_id]
+      properties:
+        event_id:
+          type: string
+    modality:
+      oneOf:
+        - const: text
+        - const: audio
+
+    clientModalities:
+      type: array
+      items:
+        $ref: '#/components/schemas/modality'
+      contains:
+        const: text
+    sessionViewModalities:
+      oneOf:
+        - type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            - const: text
+          additionalItems: false
+        - type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            - const: text
+            - const: audio
+          additionalItems: false
+
+    audioFormat:
+      const: pcm16
+    toolChoice:
+      const: auto
+    clientCapability:
+      oneOf:
+        - const: playback_drained
+    tool:
+      type: object
+      required: [type]
+      additionalProperties: false
+      anyOf:
+        - required: [name]
+        - required: [function]
+      properties:
+        type:
+          const: function
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        function:
+          type: object
+          required: [name]
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              minLength: 1
+            description:
+              type: string
+            parameters:
+              type: object
+              additionalProperties: true
+
+        prism_filler:
+          oneOf:
+            - type: object
+              required: [type]
+              additionalProperties: false
+              properties:
+                type:
+                  const: auto
+                instructions:
+                  $ref: '#/components/schemas/fillerText'
+            - type: object
+              required: [type, text]
+              additionalProperties: false
+              properties:
+                type:
+                  const: text
+                text:
+                  $ref: '#/components/schemas/fillerText'
+            - type: object
+              required: [type]
+              additionalProperties: false
+              properties:
+                type:
+                  const: none
+
+    fillerText:
+      type: string
+      minLength: 1
+      maxLength: 500
+      # Match Rust Unicode White_Space across Python and JavaScript validators.
+      pattern: '[^\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+
+    turnDetection:
+      type: object
+      additionalProperties: false
+      properties:
+        interrupt_response:
+          type: boolean
+          default: true
+        eagerness:
+          type: string
+          enum: [low, medium, high, auto]
+          default: auto
+        prism_end_of_turn_timeout_ms:
+          type: integer
+          minimum: 1000
+          maximum: 10000
+          default: 5000
+    turnDetectionView:
+      allOf:
+        - $ref: '#/components/schemas/turnDetection'
+        - type: object
+          required: [interrupt_response, eagerness, prism_end_of_turn_timeout_ms]
+
+    clientSessionSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        modalities:
+          allOf:
+            - $ref: '#/components/schemas/clientModalities'
+          default: [text, audio]
+        voice:
+          type: string
+        instructions:
+          type: string
+          default: ''
+        tools:
+          type: array
+          default: []
+          items:
+            $ref: '#/components/schemas/tool'
+        tool_choice:
+          $ref: '#/components/schemas/toolChoice'
+        input_audio_format:
+          $ref: '#/components/schemas/audioFormat'
+        turn_detection:
+          allOf:
+            - $ref: '#/components/schemas/turnDetection'
+        prism_client_caps:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/clientCapability'
+
+    sessionView:
+      type: object
+      required:
+        - id
+        - object
+        - model
+        - modalities
+        - instructions
+        - tools
+        - tool_choice
+        - input_audio_format
+        - turn_detection
+        - prism_effective_interrupt_response
+        - prism_tool_waits
+      properties:
+        id:
+          type: string
+        object:
+          const: realtime.session
+        model:
+          const: prism
+        modalities:
+          $ref: '#/components/schemas/sessionViewModalities'
+        voice:
+          type: string
+        instructions:
+          type: string
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/tool'
+        tool_choice:
+          $ref: '#/components/schemas/toolChoice'
+        input_audio_format:
+          $ref: '#/components/schemas/audioFormat'
+        turn_detection:
+          $ref: '#/components/schemas/turnDetectionView'
+        prism_effective_interrupt_response:
+          type: boolean
+        prism_tool_waits:
+          type: object
+          required: [result_timeout_s, continuation_timeout_s]
+          properties:
+            result_timeout_s:
+              oneOf:
+                - type: number
+                  exclusiveMinimum: 0
+                - type: 'null'
+            continuation_timeout_s:
+              oneOf:
+                - type: number
+                  exclusiveMinimum: 0
+                - type: 'null'
+
+    messageRole:
+      oneOf:
+        - const: user
+        - const: assistant
+    messageContentPart:
+      type: object
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+        text:
+          type: string
+        transcript:
+          type: string
+
+    inputMessage:
+      type: object
+      additionalProperties: false
+      required: [type, role]
+      properties:
+        type:
+          const: message
+        role:
+          $ref: '#/components/schemas/messageRole'
+        text:
+          type: string
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/messageContentPart'
+
+    functionResult:
+      type: object
+      additionalProperties: false
+      required: [type, call_id]
+      properties:
+        type:
+          const: function_call_output
+        call_id:
+          type: string
+        output:
+          type: string
+          default: ''
+    responseCause:
+      oneOf:
+        - const: user_text
+        - const: tool_continuation
+        - const: proactive
+
+    requestMetadata:
+      type: object
+      additionalProperties: true
+      properties:
+        prism_cause:
+          $ref: '#/components/schemas/responseCause'
+        prism_parent_response_id:
+          type: string
+    responseMetadata:
+      allOf:
+        - $ref: '#/components/schemas/requestMetadata'
+      type: object
+      properties:
+        prism_input_item_id:
+          type: string
+        prism_call_id:
+          type: string
+        prism_drain_token:
+          type: string
+    typedTurnRequest:
+      type: object
+      additionalProperties: false
+      required: [prism_input_text, metadata]
+      properties:
+        prism_input_text:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+        metadata:
+          allOf:
+            - $ref: '#/components/schemas/requestMetadata'
+          required: [prism_cause]
+          properties:
+            prism_cause:
+              const: user_text
+
+    toolContinuationRequest:
+      type: object
+      additionalProperties: false
+      required: [metadata]
+      properties:
+        metadata:
+          allOf:
+            - $ref: '#/components/schemas/requestMetadata'
+          required: [prism_cause, prism_parent_response_id]
+          properties:
+            prism_cause:
+              const: tool_continuation
+            prism_parent_response_id:
+              minLength: 1
+
+    nudgeRequest:
+      type: object
+      additionalProperties: false
+      required: [metadata]
+      properties:
+        metadata:
+          allOf:
+            - $ref: '#/components/schemas/requestMetadata'
+          required: [prism_cause]
+          properties:
+            prism_cause:
+              const: proactive
+        prism_instruction:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          pattern: '\S'
+        prism_call_id:
+          type: string
+          minLength: 1
+    assistantContentPart:
+      oneOf:
+        - type: object
+          required: [type, text]
+          properties:
+            type:
+              const: text
+            text:
+              type: string
+        - type: object
+          required: [type, transcript]
+          properties:
+            type:
+              const: audio
+            transcript:
+              type: string
+    assistantItem:
+      type: object
+      required: [type, id, object, role]
+      properties:
+        type:
+          const: message
+        id:
+          type: string
+        object:
+          const: realtime.item
+        role:
+          const: assistant
+        content:
+          type: array
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: '#/components/schemas/assistantContentPart'
+
+    functionItem:
+      type: object
+      required: [type, id, object, call_id, name]
+      properties:
+        type:
+          const: function_call
+        id:
+          type: string
+        object:
+          const: realtime.item
+        call_id:
+          type: string
+        name:
+          type: string
+        arguments:
+          type: string
+        status:
+          const: completed
+
+    completedFunctionItem:
+      allOf:
+        - $ref: '#/components/schemas/functionItem'
+        - type: object
+          required: [arguments, status]
+
+    outputItem:
+      oneOf:
+        - $ref: '#/components/schemas/assistantItem'
+        - $ref: '#/components/schemas/functionItem'
+
+    responseEndReason:
+      oneOf:
+        - const: stop
+        - const: client_cancelled
+        - const: turn_detected
+        - const: disconnected
+        - const: turn_failed
+        - const: response_timeout
+    responseView:
+      type: object
+      required: [id, object, status, output, usage]
+      properties:
+        id:
+          type: string
+        object:
+          const: realtime.response
+        status:
+          type: string
+        status_details:
+          type: object
+          required: [type, reason]
+          properties:
+            type:
+              enum: [completed, cancelled, failed]
+            reason:
+              $ref: '#/components/schemas/responseEndReason'
+            error:
+              type: object
+              required: [type, code]
+              properties:
+                type:
+                  $ref: '#/components/schemas/errorType'
+                code:
+                  $ref: '#/components/schemas/errorCode'
+        output:
+          type: array
+          items:
+            $ref: '#/components/schemas/outputItem'
+        metadata:
+          $ref: '#/components/schemas/responseMetadata'
+        usage:
+          type: 'null'
+
+    errorType:
+      oneOf:
+        - const: invalid_request_error
+        - const: server_error
+
+    errorScope:
+      oneOf:
+        - const: event
+        - const: utterance
+        - const: response
+        - const: tool_roundtrip
+        - const: session
+    errorCode:
+      oneOf:
+        - const: invalid_event
+        - const: invalid_client_event
+        - const: invalid_audio
+        - const: invalid_session
+        - const: unsupported_modality
+        - const: session_not_initialized
+        - const: session_already_initialized
+        - const: voice_required
+        - const: invalid_voice
+        - const: item_not_found
+        - const: invalid_content_index
+        - const: truncate_not_current
+        - const: response_cancel_not_active
+        - const: tool_call_not_found
+        - const: tool_result_not_ready
+        - const: conflict
+        - const: invalid_response_cause
+        - const: invalid_typed_input
+        - const: invalid_instruction
+        - const: instructions_busy
+        - const: proactive_unavailable
+        - const: nudge_superseded
+        - const: invalid_tool_continuation
+        - const: tool_continuation_not_ready
+        - const: tool_continuation_unavailable
+        - const: tool_result_timeout
+        - const: item_too_long
+        - const: typed_turn_busy
+        - const: typed_turn_superseded
+        - const: response_superseded
+        - const: pending_speech_overflow
+        - const: deferred_capture_overflow
+        - const: capacity_exceeded
+        - const: unavailable
+        - const: invalid_request
+        - const: response_timeout
+        - const: turn_failed
+        - const: no_audio
+        - const: voice_activity_detection_failed
+    errorOwner:
+      oneOf:
+        - type: object
+          required: [kind, event_id]
+          properties:
+            kind:
+              const: event
+            event_id:
+              oneOf:
+                - type: string
+                - type: 'null'
+        - type: object
+          required: [kind, item_id]
+          properties:
+            kind:
+              const: utterance
+            item_id:
+              type: string
+        - type: object
+          required: [kind, response_id]
+          properties:
+            kind:
+              const: response
+            response_id:
+              type: string
+        - type: object
+          required: [kind, response_id, call_ids]
+          properties:
+            kind:
+              const: tool_roundtrip
+            response_id:
+              type: string
+            call_ids:
+              type: array
+              items:
+                type: string
+        - type: object
+          required: [kind]
+          properties:
+            kind:
+              const: session
+
+    errorInfo:
+      type: object
+      required: [type, code, message, param, event_id, correlation_id, scope, owner]
+      properties:
+        type:
+          $ref: '#/components/schemas/errorType'
+        code:
+          $ref: '#/components/schemas/errorCode'
+        message:
+          type: string
+        param:
+          type: [string, 'null']
+        event_id:
+          type: [string, 'null']
+        correlation_id:
+          type: string
+        scope:
+          $ref: '#/components/schemas/errorScope'
+        owner:
+          $ref: '#/components/schemas/errorOwner'
+
+    streamCoordinates:
+      type: object
+      required: [response_id, item_id, output_index, content_index]
+      properties:
+        response_id:
+          type: string
+        item_id:
+          type: string
+        output_index:
+          const: 0
+        content_index:
+          const: 0
+    sessionUpdateEvent:
+      type: object
+      additionalProperties: false
+      required: [type, event_id, session]
+      properties:
+        type:
+          const: session.update
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        session:
+          $ref: '#/components/schemas/clientSessionSettings'
+
+    inputAudioBufferAppendEvent:
+      type: object
+      additionalProperties: false
+      required: [type, audio]
+      properties:
+        type:
+          const: input_audio_buffer.append
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        audio:
+          type: string
+          format: byte
+    inputAudioBufferClearEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: input_audio_buffer.clear
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+
+    conversationItemCreateEvent:
+      type: object
+      additionalProperties: false
+      required: [type, event_id, item]
+      properties:
+        type:
+          const: conversation.item.create
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        item:
+          oneOf:
+            - $ref: '#/components/schemas/inputMessage'
+            - $ref: '#/components/schemas/functionResult'
+
+    responseCreateEvent:
+      type: object
+      additionalProperties: false
+      required: [type, event_id]
+      properties:
+        type:
+          const: response.create
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        response:
+          oneOf:
+            - $ref: '#/components/schemas/typedTurnRequest'
+            - $ref: '#/components/schemas/toolContinuationRequest'
+            - $ref: '#/components/schemas/nudgeRequest'
+        metadata:
+          allOf:
+            - $ref: '#/components/schemas/requestMetadata'
+        instructions:
+          type: string
+    responseCancelEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: response.cancel
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        response_id:
+          type: string
+    conversationItemTruncateEvent:
+      type: object
+      additionalProperties: false
+      required: [type, item_id, content_index, audio_end_ms]
+      properties:
+        type:
+          const: conversation.item.truncate
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        item_id:
+          type: string
+        content_index:
+          const: 0
+        audio_end_ms:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+    playbackDrainedEvent:
+      type: object
+      additionalProperties: false
+      required: [type, drain_token]
+      properties:
+        type:
+          const: prism.playback.drained
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        drain_token:
+          type: string
+        response_id:
+          type: string
+        played_ms:
+          type: [number, 'null']
+          minimum: 0
+        audible_tail_ms:
+          type: [number, 'null']
+          minimum: 0
+    clientTurnMetricsEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: prism.client.turn_metrics
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        response_id:
+          type: string
+        ttfa_felt_ms:
+          type: [number, 'null']
+        ttfa_server_ms:
+          type: [number, 'null']
+        rtf:
+          type: [number, 'null']
+        drain_ms:
+          type: [number, 'null']
+        audio_seconds:
+          type: [number, 'null']
+        truncated:
+          type: [boolean, 'null']
+
+    sessionCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, session]
+          properties:
+            type:
+              const: session.created
+            session:
+              $ref: '#/components/schemas/sessionView'
+
+    sessionUpdatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, session]
+          properties:
+            type:
+              const: session.updated
+            session:
+              $ref: '#/components/schemas/sessionView'
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+
+    sessionIdleTimeoutEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, reason, idle_timeout_s]
+          properties:
+            type:
+              const: session.idle_timeout
+            reason:
+              const: idle_timeout
+            idle_timeout_s:
+              type: number
+              minimum: 1
+
+    typedInputReadyEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: prism.typed_input.ready
+
+    inputAudioBufferClearedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: input_audio_buffer.cleared
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+
+    inputAudioBufferSpeechStartedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, audio_start_ms]
+          properties:
+            type:
+              const: input_audio_buffer.speech_started
+            item_id:
+              type: string
+            audio_start_ms:
+              type: integer
+              minimum: 0
+    inputAudioBufferSpeechStoppedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, audio_end_ms, prism_end_reason]
+          properties:
+            type:
+              const: input_audio_buffer.speech_stopped
+            item_id:
+              type: string
+            audio_end_ms:
+              type: integer
+              minimum: 0
+            prism_end_reason:
+              $ref: '#/components/schemas/speechEndReason'
+    speechEndReason:
+      type: string
+      enum: [semantic, timeout, silence, max_duration, detector_changed]
+    inputAudioBufferCommittedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id]
+          properties:
+            type:
+              const: input_audio_buffer.committed
+            item_id:
+              type: string
+
+    speechHintEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, audio_start_ms]
+          properties:
+            type:
+              const: prism.input_audio_buffer.speech_hint
+            audio_start_ms:
+              type: integer
+              minimum: 0
+    responseCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response]
+          properties:
+            type:
+              const: response.created
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            response:
+              allOf:
+                - $ref: '#/components/schemas/responseView'
+                - type: object
+                  properties:
+                    status:
+                      const: in_progress
+                    output:
+                      maxItems: 0
+
+    responseOutputItemAddedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, output_index, item]
+          properties:
+            type:
+              const: response.output_item.added
+            response_id:
+              type: string
+            output_index:
+              type: integer
+              minimum: 0
+            item:
+              $ref: '#/components/schemas/outputItem'
+
+    responseOutputItemDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, output_index, item]
+          properties:
+            type:
+              const: response.output_item.done
+            response_id:
+              type: string
+            output_index:
+              type: integer
+              minimum: 1
+            item:
+              $ref: '#/components/schemas/completedFunctionItem'
+
+    responseTextDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, delta]
+          properties:
+            type:
+              const: response.text.delta
+            content_index:
+              const: 0
+            delta:
+              type: string
+
+    responseTextDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, text]
+          properties:
+            type:
+              const: response.text.done
+            content_index:
+              const: 0
+            text:
+              type: string
+
+    responseAudioDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type, delta]
+          properties:
+            type:
+              const: response.audio.delta
+            content_index:
+              const: 0
+            delta:
+              type: string
+              format: byte
+              # Canonical standard base64 (RFC 4648 section 4: padded, no
+              # line breaks, unused bits zero) of an even number of bytes.
+              # Groups of 8 characters are 6 bytes; the optional tail is 2
+              # bytes (`xxy=`, y with its low 2 bits zero) or 4 (`xxxxxz==`,
+              # z with its low 4 bits zero). (?!\n) keeps engines whose $
+              # also matches before a final newline to the ECMA-262 meaning.
+              pattern: '^(?:[A-Za-z0-9+/]{8})*(?:[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=|[A-Za-z0-9+/]{5}[AQgw]==)?(?!\n)$'
+    responseAudioDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - $ref: '#/components/schemas/streamCoordinates'
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: response.audio.done
+            content_index:
+              const: 0
+
+    responseDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response]
+          properties:
+            type:
+              const: response.done
+            prism_request_event_id:
+              allOf:
+                - $ref: '#/components/schemas/requestEventIdEcho'
+            response:
+              allOf:
+                - $ref: '#/components/schemas/responseView'
+                - type: object
+                  required: [status_details]
+                  properties:
+                    status:
+                      oneOf:
+                        - const: completed
+                        - const: cancelled
+                        - const: failed
+                    output:
+                      minItems: 1
+                      items:
+                        oneOf:
+                          - allOf:
+                              - $ref: '#/components/schemas/assistantItem'
+                              - type: object
+                                required: [content]
+                          - $ref: '#/components/schemas/completedFunctionItem'
+
+    responseFunctionCallArgumentsDoneEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, response_id, item_id, output_index, call_id, name, arguments]
+          properties:
+            type:
+              const: response.function_call_arguments.done
+            response_id:
+              type: string
+            item_id:
+              type: string
+            output_index:
+              type: integer
+              minimum: 1
+            call_id:
+              type: string
+            name:
+              type: string
+            arguments:
+              type: string
+
+    conversationItemCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item]
+          properties:
+            type:
+              const: conversation.item.created
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            item:
+              oneOf:
+                - type: object
+                  required: [type, id, role]
+                  properties:
+                    type:
+                      const: message
+                    id:
+                      type: string
+                    role:
+                      oneOf:
+                        - const: user
+                        - const: assistant
+                - type: object
+                  required: [type, call_id]
+                  properties:
+                    type:
+                      const: function_call_output
+                    call_id:
+                      type: string
+
+    conversationItemTruncatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, audio_end_ms]
+          properties:
+            type:
+              const: conversation.item.truncated
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            item_id:
+              type: string
+            content_index:
+              const: 0
+            audio_end_ms:
+              type: integer
+              minimum: 0
+
+    transcriptionDeltaEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, delta]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.delta
+            item_id:
+              type: string
+            content_index:
+              const: 0
+            delta:
+              type: string
+              minLength: 1
+
+    transcriptionCompletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, transcript]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.completed
+            item_id:
+              type: string
+            content_index:
+              const: 0
+            transcript:
+              type: string
+              minLength: 1
+
+    transcriptionFailedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id, content_index, error]
+          properties:
+            type:
+              const: conversation.item.input_audio_transcription.failed
+            item_id:
+              type: string
+            content_index:
+              const: 0
+            error:
+              type: object
+              required: [type, code, message]
+              properties:
+                type:
+                  const: transcription_failed
+                code:
+                  const: no_transcript
+                message:
+                  type: string
+    errorEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, error]
+          properties:
+            type:
+              const: error
+            error:
+              $ref: '#/components/schemas/errorInfo'

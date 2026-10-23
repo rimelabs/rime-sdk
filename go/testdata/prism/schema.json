@@ -1,0 +1,289 @@
+[
+  {
+    "name": "filler rejects Unicode next-line whitespace",
+    "schema": "fillerText",
+    "value": "\u0085",
+    "valid": false
+  },
+  {
+    "name": "filler accepts byte-order mark as text",
+    "schema": "fillerText",
+    "value": "\ufeff",
+    "valid": true
+  },
+  {
+    "name": "filler accepts information separator as text",
+    "schema": "fillerText",
+    "value": "\u001c",
+    "valid": true
+  },
+  {
+    "name": "tool filler beside nested function",
+    "schema": "tool",
+    "value": { "type": "function", "function": { "name": "lookup" }, "prism_filler": { "type": "none" } },
+    "valid": true
+  },
+  {
+    "name": "tool filler inside function is invalid",
+    "schema": "tool",
+    "value": { "type": "function", "function": { "name": "lookup", "prism_filler": { "type": "none" } } },
+    "valid": false
+  },
+  {
+    "name": "auto filler without instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto" },
+    "valid": true
+  },
+  {
+    "name": "auto filler with instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto", "instructions": "Say you are checking." },
+    "valid": true
+  },
+  {
+    "name": "fixed filler",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "text", "text": "One moment." },
+    "valid": true
+  },
+  {
+    "name": "fixed filler requires text",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "text" },
+    "valid": false
+  },
+  {
+    "name": "silent filler rejects text",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "none", "text": "Hi" },
+    "valid": false
+  },
+  {
+    "name": "auto filler rejects blank instructions",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "auto", "instructions": " \n\t" },
+    "valid": false
+  },
+  {
+    "name": "filler rejects unknown mode",
+    "schema": "tool/properties/prism_filler",
+    "value": { "type": "future" },
+    "valid": false
+  },
+  {
+    "name": "known response cause",
+    "schema": "responseMetadata",
+    "value": { "prism_cause": "user_text" },
+    "valid": true
+  },
+  {
+    "name": "future response cause",
+    "schema": "responseMetadata",
+    "value": { "prism_cause": "future" },
+    "valid": false
+  },
+  {
+    "name": "nonstring response cause",
+    "schema": "responseMetadata",
+    "value": { "prism_cause": 123 },
+    "valid": false
+  },
+  {
+    "name": "future response status",
+    "schema": "responseView/properties/status",
+    "value": "future",
+    "valid": true
+  },
+  {
+    "name": "nonstring response status",
+    "schema": "responseView/properties/status",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "future terminal status",
+    "schema": "responseDoneEvent/allOf/1/properties/response/allOf/1/properties/status",
+    "value": "future",
+    "valid": false
+  },
+  {
+    "name": "nonstring terminal status",
+    "schema": "responseDoneEvent/allOf/1/properties/response/allOf/1/properties/status",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "future error scope",
+    "schema": "errorInfo/properties/scope",
+    "value": "future",
+    "valid": false
+  },
+  {
+    "name": "nonstring error scope",
+    "schema": "errorInfo/properties/scope",
+    "value": 123,
+    "valid": false
+  },
+  {
+    "name": "known error owner",
+    "schema": "errorOwner",
+    "value": { "kind": "response", "response_id": "reply-1" },
+    "valid": true
+  },
+  {
+    "name": "known error owner missing identity",
+    "schema": "errorOwner",
+    "value": { "kind": "response" },
+    "valid": false
+  },
+  {
+    "name": "future error owner",
+    "schema": "errorOwner",
+    "value": { "kind": "future", "future_id": "future-1" },
+    "valid": false
+  },
+  {
+    "name": "nonstring error owner kind",
+    "schema": "errorOwner",
+    "value": { "kind": 123 },
+    "valid": false
+  },
+  {
+    "name": "known client cause",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
+        "metadata": { "prism_cause": "user_text" },
+        "prism_input_text": "hello"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "old client protocol prefix",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
+        "metadata": { "prsm_cause": "user_text" },
+        "prsm_input_text": "hello"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown client cause",
+    "schema": "responseCreateEvent",
+    "value": {
+      "type": "response.create",
+      "event_id": "evt-1",
+      "response": {
+        "metadata": { "prism_cause": "future" },
+        "prism_input_text": "hello"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: omitted timing",
+    "schema": "turnDetection",
+    "value": {},
+    "valid": true
+  },
+  {
+    "name": "turn detection: complete timing",
+    "schema": "turnDetection",
+    "value": {
+      "interrupt_response": true,
+      "eagerness": "auto",
+      "prism_end_of_turn_timeout_ms": 5000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: minimum silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 1000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: maximum silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 10000
+    },
+    "valid": true
+  },
+  {
+    "name": "turn detection: unknown eagerness",
+    "schema": "turnDetection",
+    "value": {
+      "eagerness": "future"
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: null eagerness",
+    "schema": "turnDetection",
+    "value": {
+      "eagerness": null
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: short silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 999
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: long silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 10001
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: fractional silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": 1000.5
+    },
+    "valid": false
+  },
+  {
+    "name": "turn detection: boolean silence",
+    "schema": "turnDetection",
+    "value": {
+      "prism_end_of_turn_timeout_ms": true
+    },
+    "valid": false
+  },
+  {
+    "name": "known speech end reason",
+    "schema": "speechEndReason",
+    "value": "max_duration",
+    "valid": true
+  },
+  {
+    "name": "future speech end reason",
+    "schema": "speechEndReason",
+    "value": "future",
+    "valid": false
+  },
+  {
+    "name": "nonstring speech end reason",
+    "schema": "speechEndReason",
+    "value": 1,
+    "valid": false
+  }
+]

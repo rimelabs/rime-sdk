@@ -1,6 +1,6 @@
 # Rime SDK for Rust
 
-Generate speech with Coda or Mist v3 and transcribe audio with STT
+Generate speech with Coda or Mist v3, transcribe audio with STT, and run Prism conversations
 through the async `Client`. Your application handles audio capture and playback.
 
 ## Installation
@@ -311,4 +311,150 @@ for service information, or report SDK issues on
 categories such as `ErrorKind::Timeout`, and `error.request_id()` to identify a
 request. Include the SDK version and request ID when reporting a failure; omit API keys.
 
-SDK code uses the [MIT license](LICENSE).
+SDK code uses the [MIT license](https://github.com/rimelabs/rime-sdk/blob/main/rust/LICENSE).
+Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-PRISM`.
+
+## Prism realtime
+
+Realtime support is unreleased. Run these examples from this checkout's `rust/`
+directory until the first release that contains `realtime`.
+
+```rust,no_run
+use futures_util::StreamExt;
+use rimelabs_sdk::{Client, realtime::{RealtimeConnectOptions, RealtimeEvent}};
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let client = Client::builder().build()?;
+let session = client.realtime().connect(RealtimeConnectOptions::default()).await?;
+let mut events = session.events()?;
+let reader = tokio::spawn(async move {
+    while let Some(event) = events.next().await {
+        match event?.payload {
+            RealtimeEvent::TextDelta { delta, .. } => print!("{delta}"),
+            RealtimeEvent::ResponseEnded { .. } => break,
+            _ => {},
+        }
+    }
+    Ok::<_, rimelabs_sdk::Error>(())
+});
+let reply = session.send_text("Hello").await;
+if reply.is_err() { session.close().await; }
+let received = reader.await?;
+client.close().await;
+reply?;
+received?;
+# Ok(()) }
+```
+
+`RealtimeSession` owns authentication, initialization, request matching, events,
+audio conversion, and cleanup. Prism defaults to
+`wss://prism.api.rime.ai/v1/realtime`. TTS model, voice, endpoint, and timeout
+settings do not apply. Use `RealtimeConnectOptions` builders to select a voice,
+instructions, tools, interruption, turn detection, and timeouts. Plain `ws://`
+is permitted only for localhost. Connection, admission, and request timeouts
+default to 10, 30, and 10 seconds.
+
+`TurnDetection` accepts `low`, `medium`, `high`, or `auto` eagerness and a silence
+limit of 1000 to 10000 milliseconds. `PrismFiller` selects no speech, fixed text,
+or generated speech while a tool runs. Filler text and instructions must be
+nonblank and have at most 500 Unicode scalar values. Omit these settings to use
+server defaults. `session.info()` returns the effective settings that Prism
+published.
+
+| Session method | Behavior |
+| --- | --- |
+| `send_text` | Wait for admission, add a typed turn, and return its response reference. |
+| `add_message` | Add user or assistant history without a reply. |
+| `request_reply` | Request a proactive reply, with optional instructions or a recorded tool call. |
+| `submit_tool_result` | Record an application result. The same result can be submitted again; a changed result fails. |
+| `continue_reply` | Wait for the latest tool response and all its results, then request continuation. |
+| `cancel` | Cancel a retained response. |
+| `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |
+| `report_playback` | Report measured device playback completion or interruption. |
+| `events` | Take the single owned `Stream<Item = Result<SessionEvent, Error>>`. |
+| `close` | Stop the session and wait for cleanup. |
+
+Text turns and history contain at most 4000 Unicode scalar values. Audio chunks
+contain complete PCM16 frames and at most 192000 bytes. Input supports mono or
+stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and receives
+mono 24 kHz PCM. Clear audio to reset the streaming converter. A change of input
+format also resets it.
+
+Session handles can be cloned. Dropping the last handle requests cleanup.
+Explicit `close().await` confirms cleanup. Closing the parent client stops its
+sessions. Dropping an operation future prevents submission if possible. After
+submission, the worker keeps acknowledgment matching. It cancels a reply that
+is accepted after its caller stops waiting. A write or acknowledgment with an
+unknown outcome closes the session. The SDK does not reconnect or replay it.
+Only an explicit busy refusal permits retry after a new readiness event.
+
+Voice and session instructions must be nonblank when supplied. The SDK imposes
+no length cap on these settings, consistent with the shared Prism schema and
+the Python and TypeScript SDKs. This does not guarantee that the service accepts
+every value.
+
+Dropping an active audio submission closes the session. Dropping queued audio
+sends nothing and permits other operations to continue. Terminal failures take
+precedence over queued events and remain available from later session operations.
+The event stream yields the terminal error once, then ends. Normal closure drains
+the remaining queued events and ends without an error.
+
+There are at most 128 pending requests, 128 retained responses, 128 tools or
+outputs per response, and 256 queued events. Incoming messages are limited to
+1 MiB. An expired reference fails with `ErrorKind::Input`. A full event queue
+fails with `ErrorKind::ResourceLimit`; consume events during requests. Known
+malformed events fail the session. Unknown events and fields are ignored;
+unknown server enum values are reported as `unknown`. Service faults retain
+code, scope, owners, and correlation details through `Error::realtime_fault()`.
+
+### Conversation runner and examples
+
+`ConversationRunner::new(session, source, playback)` accepts application-owned
+`ConversationSource` and `ConversationPlayback` adapters. The runner consumes
+events, sends capture audio, preserves playback order, cuts interrupted audio,
+rejects late audio, and reports device measurements. It cancels dependent
+responses that arrive after interruption. Applications execute tools separately.
+The event callback must return without blocking. Do not consume session events
+or send playback reports elsewhere while the runner runs.
+
+Each playback output has an independent receipt. Completion must report actual
+played milliseconds, including partial playback after interruption. Receiving
+or queueing PCM does not confirm playback. `interrupt` discards the selected
+outputs as a batch, then resumes the remaining queue in order. `stop` confirms
+that all playback has stopped and keeps application resources open. Adapter
+futures must finish cancellation cleanup. The runner cancels the stop token
+after five seconds and waits for adapter cleanup before returning. This is a
+cooperative deadline, not a hard limit on cleanup. An adapter that ignores
+cancellation can prevent cleanup from finishing. The runner
+stops at source EOF, session closure, failure, or cancellation. Dropping its run
+future requests shutdown through its owned task.
+
+The owned task retains the adapter handles while it confirms playback stop and
+closes the session. Keep the Tokio runtime alive until cleanup finishes. To wait
+for confirmation, keep the `run` future and cancel its token, then await that
+future. Dropping the future requests cleanup but does not itself wait for it.
+The application retains ownership of device resources through its adapter handles.
+
+The runner starts `completion(&self)` when an output opens. Its shared `Arc`
+handle permits `write`, `end`, playback interruption, and stop while that receipt
+is pending. Adapters must not hold a lock across the completion wait if those
+operations need that lock. The runner serializes `open`, `interrupt`, and `stop`.
+
+```sh
+cargo run --example realtime_typed
+cargo run --example realtime_recorded -- utterance.pcm
+cargo run --example realtime_tools
+cargo run --example realtime_live -- 127.0.0.1:8766
+```
+
+The live example connects to an application-owned audio bridge. It has no device
+library dependency. The bridge uses newline-delimited JSON on local TCP, with
+at most 1 MiB per line. Send `{"type":"audio","data":"BASE64"}` for complete
+16 kHz mono PCM16 capture chunks. The example sends `open`, `audio`, and `end`
+messages with an opaque output `id`; output audio is 24 kHz mono PCM16. Play
+outputs in `open` order. For `interrupt`, discard the outputs in `ids` as one
+batch. Send `{"type":"played","id":"ID","played_ms":12.5}` when each output
+finishes or is interrupted, using device measurements. Reply to `stop` with
+`{"type":"stopped"}` only after all playback stops. Send `{"type":"eof"}` to
+end capture, and keep reading until the stop handshake completes. This bridge
+protocol belongs to the example, not the SDK.
