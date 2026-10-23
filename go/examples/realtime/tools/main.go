@@ -6,6 +6,7 @@ import (
 	"fmt"
 	rime "github.com/rimelabs/rime-sdk/go"
 	"log"
+	"os"
 	"time"
 )
 
@@ -17,7 +18,7 @@ func run() error {
 		return e
 	}
 	defer c.Close()
-	s, e := c.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Tools: []rime.ToolDefinition{{Name: "store_hours", Description: "Return today's store hours", Parameters: map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}, PrismFiller: &rime.PrismFiller{Type: "text", Text: "I will check the hours."}}}})
+	s, e := c.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Endpoint: os.Getenv("PRISM_URL"), Tools: []rime.ToolDefinition{{Name: "store_hours", Description: "Return today's store hours", Parameters: map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}, PrismFiller: &rime.PrismFiller{Type: "text", Text: "I will check the hours."}}}})
 	if e != nil {
 		return e
 	}
@@ -49,6 +50,9 @@ func run() error {
 				}
 			}()
 		case rime.ResponseEnded:
+			if p.Status != "completed" {
+				return fmt.Errorf("response %s: %s", p.Status, p.Reason)
+			}
 			if p.Response.ResponseID() == parent {
 				parent = ""
 				go func() {
@@ -62,6 +66,8 @@ func run() error {
 			}
 		case rime.TextDelta:
 			fmt.Print(p.Delta)
+		case rime.FaultEvent:
+			return p.Fault
 		}
 	}
 }

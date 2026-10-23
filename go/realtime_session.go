@@ -159,6 +159,12 @@ func (s *RealtimeSession) Recv(ctx context.Context) (SessionEvent, error) {
 	select {
 	case e, ok := <-s.events:
 		if ok {
+			s.mu.Lock()
+			err := s.terminal
+			s.mu.Unlock()
+			if err != nil {
+				return SessionEvent{}, err
+			}
 			return e, nil
 		}
 		s.mu.Lock()
@@ -418,7 +424,10 @@ func (s *RealtimeSession) run(address, key string, settings rtObject) {
 				w.pending = append(w.pending, c)
 			}
 		case result := <-written:
-			if ctx.Err() != nil && s.normalClose.Load() {
+			if ctx.Err() != nil {
+				if !s.normalClose.Load() {
+					terminal = operationError(context.Cause(s.op.ctx), "")
+				}
 				return
 			}
 			if err := w.written(result); err != nil {
@@ -426,7 +435,10 @@ func (s *RealtimeSession) run(address, key string, settings rtObject) {
 				return
 			}
 		case read := <-reads:
-			if ctx.Err() != nil && s.normalClose.Load() {
+			if ctx.Err() != nil {
+				if !s.normalClose.Load() {
+					terminal = operationError(context.Cause(s.op.ctx), "")
+				}
 				return
 			}
 			if read.err != nil {

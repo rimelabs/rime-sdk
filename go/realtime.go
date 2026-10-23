@@ -74,6 +74,9 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		if rtText(tool.Name, 4000) != nil || tool.Parameters == nil {
 			return "", nil, t, failure(ErrInput, "tools require a name and parameters object")
 		}
+		if !utf8.ValidString(tool.Description) {
+			return "", nil, t, failure(ErrInput, "tool descriptions must be valid UTF-8")
+		}
 		if _, exists := names[tool.Name]; exists {
 			return "", nil, t, failure(ErrInput, "tool names must be unique")
 		}
@@ -110,7 +113,10 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 	if e != nil {
 		return "", nil, t, failure(ErrInput, "invalid tool schema")
 	}
-	_ = json.Unmarshal(b, &settings)
+	settings, e = rtJSONObject(b)
+	if e != nil {
+		return "", nil, t, failure(ErrInput, "invalid tool schema")
+	}
 	return address, settings, t, nil
 }
 
@@ -149,15 +155,15 @@ func (r *RealtimeService) Connect(ctx context.Context, options RealtimeConnectOp
 func (s *RealtimeSession) awaitInitialization(ctx context.Context) (*RealtimeSession, error) {
 	select {
 	case result := <-s.initialized:
-		if result != nil {
-			_ = s.Close()
-			return nil, result
-		}
 		// Initialization and cancellation can both be ready. Apply the same
 		// cancellation precedence as operation result delivery.
 		if ctx.Err() != nil {
 			_ = s.Close()
 			return nil, operationError(context.Cause(ctx), "")
+		}
+		if result != nil {
+			_ = s.Close()
+			return nil, result
 		}
 		return s, nil
 	case <-ctx.Done():

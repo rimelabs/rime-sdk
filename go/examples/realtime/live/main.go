@@ -22,7 +22,7 @@ type message struct {
 	ID       string   `json:"id,omitempty"`
 	IDs      []string `json:"ids,omitempty"`
 	Data     []byte   `json:"data,omitempty"`
-	PlayedMS float64  `json:"played_ms,omitempty"`
+	PlayedMS *float64 `json:"played_ms,omitempty"`
 }
 type bridge struct {
 	conn    net.Conn
@@ -160,13 +160,19 @@ func openBridge(ctx context.Context, address string) (*bridge, error) {
 					return
 				}
 			case "played":
+				if v.ID == "" || v.PlayedMS == nil || *v.PlayedMS < 0 {
+					cancel(fmt.Errorf("played receipt requires an id and nonnegative played_ms"))
+					return
+				}
 				b.mu.Lock()
 				o := b.outputs[v.ID]
 				delete(b.outputs, v.ID)
 				b.mu.Unlock()
-				if o != nil {
-					o.receipt <- v.PlayedMS
+				if o == nil {
+					cancel(fmt.Errorf("played receipt has unknown output id %q", v.ID))
+					return
 				}
+				o.receipt <- *v.PlayedMS
 			case "stopped":
 				select {
 				case b.stopped <- struct{}{}:
@@ -208,7 +214,7 @@ func run() error {
 		return e
 	}
 	defer client.Close()
-	session, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{})
+	session, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Endpoint: os.Getenv("PRISM_URL")})
 	if e != nil {
 		return e
 	}

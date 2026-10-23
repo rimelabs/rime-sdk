@@ -11,9 +11,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .realtime()
         .connect(RealtimeConnectOptions::default())
         .await?;
-    let result = async {
+    let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
         let mut events = session.events()?;
-        let consumer = tokio::spawn(async move {
+        let consumer = async {
             while let Some(event) = events.next().await {
                 match event?.payload {
                     RealtimeEvent::TextDelta { delta, .. } => print!("{delta}"),
@@ -22,18 +22,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             Ok::<_, rimelabs_sdk::Error>(())
-        });
-        let reply = session.send_text("Give me one short greeting.").await;
-        if reply.is_err() {
-            session.close().await;
-        }
-        let received = consumer.await?;
-        reply?;
-        received?;
+        };
+        tokio::try_join!(session.send_text("Give me one short greeting."), consumer)?;
         println!();
-        Ok::<_, Box<dyn std::error::Error>>(())
-    }
+        Ok::<_, rimelabs_sdk::Error>(())
+    })
     .await;
     client.close().await;
-    result
+    result??;
+    Ok(())
 }

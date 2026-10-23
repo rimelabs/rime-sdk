@@ -360,9 +360,10 @@ is permitted only for localhost. Zero timeouts select 10 seconds for connection,
 
 `TurnDetection` accepts `low`, `medium`, `high`, or `auto` eagerness and a silence
 limit of 1000 to 10000 milliseconds. `PrismFiller` selects `none`, `text`, or
-`auto` speech while a tool runs. Text and instructions must be valid, nonblank
-UTF-8 with at most 500 Unicode scalar values. Omit these settings to use server
-defaults. `session.Info()` returns a copy of the effective published settings.
+`auto` speech while a tool runs. Filler text and filler instructions must be
+valid, nonblank UTF-8 with at most 500 Unicode scalar values. Omit these settings
+to use server defaults. `session.Info()` returns a copy of the effective published
+settings.
 
 | Session method | Behavior |
 | --- | --- |
@@ -394,6 +395,9 @@ explicit busy refusal permits retry after a new readiness event. Use `errors.Is`
 for SDK categories or context errors. Use `errors.As` with `*RealtimeFault` for
 service code, scope, owners, and correlation details.
 
+Numbers in `ToolCall.Arguments`, including nested values, use `json.Number` to
+preserve precision. Use `String`, `Int64`, or `Float64` to read the required form.
+
 Voice and session instructions must be nonblank when supplied. The SDK imposes
 no length cap on these settings, consistent with the shared Prism schema and
 the Python and TypeScript SDKs. This does not guarantee that the service accepts
@@ -404,7 +408,8 @@ sends nothing and permits other operations to continue. Terminal failures take
 precedence over queued events and remain available from later session operations.
 Normal closure returns `io.EOF` after the remaining queued events.
 
-Text turns and history contain at most 4000 Unicode scalar values. Input audio
+Text turns and history contain at most 4000 Unicode scalar values. Tool filler
+text and filler instructions contain at most 500 Unicode scalar values. Input audio
 contains complete PCM16 frames and at most 192000 bytes per chunk. Input supports
 mono or stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and
 receives mono 24 kHz PCM. A clear or input-format change resets conversion.
@@ -428,10 +433,12 @@ Each output has an independent completion receipt. Report actual played
 milliseconds, including partial playback after interruption. Receiving or
 queueing PCM does not confirm playback. `Interrupt` discards selected outputs
 as a batch, then resumes the remaining FIFO queue. `Stop` confirms that all
-playback has stopped and keeps caller resources open. All adapter operations
-must honor their context. The runner passes a five-second context to `Stop` and
-waits for cancellation cleanup. This is a cooperative deadline, not a hard limit
-on `Run`: an adapter that ignores cancellation can prevent it from returning.
+playback has stopped and keeps caller resources open. `Read`, `Completion`, and
+`Stop` must honor their context. `Open`, `Write`, `End`, and `Interrupt` have no
+context and must return without blocking. The runner passes a five-second context
+to `Stop` and waits for cancellation cleanup. This is a cooperative deadline,
+not a hard limit on `Run`: an adapter that ignores cancellation can prevent it
+from returning.
 The SDK cannot forcibly stop an adapter goroutine or claim that its device has
 stopped. It stops at source EOF, session closure,
 failure, or cancellation, then closes the session.
@@ -447,6 +454,9 @@ go run ./examples/realtime/recorded utterance.pcm
 go run ./examples/realtime/tools
 go run ./examples/realtime/live 127.0.0.1:8766
 ```
+
+Set `RIME_API_KEY` before running these examples. Set `PRISM_URL` to override
+the default Prism endpoint, for example when using a local test server.
 
 The live example uses an application-owned audio bridge with no device library
 dependency. The local TCP connection carries newline-delimited JSON, at most

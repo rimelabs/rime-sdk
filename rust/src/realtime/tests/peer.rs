@@ -120,6 +120,15 @@ impl Peer {
                 .is_err()
         )
     }
+    pub async fn closed_without_request(&mut self) {
+        assert!(
+            tokio::time::timeout(Duration::from_secs(3), self.recv.recv())
+                .await
+                .expect("session did not close")
+                .is_none(),
+            "unexpected request before closure"
+        );
+    }
     pub fn disconnect(&self) {
         self.task.abort()
     }

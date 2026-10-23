@@ -43,8 +43,11 @@ fn optional(v: &Value) -> Result<Option<String>, Error> {
     }
 }
 fn integer(v: &Value) -> Result<u64, Error> {
-    v.as_u64()
-        .filter(|n| *n <= 9_007_199_254_740_991)
+    v.as_f64()
+        .filter(|n| {
+            n.is_finite() && (0.0..=9_007_199_254_740_991.0).contains(n) && n.fract() == 0.0
+        })
+        .map(|n| n as u64)
         .ok_or_else(|| invalid("integer"))
 }
 fn enumeration(s: String, known: &[&str]) -> String {

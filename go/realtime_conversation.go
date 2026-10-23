@@ -62,6 +62,7 @@ type rtPlayReply struct {
 	ref                           ResponseRef
 	outputs                       []*rtPlayOutput
 	ended, interrupted, reporting bool
+	stopReport                    context.CancelFunc
 }
 
 // Run ends at source EOF, session closure, failure, or cancellation. It waits for
@@ -211,6 +212,9 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 				continue
 			}
 			reply.interrupted = true
+			if reply.stopReport != nil {
+				reply.stopReport()
+			}
 			blocked[reply.ref.responseID] = true
 			for _, o := range reply.outputs {
 				outputs = append(outputs, o.ref)
@@ -257,8 +261,14 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 				}
 			} else {
 				ref := reply.ref
+				reportCtx, stopReport := context.WithCancel(running)
+				reply.stopReport = stopReport
 				if e := start(func() error {
-					e := r.Session.ReportPlayback(running, PlaybackFinished{Response: ref, PlayedMS: &total})
+					defer stopReport()
+					e := r.Session.ReportPlayback(reportCtx, PlaybackFinished{Response: ref, PlayedMS: &total})
+					if reportCtx.Err() != nil && errors.Is(e, context.Canceled) {
+						e = nil
+					}
 					if e == nil {
 						select {
 						case reported <- ref.responseID:
@@ -267,6 +277,7 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 					return e
 				}); e != nil {
+					stopReport()
 					return e
 				}
 			}

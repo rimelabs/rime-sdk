@@ -1,6 +1,7 @@
 package rime
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,48 @@ import (
 )
 
 type rtObject = map[string]any
+
+// Application JSON must retain exact numbers and contain one complete object.
+func rtJSONObject(raw []byte) (rtObject, error) {
+	if !json.Valid(raw) {
+		return nil, fmt.Errorf("invalid JSON object")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var object rtObject
+	if err := decoder.Decode(&object); err != nil {
+		return nil, err
+	}
+	if object == nil {
+		return nil, fmt.Errorf("expected JSON object")
+	}
+	if !rtFiniteJSON(object) {
+		return nil, fmt.Errorf("JSON numbers must be finite")
+	}
+	return object, nil
+}
+
+func rtFiniteJSON(value any) bool {
+	switch value := value.(type) {
+	case json.Number:
+		number, err := value.Float64()
+		return err == nil && !math.IsInf(number, 0) && !math.IsNaN(number)
+	case map[string]any:
+		for _, child := range value {
+			if !rtFiniteJSON(child) {
+				return false
+			}
+		}
+	case []any:
+		for _, child := range value {
+			if !rtFiniteJSON(child) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 type rtWire struct {
 	interruptKnown                          bool
 	kind, eventID, requestID, target, token string
@@ -262,8 +305,8 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		}
 	case "response.function_call_arguments.done":
 		w.kind = "tool.call"
-		var args any
-		if json.Unmarshal([]byte(decoder.string(o["arguments"])), &args) != nil {
+		args, err := rtJSONObject([]byte(decoder.string(o["arguments"])))
+		if err != nil {
 			decoder.bad("arguments")
 		}
 		w.payload = ToolCall{ToolCallRef{ref(o["response_id"]), decoder.id(o["call_id"])}, decoder.id(o["item_id"]), decoder.string(o["name"]), decoder.object(args)}

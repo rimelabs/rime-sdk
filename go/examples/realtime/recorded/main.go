@@ -60,7 +60,7 @@ func run() error {
 		return e
 	}
 	defer client.Close()
-	s, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{})
+	s, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Endpoint: os.Getenv("PRISM_URL")})
 	if e != nil {
 		return e
 	}
@@ -75,6 +75,13 @@ func run() error {
 	for {
 		event, e := s.Recv(ctx)
 		if e != nil {
+			select {
+			case sendErr := <-sent:
+				if sendErr != nil {
+					return sendErr
+				}
+			default:
+			}
 			return e
 		}
 		switch p := event.Payload.(type) {
@@ -83,7 +90,14 @@ func run() error {
 		case rime.TextDelta:
 			fmt.Print(p.Delta)
 		case rime.ResponseEnded:
+			if p.Status != "completed" {
+				return fmt.Errorf("response %s: %s", p.Status, p.Reason)
+			}
 			return <-sent
+		case rime.FaultEvent:
+			return p.Fault
+		case rime.TranscriptFailed:
+			return p.Fault
 		}
 	}
 }

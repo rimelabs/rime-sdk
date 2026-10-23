@@ -23,15 +23,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     let mut events = session.events()?;
     let sender = session.clone();
-    let request = tokio::spawn(async move {
+    let mut tasks = tokio::task::JoinSet::new();
+    tasks.spawn(async move {
         sender
             .send_text("Use store_hours to tell me when the store opens.")
             .await
+            .map(|_| ())
     });
     let result = async {
         let mut parent = None;
-        let mut tasks = tokio::task::JoinSet::new();
-        while let Some(event) = events.next().await {
+        loop {
+            let event = tokio::select! {
+                result = tasks.join_next(), if !tasks.is_empty() => {
+                    result.expect("pending operation")??;
+                    continue;
+                }
+                event = events.next() => {
+                    let Some(event) = event else { break };
+                    event
+                }
+            };
             match event?.payload {
                 RealtimeEvent::ToolCall { call, .. } => {
                     parent = Some(call.response().clone());
@@ -45,7 +56,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .await
                     });
                 }
-                RealtimeEvent::ResponseEnded { response, .. } => {
+                RealtimeEvent::ResponseEnded {
+                    response, status, ..
+                } => {
+                    if status != "completed" {
+                        return Err(format!("response ended with status {status}").into());
+                    }
                     if parent.as_ref() == Some(&response) {
                         let session = session.clone();
                         tasks.spawn(
@@ -57,17 +73,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 RealtimeEvent::TextDelta { delta, .. } => print!("{delta}"),
+                RealtimeEvent::Fault(fault) => return Err(fault.into()),
                 _ => {}
             }
         }
         while let Some(result) = tasks.join_next().await {
             result.map_err(Error::input)??
         }
-        Ok::<_, Error>(())
+        Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;
+    tasks.shutdown().await;
     client.close().await;
-    request.await??;
     result?;
     println!();
     Ok(())

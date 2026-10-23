@@ -1,5 +1,62 @@
 use crate::realtime::protocol::decode;
 use serde_json::Value;
+
+#[test]
+fn integer_fields_accept_integral_json_numbers() {
+    use crate::realtime::RealtimeEvent;
+    for (number, expected) in [
+        ("0", 0),
+        ("-0.0", 0),
+        ("1000.0", 1000),
+        ("1e3", 1000),
+        ("9007199254740991", 9_007_199_254_740_991),
+        ("9007199254740991.0", 9_007_199_254_740_991),
+    ] {
+        let event = format!(
+            r#"{{"type":"prism.input_audio_buffer.speech_hint","audio_start_ms":{number}}}"#
+        );
+        let wire = decode(&event, "session-1").unwrap().unwrap();
+        let Some(RealtimeEvent::SpeechHint { audio_start_ms }) = wire.payload else {
+            panic!("missing speech hint for {number}");
+        };
+        assert_eq!(audio_start_ms, expected, "{number}");
+    }
+    for number in [
+        "-1",
+        "-0.5",
+        "1.5",
+        "9007199254740992",
+        "9007199254740992.0",
+        "1e20",
+        "1e400",
+        "true",
+        "null",
+        "\"1000\"",
+    ] {
+        let event = format!(
+            r#"{{"type":"prism.input_audio_buffer.speech_hint","audio_start_ms":{number}}}"#
+        );
+        assert!(decode(&event, "session-1").is_err(), "{number}");
+    }
+}
+
+#[test]
+fn connect_without_runtime_returns_input_error() {
+    use crate::{Client, ErrorKind, RealtimeConnectOptions};
+    use std::{
+        future::Future,
+        task::{Context, Poll, Waker},
+    };
+    let client = Client::builder().api_key("test").build().unwrap();
+    let realtime = client.realtime();
+    let mut connect = Box::pin(realtime.connect(RealtimeConnectOptions::default()));
+    let mut context = Context::from_waker(Waker::noop());
+    match connect.as_mut().poll(&mut context) {
+        Poll::Ready(Err(error)) => assert_eq!(error.kind(), ErrorKind::Input),
+        _ => panic!("connect must reject calls outside a Tokio runtime"),
+    }
+}
+
 #[test]
 fn shared_protocol() {
     let cases: Value =

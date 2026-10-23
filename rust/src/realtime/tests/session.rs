@@ -3,6 +3,7 @@ use crate::{
     realtime::{AudioChunk, PlaybackReport, RealtimeEvent},
     ErrorKind, PcmFormat,
 };
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::json;
 
 #[tokio::test]
@@ -76,7 +77,10 @@ async fn audio_and_clear() {
     });
     for _ in 0..2 {
         let q = p.next("input_audio_buffer.append").await;
-        assert_eq!(q["audio"].as_str().unwrap().len(), 1708)
+        assert_eq!(
+            STANDARD.decode(q["audio"].as_str().unwrap()).unwrap(),
+            vec![0; 1280]
+        );
     }
     task.await.unwrap().unwrap();
     let session = s.clone();

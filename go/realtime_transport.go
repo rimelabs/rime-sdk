@@ -47,7 +47,11 @@ func rtReadLoop(ctx context.Context, c *websocket.Conn, out chan<- rtRead) {
 			e = failure(ErrStream, "expected a JSON text event")
 		}
 		if e != nil {
-			e = failure(ErrStream, "invalid event or lost realtime connection")
+			if ctx.Err() != nil {
+				e = operationError(context.Cause(ctx), "")
+			} else {
+				e = failure(ErrStream, "invalid event or lost realtime connection")
+			}
 		}
 		select {
 		case out <- rtRead{b, e}:

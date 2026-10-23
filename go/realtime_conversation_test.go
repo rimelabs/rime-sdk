@@ -324,3 +324,99 @@ func TestRealtimeReceiptWaitOverlapsWriteEndAndInterrupt(t *testing.T) {
 		t.Fatal("runner did not finish")
 	}
 }
+
+func TestRealtimeRunnerCancelsPendingFinishedReportOnInterruption(t *testing.T) {
+	// Hold commands at the session boundary to interrupt a finished report before
+	// the session can submit it. Already submitted socket writes cannot be undone.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	s := newRealtimeSession(&operation{ctx: ctx, cancel: func(error) {}}, RealtimeTimeouts{Ready: time.Second})
+	s.info.InterruptOnSpeech = true
+	go func() { <-ctx.Done(); close(s.done) }()
+	playback := &rtControlledPlayback{opened: make(chan *rtControlledOutput, 1), outputs: map[OutputRef]*rtControlledOutput{}}
+	interrupted := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- (&ConversationRunner{Session: s, Source: &rtControlledSource{stopped: make(chan struct{})}, Playback: playback, OnEvent: func(event SessionEvent) error {
+			if _, ok := event.Payload.(SpeechStarted); ok {
+				close(interrupted)
+			}
+			return nil
+		}}).Run(ctx)
+	}()
+	defer func() { cancel(); <-done }()
+	response := ResponseRef{"session-1", "r1"}
+	output := OutputRef{response: response, itemID: "i1"}
+	s.events <- SessionEvent{Payload: ResponseStarted{Response: response}}
+	s.events <- SessionEvent{Payload: MessageStarted{Output: output}}
+	o := rtOutput(t, playback)
+	s.events <- SessionEvent{Payload: ResponseEnded{Response: response, Status: "completed"}}
+	o.receipt <- 10
+	var report *rtCommand
+	select {
+	case report = <-s.commands:
+	case <-time.After(time.Second):
+		t.Fatal("no finished report")
+	}
+	if report.kind != "drain" {
+		t.Fatalf("got %s, want drain", report.kind)
+	}
+	s.events <- SessionEvent{Payload: SpeechStarted{}}
+	select {
+	case <-interrupted:
+	case <-time.After(time.Second):
+		t.Fatal("interruption was not processed")
+	}
+	if report.ctx.Err() == nil {
+		t.Fatal("finished report remains active after interruption")
+	}
+}
+
+type rtShutdownReceipt struct {
+	release, returned chan struct{}
+	err               error
+}
+
+func (o *rtShutdownReceipt) Write(AudioChunk) error { return nil }
+func (o *rtShutdownReceipt) End() error             { return nil }
+func (o *rtShutdownReceipt) Completion(context.Context) (float64, error) {
+	defer close(o.returned)
+	<-o.release
+	return 0, o.err
+}
+
+type rtShutdownPlayback struct{ output *rtShutdownReceipt }
+
+func (p rtShutdownPlayback) Open(OutputRef) (ConversationOutput, error) { return p.output, nil }
+func (p rtShutdownPlayback) Interrupt([]OutputRef) error                { return nil }
+func (p rtShutdownPlayback) Stop(context.Context) error {
+	close(p.output.release)
+	<-p.output.returned
+	return nil
+}
+
+func TestRealtimeRunnerRetainsReceiptFailureDuringNormalShutdown(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	expected := errors.New("device measurement failed during shutdown")
+	output := &rtShutdownReceipt{make(chan struct{}), make(chan struct{}), expected}
+	done := make(chan error, 1)
+	go func() {
+		done <- (&ConversationRunner{Session: s, Source: &rtControlledSource{stopped: make(chan struct{})}, Playback: rtShutdownPlayback{output}, OnEvent: func(event SessionEvent) error {
+			if _, ok := event.Payload.(MessageStarted); ok {
+				_ = s.Close()
+			}
+			return nil
+		}}).Run(context.Background())
+	}()
+	p.send(rtObject{"type": "response.created", "response": rtObject{"id": "r1"}})
+	p.send(rtObject{"type": "response.output_item.added", "response_id": "r1", "output_index": 0, "item": rtObject{"type": "message", "id": "i1"}})
+	select {
+	case err := <-done:
+		if !errors.Is(err, expected) {
+			t.Fatalf("got %v, want receipt failure", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("runner did not stop")
+	}
+}

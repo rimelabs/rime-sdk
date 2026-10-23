@@ -153,6 +153,21 @@ async fn unknown_acknowledgment_outcome_closes_without_replay() {
     p.next("conversation.item.create").await;
     let e = task.await.unwrap().unwrap_err();
     assert_eq!(e.kind(), ErrorKind::Timeout);
+    // Any replay is retained in the peer queue, including one sent before timeout.
+    p.closed_without_request().await;
+    let error = s.add_message("user", "after timeout").await.unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Timeout);
+    assert_eq!(error.message(), e.message());
+    assert_eq!(
+        s.events()
+            .unwrap()
+            .next()
+            .await
+            .unwrap()
+            .unwrap_err()
+            .kind(),
+        ErrorKind::Timeout
+    );
     c.close().await;
 }
 #[tokio::test]

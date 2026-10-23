@@ -99,6 +99,7 @@ impl Realtime<'_> {
         &self,
         options: RealtimeConnectOptions,
     ) -> Result<super::RealtimeSession, Error> {
+        crate::client::require_runtime()?;
         self.client.ensure_open()?;
         let settings = settings(&options)?;
         session::connect(self.client.inner.clone(), options, settings).await

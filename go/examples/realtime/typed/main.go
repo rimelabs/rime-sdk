@@ -6,6 +6,7 @@ import (
 	"fmt"
 	rime "github.com/rimelabs/rime-sdk/go"
 	"log"
+	"os"
 	"time"
 )
 
@@ -17,23 +18,41 @@ func run() error {
 		return e
 	}
 	defer client.Close()
-	session, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{})
+	session, e := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Endpoint: os.Getenv("PRISM_URL")})
 	if e != nil {
 		return e
 	}
 	sent := make(chan error, 1)
-	go func() { _, e := session.SendText(ctx, "Give me one short greeting."); sent <- e }()
+	go func() {
+		_, e := session.SendText(ctx, "Give me one short greeting.")
+		sent <- e
+		if e != nil {
+			_ = session.Close()
+		}
+	}()
 	for {
 		event, e := session.Recv(ctx)
 		if e != nil {
+			select {
+			case sendErr := <-sent:
+				if sendErr != nil {
+					return sendErr
+				}
+			default:
+			}
 			return e
 		}
 		switch p := event.Payload.(type) {
 		case rime.TextDelta:
 			fmt.Print(p.Delta)
 		case rime.ResponseEnded:
+			if p.Status != "completed" {
+				return fmt.Errorf("response %s: %s", p.Status, p.Reason)
+			}
 			fmt.Println()
 			return <-sent
+		case rime.FaultEvent:
+			return p.Fault
 		}
 	}
 }
