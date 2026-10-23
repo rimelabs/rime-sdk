@@ -74,6 +74,23 @@ fn revision(v: &Value) -> Result<Option<u64>, Error> {
 fn view(v: &Value) -> Result<SessionInfo, Error> {
     let o = object(v)?;
     let mut s = SessionInfo {
+        truncation: o
+            .get("truncation")
+            .map(|value| {
+                let t = match value.as_str() {
+                    Some("auto") => Truncation::Auto,
+                    Some("disabled") => Truncation::Disabled,
+                    _ if value["type"] == "retention_ratio" => Truncation::RetentionRatio(
+                        value["retention_ratio"]
+                            .as_f64()
+                            .ok_or_else(|| invalid("session.truncation"))?,
+                    ),
+                    _ => return Err(invalid("session.truncation")),
+                };
+                super::client::truncation(&t).map_err(|_| invalid("session.truncation"))?;
+                Ok(t)
+            })
+            .transpose()?,
         settings_revision: revision(v)?,
         model: "prism",
         session_id: id(&v["id"])?,

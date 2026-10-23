@@ -40,6 +40,7 @@ class SessionSettings(TypedDict):
     voice: NotRequired[str]
     instructions: NotRequired[str]
     prism_response_metadata: NotRequired[t.Labels]
+    truncation: NotRequired[t.JsonValue]
 
 
 def response_metadata(value: object) -> t.Labels:
@@ -52,6 +53,7 @@ def response_metadata(value: object) -> t.Labels:
 
 
 class SessionPatch(TypedDict, total=False):
+    truncation: t.JsonValue
     voice: str
     instructions: str
     tools: list[_Tool]
@@ -60,6 +62,7 @@ class SessionPatch(TypedDict, total=False):
 
 @dataclass(frozen=True, kw_only=True)
 class SessionView:
+    truncation: t.Truncation | None = None
     settings_revision: int | None = None
     id: str
     request_id: str | None
@@ -231,6 +234,26 @@ def _duration(value: object, name: str) -> float | None:
     return float(value)
 
 
+def truncation_settings(value: t.Truncation) -> t.JsonValue:
+    """Serialize an explicit setting; callers omit None for older servers."""
+    if isinstance(value, str) and value in ("auto", "disabled"):
+        return value
+    if isinstance(value, t.RetentionRatio):
+        return {"type": "retention_ratio", "retention_ratio": value.retention_ratio}
+    raise RimeInputError("truncation must be auto, disabled, or RetentionRatio")
+
+
+def _truncation(value: object) -> t.Truncation:
+    if isinstance(value, str) and value in ("auto", "disabled"):
+        return cast(t.Truncation, value)
+    if isinstance(value, dict) and value.get("type") == "retention_ratio":
+        try:
+            return t.RetentionRatio(cast(float, value.get("retention_ratio")))
+        except RimeInputError:
+            pass
+    _invalid("session.truncation")
+
+
 def _session(value: object) -> SessionView:
     view = _object(value, "session")
     detection = (
@@ -265,6 +288,7 @@ def _session(value: object) -> SessionView:
             _invalid("session.prism_effective_interrupt_response")
         interrupt = None
     return SessionView(
+        truncation=_truncation(view["truncation"]) if "truncation" in view else None,
         settings_revision=_revision(view, "session.prism_settings_revision"),
         id=_id(view.get("id"), "session.id"),
         request_id=_optional_string(view.get("request_id"), "session.request_id"),

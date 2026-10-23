@@ -457,8 +457,24 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/clientCapability'
+        truncation:
+          $ref: '#/components/schemas/truncation'
         prism_response_metadata:
           $ref: '#/components/schemas/labels'
+
+    truncation:
+      oneOf:
+        - enum: [auto, disabled]
+        - type: object
+          additionalProperties: false
+          required: [type, retention_ratio]
+          properties:
+            type:
+              const: retention_ratio
+            retention_ratio:
+              type: number
+              exclusiveMinimum: 0
+              maximum: 1
 
     labels:
       type: object
@@ -493,6 +509,8 @@ components:
           type: string
         request_id:
           type: string
+        truncation:
+          $ref: '#/components/schemas/truncation'
         prism_response_metadata:
           $ref: '#/components/schemas/labels'
         object:

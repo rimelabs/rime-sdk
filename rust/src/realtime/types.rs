@@ -57,6 +57,16 @@ pub struct ToolDefinition {
     /// Optional speech while the function runs.
     pub prism_filler: Option<PrismFiller>,
 }
+/// History policy when the context fills. Omit it to keep the server default.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Truncation {
+    /// Drop oldest turns, retaining 0.8 of available history capacity.
+    Auto,
+    /// Keep history; an oversized prompt fails with context_length_exceeded.
+    Disabled,
+    /// Retain this fraction of available history capacity, above zero and at most one.
+    RetentionRatio(f64),
+}
 /// Prism settings, independent of TTS configuration.
 #[derive(Clone, Debug)]
 pub struct RealtimeConnectOptions {
@@ -66,6 +76,7 @@ pub struct RealtimeConnectOptions {
     pub(crate) tools: Vec<ToolDefinition>,
     pub(crate) interrupt: bool,
     pub(crate) detection: TurnDetection,
+    pub(crate) truncation: Option<Truncation>,
     pub(crate) timeouts: RealtimeTimeouts,
     pub(crate) request_id: Option<String>,
     pub(crate) response_metadata: Option<Labels>,
@@ -79,6 +90,7 @@ impl Default for RealtimeConnectOptions {
             tools: vec![],
             interrupt: true,
             detection: TurnDetection::default(),
+            truncation: None,
             timeouts: RealtimeTimeouts::default(),
             request_id: None,
             response_metadata: None,
@@ -86,6 +98,11 @@ impl Default for RealtimeConnectOptions {
     }
 }
 impl RealtimeConnectOptions {
+    /// Set history truncation, also changeable during a call.
+    pub fn truncation(mut self, value: Truncation) -> Self {
+        self.truncation = Some(value);
+        self
+    }
     /// Override the Prism endpoint. Plain ws is restricted to localhost.
     pub fn endpoint(mut self, value: impl Into<String>) -> Self {
         self.endpoint = value.into();
@@ -142,8 +159,14 @@ pub struct RealtimeUpdateOptions {
     pub(crate) tools: Option<Vec<ToolDefinition>>,
     pub(crate) voice: Option<String>,
     pub(crate) interrupt: Option<bool>,
+    pub(crate) truncation: Option<Truncation>,
 }
 impl RealtimeUpdateOptions {
+    /// Set history truncation, also changeable during a call.
+    pub fn truncation(mut self, value: Truncation) -> Self {
+        self.truncation = Some(value);
+        self
+    }
     /// Replace instructions. An empty string clears them.
     pub fn instructions(mut self, value: impl Into<String>) -> Self {
         self.instructions = Some(value.into());
@@ -268,6 +291,8 @@ impl OutputRef {
 /// Effective settings supplied by Prism. None means the field was not published.
 #[derive(Clone, Debug)]
 pub struct SessionInfo {
+    /// History policy, absent when an older server does not publish it.
+    pub truncation: Option<Truncation>,
     /// Settings revision published by the server, if available.
     pub settings_revision: Option<u64>,
     /// Model name, always prism.

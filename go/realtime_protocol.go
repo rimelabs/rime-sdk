@@ -128,6 +128,23 @@ func rtEnum(s string, values ...string) string {
 func (decoder *rtDecoder) view(v any) SessionInfo {
 	o := decoder.object(v)
 	s := SessionInfo{SessionID: decoder.id(o["id"]), Model: "prism", InterruptOnSpeech: true}
+	if v, ok := o["truncation"]; ok {
+		t := Truncation{}
+		if mode, ok := v.(string); ok {
+			t.Mode = TruncationMode(mode)
+		} else {
+			ratio := decoder.object(v)
+			t.Mode = TruncationMode(decoder.string(ratio["type"]))
+			t.Ratio, ok = ratio["retention_ratio"].(float64)
+			if !ok || t.Mode != TruncationRetentionRatio {
+				decoder.bad("session.truncation")
+			}
+		}
+		if _, err := rtTruncation(t); err != nil {
+			decoder.bad("session.truncation")
+		}
+		s.Truncation = &t
+	}
 	if v, ok := o["voice"]; ok {
 		s.Voice = decoder.string(v)
 	}

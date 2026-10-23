@@ -48,6 +48,9 @@ export interface ToolDefinition {
   readonly description?: string;
   readonly prismFiller?: PrismFiller;
 }
+/** History policy when the context fills. The server uses auto when omitted. */
+export type Truncation =
+  "auto" | "disabled" | { readonly retentionRatio: number };
 export type TurnEagerness = "low" | "medium" | "high" | "auto";
 /** Omitted fields use the server's turn timing defaults. */
 export interface TurnDetection {
@@ -62,6 +65,7 @@ export interface TurnDetectionInfo {
   readonly endOfTurnTimeoutMs: number | null;
 }
 export interface RealtimeConnectOptions extends RealtimeOperationOptions {
+  readonly truncation?: Truncation;
   /** Defaults to wss://prism.api.rime.ai/v1/realtime. */
   readonly endpoint?: string;
   readonly model?: "prism";
@@ -84,6 +88,7 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
 }
 /** Omitted fields keep their values. Empty instructions or tools clear them. */
 export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
+  readonly truncation?: Truncation;
   readonly instructions?: string;
   readonly tools?: readonly ToolDefinition[];
   readonly voice?: string;
@@ -115,6 +120,8 @@ export interface OutputRef {
   readonly contentIndex: number;
 }
 export interface SessionInfo {
+  /** Null when an older server does not publish its history policy. */
+  readonly truncation?: Truncation | null;
   /** Settings revision published by the server; null when unavailable.
    * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;

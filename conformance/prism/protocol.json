@@ -1239,5 +1239,169 @@
       }
     },
     "invalid": true
+  },
+  {
+    "name": "session truncation auto",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": "auto"
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "session truncation disabled",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": "disabled"
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "session truncation {'type': 'retention_ratio', 'retention_ratio': 0.9}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": 0.9
+        }
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "session truncation {'type': 'retention_ratio', 'retention_ratio': 1}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": 1
+        }
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "invalid session truncation None",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation True",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": true
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation 0",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": 0
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation invalid",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": "invalid"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation {}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {}
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation {'type': 'retention_ratio', 'retention_ratio': 0}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": 0
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation {'type': 'retention_ratio', 'retention_ratio': 1.1}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": 1.1
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid session truncation {'type': 'retention_ratio', 'retention_ratio': '0.9'}",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": "0.9"
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session truncation keeps known fields from future server objects",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "truncation": {
+          "type": "retention_ratio",
+          "retention_ratio": 0.9,
+          "future_server_field": {
+            "enabled": true
+          }
+        }
+      }
+    },
+    "expected_kind": "session.updated"
   }
 ]

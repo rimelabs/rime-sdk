@@ -17,11 +17,11 @@ from .._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
-from ._protocol import SessionSettings
+from ._protocol import SessionSettings, truncation_settings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
 from ._settings import tool_settings
-from ._types import Labels, RealtimeTimeouts, ToolDefinition, TurnDetection
+from ._types import Labels, RealtimeTimeouts, ToolDefinition, Truncation, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -53,6 +53,7 @@ class Realtime:
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
         request_id: str | None = None,
         response_metadata: Labels | None = None,
+        truncation: Truncation | None = None,
     ) -> AsyncIterator[RealtimeSession]:
         """Open and initialize a session on the public Prism endpoint.
 
@@ -92,6 +93,8 @@ class Realtime:
             "turn_detection": {"interrupt_response": interrupt_on_speech},
             "tools": tool_settings(tools),
         }
+        if truncation is not None:
+            settings["truncation"] = truncation_settings(truncation)
         if turn_detection is not None:
             if not isinstance(turn_detection, TurnDetection):
                 raise RimeInputError("turn_detection must be a TurnDetection value")

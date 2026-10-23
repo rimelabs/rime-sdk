@@ -10,7 +10,7 @@ import { RealtimeSession } from "./session.js";
 import { RealtimeConnection } from "./transport.js";
 import type { RealtimeConnectOptions, RealtimeTimeouts } from "./types.js";
 import { toolSettings } from "./settings.js";
-import { responseMetadata } from "./protocol.js";
+import { responseMetadata, truncationSettings } from "./protocol.js";
 import type { SessionSettings } from "./protocol.js";
 
 const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
@@ -93,6 +93,8 @@ export class Realtime {
       turn_detection: { interrupt_response: options.interruptOnSpeech ?? true },
       tools: toolSettings(options.tools ?? []),
     };
+    if (options.truncation !== undefined)
+      settings.truncation = truncationSettings(options.truncation);
     if (options.turnDetection !== undefined) {
       const detection = options.turnDetection;
       if (

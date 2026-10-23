@@ -48,8 +48,24 @@ fn tool_settings(definitions: &[ToolDefinition]) -> Result<Vec<Value>, Error> {
     Ok(tools)
 }
 
+pub(super) fn truncation(value: &Truncation) -> Result<Value, Error> {
+    match value {
+        Truncation::Auto => Ok(json!("auto")),
+        Truncation::Disabled => Ok(json!("disabled")),
+        Truncation::RetentionRatio(r) if *r > 0.0 && *r <= 1.0 => {
+            Ok(json!({"type":"retention_ratio", "retention_ratio":r}))
+        }
+        _ => Err(Error::new(
+            ErrorKind::Input,
+            "retention ratio must be above zero and at most one",
+        )),
+    }
+}
 pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
     let mut result = json!({});
+    if let Some(value) = &o.truncation {
+        result["truncation"] = truncation(value)?;
+    }
     if let Some(value) = o.instructions {
         result["instructions"] = json!(value)
     }
@@ -115,6 +131,9 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         }
     }
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
+    if let Some(value) = &o.truncation {
+        result["truncation"] = truncation(value)?;
+    }
     if let Some(labels) = &o.response_metadata {
         result["prism_response_metadata"] = json!(labels)
     }

@@ -11,6 +11,22 @@ type TurnDetection struct {
 	EndOfTurnTimeoutMS int
 }
 
+// TruncationMode selects the history policy when the context fills.
+type TruncationMode string
+
+const (
+	TruncationAuto           TruncationMode = "auto"
+	TruncationDisabled       TruncationMode = "disabled"
+	TruncationRetentionRatio TruncationMode = "retention_ratio"
+)
+
+// Truncation keeps Ratio of available history capacity in retention-ratio mode.
+// Ratio must be above zero and at most one in that mode; otherwise it must be zero.
+type Truncation struct {
+	Mode  TruncationMode
+	Ratio float64
+}
+
 // PrismFiller selects none, text, or auto speech during a tool call.
 type PrismFiller struct {
 	Type         string `json:"type"`
@@ -27,6 +43,8 @@ type ToolDefinition struct {
 
 // RealtimeConnectOptions configure Prism independently of the parent TTS client.
 type RealtimeConnectOptions struct {
+	// Truncation is nil when omitted or not published by an older server.
+	Truncation                    *Truncation
 	Endpoint, Voice, Instructions string
 	Tools                         []ToolDefinition
 	InterruptOnSpeech             *bool // Nil means true.
@@ -91,6 +109,8 @@ func (r OutputRef) ContentIndex() uint64  { return r.contentIndex }
 // Nil fields keep their values. An empty string clears instructions; an empty,
 // non-nil Tools slice removes all tools. Tools replaces the complete list.
 type RealtimeUpdateOptions struct {
+	// Truncation is nil when omitted or not published by an older server.
+	Truncation        *Truncation
 	Instructions      *string
 	Tools             []ToolDefinition
 	Voice             *string
@@ -99,6 +119,8 @@ type RealtimeUpdateOptions struct {
 
 // SessionInfo contains the settings returned by Prism. Nil fields were not published.
 type SessionInfo struct {
+	// Truncation is nil when omitted or not published by an older server.
+	Truncation *Truncation
 	// SettingsRevision is nil when the server did not publish it.
 	SettingsRevision                             *uint64
 	SessionID, Model, Voice                      string

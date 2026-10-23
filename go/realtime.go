@@ -119,8 +119,28 @@ func rtTools(tools []ToolDefinition) ([]any, error) {
 	return ts, nil
 }
 
+func rtTruncation(value Truncation) (any, error) {
+	switch value.Mode {
+	case TruncationAuto, TruncationDisabled:
+		if value.Ratio == 0 {
+			return string(value.Mode), nil
+		}
+	case TruncationRetentionRatio:
+		if value.Ratio > 0 && value.Ratio <= 1 {
+			return rtObject{"type": "retention_ratio", "retention_ratio": value.Ratio}, nil
+		}
+	}
+	return nil, failure(ErrInput, "invalid truncation mode or ratio")
+}
 func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
 	settings := rtObject{}
+	if o.Truncation != nil {
+		value, err := rtTruncation(*o.Truncation)
+		if err != nil {
+			return nil, err
+		}
+		settings["truncation"] = value
+	}
 	for k, v := range map[string]*string{"voice": o.Voice, "instructions": o.Instructions} {
 		if v != nil {
 			if !utf8.ValidString(*v) {
@@ -216,6 +236,13 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if o.Truncation != nil {
+		value, err := rtTruncation(*o.Truncation)
+		if err != nil {
+			return "", nil, t, err
+		}
+		settings["truncation"] = value
+	}
 	if e := rtLabelsValid(o.ResponseMetadata); e != nil {
 		return "", nil, t, e
 	}
