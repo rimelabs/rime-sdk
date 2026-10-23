@@ -205,6 +205,12 @@ to request a release.
 
 ## How CI starts
 
+The `main` ruleset must require the `CI passed` check from GitHub Actions, with
+no bypass actors. This final job runs even when a dependency fails. It requires
+successful change detection and successful checks for every changed package.
+Unchanged packages may be skipped. Keep this check name stable when updating
+the workflow, and add new package jobs to its dependencies and result checks.
+
 The **Release** workflow merges the latest `main` into an open release PR branch
 before updating metadata and starting checks. This includes test and maintenance
 commits even when Release Please leaves the release notes unchanged. If the branch
