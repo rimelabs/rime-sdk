@@ -99,6 +99,17 @@ func (p *Peer) Next(kind string) Object {
 	}
 }
 
+func (p *Peer) NoRequest() {
+	p.t.Helper()
+	select {
+	case request := <-p.requests:
+		p.t.Fatalf("request sent before readiness: %v", request)
+	case <-time.After(30 * time.Millisecond):
+	case <-p.ctx.Done():
+		p.t.Fatal("peer expired while waiting for no request")
+	}
+}
+
 func Run(run func() error) <-chan error {
 	done := make(chan error, 1)
 	go func() { done <- run() }()

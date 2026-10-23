@@ -28,6 +28,7 @@ func TestBusyRequestRetriesAfterReadiness(t *testing.T) {
 			done := testpeer.Run(run)
 			request := p.Next("response.create")
 			p.Send(testpeer.Object{"type": "error", "error": testpeer.Object{"code": code, "scope": "event", "owner": testpeer.Object{"kind": "event", "event_id": request["event_id"]}}})
+			p.NoRequest()
 			p.Send(testpeer.Object{"type": "prism.typed_input.ready"})
 			retry := p.Next("response.create")
 			if retry["event_id"] == request["event_id"] {
