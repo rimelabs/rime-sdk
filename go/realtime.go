@@ -99,7 +99,13 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		}
 		ts = append(ts, v)
 	}
+	if id := o.RequestID; id != "" && (strings.TrimSpace(id) == "" || strings.IndexFunc(id, func(r rune) bool { return r < 0x20 || r > 0x7e }) >= 0) {
+		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
+	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if o.ResponseMetadata != nil {
+		settings["prism_response_metadata"] = o.ResponseMetadata
+	}
 	for k, v := range map[string]string{"voice": o.Voice, "instructions": o.Instructions} {
 		if v != "" {
 			if !utf8.ValidString(v) || strings.TrimSpace(v) == "" {
@@ -148,7 +154,7 @@ func (r *RealtimeService) Connect(ctx context.Context, options RealtimeConnectOp
 	r.client.realtimeSessions[s] = struct{}{}
 	key := r.client.key
 	r.client.mu.Unlock()
-	go s.run(address, key, settings)
+	go s.run(address, key, options.RequestID, settings)
 	return s.awaitInitialization(ctx)
 }
 

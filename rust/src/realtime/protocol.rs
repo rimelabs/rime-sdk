@@ -50,6 +50,17 @@ fn integer(v: &Value) -> Result<u64, Error> {
         .map(|n| n as u64)
         .ok_or_else(|| invalid("integer"))
 }
+/// The client's own labels in `metadata`: string values under keys without
+/// Prism's `prism_` prefix.
+fn labels(metadata: &Value) -> Labels {
+    metadata
+        .as_object()
+        .into_iter()
+        .flatten()
+        .filter(|(k, _)| !k.starts_with("prism_"))
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+        .collect()
+}
 fn enumeration(s: String, known: &[&str]) -> String {
     if known.contains(&s.as_str()) {
         s
@@ -68,9 +79,15 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
         tool_continuation_timeout_s: None,
         eagerness: None,
         end_of_turn_timeout_ms: None,
+        request_id: optional(&v["request_id"])?,
+        response_metadata: None,
     };
     if let Some(v) = o.get("voice") {
         s.voice = string(v)?
+    }
+    if let Some(v) = o.get("prism_response_metadata") {
+        object(v)?;
+        s.response_metadata = Some(labels(v))
     }
     if let Some(v) = o.get("prism_effective_interrupt_response") {
         s.interrupt_on_speech = v.as_bool().ok_or_else(|| invalid("interrupt"))?
@@ -299,11 +316,19 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                 } else {
                     Some(reference(&m["prism_parent_response_id"])?)
                 };
+                let input_item_id = optional(&m["prism_input_item_id"])?;
+                let input_item_ids = match &m["prism_input_item_ids"] {
+                    Value::Null => input_item_id.iter().cloned().collect(),
+                    Value::Array(a) => a.iter().map(id).collect::<Result<_, _>>()?,
+                    _ => return Err(invalid("prism_input_item_ids")),
+                };
                 w.payload = Some(ResponseStarted {
                     response,
                     cause,
                     parent,
-                    input_item_id: optional(&m["prism_input_item_id"])?,
+                    input_item_id,
+                    metadata: labels(m),
+                    input_item_ids,
                 });
             } else {
                 w.kind = "response.ended".into();

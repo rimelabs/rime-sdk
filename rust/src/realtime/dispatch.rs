@@ -31,6 +31,7 @@ impl Worker {
                     .insert(c.target.clone(), c.digest);
             }
             Kind::Clear => self.converter = None,
+            Kind::Labels => answer.labels = e.info.and_then(|info| info.response_metadata),
             Kind::Update => {
                 let mut info = e.info.ok_or_else(|| failure("missing session view"))?;
                 info.session_id = self.id.clone();

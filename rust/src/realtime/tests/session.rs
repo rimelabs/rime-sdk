@@ -126,3 +126,37 @@ async fn cancelled_tool_wait_keeps_acknowledgment_and_continuation() {
     );
     c.close().await;
 }
+
+#[tokio::test]
+async fn request_id_and_response_metadata() {
+    use crate::realtime::{Labels, RealtimeConnectOptions};
+    let mut p = Peer::new().await;
+    let labels = |step: &str| Labels::from([("step".into(), step.into())]);
+    let (c, s) = p
+        .setup_with(
+            RealtimeConnectOptions::default()
+                .request_id("client-7")
+                .response_metadata(labels("1")),
+        )
+        .await;
+    assert_eq!(p.request_id().as_deref(), Some("client-7"));
+    assert_eq!(
+        p.update().await["prism_response_metadata"],
+        json!({"step": "1"})
+    );
+    let info = s.info();
+    assert_eq!(info.request_id.as_deref(), Some("client-7"));
+    assert_eq!(info.response_metadata, Some(labels("1")));
+    s.set_response_metadata(labels("2")).await.unwrap();
+    assert_eq!(
+        p.update().await,
+        json!({"prism_response_metadata": {"step": "2"}})
+    );
+    assert_eq!(s.info().response_metadata, Some(labels("2")));
+    c.close().await;
+    let other = Peer::new().await;
+    let (c, s) = other.setup().await;
+    assert_eq!(other.request_id(), None);
+    assert_eq!(s.info().request_id.as_deref(), Some("server-made"));
+    c.close().await;
+}

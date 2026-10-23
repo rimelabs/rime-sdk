@@ -32,6 +32,14 @@ type RealtimeConnectOptions struct {
 	InterruptOnSpeech             *bool // Nil means true.
 	TurnDetection                 TurnDetection
 	Timeouts                      RealtimeTimeouts
+	// RequestID is sent as the upgrade's x-request-id. Prism keeps one of 1 to
+	// 128 printable ASCII characters and otherwise makes its own; Info reports
+	// the one it used.
+	RequestID string
+	// ResponseMetadata labels every reply, such as {"step": "3"}: at most 16,
+	// keys up to 64 characters without the prism_ prefix, values up to 512.
+	// Change them with SetResponseMetadata.
+	ResponseMetadata map[string]string
 }
 
 // ReplyOptions request a proactive reply, optionally about a recorded tool result.
@@ -85,6 +93,10 @@ type SessionInfo struct {
 	ToolResultTimeoutS, ToolContinuationTimeoutS *float64
 	Eagerness                                    *string
 	EndOfTurnTimeoutMS                           *uint64
+	// RequestID is the x-request-id Prism's logs name the session by.
+	RequestID *string
+	// ResponseMetadata holds the labels replies carry, as Prism last confirmed them.
+	ResponseMetadata map[string]string
 }
 
 // RealtimeFault preserves structured service fault details. Use errors.As.
@@ -139,6 +151,10 @@ type ResponseStarted struct {
 	Cause       string
 	Parent      *ResponseRef
 	InputItemID string
+	// Metadata holds your own labels: the session's, with the request's over them.
+	Metadata map[string]string
+	// InputItemIDs names the user items the reply answers; empty when Prism names none.
+	InputItemIDs []string
 }
 type ResponseAbandoned struct{ Response ResponseRef }
 type MessageStarted struct{ Output OutputRef }

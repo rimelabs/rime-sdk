@@ -37,6 +37,7 @@ impl Transport {
     pub async fn connect(
         address: &str,
         authorization: &str,
+        request_id: Option<&str>,
         request_timeout: Duration,
         stop: CancellationToken,
     ) -> Result<Self, Error> {
@@ -51,6 +52,12 @@ impl Transport {
             h.set_sensitive(true);
             header
         });
+        if let Some(id) = request_id {
+            let id = id
+                .parse()
+                .map_err(|_| Error::new(ErrorKind::Input, "invalid request ID"))?;
+            request.headers_mut().insert("x-request-id", id);
+        }
         let config = WebSocketConfig::default()
             .max_message_size(Some(1024 * 1024))
             .max_frame_size(Some(1024 * 1024));
@@ -280,6 +287,7 @@ mod shutdown_tests {
         let transport = Transport::connect(
             &address,
             "Bearer test",
+            None,
             Duration::from_secs(2),
             stop.clone(),
         )

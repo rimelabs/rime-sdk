@@ -216,14 +216,16 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
                 terminal: terminal.clone(),
                 ended: false,
             }))),
-            info: protocol::decode(
-                r#"{"type":"session.created","session":{"id":"session-1"}}"#,
-                "session-1",
-            )
-            .unwrap()
-            .unwrap()
-            .info
-            .unwrap(),
+            info: Arc::new(Mutex::new(
+                protocol::decode(
+                    r#"{"type":"session.created","session":{"id":"session-1"}}"#,
+                    "session-1",
+                )
+                .unwrap()
+                .unwrap()
+                .info
+                .unwrap(),
+            )),
             budgets: RealtimeTimeouts::default(),
             done: done.clone(),
             wake: Arc::new(Notify::new()),
