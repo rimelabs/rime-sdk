@@ -18,6 +18,7 @@ def gate():
     gate = jobs["ci-passed"]
     # A new package job must also become a dependency of the required check.
     assert set(gate["needs"]) == set(jobs) - {"ci-passed"}
+    assert set(gate["needs"]) - {"changes"} == set(PACKAGES)
     assert gate["name"] == "CI passed"
     assert gate["if"] == "${{ always() }}"
     step = gate["steps"][0]
