@@ -372,8 +372,7 @@ settings.
 
 `RequestID` is sent as the upgrade's `x-request-id`. It must be nonblank
 printable ASCII, or `Connect` returns `ErrInput`. Prism uses it if it is at most 128 characters,
-else makes its own; `Info().RequestID` reports the one it used. For now, hosted
-Prism always makes its own. Include it when
+else makes its own; `Info().RequestID` reports the one it used. Include it when
 you report a problem; an event's or fault's `RequestID` names the SDK request that
 caused it instead. `ResponseMetadata` labels every reply, such as `{"step": "3"}`: up to 16
 strings, keys up to 64 characters and values up to 512, no key starting with

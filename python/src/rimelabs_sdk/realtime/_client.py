@@ -78,8 +78,7 @@ class Realtime:
 
         request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
         connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
-        makes its own; info.request_id reports the one it used. For now, hosted Prism always
-        makes its own.
+        makes its own; info.request_id reports the one it used.
         """
         self._client._check_loop()
         self._client._check_open()

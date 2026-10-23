@@ -364,7 +364,7 @@ published.
 `request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
 printable ASCII, or `connect` returns an input error. Prism uses it if it is at most 128
 characters, else makes its own; `info().request_id` reports the one it used.
-For now, hosted Prism always makes its own. Include it when you report a problem; an event's or fault's `request_id` names
+Include it when you report a problem; an event's or fault's `request_id` names
 the SDK request that caused it instead. `response_metadata` labels every reply, such as
 `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512,
 no key starting with `prism_`. Prism refuses labels that break these rules with a
