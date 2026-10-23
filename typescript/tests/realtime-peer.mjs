@@ -30,6 +30,7 @@ export class Peer {
   invalid = [];
   settings = null;
   sessionFields = {};
+  echoResponseMetadata = true;
   autoInitialize = true;
   autoCreate = true;
   onRequest = null;
@@ -64,7 +65,8 @@ export class Peer {
                   result_timeout_s: 20,
                   continuation_timeout_s: 5,
                 },
-                ...(event.session.prism_response_metadata === undefined
+                ...(event.session.prism_response_metadata === undefined ||
+                !this.echoResponseMetadata
                   ? {}
                   : {
                       prism_response_metadata:

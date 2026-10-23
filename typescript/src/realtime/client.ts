@@ -213,9 +213,11 @@ export class Realtime {
     const requestId = options.requestId;
     if (
       requestId !== undefined &&
-      (typeof requestId !== "string" || !requestId.trim())
+      (typeof requestId !== "string" ||
+        !requestId.trim() ||
+        !/^[\x20-\x7e]+$/.test(requestId))
     )
-      throw new RimeInputError("requestId must be nonblank");
+      throw new RimeInputError("requestId must be nonblank printable ASCII");
     for (const name of ["voice", "instructions"] as const) {
       const value = options[name];
       if (value !== undefined && value !== null) {

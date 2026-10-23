@@ -607,7 +607,7 @@ export class RealtimeSession {
       );
       this.sessionInfo = Object.freeze({
         ...this.info,
-        responseMetadata: event.session.responseMetadata ?? labels,
+        responseMetadata: event.session.responseMetadata,
       });
     });
   }

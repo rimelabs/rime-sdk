@@ -72,8 +72,8 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
    * reports the one it used. */
   readonly requestId?: string;
   /** Labels every reply's `response.started` carries in `metadata`, such as
-   * `{ step: "3" }`; change them with `session.setResponseMetadata`. Keys
-   * starting with `prism_` are Prism's and are refused. */
+   * `{ step: "3" }`; change them with `session.setResponseMetadata`. Prism
+   * refuses keys starting with `prism_`. */
   readonly responseMetadata?: JsonObject;
 }
 export interface ReplyOptions extends RealtimeOperationOptions {

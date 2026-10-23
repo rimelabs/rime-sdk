@@ -272,7 +272,7 @@ async def test_request_id_on_the_upgrade_and_the_one_prism_used(monkeypatch, req
         assert session.info.request_id == used
 
 
-@pytest.mark.parametrize("value", [123, "", "  "])
+@pytest.mark.parametrize("value", [123, "", "  ", "line\nbreak", "é"])
 async def test_invalid_request_id_does_not_open_connection(monkeypatch, value):
     async def connect(*args, **kwargs):
         pytest.fail("Invalid settings must fail before opening a socket")
@@ -287,6 +287,8 @@ async def test_invalid_request_id_does_not_open_connection(monkeypatch, value):
 class _LabelPeer(Peer):
     """Echoes the labels an update names, as Prism does."""
 
+    echo = True
+
     async def send(self, raw):
         event = json.loads(raw)
         if event["type"] != "session.update":
@@ -294,7 +296,7 @@ class _LabelPeer(Peer):
         _VALIDATORS[event["type"]].validate(event)
         self.settings = event["session"]
         session = {"id": "session-1", "voice": "test"}
-        if "prism_response_metadata" in event["session"]:
+        if self.echo and "prism_response_metadata" in event["session"]:
             session["prism_response_metadata"] = event["session"]["prism_response_metadata"]
         self.emit("session.updated", prism_request_event_id=event["event_id"], session=session)
 
@@ -317,6 +319,10 @@ async def test_response_metadata_is_set_changed_and_shown(monkeypatch):
         await session.set_response_metadata(second)
         assert peer.settings == {"prism_response_metadata": second}
         assert session.info.response_metadata == second
+        # A server that does not confirm the labels leaves none shown.
+        peer.echo = False
+        await session.set_response_metadata({"step": "3"})
+        assert session.info.response_metadata is None
 
 
 @pytest.mark.parametrize("value", [[], "step", {"step": float("nan")}])

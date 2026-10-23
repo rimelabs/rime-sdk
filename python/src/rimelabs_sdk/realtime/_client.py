@@ -128,8 +128,12 @@ class Realtime:
                 )
         if response_metadata is not None:
             settings["prism_response_metadata"] = _response_metadata(response_metadata)
-        if request_id is not None and (not isinstance(request_id, str) or not request_id.strip()):
-            raise RimeInputError("request_id must be nonblank")
+        if request_id is not None and (
+            not isinstance(request_id, str)
+            or not request_id.strip()
+            or not all(" " <= character <= "~" for character in request_id)
+        ):
+            raise RimeInputError("request_id must be nonblank printable ASCII")
         for name, value in (("voice", voice), ("instructions", instructions)):
             if value is not None:
                 if not isinstance(value, str) or not value.strip():

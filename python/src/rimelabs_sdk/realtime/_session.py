@@ -481,9 +481,7 @@ class RealtimeSession:
         event = await self._request(p.UPDATE, {"session": {"prism_response_metadata": labels}})
         self._info = replace(
             self.info,
-            response_metadata=event.session.response_metadata
-            if event.session.response_metadata is not None
-            else labels,
+            response_metadata=event.session.response_metadata,
         )
 
     async def clear_audio(self) -> None:

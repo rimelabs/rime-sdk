@@ -324,7 +324,7 @@ test("invalid request ids fail before opening a socket", async (t) => {
   t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
   const client = new Rime({ apiKey: "test" });
   t.after(() => client.close());
-  for (const requestId of [123, "", "  "])
+  for (const requestId of [123, "", "  ", "line\nbreak", "é"])
     await assert.rejects(
       client.realtime.connect({ requestId }),
       RimeInputError,
@@ -350,6 +350,10 @@ test("response metadata is set on connect, changed mid-call, and shown in info",
   assert.deepEqual(peer.settings, { prism_response_metadata: second });
   assert.deepEqual(session.info.responseMetadata, second);
   assert.deepEqual(peer.invalid, []);
+  // A server that does not confirm the labels leaves none shown.
+  peer.echoResponseMetadata = false;
+  await session.setResponseMetadata({ step: "3" });
+  assert.equal(session.info.responseMetadata, null);
 });
 
 test("invalid response metadata fails before it is sent", async (t) => {
