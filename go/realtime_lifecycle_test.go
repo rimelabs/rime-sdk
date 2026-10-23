@@ -5,7 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -332,31 +336,72 @@ func TestRealtimeQueuedAudioCancellationPreservesOtherWork(t *testing.T) {
 
 func TestRealtimeActiveAudioCancellationClosesSession(t *testing.T) {
 	p := newRealtimePeerWithPause(t, true)
-	_, s := p.setup(t)
-	// Fill the local socket buffers while the peer deliberately does not read.
-	// Completed chunks are known outcomes. Cancel the first chunk still in flight.
-	for i := 0; i < 128; i++ {
-		ctx, cancel := context.WithCancel(context.Background())
-		done := make(chan error, 1)
-		go func() { done <- s.SendAudio(ctx, AudioChunk{Data: make([]byte, 192000)}) }()
-		select {
-		case err := <-done:
-			cancel()
-			if err != nil {
-				t.Fatal(err)
-			}
-		case <-time.After(100 * time.Millisecond):
-			cancel()
-			if err := <-done; !errors.Is(err, context.Canceled) {
-				t.Fatal(err)
-			}
-			receive, cancelReceive := context.WithTimeout(context.Background(), 500*time.Millisecond)
-			defer cancelReceive()
-			if _, err := s.Recv(receive); !errors.Is(err, ErrStream) {
-				t.Fatalf("active cancellation did not fail the session: %v", err)
-			}
-			return
+	connections := make(chan *realtimeAudioWriteConn, 1)
+	transport := &http.Transport{DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+		conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
+		if err != nil {
+			return nil, err
 		}
+		controlled := &realtimeAudioWriteConn{Conn: conn, started: make(chan struct{}), closed: make(chan struct{})}
+		connections <- controlled
+		return controlled, nil
+	}}
+	t.Cleanup(transport.CloseIdleConnections)
+	// The write deadline must outlast the test: only cancellation should close it.
+	_, s := p.setupWithTransport(t, RealtimeConnectOptions{Timeouts: RealtimeTimeouts{Request: time.Minute}}, transport)
+	conn := <-connections
+	// Initialization uses the real socket. Hold the next write until cancellation
+	// closes it, so the test observes transport entry without filling OS buffers.
+	conn.hold.Store(true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	wait, stop := context.WithTimeout(context.Background(), 5*time.Second)
+	defer stop()
+	done := make(chan error, 1)
+	go func() { done <- s.SendAudio(ctx, AudioChunk{Data: make([]byte, 2560)}) }()
+	select {
+	case <-conn.started:
+	case err := <-done:
+		t.Fatalf("audio returned before transport entry: %v", err)
+	case <-wait.Done():
+		t.Fatal("audio did not enter the transport")
 	}
-	t.Fatal("peer did not apply socket backpressure")
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatal(err)
+		}
+	case <-wait.Done():
+		t.Fatal("audio did not return after cancellation")
+	}
+	if _, err := s.Recv(wait); !errors.Is(err, ErrStream) {
+		t.Fatalf("active cancellation did not fail the session: %v", err)
+	}
+	if _, err := s.AddMessage(wait, "user", "after cancellation"); !errors.Is(err, ErrStream) {
+		t.Fatalf("later operation lost the terminal failure: %v", err)
+	}
+}
+
+type realtimeAudioWriteConn struct {
+	net.Conn
+	hold      atomic.Bool
+	started   chan struct{}
+	closed    chan struct{}
+	startOnce sync.Once
+	closeOnce sync.Once
+}
+
+func (c *realtimeAudioWriteConn) Write(data []byte) (int, error) {
+	if c.hold.Load() {
+		c.startOnce.Do(func() { close(c.started) })
+		<-c.closed
+		return 0, net.ErrClosed
+	}
+	return c.Conn.Write(data)
+}
+
+func (c *realtimeAudioWriteConn) Close() error {
+	c.closeOnce.Do(func() { close(c.closed) })
+	return c.Conn.Close()
 }

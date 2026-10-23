@@ -373,7 +373,7 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 	}()
 	connectionDeadline := time.Now().Add(s.timeouts.Connect)
 	connectCtx, stop := context.WithDeadline(ctx, connectionDeadline)
-	conn, err := rtDial(connectCtx, address, key, requestID)
+	conn, err := rtDial(connectCtx, address, key, requestID, s.op.client.realtimeTransport)
 	stop()
 	if err != nil {
 		terminal = err

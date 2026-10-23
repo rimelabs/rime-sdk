@@ -59,7 +59,7 @@ func TestRealtimeProxyChild(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	c, err := rtDial(ctx, "wss://sdk-audit.invalid/v1/realtime", "audit-test-key", "")
+	c, err := rtDial(ctx, "wss://sdk-audit.invalid/v1/realtime", "audit-test-key", "", nil)
 	if c != nil {
 		_ = c.CloseNow()
 	}

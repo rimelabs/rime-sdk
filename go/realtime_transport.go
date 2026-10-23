@@ -24,8 +24,8 @@ type rtWritten struct {
 	skipped bool
 }
 
-func rtDial(ctx context.Context, address, key, requestID string) (*websocket.Conn, error) {
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+func rtDial(ctx context.Context, address, key, requestID string, transport http.RoundTripper) (*websocket.Conn, error) {
+	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	header := http.Header{"Authorization": []string{"Bearer " + key}}
 	if requestID != "" {
 		header.Set("x-request-id", requestID)

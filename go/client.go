@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
@@ -66,6 +67,7 @@ type Client struct {
 	timeout            time.Duration
 	operations         map[*operation]struct{}
 	dialOptions        []grpc.DialOption // Private seam for tests with local services.
+	realtimeTransport  http.RoundTripper // Private seam for controlled WebSocket transport tests.
 	limits             streamLimits
 }
 
