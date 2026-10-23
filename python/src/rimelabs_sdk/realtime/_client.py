@@ -64,8 +64,8 @@ class Realtime:
         Use session.update to change instructions, tools, voice, or interruption.
 
         request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
-        connect raises RimeInputError. The server or gateway can replace it;
-        info.request_id reports the ID Prism actually used.
+        connect raises RimeInputError. Prism replaces IDs longer than 128 characters.
+        A gateway can replace shorter IDs too. info.request_id reports the ID Prism actually used.
         """
         self._client._check_loop()
         self._client._check_open()

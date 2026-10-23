@@ -163,7 +163,7 @@ Use `session.set_response_metadata` to replace reply labels.
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `request_id: str \| None` | No | Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK raises `RimeInputError`. A server or gateway can replace it; read `session.info.request_id` for the ID Prism actually used. |
+| `request_id: str \| None` | No | Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK raises `RimeInputError`. Prism replaces IDs longer than 128 characters. A gateway can replace shorter IDs too. Read `session.info.request_id` for the ID Prism actually used. |
 | `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 
 All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or

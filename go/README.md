@@ -435,8 +435,8 @@ a revision establishes a new known setting. Replies without a revision use the
 current acknowledged setting.
 
 `RequestID` is sent as the upgrade's `x-request-id`. It must be nonblank
-printable ASCII, or `Connect` returns `ErrInput`. Prism accepts IDs up to 128
-characters, but a server or gateway can replace them. `Info().RequestID`
+printable ASCII, or `Connect` returns `ErrInput`. Prism replaces IDs longer than
+128 characters. A gateway can replace shorter IDs too. `Info().RequestID`
 reports the ID Prism actually used. Include it when
 you report a problem; an event's or fault's `RequestID` names the SDK request that
 caused it instead. `ResponseMetadata` labels every reply, such as `{"step": "3"}`: up to 16

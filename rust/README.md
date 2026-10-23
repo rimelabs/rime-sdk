@@ -422,8 +422,8 @@ current acknowledged setting.
 `session.info()` returns an owned `SessionInfo` snapshot. All cloned session
 handles read the latest acknowledged settings.
 `request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
-printable ASCII, or `connect` returns an input error. Prism accepts IDs up to 128
-characters, but a server or gateway can replace them. `info().request_id`
+printable ASCII, or `connect` returns an input error. Prism replaces IDs longer
+than 128 characters. A gateway can replace shorter IDs too. `info().request_id`
 reports the ID Prism actually used.
 Include it when you report a problem; an event's or fault's `request_id` names
 the SDK request that caused it instead. `response_metadata` labels every reply, such as
