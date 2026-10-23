@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.11](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.10...go/v0.1.0-alpha.11) (2026-10-23)
+
+
+### Features
+
+* add Prism realtime support to Rust and Go ([#96](https://github.com/rimelabs/rime-sdk/issues/96)) ([ab5a360](https://github.com/rimelabs/rime-sdk/commit/ab5a3608280b83dd8d01b343bd9aee6a4e89adf7))
+
 ## [0.1.0-alpha.10](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.9...go/v0.1.0-alpha.10) (2026-10-21)
 
 
