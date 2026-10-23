@@ -106,7 +106,18 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         d["prism_end_of_turn_timeout_ms"] = json!(n)
     }
     let tools = tool_settings(&o.tools)?;
+    if let Some(id) = &o.request_id {
+        if id.trim().is_empty() || !id.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "request ID must be nonblank printable ASCII",
+            ));
+        }
+    }
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
+    if let Some(labels) = &o.response_metadata {
+        result["prism_response_metadata"] = json!(labels)
+    }
     for (key, value) in [("voice", &o.voice), ("instructions", &o.instructions)] {
         if let Some(s) = value {
             text(s, usize::MAX)?;

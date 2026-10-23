@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -104,6 +105,18 @@ func (decoder *rtDecoder) integer(v any) uint64 {
 	}
 	return uint64(x)
 }
+
+// rtLabels keeps the client's own labels in metadata: string values under keys
+// without Prism's prism_ prefix.
+func rtLabels(metadata rtObject) map[string]string {
+	labels := map[string]string{}
+	for k, v := range metadata {
+		if s, ok := v.(string); ok && !strings.HasPrefix(k, "prism_") {
+			labels[k] = s
+		}
+	}
+	return labels
+}
 func rtEnum(s string, values ...string) string {
 	for _, v := range values {
 		if s == v {
@@ -117,6 +130,13 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 	s := SessionInfo{SessionID: decoder.id(o["id"]), Model: "prism", InterruptOnSpeech: true}
 	if v, ok := o["voice"]; ok {
 		s.Voice = decoder.string(v)
+	}
+	if v := o["request_id"]; v != nil {
+		x := decoder.string(v)
+		s.RequestID = &x
+	}
+	if v, ok := o["prism_response_metadata"]; ok {
+		s.ResponseMetadata = rtLabels(decoder.object(v))
 	}
 	if v, ok := o["prism_effective_interrupt_response"]; ok {
 		b, ok := v.(bool)
@@ -301,7 +321,20 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 				r := ref(id)
 				parent = &r
 			}
-			w.payload = ResponseStarted{Response: r, Cause: cause, Parent: parent, InputItemID: decoder.optional(m["prism_input_item_id"]), SettingsRevision: decoder.revision(d)}
+			input := decoder.optional(m["prism_input_item_id"])
+			inputs := []string{}
+			if v := d["prism_input_item_ids"]; v != nil {
+				a, ok := v.([]any)
+				if !ok {
+					decoder.bad("prism_input_item_ids")
+				}
+				for _, v := range a {
+					inputs = append(inputs, decoder.id(v))
+				}
+			} else if input != "" {
+				inputs = append(inputs, input)
+			}
+			w.payload = ResponseStarted{Response: r, Cause: cause, Parent: parent, InputItemID: input, Metadata: rtLabels(m), InputItemIDs: inputs, SettingsRevision: decoder.revision(d)}
 		} else {
 			w.kind = "response.ended"
 			details := rtObject{}

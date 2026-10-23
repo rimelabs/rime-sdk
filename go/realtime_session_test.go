@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"reflect"
 	"testing"
 )
 
@@ -97,4 +98,48 @@ func TestRealtimeToolContinuationAndLateAcknowledgment(t *testing.T) {
 	if e := s.SubmitToolResult(context.Background(), call, "changed"); !errors.Is(e, ErrInput) {
 		t.Fatal(e)
 	}
+}
+
+func TestRealtimeRequestIDAndResponseMetadata(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setupWith(t, RealtimeConnectOptions{RequestID: "client-7", ResponseMetadata: map[string]string{"step": "1"}})
+	if p.requestID != "client-7" {
+		t.Fatalf("x-request-id %q", p.requestID)
+	}
+	if got := p.update()["prism_response_metadata"]; !reflect.DeepEqual(got, map[string]any{"step": "1"}) {
+		t.Fatalf("initial labels %v", got)
+	}
+	if info := s.Info(); info.RequestID == nil || *info.RequestID != "client-7" || !reflect.DeepEqual(info.ResponseMetadata, map[string]string{"step": "1"}) {
+		t.Fatalf("info %+v", info)
+	}
+	if e := s.SetResponseMetadata(context.Background(), map[string]string{"step": "2"}); e != nil {
+		t.Fatal(e)
+	}
+	if got := p.update(); !reflect.DeepEqual(got, rtObject{"prism_response_metadata": map[string]any{"step": "2"}}) {
+		t.Fatalf("update %v", got)
+	}
+	if got := s.Info().ResponseMetadata; !reflect.DeepEqual(got, map[string]string{"step": "2"}) {
+		t.Fatalf("labels %v", got)
+	}
+	other := newRealtimePeer(t)
+	if _, s = other.setup(t); other.requestID != "" || *s.Info().RequestID != "server-made" {
+		t.Fatalf("x-request-id %q, info %+v", other.requestID, s.Info())
+	}
+}
+
+func TestRealtimeRefusedLabelsFailOnlyTheCall(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setupWith(t, RealtimeConnectOptions{ResponseMetadata: map[string]string{"step": "1"}})
+	p.refuse.Store(true)
+	var fault *RealtimeFault
+	if e := s.SetResponseMetadata(context.Background(), map[string]string{"step": "2"}); !errors.As(e, &fault) || fault.Code != "invalid_session" {
+		t.Fatalf("refusal %v", e)
+	}
+	if got := s.Info().ResponseMetadata; !reflect.DeepEqual(got, map[string]string{"step": "1"}) {
+		t.Fatalf("labels %v", got)
+	}
+	if e := s.SetResponseMetadata(context.Background(), map[string]string{"\xff": "x"}); !errors.Is(e, ErrInput) {
+		t.Fatalf("invalid UTF-8 %v", e)
+	}
+	p.turn(s, "reply-1")
 }

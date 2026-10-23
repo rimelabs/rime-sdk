@@ -5,6 +5,10 @@ import { normalizeFault } from "./faults.js";
 
 export type JsonValue =
   null | boolean | number | string | JsonValue[] | JsonObject;
+/** Your labels for replies, keys to strings, such as `{ step: "3" }`. Prism
+ * takes at most 16, keys up to 64 characters and values up to 512, and
+ * refuses keys starting with `prism_`. */
+export type Labels = Readonly<Record<string, string>>;
 export interface JsonObject {
   [key: string]: JsonValue;
 }
@@ -67,6 +71,15 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly interruptOnSpeech?: boolean;
   readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
+  /** Sent as the upgrade's `x-request-id`. It must be nonblank printable ASCII, or
+   * `connect` throws `RimeInputError`. Prism uses it if it is at most 128
+   * characters, else makes its own; `info.requestId` reports the one it used.
+   * Omitted or `null` sends none. */
+  readonly requestId?: string | null;
+  /** Labels every reply's `response.started` carries in `metadata`, such as
+   * `{ step: "3" }`; change them with `session.setResponseMetadata`. Prism
+   * refuses keys starting with `prism_`. Omitted or `null` sets none. */
+  readonly responseMetadata?: Labels | null;
 }
 /** Omitted fields keep their values. Empty instructions or tools clear them. */
 export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
@@ -104,6 +117,12 @@ export interface SessionInfo {
   /** Settings revision published by the server; null when unavailable. */
   readonly settingsRevision?: number | null;
   readonly sessionId: string;
+  /** The `x-request-id` Prism's logs name this session by. Null when the
+   * server does not publish it. */
+  readonly requestId: string | null;
+  /** The labels replies carry, as Prism last confirmed them. Null when the
+   * server does not publish them. */
+  readonly responseMetadata: Labels | null;
   readonly model: "prism";
   readonly voice: string;
   readonly interruptOnSpeech: boolean;
@@ -210,6 +229,12 @@ export interface ResponseStarted {
   readonly cause: "speech" | "text" | "proactive" | "tools" | "unknown";
   readonly parent: ResponseRef | null;
   readonly inputItemId: string | null;
+  /** The session's labels when the reply began. Prism's `prism_` keys are
+   * left out. */
+  readonly metadata: Labels;
+  /** The user items the reply answers: a spoken reply's committed turns, or
+   * a typed turn's item. Empty when the server names none. */
+  readonly inputItemIds: readonly string[];
 }
 export interface MessageStarted {
   readonly kind: "message.started";

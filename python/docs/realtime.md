@@ -151,6 +151,7 @@ keeps tool execution outside the runner.
 Use `async with client.realtime.connect() as session` with `RIME_API_KEY` set.
 The context opens the WebSocket, initializes the session, and closes it on exit.
 Use `session.update` to change instructions, tools, voice, or interruption.
+Use `session.set_response_metadata` to replace reply labels.
 
 | Argument | Required? | Default and behavior |
 | --- | --- | --- |
@@ -162,13 +163,19 @@ Use `session.update` to change instructions, tools, voice, or interruption.
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
+| `request_id: str \| None` | No | Your id for the session. Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK raises `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 
 All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or
 `RIME_API_KEY`, sent as `Authorization: Bearer <key>`. The endpoint must accept
 that handshake. TTS model, endpoint, voice, and timeout settings do not apply.
 
 Once connected, `session.info` gives the session ID, voice, model, effective
-interruption setting, turn timing, and any published tool wait durations. Check
+interruption setting, turn timing, reply labels (`response_metadata`), and any
+published tool wait durations.
+`session.info.request_id` is the id Prism's logs use; include it when you report
+a problem. It is `None` on servers that do not send it. An event's or error's
+`request_id` names the SDK request that caused it instead. Check
 `session.info.interrupt_on_speech` for the setting the server actually applied.
 Prism sessions always request both text and audio output.
 
@@ -260,6 +267,7 @@ Each method is async. Arguments without a default are required.
 | `continue_reply(parent)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
 | `cancel(response)` | Request that generation stop. | `None` when the response is terminal |
 | `clear_audio()` | Clear buffered input and reset audio conversion. | `None` after acknowledgment |
+| `set_response_metadata(metadata)` | Replace the labels for later replies. | `None` once Prism confirms |
 | `report_playback(report)` | Report interrupted or finished playback. | `None` |
 | `close()` | Close the session and release its resources. | `None`; safe to repeat |
 
@@ -371,7 +379,7 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |
 | `TranscriptFailed` | `item_id`, `error` |
-| `ResponseStarted` | `response`, `cause`; optional `parent` and `input_item_id` |
+| `ResponseStarted` | `response`, `cause`; optional `parent` and `input_item_id`; `input_item_ids` (the user items it answers); `metadata` (your own keys) |
 | `MessageStarted` | `output` |
 | `TextDelta`, `TextDone` | `output` and `delta` or `text` |
 | `AudioDelta`, `AudioDone` | `output`; `AudioDelta` also has `audio` |

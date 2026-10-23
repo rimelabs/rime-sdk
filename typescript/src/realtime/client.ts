@@ -10,6 +10,7 @@ import { RealtimeSession } from "./session.js";
 import { RealtimeConnection } from "./transport.js";
 import type { RealtimeConnectOptions, RealtimeTimeouts } from "./types.js";
 import { toolSettings } from "./settings.js";
+import { responseMetadata } from "./protocol.js";
 import type { SessionSettings } from "./protocol.js";
 
 const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
@@ -116,6 +117,18 @@ export class Realtime {
         settings.turn_detection.prism_end_of_turn_timeout_ms = value;
       }
     }
+    if (options.responseMetadata != null)
+      settings.prism_response_metadata = responseMetadata(
+        options.responseMetadata,
+      );
+    const requestId = options.requestId ?? undefined;
+    if (
+      requestId !== undefined &&
+      (typeof requestId !== "string" ||
+        !requestId.trim() ||
+        !/^[\x20-\x7e]+$/.test(requestId))
+    )
+      throw new RimeInputError("requestId must be nonblank printable ASCII");
     for (const name of ["voice", "instructions"] as const) {
       const value = options[name];
       if (value !== undefined && value !== null) {
@@ -136,6 +149,7 @@ export class Realtime {
           socket = new RealtimeConnection(
             address,
             this.credentials.realtimeAuthorization(),
+            requestId,
           );
         } catch {
           throw new RimeUnavailableError("Realtime handshake failed");

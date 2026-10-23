@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import https from "node:https";
-import { Rime, RimeInputError, RimeUnavailableError } from "../dist/index.js";
+import {
+  Rime,
+  RimeInputError,
+  RimeRealtimeError,
+  RimeUnavailableError,
+} from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 
 for (const filler of [
@@ -298,3 +303,123 @@ for (const eagerness of [undefined, "future"]) {
     });
   });
 }
+
+for (const [requestId, used] of [
+  ["client-7", "client-7"],
+  [undefined, "server-made"],
+]) {
+  test(`request id on the upgrade, and the one Prism used: ${requestId}`, async (t) => {
+    const peer = await new Peer().start();
+    peer.sessionFields = { request_id: used };
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await peer.close();
+    });
+    const session = await client.realtime.connect({
+      endpoint: peer.endpoint,
+      requestId,
+    });
+    assert.equal(peer.requestId, requestId);
+    assert.equal(session.info.requestId, used);
+  });
+}
+
+test("invalid request ids fail before opening a socket", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const requestId of [123, "", "  ", "line\nbreak", "é"])
+    await assert.rejects(
+      client.realtime.connect({ requestId }),
+      RimeInputError,
+    );
+});
+
+test("response metadata is set on connect, changed mid-call, and shown in info", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  const first = { scenario: "refund", step: "1" };
+  const session = await client.realtime.connect({
+    endpoint: peer.endpoint,
+    responseMetadata: first,
+  });
+  assert.deepEqual(peer.settings.prism_response_metadata, first);
+  assert.deepEqual(session.info.responseMetadata, first);
+  const second = { scenario: "refund", step: "2" };
+  await session.setResponseMetadata(second);
+  assert.deepEqual(peer.settings, { prism_response_metadata: second });
+  assert.deepEqual(session.info.responseMetadata, second);
+  assert.deepEqual(peer.invalid, []);
+  // A server that does not confirm the labels leaves none shown.
+  peer.echoResponseMetadata = false;
+  await session.setResponseMetadata({ step: "3" });
+  assert.equal(session.info.responseMetadata, null);
+});
+
+test("invalid response metadata fails before it is sent", async (t) => {
+  t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
+  const client = new Rime({ apiKey: "test" });
+  t.after(() => client.close());
+  for (const responseMetadata of [
+    [],
+    "step",
+    { step: 3 },
+    new Map([["step", "1"]]),
+  ])
+    await assert.rejects(
+      client.realtime.connect({ responseMetadata }),
+      RimeInputError,
+    );
+  const peer = await new Peer().start();
+  t.after(() => peer.close());
+  const session = await client.realtime.connect({ endpoint: peer.endpoint });
+  const sent = peer.requests.length;
+  await assert.rejects(session.setResponseMetadata([]), RimeInputError);
+  assert.equal(peer.requests.length, sent);
+});
+
+test("null request id and labels are omitted", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  await client.realtime.connect({
+    endpoint: peer.endpoint,
+    requestId: null,
+    responseMetadata: null,
+  });
+  assert.equal(peer.requestId, undefined);
+  assert.equal("prism_response_metadata" in peer.settings, false);
+});
+
+test("a refused label change fails with invalid_session and keeps the labels", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  const session = await client.realtime.connect({
+    endpoint: peer.endpoint,
+    responseMetadata: { step: "1" },
+  });
+  peer.autoInitialize = false;
+  peer.onRequest = (event) => peer.fault(event, "invalid_session");
+  await assert.rejects(
+    session.setResponseMetadata({ step: "2" }),
+    (error) =>
+      error instanceof RimeRealtimeError &&
+      error.fault.code === "invalid_session",
+  );
+  assert.deepEqual(session.info.responseMetadata, { step: "1" });
+  peer.autoInitialize = true;
+  await session.setResponseMetadata({ step: "3" });
+  assert.deepEqual(session.info.responseMetadata, { step: "3" });
+});

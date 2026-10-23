@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -167,6 +168,11 @@ func cloneSessionInfo(info SessionInfo) SessionInfo {
 		x := *v.ToolContinuationTimeoutS
 		v.ToolContinuationTimeoutS = &x
 	}
+	if v.RequestID != nil {
+		x := *v.RequestID
+		v.RequestID = &x
+	}
+	v.ResponseMetadata = maps.Clone(v.ResponseMetadata)
 	return v
 }
 func (s *RealtimeSession) failure() error {
@@ -349,6 +355,20 @@ func (s *RealtimeSession) Cancel(ctx context.Context, ref ResponseRef) error {
 	_, e := s.invoke(ctx, &rtCommand{kind: "cancel", ref: ref, body: rtObject{"response_id": ref.responseID}})
 	return e
 }
+
+// SetResponseMetadata replaces the labels later replies carry; a reply already
+// started keeps its own. It returns once Prism confirms the change.
+func (s *RealtimeSession) SetResponseMetadata(ctx context.Context, labels map[string]string) error {
+	if e := rtLabelsValid(labels); e != nil {
+		return e
+	}
+	labels = maps.Clone(labels)
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	_, e := s.invoke(ctx, &rtCommand{kind: "labels", body: rtObject{"session": rtObject{"prism_response_metadata": labels}}})
+	return e
+}
 func (s *RealtimeSession) ClearAudio(ctx context.Context) error {
 	_, e := s.invoke(ctx, &rtCommand{kind: "clear", body: rtObject{}})
 	return e
@@ -395,7 +415,7 @@ func (s *RealtimeSession) ReportPlayback(ctx context.Context, report PlaybackRep
 	_, e := s.invoke(ctx, c)
 	return e
 }
-func (s *RealtimeSession) run(address, key string, settings rtObject) {
+func (s *RealtimeSession) run(address, key, requestID string, settings rtObject) {
 	var terminal error
 	var socketDone sync.WaitGroup
 	ctx, cancel := context.WithCancel(s.op.ctx)
@@ -418,7 +438,7 @@ func (s *RealtimeSession) run(address, key string, settings rtObject) {
 	}()
 	connectionDeadline := time.Now().Add(s.timeouts.Connect)
 	connectCtx, stop := context.WithDeadline(ctx, connectionDeadline)
-	conn, err := rtDial(connectCtx, address, key)
+	conn, err := rtDial(connectCtx, address, key, requestID)
 	stop()
 	if err != nil {
 		terminal = err
@@ -765,7 +785,7 @@ func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 	case "history":
 		wire = "conversation.item.create"
 		c.expected = "item.created"
-	case "update":
+	case "update", "labels":
 		wire = "session.update"
 		c.expected = "session.updated"
 	case "clear":
@@ -828,7 +848,7 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 			}
 		}
 	}
-	if c.kind == "update" {
+	if c.kind == "update" || c.kind == "labels" {
 		result.info = cloneSessionInfo(e.info)
 		if !w.initialized {
 			w.initialized = true
@@ -1015,7 +1035,7 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		}
 	}
 	for _, c := range matched {
-		if c.kind == "update" {
+		if c.kind == "update" || c.kind == "labels" {
 			w.applySessionInfo(c, e)
 		}
 		c.ack = e

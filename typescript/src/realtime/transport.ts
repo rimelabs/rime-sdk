@@ -18,9 +18,12 @@ export class RealtimeConnection {
   onMessage: (raw: string) => void = () => {};
   onFailure: (error: RimeError) => void = () => {};
 
-  constructor(endpoint: string, authorization: string) {
+  constructor(endpoint: string, authorization: string, requestId?: string) {
     this.socket = new WebSocket(endpoint, {
-      headers: { Authorization: authorization },
+      headers: {
+        Authorization: authorization,
+        ...(requestId === undefined ? {} : { "x-request-id": requestId }),
+      },
       followRedirects: false,
       perMessageDeflate: false,
       maxPayload: 1024 * 1024,

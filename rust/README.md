@@ -410,9 +410,17 @@ session retains at most 128 interruption policy changes; updates that keep the
 same policy do not consume history. A reply that refers to an evicted policy
 ends the session with `ErrorKind::ResourceLimit`, rather than guessing its policy.
 
-`session.info()` now returns an owned `SessionInfo` snapshot instead of
-`&SessionInfo`. All cloned session handles read the latest acknowledged settings.
-Code that needs a reference can borrow a local snapshot with `&info`.
+`session.info()` returns an owned `SessionInfo` snapshot. All cloned session
+handles read the latest acknowledged settings.
+`request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
+printable ASCII, or `connect` returns an input error. Prism uses it if it is at most 128
+characters, else makes its own; `info().request_id` reports the one it used.
+Include it when you report a problem; an event's or fault's `request_id` names
+the SDK request that caused it instead. `response_metadata` labels every reply, such as
+`{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512,
+no key starting with `prism_`. Prism refuses labels that break these rules with a
+realtime fault whose code is `invalid_session`. `set_response_metadata` replaces these labels. `ResponseStarted`'s `metadata`
+carries them, and its `input_item_ids` names the user items a reply answers.
 
 | Session method | Behavior |
 | --- | --- |
@@ -423,6 +431,7 @@ Code that needs a reference can borrow a local snapshot with `&info`.
 | `submit_tool_result` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `continue_reply` | Wait for the latest tool response and all its results, then request continuation. |
 | `cancel` | Cancel a retained response. |
+| `set_response_metadata` | Replace the labels for later replies once Prism confirms. |
 | `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |
 | `report_playback` | Report measured device playback completion or interruption. |
 | `events` | Take the single owned `Stream<Item = Result<SessionEvent, Error>>`. |

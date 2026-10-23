@@ -172,6 +172,7 @@ enum Kind {
     Truncate,
     Drain,
     Update,
+    Labels,
 }
 struct Command {
     epoch: u64,
@@ -322,6 +323,7 @@ pub(super) async fn connect(
             .run(
                 &options.endpoint,
                 &authorization,
+                options.request_id.as_deref(),
                 settings,
                 stop.clone(),
                 notify,
@@ -524,6 +526,15 @@ impl RealtimeSession {
     pub async fn cancel(&self, reference: &ResponseRef) -> Result<(), Error> {
         let mut c = Command::new(Kind::Cancel, json!({"response_id":reference.response_id}));
         c.reference = Some(reference.clone());
+        self.invoke(c).await.map(|_| ())
+    }
+    /// Replace the labels later replies carry; a reply already started keeps
+    /// its own. Returns once Prism confirms the change.
+    pub async fn set_response_metadata(&self, labels: Labels) -> Result<(), Error> {
+        let c = Command::new(
+            Kind::Labels,
+            json!({"session": {"prism_response_metadata": labels}}),
+        );
         self.invoke(c).await.map(|_| ())
     }
     /// Clear input audio and reset its converter after acknowledgment.

@@ -10,7 +10,7 @@ import (
 
 func rtAcknowledgeUpdate(p *realtimePeer, q rtObject, revision uint64) {
 	p.send(rtObject{"type": "session.updated", "prism_request_event_id": q["event_id"],
-		"session": rtObject{"id": "session-1", "voice": "astra", "prism_effective_interrupt_response": false, "prism_settings_revision": revision}})
+		"session": rtObject{"id": "session-1", "voice": "astra", "request_id": "trace-update", "prism_response_metadata": rtObject{"step": "billing"}, "prism_effective_interrupt_response": false, "prism_settings_revision": revision}})
 }
 
 func TestRealtimePartialUpdateAndClearing(t *testing.T) {
@@ -38,6 +38,9 @@ func TestRealtimePartialUpdateAndClearing(t *testing.T) {
 	rtWait(t, done)
 	info := <-results
 	if info.SettingsRevision == nil || *info.SettingsRevision != 2 || info.Voice != "astra" || info.InterruptOnSpeech {
+		t.Fatal(info)
+	}
+	if info.RequestID == nil || *info.RequestID != "trace-update" || info.ResponseMetadata["step"] != "billing" {
 		t.Fatal(info)
 	}
 	*info.SettingsRevision = 99
@@ -163,5 +166,17 @@ func TestRealtimeUpdatePreservesToolRoundAndReplyRevision(t *testing.T) {
 	rtWait(t, done)
 	if started := rtRecv(t, s).Payload.(ResponseStarted); started.SettingsRevision == nil || *started.SettingsRevision != 2 {
 		t.Fatal(started)
+	}
+}
+
+func TestRealtimeReplyLabelsKeepSettingsRevision(t *testing.T) {
+	p := newRealtimePeerWithSession(t, false, rtObject{"id": "session-1", "voice": "test", "prism_settings_revision": uint64(2), "prism_effective_interrupt_response": false})
+	_, s := p.setup(t)
+	if err := s.SetResponseMetadata(context.Background(), map[string]string{"step": "billing"}); err != nil {
+		t.Fatal(err)
+	}
+	info := s.Info()
+	if info.SettingsRevision == nil || *info.SettingsRevision != 2 || info.InterruptOnSpeech || info.ResponseMetadata["step"] != "billing" {
+		t.Fatal(info)
 	}
 }

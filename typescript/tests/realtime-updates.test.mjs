@@ -20,6 +20,8 @@ function acknowledge(peer, request, revision, voice = "astra") {
     session: {
       id: "session-1",
       voice,
+      request_id: "trace-update",
+      prism_response_metadata: { step: "billing" },
       prism_effective_interrupt_response: false,
       prism_settings_revision: revision,
     },
@@ -56,6 +58,8 @@ test("partial updates and clearing work without turn readiness", async (t) => {
   assert.equal(info, session.info);
   assert.equal(info.settingsRevision, 2);
   assert.equal(info.voice, "astra");
+  assert.equal(info.requestId, "trace-update");
+  assert.deepEqual(info.responseMetadata, { step: "billing" });
   assert.equal(original.voice, "test");
   const cleared = session.update({
     instructions: "",
@@ -172,4 +176,16 @@ test("updates preserve tool calls and each response's revision", async (t) => {
   await next;
   assert.equal((await events.next()).value.payload.settingsRevision, 2);
   await events.return();
+});
+
+test("reply label updates refresh the settings revision", async (t) => {
+  const { session, peer } = await setup(t);
+  const pending = session.setResponseMetadata({ step: "billing" });
+  const request = await peer.next("session.update");
+  acknowledge(peer, request, 2);
+  await pending;
+  assert.equal(session.info.settingsRevision, 2);
+  assert.equal(session.info.requestId, "trace-update");
+  assert.deepEqual(session.info.responseMetadata, { step: "billing" });
+  assert.equal(session.info.interruptOnSpeech, false);
 });

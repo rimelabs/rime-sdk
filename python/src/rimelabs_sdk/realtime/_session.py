@@ -510,6 +510,14 @@ class RealtimeSession:
                     p.CANCEL, {"response_id": response.response_id}, response.response_id
                 )
 
+    async def set_response_metadata(self, metadata: t.Labels) -> None:
+        """Replace the labels later replies carry; a reply already started keeps its own.
+
+        Returns once Prism confirms the change.
+        """
+        labels = p.response_metadata(metadata)
+        await self._request(p.UPDATE, {"session": {"prism_response_metadata": labels}})
+
     async def clear_audio(self) -> None:
         async with self._audio_lock, self._clear_lock:
             await self._request(p.CLEAR, {})
@@ -678,6 +686,8 @@ class RealtimeSession:
                 tool_continuation_timeout_s=view.tool_continuation_timeout_s,
                 turn_detection=view.turn_detection,
                 settings_revision=view.settings_revision,
+                request_id=view.request_id,
+                response_metadata=view.response_metadata,
             )
             self._interruption_policies.record(
                 view.settings_revision, self._info.interrupt_on_speech

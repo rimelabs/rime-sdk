@@ -8,6 +8,7 @@ impl Worker {
         &mut self,
         address: &str,
         key: &str,
+        request_id: Option<&str>,
         settings: Value,
         stop: CancellationToken,
         wake: Arc<Notify>,
@@ -17,7 +18,7 @@ impl Worker {
             _ = stop.cancelled() => return Ok(()),
             result = tokio::time::timeout_at(
                 connection_deadline,
-                Transport::connect(address, key, self.timeouts.request, stop.clone()),
+                Transport::connect(address, key, request_id, self.timeouts.request, stop.clone()),
             ) => result.map_err(|_| Error::new(ErrorKind::Timeout, "realtime handshake timed out"))??,
         };
         let result = self
@@ -392,7 +393,7 @@ impl Worker {
                 c.expected = "item.created";
                 "conversation.item.create"
             }
-            Kind::Update => {
+            Kind::Update | Kind::Labels => {
                 c.expected = "session.updated";
                 "session.update"
             }

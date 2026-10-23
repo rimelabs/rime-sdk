@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Generic, Literal, NoReturn, NotRequired, TypeAlias, TypedDict, TypeVar, cast
 
-from .._errors import RimeStreamError
+from .._errors import RimeInputError, RimeStreamError
 from . import _types as t
 
 
@@ -39,6 +39,16 @@ class SessionSettings(TypedDict):
     tools: list[_Tool]
     voice: NotRequired[str]
     instructions: NotRequired[str]
+    prism_response_metadata: NotRequired[t.Labels]
+
+
+def response_metadata(value: object) -> t.Labels:
+    """A copy of the client's labels for every reply: keys to strings."""
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) and isinstance(label, str) for key, label in value.items()
+    ):
+        raise RimeInputError("response_metadata must map keys to strings")
+    return dict(value)
 
 
 class SessionPatch(TypedDict, total=False):
@@ -52,6 +62,8 @@ class SessionPatch(TypedDict, total=False):
 class SessionView:
     settings_revision: int | None = None
     id: str
+    request_id: str | None
+    response_metadata: t.Labels | None
     voice: str
     interrupt_on_speech: bool | None
     tool_result_timeout_s: float | None
@@ -255,6 +267,12 @@ def _session(value: object) -> SessionView:
     return SessionView(
         settings_revision=_revision(view, "session.prism_settings_revision"),
         id=_id(view.get("id"), "session.id"),
+        request_id=_optional_string(view.get("request_id"), "session.request_id"),
+        response_metadata=_client_metadata(
+            _object(view["prism_response_metadata"], "session.prism_response_metadata")
+        )
+        if "prism_response_metadata" in view
+        else None,
         voice=_string(view.get("voice", ""), "session.voice"),
         interrupt_on_speech=interrupt,
         turn_detection=t.TurnDetectionInfo(
@@ -303,6 +321,15 @@ def _json(value: object) -> t.JsonValue:
     if isinstance(value, list):
         return [_json(item) for item in value]
     return {key: _json(item) for key, item in _object(value, "arguments").items()}
+
+
+def _client_metadata(metadata: dict[str, object]) -> t.Labels:
+    """The client's labels in metadata: its string values under keys that are not Prism's."""
+    return {
+        key: label
+        for key, label in metadata.items()
+        if not key.startswith("prism_") and isinstance(label, str)
+    }
 
 
 def _arguments(value: object) -> t.JsonObject:
@@ -428,6 +455,12 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         parent = _optional_string(
             metadata.get("prism_parent_response_id"), "prism_parent_response_id"
         )
+        input_item_id = _optional_string(metadata.get("prism_input_item_id"), "prism_input_item_id")
+        input_item_ids = response.get("prism_input_item_ids")
+        if input_item_ids is None:
+            input_item_ids = [] if input_item_id is None else [input_item_id]
+        if not isinstance(input_item_ids, list):
+            _invalid("prism_input_item_ids")
         payload = t.ResponseStarted(
             settings_revision=_revision(response, "response.prism_settings_revision"),
             response=ref(response.get("id")),
@@ -442,9 +475,9 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
                 }.get(cause, "unknown"),
             ),
             parent=ref(parent) if parent is not None else None,
-            input_item_id=_optional_string(
-                metadata.get("prism_input_item_id"), "prism_input_item_id"
-            ),
+            input_item_id=input_item_id,
+            metadata=_client_metadata(metadata),
+            input_item_ids=tuple(_id(value, "prism_input_item_ids") for value in input_item_ids),
         )
     elif kind == "response.done":
         response = _object(event.get("response"), "response")

@@ -631,6 +631,21 @@ export class RealtimeSession {
       }),
     );
   }
+  /** Replaces the labels later replies carry; a reply already started keeps
+   * its own. Resolves once Prism confirms the change. */
+  async setResponseMetadata(
+    metadata: t.Labels,
+    options: t.RealtimeOperationOptions = {},
+  ): Promise<void> {
+    const labels = p.responseMetadata(metadata);
+    return this.operation(options, async (signal) => {
+      await this.request(
+        p.requests.update,
+        { session: { prism_response_metadata: labels } },
+        signal,
+      );
+    });
+  }
   async clearAudio(options: t.RealtimeOperationOptions = {}): Promise<void> {
     return this.operation(options, (signal) =>
       this.locked(this.audioLock, signal, async () => {
@@ -819,6 +834,8 @@ export class RealtimeSession {
           toolContinuationTimeoutS: view.toolContinuationTimeoutS,
           turnDetection: view.turnDetection,
           settingsRevision: view.settingsRevision,
+          requestId: view.requestId,
+          responseMetadata: view.responseMetadata,
         });
         this.interruptionPolicies.record(
           view.settingsRevision,

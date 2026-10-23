@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 
 async fn acknowledge(p: &Peer, q: &Value, revision: u64) {
     p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],
-        "session":{"id":"session-1","voice":"astra","prism_effective_interrupt_response":false,"prism_settings_revision":revision}})).await;
+        "session":{"id":"session-1","voice":"astra","request_id":"trace-update","prism_response_metadata":{"step":"billing"},"prism_effective_interrupt_response":false,"prism_settings_revision":revision}})).await;
 }
 
 #[tokio::test]
@@ -37,6 +37,8 @@ async fn partial_update_clear_and_shared_settings() {
     let info = task.await.unwrap().unwrap();
     assert_eq!(info.settings_revision, Some(2));
     assert_eq!(s.info().voice, "astra");
+    assert_eq!(info.request_id.as_deref(), Some("trace-update"));
+    assert_eq!(info.response_metadata.as_ref().unwrap()["step"], "billing");
     assert!(!s.info().interrupt_on_speech);
     let clone = s.clone();
     let task = tokio::spawn(async move {
@@ -296,4 +298,19 @@ async fn delivered_response_policy_outlives_response_retention_until_next_poll()
         );
     }
     client.close().await;
+}
+
+#[tokio::test]
+async fn reply_labels_keep_settings_revision() {
+    let p = Peer::with_initial_interruption(false).await;
+    let (c, s) = p.setup().await;
+    let clone = s.clone();
+    s.set_response_metadata(serde_json::from_value(json!({"step":"billing"})).unwrap())
+        .await
+        .unwrap();
+    let info = clone.info();
+    assert_eq!(info.settings_revision, Some(1));
+    assert!(!info.interrupt_on_speech);
+    assert_eq!(info.response_metadata.unwrap()["step"], "billing");
+    c.close().await;
 }

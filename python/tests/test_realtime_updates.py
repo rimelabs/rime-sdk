@@ -16,6 +16,8 @@ def acknowledge(peer, request, revision, voice="astra", interrupt=False):
         session={
             "id": "session-1",
             "voice": voice,
+            "request_id": "trace-update",
+            "prism_response_metadata": {"step": "billing"},
             "prism_effective_interrupt_response": interrupt,
             "prism_settings_revision": revision,
         },
@@ -60,6 +62,8 @@ async def test_partial_update_and_clear_without_turn_readiness(monkeypatch):
         assert result == current.info
         assert result.settings_revision == 2
         assert result.voice == "astra"
+        assert result.request_id == "trace-update"
+        assert result.response_metadata == {"step": "billing"}
         assert not result.interrupt_on_speech
         assert original.voice == "test"
 
@@ -194,3 +198,15 @@ async def test_update_preserves_tool_round_and_response_revisions(monkeypatch):
         )
         await continuation
         assert (await anext(events)).payload.settings_revision == 2
+
+
+async def test_reply_label_update_refreshes_settings_revision(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        pending = asyncio.create_task(current.set_response_metadata({"step": "billing"}))
+        request = await peer.next("session.update")
+        acknowledge(peer, request, 2)
+        await pending
+        assert current.info.settings_revision == 2
+        assert current.info.request_id == "trace-update"
+        assert current.info.response_metadata == {"step": "billing"}
+        assert not current.info.interrupt_on_speech

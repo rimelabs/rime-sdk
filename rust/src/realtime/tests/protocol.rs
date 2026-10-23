@@ -115,6 +115,9 @@ async fn options_validate_before_connection() {
             parameters: Default::default(),
             prism_filler: Some(PrismFiller::Text(" ".into())),
         }]),
+        RealtimeConnectOptions::default().request_id("  "),
+        RealtimeConnectOptions::default().request_id("line\nbreak"),
+        RealtimeConnectOptions::default().request_id("é"),
     ];
     for options in cases {
         let result = client.realtime().connect(options).await;
@@ -160,4 +163,34 @@ async fn duplicate_tool_names_do_not_connect() {
             .is_err()
     );
     client.close().await;
+}
+
+#[test]
+fn response_started_labels_and_inputs() {
+    use crate::realtime::{Labels, RealtimeEvent};
+    use serde_json::json;
+    let started = |mut response: Value| {
+        response["id"] = json!("reply-1");
+        let raw = json!({"type": "response.created", "response": response});
+        match decode(&raw.to_string(), "session-1")
+            .unwrap()
+            .unwrap()
+            .payload
+        {
+            Some(RealtimeEvent::ResponseStarted {
+                metadata,
+                input_item_ids,
+                ..
+            }) => (metadata, input_item_ids),
+            _ => panic!("not a started reply"),
+        }
+    };
+    let (labels, inputs) = started(
+        json!({"metadata": {"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": {"a": 1}}}),
+    );
+    assert_eq!(labels, Labels::from([("step".into(), "3".into())]));
+    assert_eq!(inputs, ["item-3"]);
+    let inputs = started(json!({"prism_input_item_ids": ["item-1", "item-2"]})).1;
+    assert_eq!(inputs, ["item-1", "item-2"]);
+    assert_eq!(started(json!({})), (Labels::new(), vec![]));
 }

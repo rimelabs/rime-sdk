@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Decode only the protocol fields the SDK uses. Unknown events and fields stay open. */
-import { RimeStreamError } from "../errors.js";
+import { RimeInputError, RimeStreamError } from "../errors.js";
 import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
 
@@ -19,6 +19,18 @@ export interface SessionSettings {
   }[];
   voice?: string;
   instructions?: string;
+  prism_response_metadata?: t.Labels;
+}
+/** A copy of the client's labels for every reply: keys to strings. */
+export function responseMetadata(value: unknown): t.Labels {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value)) ||
+    Object.values(value).some((label) => typeof label !== "string")
+  )
+    throw new RimeInputError("responseMetadata must map keys to strings");
+  return Object.freeze({ ...(value as t.Labels) });
 }
 export interface SessionPatch {
   voice?: string;
@@ -29,6 +41,8 @@ export interface SessionPatch {
 export interface SessionView {
   settingsRevision: number | null;
   id: string;
+  requestId: string | null;
+  responseMetadata: t.Labels | null;
   voice: string;
   interruptOnSpeech: boolean | null;
   toolResultTimeoutS: number | null;
@@ -233,6 +247,16 @@ function session(value: unknown): SessionView {
   return {
     settingsRevision: revision(view),
     id: id(view.id, "session.id"),
+    requestId: optionalString(view.request_id, "session.request_id"),
+    responseMetadata:
+      view.prism_response_metadata === undefined
+        ? null
+        : clientMetadata(
+            object(
+              view.prism_response_metadata,
+              "session.prism_response_metadata",
+            ),
+          ),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
     turnDetection: Object.freeze({ eagerness, endOfTurnTimeoutMs }),
@@ -242,6 +266,18 @@ function session(value: unknown): SessionView {
       "continuation_timeout_s",
     ),
   };
+}
+/** The client's labels in `metadata`: its string values under keys that are
+ * not Prism's `prism_` ones. */
+function clientMetadata(metadata: Record<string, unknown>): t.Labels {
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(metadata).filter(
+        (entry): entry is [string, string] =>
+          !entry[0].startsWith("prism_") && typeof entry[1] === "string",
+      ),
+    ),
+  );
 }
 function fault(value: unknown): t.NormalizedRealtimeFault {
   const error = object(value, "error");
@@ -448,6 +484,14 @@ function decodeValue(
         metadata.prism_parent_response_id,
         "prism_parent_response_id",
       );
+      const inputItemId = optionalString(
+        metadata.prism_input_item_id,
+        "prism_input_item_id",
+      );
+      const inputItemIds =
+        response.prism_input_item_ids ??
+        (inputItemId === null ? [] : [inputItemId]);
+      if (!Array.isArray(inputItemIds)) return invalid("prism_input_item_ids");
       payload = {
         kind: "response.started",
         settingsRevision: revision(response),
@@ -463,9 +507,10 @@ function decodeValue(
                   ? "proactive"
                   : "unknown",
         parent: parent === null ? null : ref(parent),
-        inputItemId: optionalString(
-          metadata.prism_input_item_id,
-          "prism_input_item_id",
+        inputItemId,
+        metadata: clientMetadata(metadata),
+        inputItemIds: Object.freeze(
+          inputItemIds.map((value) => id(value, "prism_input_item_ids")),
         ),
       };
       break;

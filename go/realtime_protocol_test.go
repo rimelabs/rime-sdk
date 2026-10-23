@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -81,10 +82,35 @@ func TestRealtimeOptionsValidateBeforeConnection(t *testing.T) {
 		{TurnDetection: TurnDetection{Eagerness: "invalid"}}, {TurnDetection: TurnDetection{EndOfTurnTimeoutMS: 999}},
 		{Tools: []ToolDefinition{{Name: "tool", Parameters: map[string]any{}, PrismFiller: &PrismFiller{Type: "text", Text: " "}}}},
 		{Tools: []ToolDefinition{{Name: "tool", Parameters: map[string]any{}, PrismFiller: &PrismFiller{Type: "none", Text: "invalid"}}}},
+		{RequestID: "  "}, {RequestID: "line\nbreak"}, {RequestID: "é"},
+		{ResponseMetadata: map[string]string{"step": "\xff"}},
 	}
 	for _, options := range cases {
 		if _, e := client.Realtime.Connect(context.Background(), options); !errors.Is(e, ErrInput) {
 			t.Fatalf("%+v: %v", options, e)
 		}
+	}
+}
+
+func TestRealtimeResponseStartedLabelsAndInputs(t *testing.T) {
+	started := func(response rtObject) ResponseStarted {
+		t.Helper()
+		response["id"] = "reply-1"
+		b, _ := json.Marshal(rtObject{"type": "response.created", "response": response})
+		w, e := decodeRealtime(b, "session-1")
+		if e != nil {
+			t.Fatal(e)
+		}
+		return w.payload.(ResponseStarted)
+	}
+	r := started(rtObject{"metadata": rtObject{"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": rtObject{"a": 1}}})
+	if !reflect.DeepEqual(r.Metadata, map[string]string{"step": "3"}) || !reflect.DeepEqual(r.InputItemIDs, []string{"item-3"}) {
+		t.Fatalf("%+v", r)
+	}
+	if r = started(rtObject{"prism_input_item_ids": []string{"item-1", "item-2"}}); !reflect.DeepEqual(r.InputItemIDs, []string{"item-1", "item-2"}) {
+		t.Fatalf("%+v", r)
+	}
+	if r = started(rtObject{}); len(r.Metadata) != 0 || len(r.InputItemIDs) != 0 {
+		t.Fatalf("%+v", r)
 	}
 }
