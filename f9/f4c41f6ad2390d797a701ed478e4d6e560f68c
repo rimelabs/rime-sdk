@@ -1,0 +1,23 @@
+go/examples/realtime/typed/main_test.go
+  s_4fd1a95407470e::t_5f5e3452b4927d 30
+go/examples/realtime/internal/testpeer/peer.go
+  s_4fd1a95407470e::t_5f5e3452b4927d 102-112
+go/examples/realtime/tools/main_test.go
+  s_4fd1a95407470e::t_5f5e3452b4927d 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9f4c41f6ad2390d797a701ed478e4d6e560f68c",
+  "prompts": {},
+  "sessions": {
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
