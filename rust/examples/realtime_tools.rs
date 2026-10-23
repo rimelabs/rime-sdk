@@ -73,6 +73,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 RealtimeEvent::TextDelta { delta, .. } => print!("{delta}"),
+                RealtimeEvent::Fault(fault)
+                    if fault.scope == "event"
+                        && matches!(
+                            fault.code.as_str(),
+                            "typed_turn_busy" | "instructions_busy" | "proactive_unavailable"
+                        ) =>
+                {
+                    // The session retries these refusals after the next readiness event.
+                }
                 RealtimeEvent::Fault(fault) => return Err(fault.into()),
                 _ => {}
             }

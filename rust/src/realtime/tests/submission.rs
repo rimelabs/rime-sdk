@@ -166,3 +166,138 @@ async fn early_acknowledgment_and_future_drop_cancel_exactly_once() {
         assert_eq!(abandoned, 1);
     }
 }
+
+struct WaitingSource;
+impl crate::realtime::ConversationSource for WaitingSource {
+    async fn read(&mut self, stop: CancellationToken) -> Result<Option<AudioChunk>, Error> {
+        stop.cancelled().await;
+        Err(Error::cancelled())
+    }
+}
+struct SilentPlayback;
+impl crate::realtime::ConversationOutput for SilentPlayback {
+    fn write(&self, _: AudioChunk) -> Result<(), Error> {
+        unreachable!("this response has no audio")
+    }
+    fn end(&self) -> Result<(), Error> {
+        unreachable!("this response has no audio")
+    }
+    async fn completion(&self, _: CancellationToken) -> Result<f64, Error> {
+        unreachable!("this response has no audio")
+    }
+}
+impl crate::realtime::ConversationPlayback for SilentPlayback {
+    type Output = Self;
+    fn open(&mut self, _: &OutputRef) -> Result<Arc<Self>, Error> {
+        unreachable!("this response has no audio")
+    }
+    fn interrupt(&mut self, _: &[OutputRef]) -> Result<(), Error> {
+        unreachable!("this response has no audio")
+    }
+    async fn stop(&mut self, _: CancellationToken) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
+    use crate::realtime::ConversationRunner;
+    for submitted in [false, true] {
+        let (mut worker, writes, mut jobs, receiver) = worker();
+        let (commands, command_receiver) = mpsc::channel(128);
+        worker.commands = command_receiver;
+        let terminal = Arc::new(Mutex::new(None));
+        let done = CancellationToken::new();
+        let session = RealtimeSession {
+            lease: Arc::new(Lease(CancellationToken::new())),
+            commands,
+            events: Arc::new(Mutex::new(Some(RealtimeEvents {
+                receiver,
+                terminal: terminal.clone(),
+                ended: false,
+            }))),
+            info: protocol::decode(
+                r#"{"type":"session.created","session":{"id":"session-1"}}"#,
+                "session-1",
+            )
+            .unwrap()
+            .unwrap()
+            .info
+            .unwrap(),
+            budgets: RealtimeTimeouts::default(),
+            done: done.clone(),
+            wake: Arc::new(Notify::new()),
+            terminal,
+        };
+        let stop = CancellationToken::new();
+        let interrupted = CancellationToken::new();
+        let observed = interrupted.clone();
+        let runner = tokio::spawn(
+            ConversationRunner::new(session, WaitingSource, SilentPlayback)
+                .on_event(move |event| {
+                    if matches!(event.payload, RealtimeEvent::SpeechStarted { .. }) {
+                        observed.cancel();
+                    }
+                    Ok(())
+                })
+                .run(stop.clone()),
+        );
+        dispatch(
+            &mut worker,
+            json!({"type":"response.created","response":{"id":"r1"}}),
+        );
+        dispatch(
+            &mut worker,
+            json!({"type":"response.done","response":{"id":"r1","status":"completed","metadata":{"prism_drain_token":"drain-r1"}}}),
+        );
+        let command = tokio::time::timeout(Duration::from_secs(1), worker.commands.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(command.kind == Kind::Drain);
+        let cancelled = command.cancelled.clone();
+        worker.pending.push(command);
+        let active = if submitted {
+            worker.advance(&writes).unwrap();
+            let job = jobs.recv().await.unwrap();
+            let (mut sink, mut sent, release) = gate();
+            let writer =
+                tokio::spawn(
+                    async move { write_frames(&mut sink, job, Duration::from_secs(1)).await },
+                );
+            sent.recv().await.unwrap();
+            Some((writer, release))
+        } else {
+            None
+        };
+        dispatch(
+            &mut worker,
+            json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
+        );
+        tokio::time::timeout(Duration::from_secs(1), interrupted.cancelled())
+            .await
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), cancelled.cancelled())
+            .await
+            .expect("finished report remains active after interruption");
+        if let Some((writer, release)) = active {
+            release.cancel();
+            let result = writer.await.unwrap();
+            assert!(!result.skipped, "a submitted control write must complete");
+            worker.written(result).unwrap();
+        }
+        worker.advance(&writes).unwrap();
+        assert!(
+            jobs.try_recv().is_err(),
+            "interruption must prevent queued drain submission"
+        );
+        done.cancel();
+        stop.cancel();
+        let error = tokio::time::timeout(Duration::from_secs(1), runner)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Cancelled);
+    }
+}

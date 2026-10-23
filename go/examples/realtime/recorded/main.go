@@ -95,6 +95,12 @@ func run() error {
 			}
 			return <-sent
 		case rime.FaultEvent:
+			if p.Fault.Scope == "event" {
+				switch p.Fault.Code {
+				case "typed_turn_busy", "instructions_busy", "proactive_unavailable":
+					continue
+				}
+			}
 			return p.Fault
 		case rime.TranscriptFailed:
 			return p.Fault

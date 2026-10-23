@@ -199,6 +199,9 @@ func (s *RealtimeSession) invoke(ctx context.Context, c *rtCommand) (rtResult, e
 	select {
 	case <-s.done:
 		c.stop()
+		if ctx.Err() != nil {
+			return rtResult{}, operationError(context.Cause(ctx), "")
+		}
 		return rtResult{}, s.failure()
 	default:
 	}
@@ -226,6 +229,9 @@ func (s *RealtimeSession) invoke(ctx context.Context, c *rtCommand) (rtResult, e
 	case <-ctx.Done():
 		return rtResult{}, operationError(context.Cause(ctx), "")
 	case <-s.done:
+		if ctx.Err() != nil {
+			return rtResult{}, operationError(context.Cause(ctx), "")
+		}
 		return rtResult{}, s.failure()
 	}
 }

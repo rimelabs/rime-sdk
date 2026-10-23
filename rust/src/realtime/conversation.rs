@@ -106,6 +106,7 @@ struct Reply<O> {
     ended: bool,
     interrupted: bool,
     reporting: bool,
+    finished_report: CancellationToken,
 }
 enum Completion {
     Measured(OutputRef, f64),
@@ -286,6 +287,7 @@ impl<O: ConversationOutput> PlaybackState<O> {
                     ended: false,
                     interrupted: cut,
                     reporting: false,
+                    finished_report: CancellationToken::new(),
                 });
             }
             RealtimeEvent::SpeechStarted { .. } | RealtimeEvent::ResponseAbandoned { .. } => {
@@ -305,6 +307,7 @@ impl<O: ConversationOutput> PlaybackState<O> {
                             ))
                     {
                         reply.interrupted = true;
+                        reply.finished_report.cancel();
                         self.interrupted.insert(reply.reference.response_id.clone());
                         outputs.extend(reply.outputs.iter().map(|o| o.reference.clone()))
                     }
@@ -461,12 +464,17 @@ impl<S: ConversationSource, P: ConversationPlayback> ConversationRunner<S, P> {
                     let session = self.session.clone();
                     let response = reply.reference.clone();
                     let interrupted = reply.interrupted;
+                    let cancelled = reply.finished_report.clone();
                     let played = reply.outputs.iter().map(|o| o.measured.unwrap_or_default()).sum();
                     launch(&tasks, async move {
                         if !interrupted {
-                            session.report_playback(PlaybackReport::Finished {
-                                response: response.clone(), played_ms: Some(played), audible_tail_ms: None,
-                            }).await?;
+                            tokio::select! {
+                                biased;
+                                _ = cancelled.cancelled() => {},
+                                result = session.report_playback(PlaybackReport::Finished {
+                                    response: response.clone(), played_ms: Some(played), audible_tail_ms: None,
+                                }) => result?,
+                            }
                         }
                         Ok(Completion::Reported(response.response_id))
                     })?;

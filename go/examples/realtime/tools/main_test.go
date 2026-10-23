@@ -14,10 +14,31 @@ func TestResponseFaultReturnsPromptly(t *testing.T) {
 	done := testpeer.Run(run)
 	request := p.Next("response.create")
 	p.Send(testpeer.Object{"type": "response.created", "prism_request_event_id": request["event_id"], "response": testpeer.Object{"id": "reply"}})
-	p.Send(testpeer.Object{"type": "error", "error": testpeer.Object{"code": "tool_failed", "message": "tool failed", "scope": "response", "response_id": "reply"}})
+	p.Send(testpeer.Object{"type": "error", "error": testpeer.Object{"code": "tool_failed", "message": "tool failed", "scope": "response", "owner": testpeer.Object{"kind": "response", "response_id": "reply"}}})
 	var fault *rime.RealtimeFault
-	if err := testpeer.Result(t, done); !errors.As(err, &fault) || fault.Code != "tool_failed" {
+	if err := testpeer.Result(t, done); !errors.As(err, &fault) || fault.Code != "tool_failed" || fault.ResponseID != "reply" {
 		t.Fatalf("error = %v, want tool fault", err)
+	}
+}
+
+func TestBusyRequestRetriesAfterReadiness(t *testing.T) {
+	for _, code := range []string{"typed_turn_busy", "instructions_busy", "proactive_unavailable"} {
+		t.Run(code, func(t *testing.T) {
+			p := testpeer.New(t)
+			done := testpeer.Run(run)
+			request := p.Next("response.create")
+			p.Send(testpeer.Object{"type": "error", "error": testpeer.Object{"code": code, "scope": "event", "owner": testpeer.Object{"kind": "event", "event_id": request["event_id"]}}})
+			p.Send(testpeer.Object{"type": "prism.typed_input.ready"})
+			retry := p.Next("response.create")
+			if retry["event_id"] == request["event_id"] {
+				t.Fatal("retry reused the refused request ID")
+			}
+			p.Send(testpeer.Object{"type": "response.created", "prism_request_event_id": retry["event_id"], "response": testpeer.Object{"id": "reply"}})
+			p.Send(testpeer.Object{"type": "response.done", "response": testpeer.Object{"id": "reply", "status": "completed"}})
+			if err := testpeer.Result(t, done); err != nil {
+				t.Fatalf("busy request did not complete after readiness: %v", err)
+			}
+		})
 	}
 }
 

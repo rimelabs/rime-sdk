@@ -52,6 +52,13 @@ func run() error {
 			fmt.Println()
 			return <-sent
 		case rime.FaultEvent:
+			if p.Fault.Scope == "event" {
+				switch p.Fault.Code {
+				case "typed_turn_busy", "instructions_busy", "proactive_unavailable":
+					// The session retries after the next readiness event.
+					continue
+				}
+			}
 			return p.Fault
 		}
 	}

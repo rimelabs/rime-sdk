@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -107,6 +108,71 @@ func TestRealtimeLifetimeCancellationPreservesCause(t *testing.T) {
 				}
 				if !errors.Is(s.failure(), cause) {
 					t.Fatalf("lost cancellation cause: got %v, want %v", s.failure(), cause)
+				}
+			}
+		})
+	}
+}
+
+// Pause evaluation of invoke's result select after its command is queued. This
+// lets cancellation and shutdown become observable before the select chooses.
+type realtimeInvokeWaitContext struct {
+	context.Context
+	commands <-chan *rtCommand
+	waiting  chan struct{}
+	resume   chan struct{}
+	once     sync.Once
+}
+
+func (c *realtimeInvokeWaitContext) Done() <-chan struct{} {
+	if len(c.commands) > 0 {
+		c.once.Do(func() {
+			close(c.waiting)
+			<-c.resume
+		})
+	}
+	return c.Context.Done()
+}
+
+func TestRealtimeInvokeCancellationWinsSessionShutdown(t *testing.T) {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			for i := 0; i < 64; i++ {
+				s := &RealtimeSession{commands: make(chan *rtCommand, 1), wake: make(chan struct{}, 1), done: make(chan struct{}), timeouts: RealtimeTimeouts{Ready: time.Second}}
+				lifetime, cancel := context.WithCancelCause(context.Background())
+				ctx := &realtimeInvokeWaitContext{Context: lifetime, commands: s.commands, waiting: make(chan struct{}), resume: make(chan struct{})}
+				returned := make(chan error, 1)
+				go func() { _, err := s.invoke(ctx, &rtCommand{kind: "audio"}); returned <- err }()
+				var command *rtCommand
+				select {
+				case <-ctx.waiting:
+					command = <-s.commands
+				case <-time.After(time.Second):
+					close(ctx.resume)
+					cancel(cause)
+					t.Fatal("audio was not queued")
+				}
+				s.mu.Lock()
+				s.terminal = failure(ErrStream, "audio submission cancelled; outcome unknown")
+				s.mu.Unlock()
+				// Cancellation and session shutdown can both be ready when the caller
+				// resumes. The caller keeps its cancellation cause; the session keeps its
+				// terminal failure because submitted audio has an unknown outcome.
+				cancel(cause)
+				close(s.done)
+				close(ctx.resume)
+				var err error
+				select {
+				case err = <-returned:
+				case <-time.After(time.Second):
+					t.Fatal("caller did not return")
+				}
+				command.stop()
+				if !errors.Is(err, cause) {
+					t.Fatalf("iteration %d: caller got %v, want %v", i, err, cause)
+				}
+				if !errors.Is(s.failure(), ErrStream) {
+					t.Fatalf("session lost terminal failure: %v", s.failure())
 				}
 			}
 		})
