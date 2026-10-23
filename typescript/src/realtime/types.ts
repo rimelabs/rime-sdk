@@ -74,7 +74,7 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   /** Sent as the upgrade's `x-request-id`. It must be nonblank printable ASCII, or
    * `connect` throws `RimeInputError`. Prism uses it if it is at most 128
    * characters, else makes its own; `info.requestId` reports the one it used.
-   * Omitted or `null` sends none. */
+   * For now, hosted Prism always makes its own. Omitted or `null` sends none. */
   readonly requestId?: string | null;
   /** Labels every reply's `response.started` carries in `metadata`, such as
    * `{ step: "3" }`; change them with `session.setResponseMetadata`. Prism
