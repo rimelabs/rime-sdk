@@ -28,6 +28,7 @@ const (
 )
 
 // Error includes the service request ID when the service supplies one.
+// Realtime service faults are available through errors.As with *RealtimeFault.
 type Error struct {
 	Kind      ErrorKind
 	Message   string

@@ -3,23 +3,29 @@ name = "rimelabs-sdk"
 version = "0.1.0-alpha.8"
 edition = "2021"
 rust-version = "1.88"
-description = "Rime streaming text-to-speech and speech recognition SDK"
-license = "MIT"
+description = "Rime streaming TTS, STT and Prism realtime SDK"
+license = "MIT AND Apache-2.0"
 repository = "https://github.com/rimelabs/rime-sdk"
 readme = "README.md"
-include = ["src/**", "testdata/**", "examples/**", "README.md", "LICENSE", "CHANGELOG.md"]
+include = ["src/**", "testdata/**", "examples/**", "README.md", "LICENSE", "LICENSE-PRISM", "NOTICE-PRISM", "CHANGELOG.md"]
 
 [dependencies]
 rimelabs-api = "0.4.0"
 bytes = "1"
 futures-core = "0.3"
-futures-util = "0.3"
+futures-util = { version = "0.3", features = ["sink"] }
+serde_json = "1"
+base64 = "0.22"
+sha2 = "0.11"
+tokio-tungstenite = { version = "0.28", features = ["rustls-tls-native-roots"] }
 tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 tonic = { version = "0.14", default-features = false, features = ["transport", "codegen", "tls-ring", "tls-native-roots"] }
 
 [dev-dependencies]
+jsonschema = { version = "0.33", default-features = false }
+serde_yaml = "0.9"
 tonic = { version = "0.14", default-features = false, features = ["router"] }
 hex = "0.4"
 serde_json = "1"

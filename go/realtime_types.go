@@ -1,0 +1,187 @@
+package rime
+
+import "time"
+
+// RealtimeTimeouts are independent of TTS. Zero selects 10s, 30s, and 10s.
+type RealtimeTimeouts struct{ Connect, Ready, Request time.Duration }
+
+// TurnDetection controls Prism's speech endpoint detection.
+type TurnDetection struct {
+	Eagerness          string
+	EndOfTurnTimeoutMS int
+}
+
+// PrismFiller selects none, text, or auto speech during a tool call.
+type PrismFiller struct {
+	Type         string `json:"type"`
+	Text         string `json:"text,omitempty"`
+	Instructions string `json:"instructions,omitempty"`
+}
+
+// ToolDefinition describes an application-owned function.
+type ToolDefinition struct {
+	Name, Description string
+	Parameters        map[string]any
+	PrismFiller       *PrismFiller
+}
+
+// RealtimeConnectOptions configure Prism independently of the parent TTS client.
+type RealtimeConnectOptions struct {
+	Endpoint, Voice, Instructions string
+	Tools                         []ToolDefinition
+	InterruptOnSpeech             *bool // Nil means true.
+	TurnDetection                 TurnDetection
+	Timeouts                      RealtimeTimeouts
+}
+
+// ReplyOptions request a proactive reply, optionally about a recorded tool result.
+type ReplyOptions struct {
+	Instruction string
+	ToolCall    *ToolCallRef
+}
+
+// AudioChunk contains complete signed little-endian PCM16 frames, at most 192000 bytes.
+type AudioChunk struct {
+	Data   []byte
+	Format PCMFormat
+}
+
+// ResponseRef identifies a retained response in one session.
+type ResponseRef struct{ sessionID, responseID string }
+
+func (r ResponseRef) SessionID() string  { return r.sessionID }
+func (r ResponseRef) ResponseID() string { return r.responseID }
+
+// ItemRef identifies a history message.
+type ItemRef struct{ sessionID, itemID string }
+
+func (r ItemRef) SessionID() string { return r.sessionID }
+func (r ItemRef) ItemID() string    { return r.itemID }
+
+// ToolCallRef identifies a tool call in one response.
+type ToolCallRef struct {
+	ResponseRef
+	callID string
+}
+
+func (r ToolCallRef) CallID() string { return r.callID }
+
+// OutputRef identifies an assistant message's audio content.
+type OutputRef struct {
+	response                  ResponseRef
+	itemID                    string
+	outputIndex, contentIndex uint64
+}
+
+func (r OutputRef) Response() ResponseRef { return r.response }
+func (r OutputRef) ItemID() string        { return r.itemID }
+func (r OutputRef) OutputIndex() uint64   { return r.outputIndex }
+func (r OutputRef) ContentIndex() uint64  { return r.contentIndex }
+
+// SessionInfo contains the settings returned by Prism. Nil fields were not published.
+type SessionInfo struct {
+	SessionID, Model, Voice                      string
+	InterruptOnSpeech                            bool
+	ToolResultTimeoutS, ToolContinuationTimeoutS *float64
+	Eagerness                                    *string
+	EndOfTurnTimeoutMS                           *uint64
+}
+
+// RealtimeFault preserves structured service fault details. Use errors.As.
+type RealtimeFault struct {
+	Code, Message, Scope, RequestID, ResponseID, ItemID, CorrelationID, Parameter string
+	CallIDs                                                                       []string
+}
+
+func (f *RealtimeFault) Error() string { return f.Code + ": " + f.Message }
+
+// RealtimeEvent is one typed event payload. Unknown server events are ignored.
+type RealtimeEvent interface{ isRealtimeEvent() }
+
+// SessionEvent carries protocol correlation and a typed payload.
+type SessionEvent struct {
+	SessionID, EventID, RequestID string
+	Payload                       RealtimeEvent
+}
+type InputReady struct{}
+type SpeechHint struct{ AudioStartMS uint64 }
+type SpeechStarted struct {
+	ItemID       string
+	AudioStartMS uint64
+}
+type SpeechStopped struct {
+	ItemID     string
+	AudioEndMS uint64
+	EndReason  string
+}
+type InputCommitted struct{ ItemID string }
+type TranscriptDelta struct{ ItemID, Delta string }
+type TranscriptFinal struct{ ItemID, Text string }
+type TranscriptFailed struct {
+	ItemID string
+	Fault  *RealtimeFault
+}
+type ResponseStarted struct {
+	Response    ResponseRef
+	Cause       string
+	Parent      *ResponseRef
+	InputItemID string
+}
+type ResponseAbandoned struct{ Response ResponseRef }
+type MessageStarted struct{ Output OutputRef }
+type TextDelta struct {
+	Output OutputRef
+	Delta  string
+}
+type TextDone struct {
+	Output OutputRef
+	Text   string
+}
+type AudioDelta struct {
+	Output OutputRef
+	Audio  AudioChunk
+}
+type AudioDone struct{ Output OutputRef }
+type ToolCall struct {
+	Call         ToolCallRef
+	ItemID, Name string
+	Arguments    map[string]any
+}
+type ResponseEnded struct {
+	Response       ResponseRef
+	Status, Reason string
+}
+type FaultEvent struct{ Fault *RealtimeFault }
+
+func (InputReady) isRealtimeEvent()        {}
+func (SpeechHint) isRealtimeEvent()        {}
+func (SpeechStarted) isRealtimeEvent()     {}
+func (SpeechStopped) isRealtimeEvent()     {}
+func (InputCommitted) isRealtimeEvent()    {}
+func (TranscriptDelta) isRealtimeEvent()   {}
+func (TranscriptFinal) isRealtimeEvent()   {}
+func (TranscriptFailed) isRealtimeEvent()  {}
+func (ResponseStarted) isRealtimeEvent()   {}
+func (ResponseAbandoned) isRealtimeEvent() {}
+func (MessageStarted) isRealtimeEvent()    {}
+func (TextDelta) isRealtimeEvent()         {}
+func (TextDone) isRealtimeEvent()          {}
+func (AudioDelta) isRealtimeEvent()        {}
+func (AudioDone) isRealtimeEvent()         {}
+func (ToolCall) isRealtimeEvent()          {}
+func (ResponseEnded) isRealtimeEvent()     {}
+func (FaultEvent) isRealtimeEvent()        {}
+
+// PlaybackReport reports device measurements, not received audio duration.
+type PlaybackReport interface{ isPlaybackReport() }
+type PlaybackInterrupted struct {
+	Output     OutputRef
+	AudioEndMS uint32
+}
+type PlaybackFinished struct {
+	Response                ResponseRef
+	PlayedMS, AudibleTailMS *float64
+}
+
+func (PlaybackInterrupted) isPlaybackReport() {}
+func (PlaybackFinished) isPlaybackReport()    {}

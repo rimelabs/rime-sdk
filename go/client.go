@@ -1,4 +1,5 @@
-// Package rime streams speech synthesis and recognition. Applications own audio devices.
+// Package rime streams speech synthesis, recognition, and Prism conversations.
+// Applications own audio devices.
 package rime
 
 import (
@@ -47,6 +48,8 @@ type VoiceListOptions struct {
 
 // Client can be shared by concurrent goroutines. Close cancels all its operations.
 type Client struct {
+	Realtime           *RealtimeService
+	realtimeSessions   map[*RealtimeSession]struct{}
 	STT                *STTService
 	TTS                *TTSService
 	Voices             *VoiceService
@@ -124,6 +127,7 @@ func NewClient(config Config) (*Client, error) {
 	}
 	c := &Client{key: key, target: target, voice: voice, model: model, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
 	c.sttTarget, c.sttLimits = "stt.api.rime.ai:443", defaultTranscriptionLimits
+	c.Realtime = &RealtimeService{c}
 	c.STT = &STTService{c}
 	c.TTS = &TTSService{c}
 	c.Voices = &VoiceService{c}
@@ -261,12 +265,22 @@ func (c *Client) Close() error {
 		return nil
 	}
 	c.closed = true
+	for s := range c.realtimeSessions {
+		s.normalClose.Store(true)
+	}
 	for operation := range c.operations {
 		operation.cancel(failure(ErrCancelled, "client closed"))
+	}
+	sessions := make([]*RealtimeSession, 0, len(c.realtimeSessions))
+	for s := range c.realtimeSessions {
+		sessions = append(sessions, s)
 	}
 	conn, sttConn := c.conn, c.sttConn
 	c.key = ""
 	c.mu.Unlock()
+	for _, s := range sessions {
+		_ = s.Close()
+	}
 	var err error
 	if conn != nil {
 		err = conn.Close()

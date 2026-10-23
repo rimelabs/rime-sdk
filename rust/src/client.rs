@@ -287,7 +287,7 @@ pub(crate) struct Inner {
     pub(crate) stt_endpoint: Endpoint,
     stt_channel: OnceCell<Channel>,
     pub(crate) stt_limits: crate::stt::Limits,
-    authorization: MetadataValue<Ascii>,
+    pub(crate) authorization: MetadataValue<Ascii>,
     pub(crate) model: Model,
     pub(crate) timeout: Option<Duration>,
     channel: OnceCell<Channel>,
@@ -447,6 +447,11 @@ impl Client {
     /// Access streaming and buffered text-to-speech operations.
     pub fn tts(&self) -> Tts<'_> {
         Tts { client: self }
+    }
+
+    /// Access Prism realtime sessions with independent settings.
+    pub fn realtime(&self) -> crate::Realtime<'_> {
+        crate::Realtime { client: self }
     }
 
     /// Access streaming speech recognition. TTS model and timeout defaults do not apply.

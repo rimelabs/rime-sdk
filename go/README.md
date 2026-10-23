@@ -1,6 +1,6 @@
 # Rime SDK for Go
 
-Generate speech with Coda or Mist v3 and transcribe audio with STT
+Generate speech with Coda or Mist v3, transcribe audio with STT, and run Prism conversations
 through the `rime.Client`. Your application handles audio capture and playback.
 
 ## Installation
@@ -332,3 +332,130 @@ with `*rime.Error` to read `Message` and `RequestID`. Include the SDK version an
 request ID when reporting a failure; omit API keys.
 
 SDK code uses the [MIT license](LICENSE).
+Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-PRISM`.
+
+## Prism realtime
+
+Realtime support is unreleased. Run these examples from this checkout's `go/`
+directory until the first release that contains `Client.Realtime`.
+
+```go
+client, err := rime.NewClient(rime.Config{})
+if err != nil { return err }
+defer client.Close()
+session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{})
+if err != nil { return err }
+defer session.Close()
+// Read session.Recv(ctx) concurrently with requests.
+response, err := session.SendText(ctx, "Hello")
+```
+
+`RealtimeSession` owns authentication, initialization, request matching, events,
+audio conversion, and cleanup. Prism defaults to
+`wss://prism.api.rime.ai/v1/realtime`. TTS model, voice, endpoint, and timeout
+settings do not apply. `RealtimeConnectOptions` selects the endpoint, voice,
+instructions, tools, interruption, turn detection, and timeouts. Plain `ws://`
+is permitted only for localhost. Zero timeouts select 10 seconds for connection,
+30 seconds for admission, and 10 seconds for writes and acknowledgments.
+
+`TurnDetection` accepts `low`, `medium`, `high`, or `auto` eagerness and a silence
+limit of 1000 to 10000 milliseconds. `PrismFiller` selects `none`, `text`, or
+`auto` speech while a tool runs. Text and instructions must be valid, nonblank
+UTF-8 with at most 500 Unicode scalar values. Omit these settings to use server
+defaults. `session.Info()` returns a copy of the effective published settings.
+
+| Session method | Behavior |
+| --- | --- |
+| `SendText` | Wait for admission, add a typed turn, and return its response reference. |
+| `AddMessage` | Add user or assistant history without a reply. |
+| `RequestReply` | Request a proactive reply, with optional instructions or a recorded tool call. |
+| `SubmitToolResult` | Record an application result. The same result can be submitted again; a changed result fails. |
+| `ContinueReply` | Wait for the latest tool response and all its results, then request continuation. |
+| `Cancel` | Cancel a retained response. |
+| `SendAudio` / `ClearAudio` | Convert input PCM or clear the input buffer. |
+| `ReportPlayback` | Report measured device playback completion or interruption. |
+| `Recv` | Read one typed event; normal closure returns `io.EOF`. |
+| `Close` | Stop the session and wait for cleanup. |
+
+Use a type switch on `SessionEvent.Payload`, such as `TextDelta`, `ToolCall`,
+`SpeechStarted`, or `ResponseEnded`. There is one event consumer. Read events
+while requests wait. Every operation has its own context; the context passed to
+`Connect` controls the session lifetime. Closing the parent client stops its
+sessions. `Close` is safe to repeat and waits for cleanup.
+If connection cancellation is already observable when initialization succeeds,
+`Connect` closes the session and returns the context error. The context continues
+to own the session after a successful return.
+
+Cancellation before submission sends nothing. After submission, the worker keeps
+acknowledgment matching even if the caller stops waiting. It cancels a reply
+accepted after caller cancellation. A write or acknowledgment with an unknown
+outcome closes the session. There is no automatic reconnect or replay. Only an
+explicit busy refusal permits retry after a new readiness event. Use `errors.Is`
+for SDK categories or context errors. Use `errors.As` with `*RealtimeFault` for
+service code, scope, owners, and correlation details.
+
+Voice and session instructions must be nonblank when supplied. The SDK imposes
+no length cap on these settings, consistent with the shared Prism schema and
+the Python and TypeScript SDKs. This does not guarantee that the service accepts
+every value.
+
+Canceling an active audio submission closes the session. Canceling queued audio
+sends nothing and permits other operations to continue. Terminal failures take
+precedence over queued events and remain available from later session operations.
+Normal closure returns `io.EOF` after the remaining queued events.
+
+Text turns and history contain at most 4000 Unicode scalar values. Input audio
+contains complete PCM16 frames and at most 192000 bytes per chunk. Input supports
+mono or stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and
+receives mono 24 kHz PCM. A clear or input-format change resets conversion.
+There are at most 128 pending requests, 128 retained responses, 128 tools or
+outputs per response, and 256 queued events. Incoming messages are limited to
+1 MiB. Expired references fail with `ErrInput`; a full event queue fails with
+`ErrResourceLimit`. Known malformed events fail the session. Unknown events and
+fields are ignored; unknown enum values become `unknown`.
+
+### Conversation runner and examples
+
+`ConversationRunner` accepts application-owned `ConversationSource` and
+`ConversationPlayback` adapters. It consumes events, sends capture audio,
+preserves playback order, interrupts selected outputs, rejects late audio, and
+reports device measurements. It cancels dependent responses that arrive after
+interruption. Applications execute tools in their own goroutines. `OnEvent`
+runs inline and must not block. Do not call `Recv` or send playback reports
+elsewhere while the runner runs.
+
+Each output has an independent completion receipt. Report actual played
+milliseconds, including partial playback after interruption. Receiving or
+queueing PCM does not confirm playback. `Interrupt` discards selected outputs
+as a batch, then resumes the remaining FIFO queue. `Stop` confirms that all
+playback has stopped and keeps caller resources open. All adapter operations
+must honor their context. The runner passes a five-second context to `Stop` and
+waits for cancellation cleanup. This is a cooperative deadline, not a hard limit
+on `Run`: an adapter that ignores cancellation can prevent it from returning.
+The SDK cannot forcibly stop an adapter goroutine or claim that its device has
+stopped. It stops at source EOF, session closure,
+failure, or cancellation, then closes the session.
+
+`Completion` starts when an output opens. It can remain pending during `Write`,
+`End`, `Interrupt`, and `Stop`. Adapters must permit these calls to overlap;
+do not hold a shared lock while waiting for playback completion. The runner
+serializes `Open`, `Interrupt`, and `Stop`, while source reads run independently.
+
+```sh
+go run ./examples/realtime/typed
+go run ./examples/realtime/recorded utterance.pcm
+go run ./examples/realtime/tools
+go run ./examples/realtime/live 127.0.0.1:8766
+```
+
+The live example uses an application-owned audio bridge with no device library
+dependency. The local TCP connection carries newline-delimited JSON, at most
+1 MiB per line. Send `{"type":"audio","data":"BASE64"}` for complete 16 kHz
+mono PCM16 capture chunks. The example sends `open`, `audio`, and `end` with an
+opaque output `id`; output audio is 24 kHz mono PCM16. Play outputs in `open`
+order. For `interrupt`, discard outputs in `ids` as one batch. Send
+`{"type":"played","id":"ID","played_ms":12.5}` when an output finishes or is
+interrupted, using device measurements. Reply to `stop` with
+`{"type":"stopped"}` only after all playback stops. Send `{"type":"eof"}` to
+end capture, and keep reading until the stop handshake completes. This bridge
+protocol belongs to the example, not the SDK.

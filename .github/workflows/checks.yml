@@ -127,9 +127,10 @@ jobs:
           cache-dependency-path: go/go.sum
       - name: Check shared fixtures and formatting
         run: |
-          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts prism/protocol prism/schema; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
+          cmp ../conformance/prism/speech_to_speech.asyncapi.yaml testdata/prism/speech_to_speech.asyncapi.yaml
           test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test -race ./...
@@ -155,9 +156,10 @@ jobs:
           components: rustfmt, clippy
       - name: Check shared fixtures
         run: |
-          for fixture in text-input contract audio mulaw pcm-input stt/transcripts; do
+          for fixture in text-input contract audio mulaw pcm-input stt/transcripts prism/protocol prism/schema; do
             cmp "../conformance/$fixture.json" "testdata/$fixture.json"
           done
+          cmp ../conformance/prism/speech_to_speech.asyncapi.yaml testdata/prism/speech_to_speech.asyncapi.yaml
       - run: cargo fmt --check
       - run: cargo clippy --locked --all-targets -- -D warnings
       - run: cargo test --locked

@@ -1,0 +1,9 @@
+Prism protocol implementation
+
+The Go realtime implementation adapts the Python and TypeScript SDKs and the
+reference client in rimelabs/sglang-omni at bc8a500249536f369d20bc094baa9169e5986758:
+  clients/prism_realtime/prism_realtime/client.py
+
+The reference file identifies its license as Apache-2.0. See LICENSE-PRISM.
+This SDK adds Go events, session worker ownership, operation contexts,
+application-owned audio adapters, PCM conversion, and resource limits.

@@ -1,6 +1,6 @@
 # Prism protocol tests
 
-This directory contains shared fixtures for the Python and TypeScript realtime
+This directory contains shared fixtures for the Python, TypeScript, Rust, and Go realtime
 tests. The schema uses AsyncAPI 3.0.0 and describes protocol version 1.0.0.
 Prism events and fields use `prism.` and `prism_`. The SDK does not send or
 recognize the former `prsm` names.
@@ -16,7 +16,7 @@ recognize the former `prsm` names.
   before connection setup, as required by the engine's JSON parser.
 - `schema.json` checks whether values match the current protocol schema,
   including rejection of requests with the former prefix.
-- `protocol.json` checks both SDK decoders, including malformed messages,
+- `protocol.json` checks all four SDK decoders, including malformed messages,
   unknown events, extra fields, and unknown enum values.
 
 The schema describes known protocol values. The decoders tolerate unknown
@@ -25,9 +25,41 @@ decoder tests check that behavior without relaxing client request validation.
 A future server value can fail the current schema check and still be accepted
 by the SDK decoder. The SDK does not use this fixture to reject incoming events.
 
+Each SDK runs the cases in `schema.json` against the schema fixture. Local test
+peers also validate outgoing SDK requests against the message schemas, including
+initialization, tools, audio, and playback reports. Rust and Go use package-local
+fixture copies; CI checks that these copies match this directory.
+
+All four SDKs report terminal session failures before queued events. Normal
+closure ends event consumption without a terminal error. Canceling audio before
+socket submission
+sends nothing. Canceling an active audio submission closes the session because
+the submitted audio can have an unknown outcome; it is never replayed.
+
 Session tests use local WebSocket peers to check request acknowledgments,
 readiness, typed input, tool calls, cancellation, and playback reports. Audio
 tests use the shared conversion samples in `../pcm-input.json`.
+
+Rust and Go use these request states:
+
+| State | Tracking and cancellation |
+| --- | --- |
+| Queued | The operation waits for admission. Cancellation sends nothing. |
+| Writer handoff | The worker retains request matching before it can process incoming acknowledgments or cancellation. Its internal `submitted` flag is conservative: it also covers this handoff. Only a writer-confirmed skip releases the reservation without a write. |
+| Submitted | The writer commits to the write when its final cancellation check succeeds, immediately before transport entry. Reply, control, and tool-result matching remains active after caller cancellation. |
+| Settled | The write outcome and required acknowledgment are known. Accepted replies remain tracked until caller delivery or cancellation is observed. |
+
+The handoff is one synchronous worker transition. A writer can start on another
+task or goroutine, but the worker cannot process its results halfway through
+that transition. An acknowledgment can arrive before write completion; the
+worker retains it and cancels an abandoned accepted reply exactly once.
+Controlled private writers test cancellation on both sides of submission.
+
+Cancellation flags, tokens, and wake signals do not use the bounded work queues.
+Queue saturation tests cover future drop, last-handle drop, and socket shutdown.
+Runner tests cover receipt waits concurrent with playback operations, dropped
+Rust run futures during playback and stop confirmation, and the cooperative
+cleanup contract for application adapters.
 
 For SDK usage and connection settings, see the
 [Python realtime guide](../../python/docs/realtime.md) or the
