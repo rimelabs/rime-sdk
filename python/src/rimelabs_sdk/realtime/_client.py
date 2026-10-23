@@ -73,11 +73,12 @@ class Realtime:
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
-        Settings are fixed for the lifetime of the session.
+        Settings are fixed for the lifetime of the session, except the reply labels, which
+        set_response_metadata replaces.
 
-        request_id is sent as the upgrade's x-request-id. Prism keeps it when it is 1 to 128
-        printable ASCII characters and otherwise makes its own; info.request_id reports the
-        one it used.
+        request_id is sent as the upgrade's x-request-id. It must be printable ASCII, or
+        connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
+        makes its own; info.request_id reports the one it used.
         """
         self._client._check_loop()
         self._client._check_open()

@@ -121,9 +121,9 @@ impl RealtimeConnectOptions {
         self.timeouts = value;
         self
     }
-    /// Send the upgrade's x-request-id. Prism keeps one of 1 to 128 printable
-    /// ASCII characters and otherwise makes its own; `info().request_id`
-    /// reports the one it used.
+    /// Send the upgrade's x-request-id. It must be printable ASCII, or `connect`
+    /// returns an input error. Prism uses it if it is at most 128 characters,
+    /// else makes its own; `info().request_id` reports the one it used.
     pub fn request_id(mut self, value: impl Into<String>) -> Self {
         self.request_id = Some(value.into());
         self
@@ -374,7 +374,7 @@ pub enum RealtimeEvent {
         parent: Option<ResponseRef>,
         /// Typed input history item.
         input_item_id: Option<String>,
-        /// Your own labels: the session's, with the request's over them.
+        /// The session's labels when the reply began.
         metadata: Labels,
         /// The user items the reply answers; empty when Prism names none.
         input_item_ids: Vec<String>,

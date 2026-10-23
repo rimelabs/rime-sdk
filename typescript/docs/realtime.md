@@ -153,7 +153,8 @@ tool execution outside the runner.
 
 Use `await client.realtime.connect()` with `RIME_API_KEY` set. It opens a WebSocket,
 initializes one conversation, and returns a `RealtimeSession`. Settings apply
-once. Open a new session to change them.
+once, except the reply labels, which `setResponseMetadata` replaces. Open a new
+session to change the others.
 
 | Option | Required? | Default and behavior |
 | --- | --- | --- |
@@ -165,8 +166,8 @@ once. Open a new session to change them.
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `requestId` | No | Your id for the session, sent as `x-request-id`. Prism uses it if it is 1 to 128 printable ASCII characters, else makes its own. |
-| `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. |
+| `requestId` | No | Your id for the session. Sent as `x-request-id`. It must be printable ASCII, or the SDK throws `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
 
 Credentials come from `new Rime({ apiKey: "..." })` or `RIME_API_KEY`. Prism uses
@@ -177,7 +178,8 @@ After connection, `session.info` contains `sessionId`, `requestId`, `model`,
 `voice`, `interruptOnSpeech`, `turnDetection`, `responseMetadata`,
 `toolResultTimeoutS`, and `toolContinuationTimeoutS`. `requestId` is the id
 Prism's logs use; include it when you report a problem. It is `null` on servers
-that do not send it.
+that do not send it. An event's or error's `requestId` is the SDK's event ID,
+not this one.
 Check the effective interruption setting there. Tool wait durations are total
 server deadlines, not remaining time. A `null` duration can mean an omitted
 field; it does not prove that no deadline exists.

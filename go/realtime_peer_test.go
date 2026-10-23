@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,6 +22,8 @@ type realtimePeer struct {
 	// The upgrade's x-request-id, and each session.update's settings.
 	requestID string
 	updates   chan rtObject
+	// Refuse session updates with invalid_session.
+	refuse atomic.Bool
 }
 
 func newRealtimePeer(t *testing.T) *realtimePeer { return newRealtimePeerWithPause(t, false) }
@@ -70,6 +73,10 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 				select {
 				case p.updates <- settings:
 				default:
+				}
+				if p.refuse.Load() {
+					_ = send(rtObject{"type": "error", "error": rtObject{"code": "invalid_session", "scope": "event", "owner": rtObject{"event_id": v["event_id"]}}})
+					continue
 				}
 				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": session})
 				if pause {

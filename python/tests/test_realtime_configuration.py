@@ -288,6 +288,7 @@ class _LabelPeer(Peer):
     """Echoes the labels an update names, as Prism does."""
 
     echo = True
+    refuse = False
 
     async def send(self, raw):
         event = json.loads(raw)
@@ -295,6 +296,10 @@ class _LabelPeer(Peer):
             return await super().send(raw)
         _VALIDATORS[event["type"]].validate(event)
         self.settings = event["session"]
+        if self.refuse:
+            error = {"code": "invalid_session", "scope": "event"}
+            self.emit("error", error={**error, "owner": {"event_id": event["event_id"]}})
+            return
         session = {"id": "session-1", "voice": "test"}
         if self.echo and "prism_response_metadata" in event["session"]:
             session["prism_response_metadata"] = event["session"]["prism_response_metadata"]
@@ -342,3 +347,21 @@ async def test_invalid_response_metadata_is_not_sent(monkeypatch, value):
             with pytest.raises(RimeInputError, match="response_metadata"):
                 await session.set_response_metadata(value)
             assert peer.settings is settings
+
+
+async def test_a_refused_label_change_raises_invalid_session(monkeypatch):
+    peer = _LabelPeer()
+
+    async def connect(endpoint, **kwargs):
+        return peer
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with (
+        Rime(api_key="test") as client,
+        client.realtime.connect(response_metadata={"step": "1"}) as session,
+    ):
+        peer.refuse = True
+        with pytest.raises(r.RimeRealtimeError) as refusal:
+            await session.set_response_metadata({"step": "2"})
+        assert refusal.value.fault.code == "invalid_session"
+        assert session.info.response_metadata == {"step": "1"}

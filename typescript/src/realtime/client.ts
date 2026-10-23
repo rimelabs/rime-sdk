@@ -221,11 +221,11 @@ export class Realtime {
         settings.turn_detection.prism_end_of_turn_timeout_ms = value;
       }
     }
-    if (options.responseMetadata !== undefined)
+    if (options.responseMetadata != null)
       settings.prism_response_metadata = responseMetadata(
         options.responseMetadata,
       );
-    const requestId = options.requestId;
+    const requestId = options.requestId ?? undefined;
     if (
       requestId !== undefined &&
       (typeof requestId !== "string" ||

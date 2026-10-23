@@ -126,3 +126,17 @@ func TestRealtimeRequestIDAndResponseMetadata(t *testing.T) {
 		t.Fatalf("x-request-id %q, info %+v", other.requestID, s.Info())
 	}
 }
+
+func TestRealtimeRefusedLabelsFailOnlyTheCall(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setupWith(t, RealtimeConnectOptions{ResponseMetadata: map[string]string{"step": "1"}})
+	p.refuse.Store(true)
+	var fault *RealtimeFault
+	if e := s.SetResponseMetadata(context.Background(), map[string]string{"step": "2"}); !errors.As(e, &fault) || fault.Code != "invalid_session" {
+		t.Fatalf("refusal %v", e)
+	}
+	if got := s.Info().ResponseMetadata; !reflect.DeepEqual(got, map[string]string{"step": "1"}) {
+		t.Fatalf("labels %v", got)
+	}
+	p.turn(s, "reply-1")
+}

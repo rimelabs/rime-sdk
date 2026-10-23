@@ -281,8 +281,7 @@ class ResponseStarted:
     cause: Literal["speech", "text", "proactive", "tools", "unknown"]
     parent: ResponseRef | None = None
     input_item_id: str | None = None
-    # The client's own metadata keys: the session's labels, with the request's own over
-    # them. Prism's prism_ keys are left out.
+    # The session's labels when the reply began. Prism's prism_ keys are left out.
     metadata: Labels = field(default_factory=dict)
     # The user items the reply answers: a spoken reply's committed turns, or a typed
     # turn's item. Empty when the server names none.

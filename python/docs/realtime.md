@@ -147,7 +147,8 @@ keeps tool execution outside the runner.
 
 Use `async with client.realtime.connect() as session` with `RIME_API_KEY` set.
 The context opens the WebSocket, initializes the session, and closes it on exit.
-Settings apply once; open a new session to change them.
+Settings apply once, except the reply labels, which `set_response_metadata`
+replaces; open a new session to change the others.
 
 | Argument | Required? | Default and behavior |
 | --- | --- | --- |
@@ -159,8 +160,8 @@ Settings apply once; open a new session to change them.
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `request_id: str \| None` | No | Your id for the session, sent as `x-request-id`. Prism uses it if it is 1 to 128 printable ASCII characters, else makes its own. |
-| `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. |
+| `request_id: str \| None` | No | Your id for the session. Sent as `x-request-id`. It must be printable ASCII, or the SDK raises `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 
 All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or
 `RIME_API_KEY`, sent as `Authorization: Bearer <key>`. The endpoint must accept
@@ -170,7 +171,8 @@ Once connected, `session.info` gives the session ID, voice, model, effective
 interruption setting, turn timing, reply labels (`response_metadata`), and any
 published tool wait durations.
 `session.info.request_id` is the id Prism's logs use; include it when you report
-a problem. It is `None` on servers that do not send it. Check
+a problem. It is `None` on servers that do not send it. An event's or error's
+`request_id` is the SDK's event ID, not this one. Check
 `session.info.interrupt_on_speech` for the setting the server actually applied.
 Prism sessions always request both text and audio output.
 

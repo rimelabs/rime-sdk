@@ -160,3 +160,19 @@ async fn request_id_and_response_metadata() {
     assert_eq!(s.info().request_id.as_deref(), Some("server-made"));
     c.close().await;
 }
+
+#[tokio::test]
+async fn refused_labels_fail_only_the_call() {
+    use crate::realtime::{Labels, RealtimeConnectOptions};
+    let mut p = Peer::new().await;
+    let labels = |step: &str| Labels::from([("step".into(), step.into())]);
+    let (c, s) = p
+        .setup_with(RealtimeConnectOptions::default().response_metadata(labels("1")))
+        .await;
+    p.refuse_updates();
+    let error = s.set_response_metadata(labels("2")).await.unwrap_err();
+    assert_eq!(error.realtime_fault().unwrap().code, "invalid_session");
+    assert_eq!(s.info().response_metadata, Some(labels("1")));
+    p.turn(&s, "reply-1").await;
+    c.close().await;
+}

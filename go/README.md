@@ -370,13 +370,16 @@ valid, nonblank UTF-8 with at most 500 Unicode scalar values. Omit these setting
 to use server defaults. `session.Info()` returns a copy of the effective published
 settings.
 
-`RequestID` is sent as the upgrade's `x-request-id`. Prism keeps one of 1 to 128
-printable ASCII characters and otherwise makes its own; `Info().RequestID` reports
-the one it used. Include it when you report a problem. `ResponseMetadata` labels
-every reply, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters
-and values up to 512, no key starting with `prism_`. `ResponseStarted.Metadata`
-carries them, and `ResponseStarted.InputItemIDs` names the user items a reply
-answers.
+`RequestID` is sent as the upgrade's `x-request-id`. It must be printable ASCII,
+or `Connect` returns `ErrInput`. Prism uses it if it is at most 128 characters,
+else makes its own; `Info().RequestID` reports the one it used. Include it when
+you report a problem; an event's or fault's `RequestID` is the SDK's event ID, not
+this one. `ResponseMetadata` labels every reply, such as `{"step": "3"}`: up to 16
+strings, keys up to 64 characters and values up to 512, no key starting with
+`prism_`. Prism refuses labels that break these rules with a `*RealtimeFault`
+whose code is `invalid_session`. Settings apply once, except these labels, which
+`SetResponseMetadata` replaces. `ResponseStarted.Metadata` carries them, and
+`ResponseStarted.InputItemIDs` names the user items a reply answers.
 
 | Session method | Behavior |
 | --- | --- |

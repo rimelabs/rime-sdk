@@ -5,7 +5,10 @@ use crate::{
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use tokio::{net::TcpListener, sync::mpsc, task::JoinHandle};
@@ -25,6 +28,8 @@ pub(super) struct Peer {
     updates: mpsc::Receiver<Value>,
     /// The upgrade's x-request-id.
     request_id: Arc<Mutex<Option<String>>>,
+    /// Refuse session updates with invalid_session.
+    refuse: Arc<AtomicBool>,
     task: JoinHandle<()>,
 }
 impl Drop for Peer {
@@ -47,6 +52,8 @@ impl Peer {
         let (update, updates) = mpsc::channel(16);
         let request_id = Arc::new(Mutex::new(None));
         let header = request_id.clone();
+        let refuse = Arc::new(AtomicBool::new(false));
+        let refusing = refuse.clone();
         let task = tokio::spawn(async move {
             let (socket, _) = listener.accept().await.unwrap();
             let mut ws = accept_hdr_async(socket, |r: &Request, response: Response| {
@@ -75,7 +82,7 @@ impl Peer {
             loop {
                 tokio::select! {
                  v=incoming.recv()=>match v{Some(v)=>if ws.send(Message::Text(v.to_string().into())).await.is_err(){break},None=>break},
-                 message=ws.next(), if !(pause && initialized)=>{let Some(Ok(Message::Text(message)))=message else{break};let v:Value=serde_json::from_str(&message).unwrap();super::schema::validate_request(&v);if v["type"]=="session.update"{initialized=true;let mut session=json!({"id":"session-1","voice":"test","request_id":used});if let Some(labels)=v["session"].get("prism_response_metadata"){session["prism_response_metadata"]=labels.clone()}let _=update.try_send(v["session"].clone());if ws.send(Message::Text(json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":session}).to_string().into())).await.is_err(){break}}else if out.send(v).await.is_err(){break}}
+                 message=ws.next(), if !(pause && initialized)=>{let Some(Ok(Message::Text(message)))=message else{break};let v:Value=serde_json::from_str(&message).unwrap();super::schema::validate_request(&v);if v["type"]=="session.update"{initialized=true;let mut session=json!({"id":"session-1","voice":"test","request_id":used});if let Some(labels)=v["session"].get("prism_response_metadata"){session["prism_response_metadata"]=labels.clone()}let _=update.try_send(v["session"].clone());let reply=if refusing.load(Ordering::Relaxed){json!({"type":"error","error":{"code":"invalid_session","scope":"event","owner":{"event_id":v["event_id"]}}})}else{json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":session})};if ws.send(Message::Text(reply.to_string().into())).await.is_err(){break}}else if out.send(v).await.is_err(){break}}
                 }
             }
         });
@@ -85,6 +92,7 @@ impl Peer {
             recv,
             updates,
             request_id,
+            refuse,
             task,
         }
     }
@@ -107,6 +115,9 @@ impl Peer {
             .await
             .unwrap();
         (client, session)
+    }
+    pub fn refuse_updates(&self) {
+        self.refuse.store(true, Ordering::Relaxed)
     }
     pub fn request_id(&self) -> Option<String> {
         self.request_id.lock().unwrap().clone()

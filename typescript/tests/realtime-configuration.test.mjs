@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import https from "node:https";
-import { Rime, RimeInputError, RimeUnavailableError } from "../dist/index.js";
+import {
+  Rime,
+  RimeInputError,
+  RimeRealtimeError,
+  RimeUnavailableError,
+} from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 
 for (const filler of [
@@ -371,4 +376,42 @@ test("invalid response metadata fails before it is sent", async (t) => {
   const sent = peer.requests.length;
   await assert.rejects(session.setResponseMetadata([]), RimeInputError);
   assert.equal(peer.requests.length, sent);
+});
+
+test("null request id and labels are omitted", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  await client.realtime.connect({
+    endpoint: peer.endpoint,
+    requestId: null,
+    responseMetadata: null,
+  });
+  assert.equal(peer.requestId, undefined);
+  assert.equal("prism_response_metadata" in peer.settings, false);
+});
+
+test("a refused label change fails with invalid_session and keeps the labels", async (t) => {
+  const peer = await new Peer().start();
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await peer.close();
+  });
+  const session = await client.realtime.connect({
+    endpoint: peer.endpoint,
+    responseMetadata: { step: "1" },
+  });
+  peer.autoInitialize = false;
+  peer.onRequest = (event) => peer.fault(event, "invalid_session");
+  await assert.rejects(
+    session.setResponseMetadata({ step: "2" }),
+    (error) =>
+      error instanceof RimeRealtimeError &&
+      error.fault.code === "invalid_session",
+  );
+  assert.deepEqual(session.info.responseMetadata, { step: "1" });
 });

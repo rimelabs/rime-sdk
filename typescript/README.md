@@ -324,6 +324,7 @@ See the [TTS guide](https://github.com/rimelabs/rime-sdk/blob/main/typescript/do
 for more examples. Visit [Rime documentation](https://docs.rime.ai/) for service
 information, or report SDK issues on [GitHub](https://github.com/rimelabs/rime-sdk/issues).
 Include the SDK version and the error's `requestId` when available; omit API keys.
+For Prism, include `session.info.requestId`.
 
 SDK code uses the [MIT license](LICENSE). The Prism protocol module uses
 [Apache 2.0](LICENSE-PRISM); see its [notices](NOTICE-PRISM).

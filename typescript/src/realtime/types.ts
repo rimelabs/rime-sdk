@@ -71,14 +71,15 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly interruptOnSpeech?: boolean;
   readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
-  /** Sent as the upgrade's `x-request-id`. Prism keeps it when it is 1 to 128
-   * printable ASCII characters and otherwise makes its own; `info.requestId`
-   * reports the one it used. */
-  readonly requestId?: string;
+  /** Sent as the upgrade's `x-request-id`. It must be printable ASCII, or
+   * `connect` throws `RimeInputError`. Prism uses it if it is at most 128
+   * characters, else makes its own; `info.requestId` reports the one it used.
+   * Omitted or `null` sends none. */
+  readonly requestId?: string | null;
   /** Labels every reply's `response.started` carries in `metadata`, such as
    * `{ step: "3" }`; change them with `session.setResponseMetadata`. Prism
-   * refuses keys starting with `prism_`. */
-  readonly responseMetadata?: Labels;
+   * refuses keys starting with `prism_`. Omitted or `null` sets none. */
+  readonly responseMetadata?: Labels | null;
 }
 export interface ReplyOptions extends RealtimeOperationOptions {
   readonly instruction?: string | null;
@@ -217,8 +218,8 @@ export interface ResponseStarted {
   readonly cause: "speech" | "text" | "proactive" | "tools" | "unknown";
   readonly parent: ResponseRef | null;
   readonly inputItemId: string | null;
-  /** The client's own metadata keys: the session's labels, with the
-   * request's own over them. Prism's `prism_` keys are left out. */
+  /** The session's labels when the reply began. Prism's `prism_` keys are
+   * left out. */
   readonly metadata: Labels;
   /** The user items the reply answers: a spoken reply's committed turns, or
    * a typed turn's item. Empty when the server names none. */
