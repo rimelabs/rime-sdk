@@ -1,0 +1,135 @@
+go/README.md
+  s_4a20e3ec5ae1cd::t_423ea246cae118 339,383-436,445,450,517
+conformance/prism/README.md
+  s_4a20e3ec5ae1cd::t_423ea246cae118 74-85
+rust/README.md
+  s_4a20e3ec5ae1cd::t_423ea246cae118 313,318-321,367-423,432,437,465
+conformance/prism/error-retry.json
+  s_4a20e3ec5ae1cd::t_d38db91ff4ce5e 8
+conformance/prism/protocol.json
+  s_4a20e3ec5ae1cd::t_413c0ac7a5143c 609-611,912-1183,1212-1214,1225-1227
+conformance/prism/schema.json
+  s_4a20e3ec5ae1cd::t_1dff5c8a5a67f4 294-335
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_4a20e3ec5ae1cd::t_da5c1672cd0b71 489-491,733-735,791
+go/realtime.go
+  s_4a20e3ec5ae1cd::t_e5823bee74dfc4 7,24-152,211-213,235
+go/realtime_conversation.go
+  s_4a20e3ec5ae1cd::t_5ef1b0534e1c64 65,72-96,368-371,373,381-388
+go/realtime_conversation_test.go
+  s_4a20e3ec5ae1cd::t_727e1a48d4bb6c 40-44,56,145-152,503-586
+go/realtime_interruption_policy_test.go
+  s_4a20e3ec5ae1cd::t_88a3e8b90b95ff 1-242
+go/realtime_peer_test.go
+  s_4a20e3ec5ae1cd::t_92b47156b97d58 22,24-27,33-38,61,76-84
+go/realtime_protocol.go
+  s_4a20e3ec5ae1cd::t_97159a6d3864fd 179,182-188,337,345
+go/realtime_session.go
+  s_4a20e3ec5ae1cd::t_9fc799e4f727c2 21-28,37-50,53,112-179,323-334,596,876-880,896-912,952-957,1063-1065
+go/realtime_settings_validation_test.go
+  s_4a20e3ec5ae1cd::t_ab5efbfb8ed7ea 1-129
+go/realtime_types.go
+  s_4a20e3ec5ae1cd::t_382019db168b01 89-98,101-102,162-168,195-198
+go/realtime_updates_test.go
+  s_4a20e3ec5ae1cd::t_28b47ba9af049d 1-182
+go/testdata/prism/error-retry.json
+  s_4a20e3ec5ae1cd::t_57839b62f4d4ad 8
+go/testdata/prism/protocol.json
+  s_4a20e3ec5ae1cd::t_d76c451075ecb1 609-611,912-1183,1212-1214,1225-1227
+go/testdata/prism/schema.json
+  s_4a20e3ec5ae1cd::t_39e1c522dcb63f 294-335
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_4a20e3ec5ae1cd::t_623067fb410583 489-491,733-735,791
+python/docs/realtime.md
+  s_4a20e3ec5ae1cd::t_47abdaea303f99 109-115,153-154,215-254,261,343,502,506-517
+python/src/rimelabs_sdk/realtime/_client.py
+  s_4a20e3ec5ae1cd::t_5128695c4f15b3 23-24,64,93
+python/src/rimelabs_sdk/realtime/_conversation.py
+  s_4a20e3ec5ae1cd::t_b1924563ae2bbc 15,85,272-274,286-297
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_4a20e3ec5ae1cd::t_c37bb1f74acd6b 54-60,63,83,216-223,268,465,496
+python/src/rimelabs_sdk/realtime/_session.py
+  s_4a20e3ec5ae1cd::t_7e84b70c5d0ddc 17,20,35,44-50,79,111-112,150,152-153,283-290,363-396,519,670-697,736-738,765-770
+python/src/rimelabs_sdk/realtime/_settings.py
+  s_4a20e3ec5ae1cd::t_d4c5e43c6b576b 1-87
+python/src/rimelabs_sdk/realtime/_types.py
+  s_4a20e3ec5ae1cd::t_7f2eff7ef487be 173-175,283-285,354-356
+python/tests/test_conversation.py
+  s_4a20e3ec5ae1cd::t_6e97724aa77a4d 178,184-186,199-200,333-342,849-850,857,860-862,865-871,873,875-911,959-1152
+python/tests/test_realtime.py
+  s_4a20e3ec5ae1cd::t_e8ac3b46931c52 48
+python/tests/test_realtime_updates.py
+  s_4a20e3ec5ae1cd::t_9c4520b0b3fc10 1-212
+rust/src/lib.rs
+  s_4a20e3ec5ae1cd::t_eeafafda980a89 28-30
+rust/src/realtime/client.rs
+  s_4a20e3ec5ae1cd::t_32f206672bc7e2 20-67,108
+rust/src/realtime/conversation.rs
+  s_4a20e3ec5ae1cd::t_42ff9da885f1c2 104,112-116,291,301-306,308,315,575-639
+rust/src/realtime/dispatch.rs
+  s_4a20e3ec5ae1cd::t_dedc00d4dcc539 34,38-41,43-47,65,101-120,133-140,166-169,282
+rust/src/realtime/protocol.rs
+  s_4a20e3ec5ae1cd::t_fdee3411de16b7 71-73,77,330,346
+rust/src/realtime/session.rs
+  s_4a20e3ec5ae1cd::t_92dfa92a57b89f 55-114,121-122,132-133,140-146,156-161,173-182,226,292-295,312-315,338,340-341,370,377-378,383,391,393-424
+rust/src/realtime/tests/conversation.rs
+  s_4a20e3ec5ae1cd::t_b0a728af6318c7 143-148,154,396-575
+rust/src/realtime/tests/mod.rs
+  s_4a20e3ec5ae1cd::t_ebcaff79783982 9-10
+rust/src/realtime/tests/peer.rs
+  s_4a20e3ec5ae1cd::t_360a28b46175ce 47-53,89-93,97-109
+rust/src/realtime/tests/submission.rs
+  s_4a20e3ec5ae1cd::t_596ebd36ce283c 35,37-38,206,219-220,231,233,287-290,296-310,315,327-386
+rust/src/realtime/tests/updates.rs
+  s_4a20e3ec5ae1cd::t_9897bc600bbd17 1-392
+rust/src/realtime/types.rs
+  s_4a20e3ec5ae1cd::t_bfa7def4e0c095 137-166,270-271,401-402,465-466
+rust/src/realtime/worker.rs
+  s_4a20e3ec5ae1cd::t_db5af2b57c2f40 141-148
+rust/testdata/prism/error-retry.json
+  s_4a20e3ec5ae1cd::t_fa3ee2483fd6b2 8
+rust/testdata/prism/protocol.json
+  s_4a20e3ec5ae1cd::t_66105d36145f13 609-611,912-1183,1212-1214,1225-1227
+rust/testdata/prism/schema.json
+  s_4a20e3ec5ae1cd::t_b139dad014126e 294-335
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_4a20e3ec5ae1cd::t_76a62f28911f09 489-491,733-735,791
+typescript/docs/realtime.md
+  s_4a20e3ec5ae1cd::t_63266ca49f1ff5 113-119,158-160,227-267,274,288-289,359,522,526-537
+typescript/src/realtime/client.ts
+  s_4a20e3ec5ae1cd::t_b239ef5545daa8 11-12,94
+typescript/src/realtime/conversation.ts
+  s_4a20e3ec5ae1cd::t_85c601f4d624bd 10,62,67,246,248-254,292-295,315-324,326
+typescript/src/realtime/protocol.ts
+  s_4a20e3ec5ae1cd::t_cea3b63a26a85b 35-40,42,57,192-196,248,497,531
+typescript/src/realtime/session.ts
+  s_4a20e3ec5ae1cd::t_1c40c4fc151ad5 20,29-37,48,96,145,327-335,441-471,642,820-846,887-890
+typescript/src/realtime/settings.ts
+  s_4a20e3ec5ae1cd::t_ac9c1ffb2dcfd1 1-171
+typescript/src/realtime/types.ts
+  s_4a20e3ec5ae1cd::t_1708e2a269180c 84-90,117-119,226-228,279-281
+typescript/tests/conversation.test.mjs
+  s_4a20e3ec5ae1cd::t_77d3a385139e25 210-213,224-226,234,390-395,397,400-403,935-1117
+typescript/tests/realtime-tool-validation.test.mjs
+  s_4a20e3ec5ae1cd::t_eb0bd20ccae069 1-116
+typescript/tests/realtime-updates.test.mjs
+  s_4a20e3ec5ae1cd::t_4056e4fbb4b52f 1-191
+typescript/tests/realtime.test.mjs
+  s_4a20e3ec5ae1cd::t_ee518675dc1f47 90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8116a4a26a19249466deb253d225380439e3e2b1",
+  "prompts": {},
+  "sessions": {
+    "s_4a20e3ec5ae1cd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a34-efd2-7262-92e1-61f423fa0cd3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
