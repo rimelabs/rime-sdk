@@ -18,6 +18,14 @@ import (
 
 var errRealtimeClosed = errors.New("realtime session closed")
 
+const rtInterruptionPolicyLimit = 128
+
+type rtInterruptionPolicy struct {
+	revision  uint64
+	interrupt bool
+	unknown   bool
+}
+
 func realtimeClosedError() error {
 	return &Error{Kind: ErrCancelled, Message: "realtime session closed", Cause: errRealtimeClosed}
 }
@@ -26,20 +34,23 @@ func realtimeClosedError() error {
 // Close waits for the worker and both socket operations. References expire after
 // 128 later responses. Overflow fails explicitly; no writes are replayed.
 type RealtimeSession struct {
-	normalClose atomic.Bool
-	op          *operation
-	timeouts    RealtimeTimeouts
-	commands    chan *rtCommand
-	wake        chan struct{}
-	events      chan SessionEvent
-	initialized chan error
-	done        chan struct{}
-	receiving   atomic.Bool
-	mu          sync.Mutex
-	info        SessionInfo
-	terminal    error
+	normalClose          atomic.Bool
+	op                   *operation
+	timeouts             RealtimeTimeouts
+	commands             chan *rtCommand
+	wake                 chan struct{}
+	events               chan SessionEvent
+	initialized          chan error
+	done                 chan struct{}
+	receiving            atomic.Bool
+	mu                   sync.Mutex
+	info                 SessionInfo
+	interruptionPolicies []rtInterruptionPolicy
+	lastSettingsRevision *uint64
+	terminal             error
 }
 type rtResult struct {
+	info SessionInfo
 	ref  ResponseRef
 	item ItemRef
 	err  error
@@ -98,7 +109,74 @@ func newRealtimeSession(op *operation, t RealtimeTimeouts) *RealtimeSession {
 func (s *RealtimeSession) Info() SessionInfo {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := s.info
+	return cloneSessionInfo(s.info)
+}
+
+// setInfo records only policy changes, so ordinary prompt and tool updates do
+// not discard settings needed by a reply prepared before an acknowledgment.
+func (s *RealtimeSession) setInfo(info SessionInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	policies := s.interruptionPolicies
+	if info.SettingsRevision != nil {
+		latest := *info.SettingsRevision
+		s.lastSettingsRevision = &latest
+	}
+	var next *rtInterruptionPolicy
+	if len(policies) == 0 {
+		revision := uint64(0)
+		if info.SettingsRevision != nil {
+			revision = *info.SettingsRevision
+		}
+		next = &rtInterruptionPolicy{revision: revision, interrupt: info.InterruptOnSpeech}
+	} else if info.SettingsRevision == nil {
+		if s.info.InterruptOnSpeech != info.InterruptOnSpeech && !policies[len(policies)-1].unknown {
+			// The change happened after the last published acknowledgment, but
+			// its precise revision is unknown. Do not apply an older policy there.
+			revision := uint64(0)
+			if s.lastSettingsRevision != nil {
+				revision = *s.lastSettingsRevision + 1
+			}
+			next = &rtInterruptionPolicy{revision: revision, unknown: true}
+		}
+	} else if policies[len(policies)-1].unknown || policies[len(policies)-1].interrupt != info.InterruptOnSpeech {
+		next = &rtInterruptionPolicy{revision: *info.SettingsRevision, interrupt: info.InterruptOnSpeech}
+	}
+	if next != nil {
+		policies = append(policies, *next)
+		if len(policies) > rtInterruptionPolicyLimit {
+			copy(policies, policies[len(policies)-rtInterruptionPolicyLimit:])
+			policies = policies[:rtInterruptionPolicyLimit]
+		}
+		s.interruptionPolicies = policies
+	}
+	s.info = info
+}
+
+func (s *RealtimeSession) interruptionPolicy(revision *uint64) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if revision == nil || len(s.interruptionPolicies) == 0 {
+		return s.info.InterruptOnSpeech, nil
+	}
+	for i := len(s.interruptionPolicies) - 1; i >= 0; i-- {
+		policy := s.interruptionPolicies[i]
+		if policy.revision <= *revision {
+			if policy.unknown {
+				return false, failure(ErrResourceLimit, "reply interruption policy has an unknown settings revision")
+			}
+			return policy.interrupt, nil
+		}
+	}
+	return false, failure(ErrResourceLimit, "reply settings revision is older than retained interruption policies")
+}
+
+func cloneSessionInfo(info SessionInfo) SessionInfo {
+	v := info
+	if v.SettingsRevision != nil {
+		n := *v.SettingsRevision
+		v.SettingsRevision = &n
+	}
 	if v.Eagerness != nil {
 		x := *v.Eagerness
 		v.Eagerness = &x
@@ -240,6 +318,18 @@ func (s *RealtimeSession) invoke(ctx context.Context, c *rtCommand) (rtResult, e
 		}
 		return rtResult{}, s.failure()
 	}
+}
+
+// Update applies supplied settings and waits for the server acknowledgment.
+// Replies already started keep their settings. Cancellation after submission
+// does not undo an accepted update.
+func (s *RealtimeSession) Update(ctx context.Context, options RealtimeUpdateOptions) (SessionInfo, error) {
+	settings, err := rtPatch(options)
+	if err != nil {
+		return SessionInfo{}, err
+	}
+	result, err := s.invoke(ctx, &rtCommand{kind: "update", body: rtObject{"session": settings}})
+	return result.info, err
 }
 
 // SendText waits for admission and requests a reply to a typed user turn.
@@ -503,7 +593,7 @@ func (s *RealtimeSession) failureOr(e error) error {
 	return realtimeClosedError()
 }
 func (w *rtWorker) finish(c *rtCommand, r rtResult) {
-	if c.kind == "update" && r.err != nil {
+	if c.kind == "update" && !w.initialized && r.err != nil {
 		select {
 		case w.s.initialized <- r.err:
 		default:
@@ -783,22 +873,12 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 			}
 		}
 	}
-	if c.kind == "update" {
-		info := e.info
-		info.SessionID = w.sessionID
-		if !e.interruptKnown {
-			info.InterruptOnSpeech = w.interrupt
+	if c.kind == "update" || c.kind == "labels" {
+		result.info = cloneSessionInfo(e.info)
+		if !w.initialized {
+			w.initialized = true
+			w.s.initialized <- nil
 		}
-		w.s.mu.Lock()
-		w.s.info = info
-		w.s.mu.Unlock()
-		w.initialized = true
-		w.s.initialized <- nil
-	}
-	if c.kind == "labels" {
-		w.s.mu.Lock()
-		w.s.info.ResponseMetadata = e.info.ResponseMetadata
-		w.s.mu.Unlock()
 	}
 	if c.kind == "history" {
 		result.item = ItemRef{w.sessionID, e.target}
@@ -812,6 +892,23 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 	}
 	w.finish(c, result)
 	return nil
+}
+func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
+	info := e.info
+	info.SessionID = w.sessionID
+	if !e.interruptKnown {
+		info.InterruptOnSpeech = w.interrupt
+		if settings, ok := c.body["session"].(rtObject); ok {
+			if detection, ok := settings["turn_detection"].(map[string]any); ok {
+				if value, ok := detection["interrupt_response"].(bool); ok {
+					info.InterruptOnSpeech = value
+				}
+			}
+		}
+	}
+	w.interrupt = info.InterruptOnSpeech
+	w.s.setInfo(info)
+	e.info = info
 }
 func (w *rtWorker) dispatch(e *rtWire) error {
 	var matched []*rtCommand
@@ -852,6 +949,12 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		w.ready = false
 		w.latest = ""
 	case ResponseStarted:
+		policy, err := w.s.interruptionPolicy(p.SettingsRevision)
+		if err != nil {
+			return err
+		}
+		p.interruptOnSpeech = &policy
+		e.payload = p
 		w.epoch++
 		id := p.Response.responseID
 		if w.responses[id] != nil {
@@ -957,6 +1060,9 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		}
 	}
 	for _, c := range matched {
+		if c.kind == "update" || c.kind == "labels" {
+			w.applySessionInfo(c, e)
+		}
 		c.ack = e
 		if p, ok := e.payload.(ResponseStarted); ok {
 			r := p.Response

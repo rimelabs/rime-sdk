@@ -52,13 +52,74 @@ impl Drop for CallGuard {
         self.wake.notify_one()
     }
 }
+#[derive(Default)]
+struct InterruptPolicies {
+    changes: VecDeque<(u64, bool, bool)>,
+    current: bool,
+    last_revision: Option<u64>,
+}
+impl InterruptPolicies {
+    fn record(&mut self, revision: Option<u64>, interrupt: bool) {
+        match self.changes.back() {
+            None => self
+                .changes
+                .push_back((revision.unwrap_or(0), interrupt, false)),
+            Some((_, _, unknown)) => match revision {
+                None if interrupt != self.current && !unknown => {
+                    // Earlier published revisions stay known. Later replies
+                    // are ambiguous until a new acknowledgment has a revision.
+                    let start = self.last_revision.map_or(0, |value| value + 1);
+                    self.changes.push_back((start, interrupt, true));
+                }
+                Some(revision) if *unknown || interrupt != self.current => {
+                    self.changes.push_back((revision, interrupt, false));
+                }
+                _ => {}
+            },
+        }
+        if revision.is_some() {
+            self.last_revision = revision;
+        }
+        if self.changes.len() > 128 {
+            self.changes.pop_front();
+        }
+        self.current = interrupt;
+    }
+    fn resolve(&self, revision: Option<u64>, fallback: bool) -> Result<bool, Error> {
+        let Some(revision) = revision else {
+            return Ok(fallback);
+        };
+        self.changes
+            .iter()
+            .rev()
+            .find(|(start, _, _)| *start <= revision)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::ResourceLimit,
+                    "response interruption policy revision expired",
+                )
+            })
+            .and_then(|(_, value, unknown)| {
+                if *unknown {
+                    Err(Error::new(
+                        ErrorKind::ResourceLimit,
+                        "response settings revision crosses an unreported interruption policy change",
+                    ))
+                } else {
+                    Ok(*value)
+                }
+            })
+    }
+}
+
 /// A cloneable Prism session handle. Dropping the last handle requests cleanup.
 #[derive(Clone)]
 pub struct RealtimeSession {
     lease: Arc<Lease>,
     commands: mpsc::Sender<Command>,
     events: Arc<Mutex<Option<RealtimeEvents>>>,
-    info: Arc<Mutex<SessionInfo>>,
+    info: Arc<Mutex<Option<SessionInfo>>>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
     budgets: RealtimeTimeouts,
     done: CancellationToken,
     wake: Arc<Notify>,
@@ -68,12 +129,21 @@ pub struct RealtimeSession {
 /// A terminal failure takes precedence over queued events, then ends the stream.
 pub struct RealtimeEvents {
     receiver: mpsc::Receiver<SessionEvent>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
+    previous_response: Option<ResponseRef>,
     terminal: Arc<Mutex<Option<Error>>>,
     ended: bool,
 }
 impl Stream for RealtimeEvents {
     type Item = Result<SessionEvent, Error>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // Keep a delivered response's policy until the consumer asks for another event.
+        if let Some(previous) = self.previous_response.take() {
+            self.response_policies
+                .lock()
+                .expect("response policy mutex")
+                .remove(&previous);
+        }
         if self.ended {
             return Poll::Ready(None);
         }
@@ -83,7 +153,12 @@ impl Stream for RealtimeEvents {
             return Poll::Ready(Some(Err(e)));
         }
         match self.receiver.poll_recv(cx) {
-            Poll::Ready(Some(e)) => Poll::Ready(Some(Ok(e))),
+            Poll::Ready(Some(e)) => {
+                if let RealtimeEvent::ResponseStarted { response, .. } = &e.payload {
+                    self.previous_response = Some(response.clone());
+                }
+                Poll::Ready(Some(Ok(e)))
+            }
             Poll::Ready(None) => {
                 self.ended = true;
                 // Failure can be published after the first check but before the
@@ -93,6 +168,16 @@ impl Stream for RealtimeEvents {
             }
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+impl Drop for RealtimeEvents {
+    fn drop(&mut self) {
+        // Closing first makes concurrent publication fail and release its policy.
+        self.receiver.close();
+        self.response_policies
+            .lock()
+            .expect("response policy mutex")
+            .clear();
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -138,6 +223,7 @@ struct Command {
 }
 #[derive(Default)]
 struct Answer {
+    info: Option<SessionInfo>,
     response: Option<ResponseRef>,
     item: Option<ItemRef>,
 }
@@ -203,9 +289,10 @@ struct Worker {
     converter: Option<(crate::PcmFormat, InputAudio)>,
     timeouts: RealtimeTimeouts,
     interrupt: bool,
-    initialized: Option<oneshot::Sender<Result<Arc<Mutex<SessionInfo>>, Error>>>,
-    /// The settings the session shows, updated as Prism confirms changes.
-    info: Option<Arc<Mutex<SessionInfo>>>,
+    interrupt_policies: InterruptPolicies,
+    initialized: Option<oneshot::Sender<Result<SessionInfo, Error>>>,
+    info: Arc<Mutex<Option<SessionInfo>>>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
 }
 pub(super) async fn connect(
     inner: Arc<Inner>,
@@ -222,6 +309,10 @@ pub(super) async fn connect(
     let (writes, commands) = mpsc::channel(128);
     let (events, receiver) = mpsc::channel(256);
     let (tx, rx) = oneshot::channel();
+    let info = Arc::new(Mutex::new(None));
+    let worker_info = info.clone();
+    let response_policies = Arc::new(Mutex::new(HashMap::new()));
+    let worker_response_policies = response_policies.clone();
     let wake = Arc::new(Notify::new());
     let notify = wake.clone();
     let authorization = inner
@@ -244,8 +335,10 @@ pub(super) async fn connect(
             converter: None,
             timeouts: options.timeouts,
             interrupt: options.interrupt,
+            interrupt_policies: InterruptPolicies::default(),
             initialized: Some(tx),
-            info: None,
+            info: worker_info,
+            response_policies: worker_response_policies,
         };
         let result = worker
             .run(
@@ -274,18 +367,20 @@ pub(super) async fn connect(
         drop(worker);
         finished.cancel();
     })?;
-    let info = rx
-        .await
+    rx.await
         .map_err(|_| Error::new(ErrorKind::Stream, "realtime worker stopped"))??;
     Ok(RealtimeSession {
         lease,
         commands: writes,
         events: Arc::new(Mutex::new(Some(RealtimeEvents {
             receiver,
+            response_policies: response_policies.clone(),
+            previous_response: None,
             terminal: terminal.clone(),
             ended: false,
         }))),
         info,
+        response_policies,
         budgets,
         done,
         wake,
@@ -293,9 +388,40 @@ pub(super) async fn connect(
     })
 }
 impl RealtimeSession {
-    /// Effective server settings, as Prism last confirmed them.
+    /// An owned snapshot of the current acknowledged server settings.
     pub fn info(&self) -> SessionInfo {
-        self.info.lock().expect("info mutex").clone()
+        self.info
+            .lock()
+            .expect("session info mutex")
+            .as_ref()
+            .expect("initialized session")
+            .clone()
+    }
+    pub(super) fn response_interrupt_on_speech(
+        &self,
+        response: &ResponseRef,
+    ) -> Result<bool, Error> {
+        self.response_policies
+            .lock()
+            .expect("response policy mutex")
+            .get(response)
+            .copied()
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::ResourceLimit,
+                    "response interruption policy expired",
+                )
+            })
+    }
+    /// Apply supplied settings and wait for acknowledgment. Replies already
+    /// started keep their settings. Dropping the future after submission does
+    /// not undo an accepted update.
+    pub async fn update(&self, options: RealtimeUpdateOptions) -> Result<SessionInfo, Error> {
+        let settings = super::client::patch(options)?;
+        self.invoke(Command::new(Kind::Update, json!({"session": settings})))
+            .await?
+            .info
+            .ok_or_else(|| failure("missing acknowledged settings"))
     }
     /// Take the only owned event stream. A second call fails.
     pub fn events(&self) -> Result<RealtimeEvents, Error> {

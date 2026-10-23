@@ -70,3 +70,15 @@ cleanup contract for application adapters.
 For SDK usage and connection settings, see the
 [Python realtime guide](../../python/docs/realtime.md) or the
 [Node.js realtime guide](../../typescript/docs/realtime.md).
+
+Session updates follow `rimelabs/rime` at `d83e3bbf40068d16c2c0a10d14789cc35ac9f276`.
+The fixture includes `prism_settings_revision` on session and response views,
+and `session_setting_fixed`. Revision fields remain optional here so the same
+fixture can validate messages from older servers. Decoder cases reject malformed
+revisions. Session tests cover partial updates, clearing, request matching,
+refusals, cancellation, and updates during tool rounds.
+
+Revision fields in the wire schema follow the server contract and have no
+JavaScript safe-integer maximum. All four SDK decoders accept revisions only
+from 0 through 9,007,199,254,740,991 so they use the same exact numeric range.
+The schema and decoder fixtures test these separate constraints.

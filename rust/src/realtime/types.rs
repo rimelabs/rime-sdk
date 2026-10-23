@@ -134,6 +134,36 @@ impl RealtimeConnectOptions {
         self
     }
 }
+/// Partial settings for an existing session. Omitted fields keep their values.
+#[derive(Clone, Debug, Default)]
+pub struct RealtimeUpdateOptions {
+    pub(crate) instructions: Option<String>,
+    pub(crate) tools: Option<Vec<ToolDefinition>>,
+    pub(crate) voice: Option<String>,
+    pub(crate) interrupt: Option<bool>,
+}
+impl RealtimeUpdateOptions {
+    /// Replace instructions. An empty string clears them.
+    pub fn instructions(mut self, value: impl Into<String>) -> Self {
+        self.instructions = Some(value.into());
+        self
+    }
+    /// Replace the complete tool list. An empty list removes all tools.
+    pub fn tools(mut self, value: Vec<ToolDefinition>) -> Self {
+        self.tools = Some(value);
+        self
+    }
+    /// Change voice. An empty string selects the deployment default.
+    pub fn voice(mut self, value: impl Into<String>) -> Self {
+        self.voice = Some(value.into());
+        self
+    }
+    /// Set whether user speech interrupts subsequent replies.
+    pub fn interrupt_on_speech(mut self, value: bool) -> Self {
+        self.interrupt = Some(value);
+        self
+    }
+}
 /// Proactive reply options.
 #[derive(Clone, Debug, Default)]
 pub struct ReplyOptions {
@@ -237,6 +267,8 @@ impl OutputRef {
 /// Effective settings supplied by Prism. None means the field was not published.
 #[derive(Clone, Debug)]
 pub struct SessionInfo {
+    /// Settings revision published by the server, if available.
+    pub settings_revision: Option<u64>,
     /// Model name, always prism.
     pub model: &'static str,
     /// Session ID.
@@ -366,6 +398,8 @@ pub enum RealtimeEvent {
     },
     /// A new response was accepted.
     ResponseStarted {
+        /// Settings revision the reply began with, if published.
+        settings_revision: Option<u64>,
         /// New response.
         response: ResponseRef,
         /// Speech, text, tools, proactive, or unknown.
@@ -428,6 +462,8 @@ pub enum RealtimeEvent {
     },
     /// A response finished generating. Audio can still be playing.
     ResponseEnded {
+        /// Settings revision the reply began with, if published.
+        settings_revision: Option<u64>,
         /// Response reference.
         response: ResponseRef,
         /// Completed, cancelled, failed, or unknown.

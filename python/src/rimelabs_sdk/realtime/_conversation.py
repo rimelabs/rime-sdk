@@ -12,7 +12,7 @@ from typing import Any, Protocol
 
 from .._errors import RimeInputError, RimeResourceLimitError, RimeStreamError, RimeTimeoutError
 from . import _types as t
-from ._session import RealtimeSession, _is_session_close_error
+from ._session import RealtimeSession, _is_session_close_error, _response_interrupts_speech
 
 
 class ConversationSource(Protocol):
@@ -82,6 +82,7 @@ class _Output:
 @dataclass
 class _Reply:
     ref: t.ResponseRef
+    interrupt_on_speech: bool = True
     outputs: dict[t.OutputRef, _Output] = field(default_factory=dict)
     interrupted: bool = False
     ended: bool = False
@@ -268,7 +269,9 @@ async def run_conversation(
                     expired, _ = parents.popitem(last=False)
                     interrupted.discard(expired)
                 replies[response_id] = _Reply(
-                    payload.response, interrupted=was_interrupted(response_id)
+                    payload.response,
+                    interrupt_on_speech=_response_interrupts_speech(session, payload.response),
+                    interrupted=was_interrupted(response_id),
                 )
                 if replies[response_id].interrupted:
                     interrupted.add(response_id)
@@ -280,8 +283,18 @@ async def run_conversation(
                         output.stream.write(payload.audio)
                     elif isinstance(payload, t.AudioDone):
                         output.end()
-            elif isinstance(payload, t.SpeechStarted) and session.info.interrupt_on_speech:
-                interrupt(list(replies.values()))
+            elif isinstance(payload, t.SpeechStarted):
+                eligible = [
+                    reply
+                    for reply in replies.values()
+                    if not reply.interrupted
+                    and (
+                        not reply.ended
+                        or any(not output.receipt.done() for output in reply.outputs.values())
+                    )
+                ]
+                if eligible and eligible[-1].interrupt_on_speech:
+                    interrupt(eligible)
             elif isinstance(payload, t.ResponseAbandoned):
                 if payload.response.response_id in parents:
                     interrupted.add(payload.response.response_id)

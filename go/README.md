@@ -370,6 +370,60 @@ valid, nonblank UTF-8 with at most 500 Unicode scalar values. Omit these setting
 to use server defaults. `session.Info()` returns a copy of the effective published
 settings.
 
+### Update session settings
+
+```go
+instructions := "Handle billing. Use only the supplied tools."
+info, err := session.Update(ctx, rime.RealtimeUpdateOptions{
+    Instructions: &instructions,
+    Tools: []rime.ToolDefinition{refundTool},
+})
+if err != nil {
+    return err
+}
+fmt.Println(info.SettingsRevision)
+```
+
+`Instructions`, `Voice`, and `InterruptOnSpeech` are pointers; `nil` keeps the
+setting. A `nil` `Tools` slice keeps the tools. A non-nil empty slice clears them.
+
+Omitted fields keep their values. A supplied tool list replaces the complete
+list. Empty instructions clear the prompt; an empty tool list removes all tools.
+An empty voice selects the deployment default. Instructions and tools supplied
+together change in one request.
+
+The method waits for the matching `session.updated` acknowledgment and returns
+session information. The stored session information changes only after that
+acknowledgment. A rejected update leaves it unchanged and keeps the connection
+open. Cancellation after submission does not undo an accepted update.
+
+Updates do not wait for turn readiness or tool results. Each reply keeps the
+settings it began with. A reply prepared on an early turn-end guess can be
+announced after an update but still use the previous settings revision.
+Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
+
+`SessionInfo`, `ResponseStarted`, and `ResponseEnded` expose `SettingsRevision`
+as `*uint64`. It is `nil` when the server does not publish it. Users do not need
+to manage it. Use each reply's revision to identify its settings.
+
+The conversation runner captures each reply's interruption policy from its own
+settings revision. On confirmed speech, the newest reply still generating or
+awaiting a measured playback receipt controls interruption of the playback batch.
+A later update does not change that policy, even if the server has finished its
+estimated playback before the device finishes playing.
+
+The SDK retains the latest 128 interruption policy changes. Prompt-only and
+tool-only updates do not consume this history. A newly announced reply that
+references an older, evicted policy fails with `ErrResourceLimit`. Replies whose
+policy was already captured keep it while queued or playing. Servers that omit
+revisions use the acknowledged setting in effect when the reply arrives.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and fails
+with a resource limit error for an ambiguous reply. A later acknowledgment with
+a revision establishes a new known setting. Replies without a revision use the
+current acknowledged setting.
+
 `RequestID` is sent as the upgrade's `x-request-id`. It must be nonblank
 printable ASCII, or `Connect` returns `ErrInput`. Prism uses it if it is at most 128 characters,
 else makes its own; `Info().RequestID` reports the one it used. Include it when
@@ -377,12 +431,12 @@ you report a problem; an event's or fault's `RequestID` names the SDK request th
 caused it instead. `ResponseMetadata` labels every reply, such as `{"step": "3"}`: up to 16
 strings, keys up to 64 characters and values up to 512, no key starting with
 `prism_`. Prism refuses labels that break these rules with a `*RealtimeFault`
-whose code is `invalid_session`. Settings apply once, except these labels, which
-`SetResponseMetadata` replaces. `ResponseStarted.Metadata` carries them, and
+whose code is `invalid_session`. `SetResponseMetadata` replaces these labels. `ResponseStarted.Metadata` carries them, and
 `ResponseStarted.InputItemIDs` names the user items a reply answers.
 
 | Session method | Behavior |
 | --- | --- |
+| `Update` | Apply supplied settings and return acknowledged `SessionInfo`. |
 | `SendText` | Wait for admission, add a typed turn, and return its response reference. |
 | `AddMessage` | Add user or assistant history without a reply. |
 | `RequestReply` | Request a proactive reply, with optional instructions or a recorded tool call. |
@@ -447,7 +501,7 @@ this SDK does not yet expose `conversation.item.delete`.
 Numbers in `ToolCall.Arguments`, including nested values, use `json.Number` to
 preserve precision. Use `String`, `Int64`, or `Float64` to read the required form.
 
-Voice and session instructions must be nonblank when supplied. The SDK imposes
+Voice and session instructions must be nonblank at connection setup. Updates accept empty strings. The SDK imposes
 no length cap on these settings, consistent with the shared Prism schema and
 the Python and TypeScript SDKs. This does not guarantee that the service accepts
 every value.

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import copy
-import json
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Literal
@@ -22,7 +20,8 @@ from .._errors import (
 from ._protocol import SessionSettings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
-from ._types import JsonObject, Labels, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
+from ._settings import tool_settings
+from ._types import Labels, RealtimeTimeouts, ToolDefinition, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -30,17 +29,6 @@ if TYPE_CHECKING:
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
 _DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
-
-
-def _filler_settings(filler: PrismFiller) -> JsonObject:
-    if not isinstance(filler, PrismFiller):
-        raise RimeInputError("prism_filler must be a PrismFiller value")
-    result: JsonObject = {"type": filler.type}
-    if filler.text is not None:
-        result["text"] = filler.text
-    if filler.instructions is not None:
-        result["instructions"] = filler.instructions
-    return result
 
 
 class Realtime:
@@ -73,8 +61,7 @@ class Realtime:
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
-        Settings are fixed for the lifetime of the session, except the reply labels, which
-        set_response_metadata replaces.
+        Use session.update to change instructions, tools, voice, or interruption.
 
         request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
         connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
@@ -103,21 +90,8 @@ class Realtime:
             "modalities": ["text", "audio"],
             "input_audio_format": "pcm16",
             "turn_detection": {"interrupt_response": interrupt_on_speech},
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "parameters": tool.parameters,
-                    },
-                }
-                for tool in tools
-            ],
+            "tools": tool_settings(tools),
         }
-        for tool, settings_tool in zip(tools, settings["tools"]):
-            if tool.prism_filler is not None:
-                settings_tool["prism_filler"] = _filler_settings(tool.prism_filler)
         if turn_detection is not None:
             if not isinstance(turn_detection, TurnDetection):
                 raise RimeInputError("turn_detection must be a TurnDetection value")
@@ -143,16 +117,6 @@ class Realtime:
                     settings["voice"] = value
                 else:
                     settings["instructions"] = value
-        if any(not tool.name.strip() for tool in tools) or len(
-            {tool.name for tool in tools}
-        ) != len(tools):
-            raise RimeInputError("Tool names must be nonblank and unique")
-        try:
-            # Copy mutable schemas before an await, so callers cannot change initialization.
-            settings = copy.deepcopy(settings)
-            json.dumps(settings, allow_nan=False)
-        except (ValueError, TypeError):
-            raise RimeInputError("Tool schemas must contain finite JSON values") from None
 
         headers = self._client._credentials.realtime_headers()
         if request_id is not None:

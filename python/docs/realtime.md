@@ -106,10 +106,13 @@ The runner is the only event reader. Do not consume `session.events` at the same
 time, call `report_playback` independently, or send a second audio source. Other
 session methods remain available for manual tools and application actions.
 
-On confirmed `SpeechStarted`, the runner uses the effective
-`session.info.interrupt_on_speech` setting. It stops affected output, waits for
-the interrupted receipt, and reports the measured position. It ignores late
-audio for that response. A `SpeechHint` alone does not stop playback. A server
+On confirmed `SpeechStarted`, the runner uses the interruption setting of the
+latest reply that is still generating or has unmeasured physical playback. It
+resolves that setting from the reply's revision when the session receives the
+reply. Updates and late event consumption cannot change it. If interruption is
+enabled, the runner stops affected output, waits for the interrupted receipt,
+and reports the measured position. It ignores late audio for that response.
+A `SpeechHint` alone does not stop playback. A server
 `truncate_not_current` refusal is forwarded as an event; it does not stop a newer
 response. Finished reports wait for generation completion and every output
 receipt, including outstanding playback from earlier responses. Prism treats
@@ -147,8 +150,8 @@ keeps tool execution outside the runner.
 
 Use `async with client.realtime.connect() as session` with `RIME_API_KEY` set.
 The context opens the WebSocket, initializes the session, and closes it on exit.
-Settings apply once, except the reply labels, which `set_response_metadata`
-replaces; open a new session to change the others.
+Use `session.update` to change instructions, tools, voice, or interruption.
+Use `session.set_response_metadata` to replace reply labels.
 
 | Argument | Required? | Default and behavior |
 | --- | --- | --- |
@@ -209,12 +212,53 @@ server reported in its initialization acknowledgment. A missing field is
 default. An unrecognized server eagerness becomes `"unknown"`.
 `interrupt_on_speech` remains a separate connection option.
 
+## Update session settings
+
+This method is available in the repository source and requires an SDK release
+that includes session updates.
+
+```python
+info = await session.update(
+    instructions="Handle billing. Use only the supplied tools.",
+    tools=[refund_tool],  # An existing ToolDefinition.
+)
+print(info.settings_revision)
+
+# For a transfer triggered by a tool call:
+await session.submit_tool_result(call, "Transferred to billing.")
+await session.continue_reply(parent)
+```
+
+`update` accepts optional keyword arguments `instructions`, `tools`, `voice`,
+and `interrupt_on_speech`. Omitted arguments and `None` keep their values.
+
+Omitted fields keep their values. A supplied tool list replaces the complete
+list. Empty instructions clear the prompt; an empty tool list removes all tools.
+An empty voice selects the deployment default. Instructions and tools supplied
+together change in one request.
+
+The method waits for the matching `session.updated` acknowledgment and returns
+session information. The stored session information changes only after that
+acknowledgment. A rejected update leaves it unchanged and keeps the connection
+open. Cancellation after submission does not undo an accepted update.
+
+Updates do not wait for turn readiness or tool results. Each reply keeps the
+settings it began with. A reply prepared on an early turn-end guess can be
+announced after an update but still use the previous settings revision.
+Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
+
+`SessionInfo`, `ResponseStarted`, and `ResponseEnded` expose `settings_revision`.
+It is `None` when the server does not publish it. Users do not need to manage it.
+Use each reply's revision to identify its settings, rather than the latest
+session revision.
+
 ## Choose an operation
 
 Each method is async. Arguments without a default are required.
 
 | Method | Use it to | Result |
 | --- | --- | --- |
+| `update(*, instructions=None, tools=None, voice=None, interrupt_on_speech=None)` | Change supplied settings without reconnecting. | `SessionInfo` after acknowledgment |
 | `send_text(text)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
 | `send_audio(chunk)` | Send microphone audio. | `None` |
 | `request_reply(*, instruction=None, tool_call=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
@@ -296,7 +340,7 @@ Invalid settings raise `RimeInputError` before opening a connection.
 
 Filler applies when the reply has said nothing before calling a tool. If a reply
 calls several tools, the first call's tool controls the filler. `none` suppresses
-filler only; it does not silence other speech. Settings are fixed for the session.
+filler only; it does not silence other speech. Use `session.update(tools=...)` to replace tools and their filler settings.
 
 Execution follows this order:
 
@@ -455,7 +499,19 @@ the audio conversion state.
 
 Keep up with the event stream: its queue holds 256 events, and incoming WebSocket
 messages are limited to 1 MiB. A slow consumer or lost connection ends the session.
-There is no automatic reconnect, history replay, or live configuration update.
+There is no automatic reconnect or history replay.
 
 Local peer tests cover the SDK protocol handling. Validate the gateway handshake
 and endpoint behavior for the deployment you use.
+
+The SDK retains the latest 128 interruption policy changes. Instructions or tools
+updates that keep the same interruption policy do not consume this history.
+If an unannounced reply refers to an older evicted policy, the session fails
+with a resource limit error instead of guessing its policy. A reply already
+received keeps its captured policy even after later settings updates.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and raises
+a resource limit error for an ambiguous reply instead of guessing. A later
+acknowledgment with a revision establishes a new known setting. Replies without
+a revision use the current acknowledged setting.

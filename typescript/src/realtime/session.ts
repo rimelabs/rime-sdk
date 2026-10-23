@@ -17,6 +17,7 @@ import { InputConverter } from "../pcm.js";
 import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";
+import { InterruptionPolicies, toolSettings } from "./settings.js";
 
 const NOT_READY = new Set([
   "typed_turn_busy",
@@ -25,6 +26,15 @@ const NOT_READY = new Set([
 ]);
 const LIMIT = 128;
 const closeErrors = new WeakSet<object>();
+const responseInterruptions = new WeakMap<t.ResponseRef, boolean>();
+
+/** @internal Read the policy captured before queuing the response event. */
+export function responseInterruptsSpeech(
+  session: RealtimeSession,
+  response: t.ResponseRef,
+): boolean {
+  return responseInterruptions.get(response) ?? session.info.interruptOnSpeech;
+}
 
 /** @internal Recognize only failures created by intentional session closure. */
 export function isSessionCloseError(error: unknown): boolean {
@@ -35,6 +45,7 @@ interface Pending {
   result: Deferred<p.Acknowledgment>;
   target?: string;
   itemId?: string;
+  interruptOnSpeech?: boolean;
 }
 class ResponseState {
   readonly done = new Flag();
@@ -82,6 +93,7 @@ export class RealtimeSession {
   private readonly toolLock = new Mutex();
   private readonly pending = new Map<string, Pending>();
   private readonly responses = new Map<string, ResponseState>();
+  private readonly interruptionPolicies = new InterruptionPolicies();
   private latest: string | null = null;
   private readonly tasks = new Set<Promise<unknown>>();
   private converter: InputConverter | null = null;
@@ -130,19 +142,7 @@ export class RealtimeSession {
       { session: settings },
       signal,
     );
-    const view = event.session;
-    this.sessionInfo = Object.freeze({
-      sessionId: this.id(),
-      requestId: view.requestId,
-      responseMetadata: view.responseMetadata,
-      model: "prism",
-      voice: view.voice ?? "",
-      interruptOnSpeech:
-        view.interruptOnSpeech ?? settings.turn_detection.interrupt_response,
-      toolResultTimeoutS: view.toolResultTimeoutS ?? null,
-      toolContinuationTimeoutS: view.toolContinuationTimeoutS ?? null,
-      turnDetection: view.turnDetection,
-    });
+    this.sessionInfo = event.info!;
   }
 
   get info(): t.SessionInfo {
@@ -324,7 +324,15 @@ export class RealtimeSession {
     const kind = request.kind;
     const eventId = `evt_${randomUUID().replaceAll("-", "")}`;
     const result = new Deferred<p.Acknowledgment>();
-    this.pending.set(eventId, { request, result, target });
+    this.pending.set(eventId, {
+      request,
+      result,
+      target,
+      interruptOnSpeech:
+        request.kind === "session.update"
+          ? (body.session as p.SessionPatch).turn_detection?.interrupt_response
+          : undefined,
+    });
     const deadline = scope(
       [this.lifetime.signal],
       this.timeouts.requestS,
@@ -429,6 +437,37 @@ export class RealtimeSession {
     } finally {
       release();
     }
+  }
+  /** Apply supplied settings and wait for acknowledgment. Tools replace the
+   * complete list. Replies already started keep their original settings.
+   * Cancellation after submission does not undo an accepted update. */
+  async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
+    const settings: p.SessionPatch = {};
+    for (const name of ["instructions", "voice"] as const) {
+      const value = options[name];
+      if (value !== undefined) {
+        if (typeof value !== "string")
+          throw new RimeInputError(`${name} must be a string`);
+        settings[name] = value;
+      }
+    }
+    if (options.tools !== undefined)
+      settings.tools = toolSettings(options.tools);
+    if (options.interruptOnSpeech !== undefined) {
+      if (typeof options.interruptOnSpeech !== "boolean")
+        throw new RimeInputError("interruptOnSpeech must be a boolean");
+      settings.turn_detection = {
+        interrupt_response: options.interruptOnSpeech,
+      };
+    }
+    return this.operation(options, async (signal) => {
+      const event = await this.request(
+        p.requests.update,
+        { session: settings },
+        signal,
+      );
+      return event.info!;
+    });
   }
   async sendText(
     value: string,
@@ -600,15 +639,11 @@ export class RealtimeSession {
   ): Promise<void> {
     const labels = p.responseMetadata(metadata);
     return this.operation(options, async (signal) => {
-      const event = await this.request(
+      await this.request(
         p.requests.update,
         { session: { prism_response_metadata: labels } },
         signal,
       );
-      this.sessionInfo = Object.freeze({
-        ...this.info,
-        responseMetadata: event.session.responseMetadata,
-      });
     });
   }
   async clearAudio(options: t.RealtimeOperationOptions = {}): Promise<void> {
@@ -782,7 +817,33 @@ export class RealtimeSession {
           this.created.resolve(payload.session);
         }
         return;
-      case "session.updated":
+      case "session.updated": {
+        const view = payload.session;
+        const pending = this.pending.get(echo ?? "");
+        if (!pending) return;
+        this.sessionInfo = Object.freeze({
+          sessionId: this.id(),
+          model: "prism",
+          voice: view.voice,
+          interruptOnSpeech:
+            view.interruptOnSpeech ??
+            pending?.interruptOnSpeech ??
+            this.sessionInfo?.interruptOnSpeech ??
+            true,
+          toolResultTimeoutS: view.toolResultTimeoutS,
+          toolContinuationTimeoutS: view.toolContinuationTimeoutS,
+          turnDetection: view.turnDetection,
+          settingsRevision: view.settingsRevision,
+          requestId: view.requestId,
+          responseMetadata: view.responseMetadata,
+        });
+        this.interruptionPolicies.record(
+          view.settingsRevision,
+          this.sessionInfo.interruptOnSpeech,
+        );
+        this.settle(echo, { ...payload, info: this.sessionInfo });
+        return;
+      }
       case "tool.result.created":
         this.settle(echo, payload);
         return;
@@ -823,6 +884,10 @@ export class RealtimeSession {
         const ref = payload.response;
         if (this.responses.has(ref.responseId))
           throw new RimeStreamError("Duplicate response.created");
+        responseInterruptions.set(
+          ref,
+          this.interruptionPolicies.resolve(payload.settingsRevision),
+        );
         this.responses.set(ref.responseId, new ResponseState(ref));
         for (const state of this.responses.values()) state.changed.set();
         this.latest = ref.responseId;

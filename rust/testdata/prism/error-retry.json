@@ -5,6 +5,7 @@
   { "code": "invalid_session", "retryable": false },
   { "code": "unsupported_modality", "retryable": false },
   { "code": "session_not_initialized", "retryable": false },
+  { "code": "session_setting_fixed", "retryable": false },
   { "code": "session_already_initialized", "retryable": false },
   { "code": "voice_required", "retryable": false },
   { "code": "invalid_voice", "retryable": false },
