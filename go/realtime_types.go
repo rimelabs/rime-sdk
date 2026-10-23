@@ -78,8 +78,20 @@ func (r OutputRef) ItemID() string        { return r.itemID }
 func (r OutputRef) OutputIndex() uint64   { return r.outputIndex }
 func (r OutputRef) ContentIndex() uint64  { return r.contentIndex }
 
+// RealtimeUpdateOptions change only supplied settings on the existing connection.
+// Nil fields keep their values. An empty string clears instructions; an empty,
+// non-nil Tools slice removes all tools. Tools replaces the complete list.
+type RealtimeUpdateOptions struct {
+	Instructions      *string
+	Tools             []ToolDefinition
+	Voice             *string
+	InterruptOnSpeech *bool
+}
+
 // SessionInfo contains the settings returned by Prism. Nil fields were not published.
 type SessionInfo struct {
+	// SettingsRevision is nil when the server did not publish it.
+	SettingsRevision                             *uint64
 	SessionID, Model, Voice                      string
 	InterruptOnSpeech                            bool
 	ToolResultTimeoutS, ToolContinuationTimeoutS *float64
@@ -135,10 +147,12 @@ type TranscriptFailed struct {
 	Fault  *RealtimeFault
 }
 type ResponseStarted struct {
-	Response    ResponseRef
-	Cause       string
-	Parent      *ResponseRef
-	InputItemID string
+	// SettingsRevision names the settings this reply began with, if published.
+	SettingsRevision *uint64
+	Response         ResponseRef
+	Cause            string
+	Parent           *ResponseRef
+	InputItemID      string
 }
 type ResponseAbandoned struct{ Response ResponseRef }
 type MessageStarted struct{ Output OutputRef }
@@ -161,8 +175,10 @@ type ToolCall struct {
 	Arguments    map[string]any
 }
 type ResponseEnded struct {
-	Response       ResponseRef
-	Status, Reason string
+	// SettingsRevision names the settings this reply began with, if published.
+	SettingsRevision *uint64
+	Response         ResponseRef
+	Status, Reason   string
 }
 type FaultEvent struct{ Fault *RealtimeFault }
 

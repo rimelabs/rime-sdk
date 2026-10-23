@@ -41,8 +41,16 @@ class SessionSettings(TypedDict):
     instructions: NotRequired[str]
 
 
+class SessionPatch(TypedDict, total=False):
+    voice: str
+    instructions: str
+    tools: list[_Tool]
+    turn_detection: dict[str, bool]
+
+
 @dataclass(frozen=True, kw_only=True)
 class SessionView:
+    settings_revision: int | None = None
     id: str
     voice: str
     interrupt_on_speech: bool | None
@@ -60,6 +68,7 @@ class SessionCreated:
 @dataclass(frozen=True, kw_only=True)
 class SessionUpdated:
     session: SessionView
+    info: t.SessionInfo | None = None
     kind: Literal["session.updated"] = field(default="session.updated", init=False)
 
 
@@ -192,6 +201,14 @@ def _integer(value: object, name: str) -> int:
     return int(value)
 
 
+def _revision(value: dict, name: str) -> int | None:
+    return (
+        _integer(value["prism_settings_revision"], name)
+        if "prism_settings_revision" in value
+        else None
+    )
+
+
 def _duration(value: object, name: str) -> float | None:
     if value is None:
         return None
@@ -236,6 +253,7 @@ def _session(value: object) -> SessionView:
             _invalid("session.prism_effective_interrupt_response")
         interrupt = None
     return SessionView(
+        settings_revision=_revision(view, "session.prism_settings_revision"),
         id=_id(view.get("id"), "session.id"),
         voice=_string(view.get("voice", ""), "session.voice"),
         interrupt_on_speech=interrupt,
@@ -411,6 +429,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             metadata.get("prism_parent_response_id"), "prism_parent_response_id"
         )
         payload = t.ResponseStarted(
+            settings_revision=_revision(response, "response.prism_settings_revision"),
             response=ref(response.get("id")),
             cause=cast(
                 Literal["speech", "text", "tools", "proactive", "unknown"],
@@ -441,6 +460,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         )
         status = _string(response.get("status"), "response.status")
         payload = ResponseEnded(
+            settings_revision=_revision(response, "response.prism_settings_revision"),
             response=ref(response.get("id")),
             status=cast(
                 Literal["completed", "cancelled", "failed", "unknown"],

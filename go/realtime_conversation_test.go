@@ -140,6 +140,14 @@ func TestRealtimeRunnerInterruptsAndRejectsLateAudio(t *testing.T) {
 	p.send(rtObject{"type": "response.created", "response": rtObject{"id": "r1"}})
 	rtEmitOutput(p, "r1", "i1")
 	o := rtOutput(t, playback)
+	disabled := false
+	updated := make(chan error, 1)
+	go func() {
+		_, err := s.Update(context.Background(), RealtimeUpdateOptions{InterruptOnSpeech: &disabled})
+		updated <- err
+	}()
+	rtAcknowledgeUpdate(p, p.next("session.update"), 2)
+	rtWait(t, updated)
 	p.send(rtObject{"type": "input_audio_buffer.speech_started", "item_id": "speech", "audio_start_ms": 0})
 	q := p.next("conversation.item.truncate")
 	if q["audio_end_ms"] != float64(12) {

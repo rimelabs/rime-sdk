@@ -45,7 +45,7 @@ class Peer:
     async def send(self, raw):
         event = json.loads(raw)
         _VALIDATORS[event["type"]].validate(event)
-        if event["type"] == "session.update":
+        if event["type"] == "session.update" and self.settings is None:
             self.settings = event["session"]
             self.emit(
                 "session.updated",

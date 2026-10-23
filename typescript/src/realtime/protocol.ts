@@ -20,7 +20,14 @@ export interface SessionSettings {
   voice?: string;
   instructions?: string;
 }
+export interface SessionPatch {
+  voice?: string;
+  instructions?: string;
+  tools?: SessionSettings["tools"];
+  turn_detection?: { interrupt_response: boolean };
+}
 export interface SessionView {
+  settingsRevision: number | null;
   id: string;
   voice: string;
   interruptOnSpeech: boolean | null;
@@ -33,6 +40,7 @@ export interface SessionCreated {
   session: SessionView;
 }
 export interface SessionUpdated {
+  info?: t.SessionInfo;
   kind: "session.updated";
   session: SessionView;
 }
@@ -167,6 +175,11 @@ function integer(value: unknown, field: string): number {
     return invalid(field);
   return value;
 }
+function revision(value: ObjectValue): number | null {
+  return value.prism_settings_revision === undefined
+    ? null
+    : integer(value.prism_settings_revision, "prism_settings_revision");
+}
 function duration(value: unknown, field: string): number | null {
   if (value == null) return null;
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0)
@@ -218,6 +231,7 @@ function session(value: unknown): SessionView {
   if (interrupt !== undefined && typeof interrupt !== "boolean")
     invalid("session.prism_effective_interrupt_response");
   return {
+    settingsRevision: revision(view),
     id: id(view.id, "session.id"),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
@@ -436,6 +450,7 @@ function decodeValue(
       );
       payload = {
         kind: "response.started",
+        settingsRevision: revision(response),
         response: ref(response.id),
         cause:
           cause === undefined
@@ -468,6 +483,7 @@ function decodeValue(
       const status = string(response.status, "response.status");
       payload = {
         kind: "response.ended",
+        settingsRevision: revision(response),
         response: ref(response.id),
         status:
           status === "completed" ||

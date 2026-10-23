@@ -370,8 +370,45 @@ valid, nonblank UTF-8 with at most 500 Unicode scalar values. Omit these setting
 to use server defaults. `session.Info()` returns a copy of the effective published
 settings.
 
+### Update session settings
+
+```go
+instructions := "Handle billing. Use only the supplied tools."
+info, err := session.Update(ctx, rime.RealtimeUpdateOptions{
+    Instructions: &instructions,
+    Tools: []rime.ToolDefinition{refundTool},
+})
+if err != nil {
+    return err
+}
+fmt.Println(info.SettingsRevision)
+```
+
+`Instructions`, `Voice`, and `InterruptOnSpeech` are pointers; `nil` keeps the
+setting. A `nil` `Tools` slice keeps the tools. A non-nil empty slice clears them.
+
+Omitted fields keep their values. A supplied tool list replaces the complete
+list. Empty instructions clear the prompt; an empty tool list removes all tools.
+An empty voice selects the deployment default. Instructions and tools supplied
+together change in one request.
+
+The method waits for the matching `session.updated` acknowledgment and returns
+session information. The stored session information changes only after that
+acknowledgment. A rejected update leaves it unchanged and keeps the connection
+open. Cancellation after submission does not undo an accepted update.
+
+Updates do not wait for turn readiness or tool results. Each reply keeps the
+settings it began with. A reply prepared on an early turn-end guess can be
+announced after an update but still use the previous settings revision.
+Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
+
+`SessionInfo`, `ResponseStarted`, and `ResponseEnded` expose `SettingsRevision`
+as `*uint64`. It is `nil` when the server does not publish it. Users do not need
+to manage it. Use each reply's revision to identify its settings.
+
 | Session method | Behavior |
 | --- | --- |
+| `Update` | Apply supplied settings and return acknowledged `SessionInfo`. |
 | `SendText` | Wait for admission, add a typed turn, and return its response reference. |
 | `AddMessage` | Add user or assistant history without a reply. |
 | `RequestReply` | Request a proactive reply, with optional instructions or a recorded tool call. |
@@ -435,7 +472,7 @@ this SDK does not yet expose `conversation.item.delete`.
 Numbers in `ToolCall.Arguments`, including nested values, use `json.Number` to
 preserve precision. Use `String`, `Int64`, or `Float64` to read the required form.
 
-Voice and session instructions must be nonblank when supplied. The SDK imposes
+Voice and session instructions must be nonblank at connection setup. Updates accept empty strings. The SDK imposes
 no length cap on these settings, consistent with the shared Prism schema and
 the Python and TypeScript SDKs. This does not guarantee that the service accepts
 every value.

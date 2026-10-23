@@ -17,6 +17,54 @@ pub(super) fn text(value: &str, limit: usize) -> Result<(), Error> {
         Ok(())
     }
 }
+fn tool_settings(definitions: &[ToolDefinition]) -> Result<Vec<Value>, Error> {
+    let mut tools = vec![];
+    let mut names = std::collections::HashSet::new();
+    for t in definitions {
+        text(&t.name, 4000)?;
+        if !names.insert(&t.name) {
+            return Err(Error::new(ErrorKind::Input, "tool names must be unique"));
+        }
+        let mut v = json!({"type":"function","function":{"name":t.name,"description":t.description,"parameters":t.parameters}});
+        if let Some(f) = &t.prism_filler {
+            v["prism_filler"] = match f {
+                PrismFiller::None => json!({"type":"none"}),
+                PrismFiller::Text(s) => {
+                    text(s, 500)?;
+                    json!({"type":"text","text":s})
+                }
+                PrismFiller::Auto(s) => {
+                    let mut v = json!({"type":"auto"});
+                    if let Some(s) = s {
+                        text(s, 500)?;
+                        v["instructions"] = json!(s)
+                    }
+                    v
+                }
+            }
+        }
+        tools.push(v)
+    }
+    Ok(tools)
+}
+
+pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
+    let mut result = json!({});
+    if let Some(value) = o.instructions {
+        result["instructions"] = json!(value)
+    }
+    if let Some(value) = o.voice {
+        result["voice"] = json!(value)
+    }
+    if let Some(value) = o.tools {
+        result["tools"] = json!(tool_settings(&value)?)
+    }
+    if let Some(value) = o.interrupt {
+        result["turn_detection"] = json!({"interrupt_response": value})
+    }
+    Ok(result)
+}
+
 pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
     for d in [o.timeouts.connect, o.timeouts.ready, o.timeouts.request] {
         crate::client::validate_timeout(Some(d))?;
@@ -57,33 +105,7 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         }
         d["prism_end_of_turn_timeout_ms"] = json!(n)
     }
-    let mut tools = vec![];
-    let mut names = std::collections::HashSet::new();
-    for t in &o.tools {
-        text(&t.name, 4000)?;
-        if !names.insert(&t.name) {
-            return Err(Error::new(ErrorKind::Input, "tool names must be unique"));
-        }
-        let mut v = json!({"type":"function","function":{"name":t.name,"description":t.description,"parameters":t.parameters}});
-        if let Some(f) = &t.prism_filler {
-            v["prism_filler"] = match f {
-                PrismFiller::None => json!({"type":"none"}),
-                PrismFiller::Text(s) => {
-                    text(s, 500)?;
-                    json!({"type":"text","text":s})
-                }
-                PrismFiller::Auto(s) => {
-                    let mut v = json!({"type":"auto"});
-                    if let Some(s) = s {
-                        text(s, 500)?;
-                        v["instructions"] = json!(s)
-                    }
-                    v
-                }
-            }
-        }
-        tools.push(v)
-    }
+    let tools = tool_settings(&o.tools)?;
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
     for (key, value) in [("voice", &o.voice), ("instructions", &o.instructions)] {
         if let Some(s) = value {

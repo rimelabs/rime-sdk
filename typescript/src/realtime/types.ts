@@ -68,6 +68,13 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
 }
+/** Omitted fields keep their values. Empty instructions or tools clear them. */
+export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
+  readonly instructions?: string;
+  readonly tools?: readonly ToolDefinition[];
+  readonly voice?: string;
+  readonly interruptOnSpeech?: boolean;
+}
 export interface ReplyOptions extends RealtimeOperationOptions {
   readonly instruction?: string | null;
   readonly toolCall?: ToolCallRef | null;
@@ -94,6 +101,8 @@ export interface OutputRef {
   readonly contentIndex: number;
 }
 export interface SessionInfo {
+  /** Settings revision published by the server; null when unavailable. */
+  readonly settingsRevision?: number | null;
   readonly sessionId: string;
   readonly model: "prism";
   readonly voice: string;
@@ -194,6 +203,8 @@ export interface TranscriptFailed<Fault extends RealtimeFault = RealtimeFault> {
   readonly error: Fault;
 }
 export interface ResponseStarted {
+  /** Settings revision published by the server; null when unavailable. */
+  readonly settingsRevision?: number | null;
   readonly kind: "response.started";
   readonly response: ResponseRef;
   readonly cause: "speech" | "text" | "proactive" | "tools" | "unknown";
@@ -238,6 +249,8 @@ export interface ResponseAbandoned {
   readonly response: ResponseRef;
 }
 export interface ResponseEnded {
+  /** Settings revision published by the server; null when unavailable. */
+  readonly settingsRevision?: number | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;
   readonly status: "completed" | "cancelled" | "failed" | "unknown";

@@ -56,7 +56,7 @@ impl Peer {
             loop {
                 tokio::select! {
                  v=incoming.recv()=>match v{Some(v)=>if ws.send(Message::Text(v.to_string().into())).await.is_err(){break},None=>break},
-                 message=ws.next(), if !(pause && initialized)=>{let Some(Ok(Message::Text(message)))=message else{break};let v:Value=serde_json::from_str(&message).unwrap();super::schema::validate_request(&v);if v["type"]=="session.update"{initialized=true;if ws.send(Message::Text(json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":{"id":"session-1","voice":"test"}}).to_string().into())).await.is_err(){break}}else if out.send(v).await.is_err(){break}}
+                 message=ws.next(), if !(pause && initialized)=>{let Some(Ok(Message::Text(message)))=message else{break};let v:Value=serde_json::from_str(&message).unwrap();super::schema::validate_request(&v);if v["type"]=="session.update" && !initialized{initialized=true;if ws.send(Message::Text(json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":{"id":"session-1","voice":"test"}}).to_string().into())).await.is_err(){break}}else if out.send(v).await.is_err(){break}}
                 }
             }
         });

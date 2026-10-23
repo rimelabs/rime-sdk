@@ -14,8 +14,8 @@ import json
 import os
 import uuid
 from collections import OrderedDict
-from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator, Sequence
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, TypeVar
 from weakref import WeakSet
 
@@ -32,6 +32,7 @@ from .._errors import (
 from .._pcm import InputConverter
 from . import _protocol as p
 from . import _types as t
+from ._settings import tool_settings
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
@@ -68,6 +69,7 @@ class _Pending:
     future: asyncio.Future[p.Acknowledgment]
     target: str | None = None
     item_id: str | None = None
+    interrupt_on_speech: bool | None = None
 
 
 class RealtimeSession:
@@ -136,22 +138,10 @@ class RealtimeSession:
 
     async def _initialize(self, settings: p.SessionSettings) -> None:
         try:
-            created = await asyncio.wait_for(
-                asyncio.shield(self._created), self._timeouts.connect_s
-            )
+            await asyncio.wait_for(asyncio.shield(self._created), self._timeouts.connect_s)
             session = await self._request(p.UPDATE, {"session": settings})
-            view = session.session
-            self._info = t.SessionInfo(
-                session_id=created.id,
-                model="prism",
-                voice=view.voice,
-                interrupt_on_speech=view.interrupt_on_speech
-                if view.interrupt_on_speech is not None
-                else settings["turn_detection"]["interrupt_response"],
-                tool_result_timeout_s=view.tool_result_timeout_s,
-                tool_continuation_timeout_s=view.tool_continuation_timeout_s,
-                turn_detection=view.turn_detection,
-            )
+            assert session.info is not None
+            self._info = session.info
         except TimeoutError:
             raise RimeTimeoutError("No session.created event arrived") from None
 
@@ -281,7 +271,14 @@ class RealtimeSession:
         kind = request.kind
         event_id = "evt_" + uuid.uuid4().hex
         future: asyncio.Future[p.Acknowledgment] = asyncio.get_running_loop().create_future()
-        self._pending[event_id] = _Pending(request, future, target)
+        pending = _Pending(request, future, target)
+        if request.kind == "session.update":
+            settings = body.get("session")
+            if isinstance(settings, dict):
+                pending.interrupt_on_speech = settings.get("turn_detection", {}).get(
+                    "interrupt_response"
+                )
+        self._pending[event_id] = pending
         submitted = asyncio.Event()
         try:
             async with asyncio.timeout(self._timeouts.request_s):
@@ -353,6 +350,40 @@ class RealtimeSession:
                         raise
         finally:
             self._admission.release()
+
+    async def update(
+        self,
+        *,
+        instructions: str | None = None,
+        tools: Sequence[t.ToolDefinition] | None = None,
+        voice: str | None = None,
+        interrupt_on_speech: bool | None = None,
+    ) -> t.SessionInfo:
+        """Apply supplied settings and wait for the server acknowledgment.
+
+        None keeps a setting. Empty instructions or tools clear it. A supplied
+        tool list replaces all tools. Replies already started keep their settings.
+        Cancellation after submission does not undo an accepted update.
+        """
+        self._check()
+        settings: p.SessionPatch = {}
+        for name, value in (("instructions", instructions), ("voice", voice)):
+            if value is not None:
+                if not isinstance(value, str):
+                    raise RimeInputError(f"{name} must be a string")
+                if name == "instructions":
+                    settings["instructions"] = value
+                else:
+                    settings["voice"] = value
+        if tools is not None:
+            settings["tools"] = tool_settings(tools)
+        if interrupt_on_speech is not None:
+            if not isinstance(interrupt_on_speech, bool):
+                raise RimeInputError("interrupt_on_speech must be a boolean")
+            settings["turn_detection"] = {"interrupt_response": interrupt_on_speech}
+        event = await self._request(p.UPDATE, {"session": settings})
+        assert event.info is not None
+        return event.info
 
     async def send_text(self, text: str) -> t.ResponseRef:
         """Start a typed user turn. Wait for readiness and return at response creation."""
@@ -619,7 +650,29 @@ class RealtimeSession:
             if not self._created.done():
                 self._created.set_result(payload.session)
             return
-        if isinstance(payload, (p.SessionUpdated, p.ToolResultCreated)):
+        if isinstance(payload, p.SessionUpdated):
+            view = payload.session
+            pending = self._pending.get(echo or "")
+            if pending is None:
+                return
+            fallback = self._info.interrupt_on_speech if self._info else True
+            if pending and pending.interrupt_on_speech is not None:
+                fallback = pending.interrupt_on_speech
+            self._info = t.SessionInfo(
+                session_id=self._session_id(),
+                model="prism",
+                voice=view.voice,
+                interrupt_on_speech=view.interrupt_on_speech
+                if view.interrupt_on_speech is not None
+                else fallback,
+                tool_result_timeout_s=view.tool_result_timeout_s,
+                tool_continuation_timeout_s=view.tool_continuation_timeout_s,
+                turn_detection=view.turn_detection,
+                settings_revision=view.settings_revision,
+            )
+            self._settle(echo, replace(payload, info=self._info))
+            return
+        if isinstance(payload, p.ToolResultCreated):
             self._settle(echo, payload)
             return
         if isinstance(payload, p.ItemCreated):
@@ -684,7 +737,12 @@ class RealtimeSession:
                 ):
                     self._settle(key, payload)
             self._publish(
-                t.ResponseEnded(response=state.ref, status=payload.status, reason=payload.reason),
+                t.ResponseEnded(
+                    response=state.ref,
+                    status=payload.status,
+                    reason=payload.reason,
+                    settings_revision=payload.settings_revision,
+                ),
                 event_id=event.event_id,
                 request_id=echo,
             )

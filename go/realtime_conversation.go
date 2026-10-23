@@ -348,7 +348,9 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 				}
 			case SpeechStarted:
-				if r.Session.Info().InterruptOnSpeech {
+				// With revisions, Prism filters speech using the playing reply's settings.
+				info := r.Session.Info()
+				if info.SettingsRevision != nil || info.InterruptOnSpeech {
 					if e := interrupt(replies); e != nil {
 						return e
 					}

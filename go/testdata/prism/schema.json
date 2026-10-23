@@ -291,5 +291,47 @@
     "schema": "speechEndReason",
     "value": 1,
     "valid": false
+  },
+  {
+    "name": "partial session update",
+    "schema": "sessionUpdateEvent",
+    "value": {
+      "type": "session.update",
+      "event_id": "update-1",
+      "session": {
+        "instructions": "Billing",
+        "tools": []
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "clear session settings",
+    "schema": "sessionUpdateEvent",
+    "value": {
+      "type": "session.update",
+      "event_id": "update-2",
+      "session": {
+        "instructions": "",
+        "tools": [],
+        "voice": "",
+        "turn_detection": {
+          "interrupt_response": false
+        }
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "session update rejects null instructions",
+    "schema": "sessionUpdateEvent",
+    "value": {
+      "type": "session.update",
+      "event_id": "update-3",
+      "session": {
+        "instructions": null
+      }
+    },
+    "valid": false
   }
 ]

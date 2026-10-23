@@ -19,6 +19,72 @@ func rtText(s string, limit int) error {
 	}
 	return nil
 }
+func rtTools(tools []ToolDefinition) ([]any, error) {
+	ts := []any{}
+	names := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		if rtText(tool.Name, 4000) != nil || tool.Parameters == nil {
+			return nil, failure(ErrInput, "tools require a name and parameters object")
+		}
+		if !utf8.ValidString(tool.Description) {
+			return nil, failure(ErrInput, "tool descriptions must be valid UTF-8")
+		}
+		if _, exists := names[tool.Name]; exists {
+			return nil, failure(ErrInput, "tool names must be unique")
+		}
+		names[tool.Name] = struct{}{}
+		v := rtObject{"type": "function", "function": rtObject{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}}
+		if f := tool.PrismFiller; f != nil {
+			valid := false
+			switch f.Type {
+			case "none":
+				valid = f.Text == "" && f.Instructions == ""
+			case "text":
+				valid = f.Instructions == "" && rtText(f.Text, 500) == nil
+			case "auto":
+				valid = f.Text == "" && (f.Instructions == "" || rtText(f.Instructions, 500) == nil)
+			}
+			if !valid {
+				return nil, failure(ErrInput, "invalid tool filler")
+			}
+			v["prism_filler"] = f
+		}
+		ts = append(ts, v)
+	}
+	return ts, nil
+}
+
+func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
+	settings := rtObject{}
+	for k, v := range map[string]*string{"voice": o.Voice, "instructions": o.Instructions} {
+		if v != nil {
+			if !utf8.ValidString(*v) {
+				return nil, failure(ErrInput, "invalid "+k)
+			}
+			settings[k] = *v
+		}
+	}
+	if o.Tools != nil {
+		tools, err := rtTools(o.Tools)
+		if err != nil {
+			return nil, err
+		}
+		settings["tools"] = tools
+	}
+	if o.InterruptOnSpeech != nil {
+		settings["turn_detection"] = rtObject{"interrupt_response": *o.InterruptOnSpeech}
+	}
+	b, err := json.Marshal(settings)
+	if err != nil {
+		return nil, failure(ErrInput, "invalid tool schema")
+	}
+	result, err := rtJSONObject(b)
+	if err != nil {
+		return nil, failure(ErrInput, "invalid tool schema")
+	}
+	return result, nil
+}
+
 func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, error) {
 	t := o.Timeouts
 	for _, p := range []*time.Duration{&t.Connect, &t.Ready, &t.Request} {
@@ -68,36 +134,9 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		}
 		d["prism_end_of_turn_timeout_ms"] = n
 	}
-	ts := []any{}
-	names := make(map[string]struct{}, len(o.Tools))
-	for _, tool := range o.Tools {
-		if rtText(tool.Name, 4000) != nil || tool.Parameters == nil {
-			return "", nil, t, failure(ErrInput, "tools require a name and parameters object")
-		}
-		if !utf8.ValidString(tool.Description) {
-			return "", nil, t, failure(ErrInput, "tool descriptions must be valid UTF-8")
-		}
-		if _, exists := names[tool.Name]; exists {
-			return "", nil, t, failure(ErrInput, "tool names must be unique")
-		}
-		names[tool.Name] = struct{}{}
-		v := rtObject{"type": "function", "function": rtObject{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}}
-		if f := tool.PrismFiller; f != nil {
-			valid := false
-			switch f.Type {
-			case "none":
-				valid = f.Text == "" && f.Instructions == ""
-			case "text":
-				valid = f.Instructions == "" && rtText(f.Text, 500) == nil
-			case "auto":
-				valid = f.Text == "" && (f.Instructions == "" || rtText(f.Instructions, 500) == nil)
-			}
-			if !valid {
-				return "", nil, t, failure(ErrInput, "invalid tool filler")
-			}
-			v["prism_filler"] = f
-		}
-		ts = append(ts, v)
+	ts, e := rtTools(o.Tools)
+	if e != nil {
+		return "", nil, t, e
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
 	for k, v := range map[string]string{"voice": o.Voice, "instructions": o.Instructions} {

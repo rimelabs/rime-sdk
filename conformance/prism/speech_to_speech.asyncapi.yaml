@@ -473,6 +473,9 @@ components:
         - prism_effective_interrupt_response
         - prism_tool_waits
       properties:
+        prism_settings_revision:
+          type: integer
+          minimum: 0
         id:
           type: string
         object:
@@ -710,6 +713,9 @@ components:
       type: object
       required: [id, object, status, output, usage]
       properties:
+        prism_settings_revision:
+          type: integer
+          minimum: 0
         id:
           type: string
         object:
@@ -761,6 +767,7 @@ components:
         - const: invalid_session
         - const: unsupported_modality
         - const: session_not_initialized
+        - const: session_setting_fixed
         - const: session_already_initialized
         - const: voice_required
         - const: invalid_voice

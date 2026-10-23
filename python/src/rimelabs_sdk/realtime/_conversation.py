@@ -280,8 +280,13 @@ async def run_conversation(
                         output.stream.write(payload.audio)
                     elif isinstance(payload, t.AudioDone):
                         output.end()
-            elif isinstance(payload, t.SpeechStarted) and session.info.interrupt_on_speech:
-                interrupt(list(replies.values()))
+            elif isinstance(payload, t.SpeechStarted):
+                # With revisions, Prism filters speech using the playing reply's settings.
+                if (
+                    getattr(session.info, "settings_revision", None) is not None
+                    or session.info.interrupt_on_speech
+                ):
+                    interrupt(list(replies.values()))
             elif isinstance(payload, t.ResponseAbandoned):
                 if payload.response.response_id in parents:
                     interrupted.add(payload.response.response_id)

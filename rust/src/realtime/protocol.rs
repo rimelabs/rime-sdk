@@ -57,9 +57,13 @@ fn enumeration(s: String, known: &[&str]) -> String {
         "unknown".into()
     }
 }
+fn revision(v: &Value) -> Result<Option<u64>, Error> {
+    v.get("prism_settings_revision").map(integer).transpose()
+}
 fn view(v: &Value) -> Result<SessionInfo, Error> {
     let o = object(v)?;
     let mut s = SessionInfo {
+        settings_revision: revision(v)?,
         model: "prism",
         session_id: id(&v["id"])?,
         voice: String::new(),
@@ -300,6 +304,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                     Some(reference(&m["prism_parent_response_id"])?)
                 };
                 w.payload = Some(ResponseStarted {
+                    settings_revision: revision(d)?,
                     response,
                     cause,
                     parent,
@@ -313,6 +318,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                 }
                 w.token = optional(&m["prism_drain_token"])?;
                 w.payload = Some(ResponseEnded {
+                    settings_revision: revision(d)?,
                     response,
                     status: enumeration(
                         string(&d["status"])?,

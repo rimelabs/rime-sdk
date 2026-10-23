@@ -606,7 +606,9 @@
         "message": "message",
         "scope": "event",
         "owner": {
-          "call_ids": [1]
+          "call_ids": [
+            1
+          ]
         }
       }
     },
@@ -903,6 +905,278 @@
         "turn_detection": {
           "prism_end_of_turn_timeout_ms": 10001
         }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision 0",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": 0
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "session.updated revision 2",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": 2
+      }
+    },
+    "expected_kind": "session.updated"
+  },
+  {
+    "name": "session.updated revision None",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision True",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": true
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision -1",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": -1
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision 1.5",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": 1.5
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision '2'",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": "2"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session.updated revision 9007199254740992",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "prism_settings_revision": 9007199254740992
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision 0",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": 0
+      }
+    },
+    "expected_kind": "response.started"
+  },
+  {
+    "name": "response.created revision 2",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": 2
+      }
+    },
+    "expected_kind": "response.started"
+  },
+  {
+    "name": "response.created revision None",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision True",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": true
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision -1",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": -1
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision 1.5",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": 1.5
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision '2'",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": "2"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.created revision 9007199254740992",
+    "event": {
+      "type": "response.created",
+      "response": {
+        "id": "reply-1",
+        "prism_settings_revision": 9007199254740992
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision 0",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": 0
+      }
+    },
+    "expected_kind": "response.ended"
+  },
+  {
+    "name": "response.done revision 2",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": 2
+      }
+    },
+    "expected_kind": "response.ended"
+  },
+  {
+    "name": "response.done revision None",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision True",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": true
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision -1",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": -1
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision 1.5",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": 1.5
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision '2'",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": "2"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "response.done revision 9007199254740992",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "prism_settings_revision": 9007199254740992
       }
     },
     "invalid": true

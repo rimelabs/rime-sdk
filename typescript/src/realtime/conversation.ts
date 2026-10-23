@@ -299,7 +299,13 @@ export async function runConversation(
           break;
         }
         case "speech.started":
-          if (session.info.interruptOnSpeech) interrupt([...replies.values()]);
+          // With revisions, Prism filters speech using the playing reply's settings.
+          // The latest session setting may belong to a later reply.
+          if (
+            session.info.settingsRevision != null ||
+            session.info.interruptOnSpeech
+          )
+            interrupt([...replies.values()]);
           break;
         case "response.abandoned": {
           if (parents.has(payload.response.responseId))

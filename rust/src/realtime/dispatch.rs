@@ -35,8 +35,14 @@ impl Worker {
                 let mut info = e.info.ok_or_else(|| failure("missing session view"))?;
                 info.session_id = self.id.clone();
                 if !e.interrupt_known {
-                    info.interrupt_on_speech = self.interrupt
+                    info.interrupt_on_speech = c.body["session"]["turn_detection"]
+                        ["interrupt_response"]
+                        .as_bool()
+                        .unwrap_or(self.interrupt)
                 }
+                self.interrupt = info.interrupt_on_speech;
+                *self.info.lock().expect("session info mutex") = Some(info.clone());
+                answer.info = Some(info.clone());
                 if let Some(tx) = self.initialized.take() {
                     let _ = tx.send(Ok(info));
                 }
@@ -240,7 +246,7 @@ impl Worker {
                                         r.continued = false
                                     }
                                 }
-                                if c.kind == Kind::Update {
+                                if c.kind == Kind::Update && self.initialized.is_some() {
                                     return Err(protocol::fault_error(f.clone()));
                                 }
                                 c.finish(Err(protocol::fault_error(f.clone())))

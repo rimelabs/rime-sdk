@@ -39,6 +39,7 @@ type RealtimeSession struct {
 	terminal    error
 }
 type rtResult struct {
+	info SessionInfo
 	ref  ResponseRef
 	item ItemRef
 	err  error
@@ -97,7 +98,15 @@ func newRealtimeSession(op *operation, t RealtimeTimeouts) *RealtimeSession {
 func (s *RealtimeSession) Info() SessionInfo {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	v := s.info
+	return cloneSessionInfo(s.info)
+}
+
+func cloneSessionInfo(info SessionInfo) SessionInfo {
+	v := info
+	if v.SettingsRevision != nil {
+		n := *v.SettingsRevision
+		v.SettingsRevision = &n
+	}
 	if v.Eagerness != nil {
 		x := *v.Eagerness
 		v.Eagerness = &x
@@ -234,6 +243,18 @@ func (s *RealtimeSession) invoke(ctx context.Context, c *rtCommand) (rtResult, e
 		}
 		return rtResult{}, s.failure()
 	}
+}
+
+// Update applies supplied settings and waits for the server acknowledgment.
+// Replies already started keep their settings. Cancellation after submission
+// does not undo an accepted update.
+func (s *RealtimeSession) Update(ctx context.Context, options RealtimeUpdateOptions) (SessionInfo, error) {
+	settings, err := rtPatch(options)
+	if err != nil {
+		return SessionInfo{}, err
+	}
+	result, err := s.invoke(ctx, &rtCommand{kind: "update", body: rtObject{"session": settings}})
+	return result.info, err
 }
 
 // SendText waits for admission and requests a reply to a typed user turn.
@@ -483,7 +504,7 @@ func (s *RealtimeSession) failureOr(e error) error {
 	return realtimeClosedError()
 }
 func (w *rtWorker) finish(c *rtCommand, r rtResult) {
-	if c.kind == "update" && r.err != nil {
+	if c.kind == "update" && !w.initialized && r.err != nil {
 		select {
 		case w.s.initialized <- r.err:
 		default:
@@ -768,12 +789,23 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 		info.SessionID = w.sessionID
 		if !e.interruptKnown {
 			info.InterruptOnSpeech = w.interrupt
+			if settings, ok := c.body["session"].(rtObject); ok {
+				if detection, ok := settings["turn_detection"].(map[string]any); ok {
+					if value, ok := detection["interrupt_response"].(bool); ok {
+						info.InterruptOnSpeech = value
+					}
+				}
+			}
 		}
+		w.interrupt = info.InterruptOnSpeech
+		result.info = cloneSessionInfo(info)
 		w.s.mu.Lock()
 		w.s.info = info
 		w.s.mu.Unlock()
-		w.initialized = true
-		w.s.initialized <- nil
+		if !w.initialized {
+			w.initialized = true
+			w.s.initialized <- nil
+		}
 	}
 	if c.kind == "history" {
 		result.item = ItemRef{w.sessionID, e.target}

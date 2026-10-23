@@ -917,3 +917,27 @@ test(
     assert.deepEqual(reports(peer), []);
   },
 );
+
+test("confirmed speech follows the active reply after interruption is disabled for later replies", async (t) => {
+  const { session, peer, playback, events } = await setup(t);
+  begin(peer);
+  await until(() => playback.outputs.has("first"));
+  peer.onRequest = null;
+  const update = session.update({ interruptOnSpeech: false });
+  const q = await peer.next("session.update");
+  peer.emit("session.updated", {
+    prism_request_event_id: q.event_id,
+    session: {
+      id: "session-1",
+      voice: "test",
+      prism_effective_interrupt_response: false,
+      prism_settings_revision: 2,
+    },
+  });
+  await update;
+  speech(peer);
+  await until(() => events.some((e) => e.kind === "speech.started"));
+  assert.equal(playback.outputs.get("first").interrupted, true);
+  playback.outputs.get("first").done.resolve(17);
+  ack(peer, await peer.next("conversation.item.truncate"));
+});

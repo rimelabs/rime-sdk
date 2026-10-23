@@ -58,7 +58,7 @@ pub struct RealtimeSession {
     lease: Arc<Lease>,
     commands: mpsc::Sender<Command>,
     events: Arc<Mutex<Option<RealtimeEvents>>>,
-    info: SessionInfo,
+    info: Arc<Mutex<Option<SessionInfo>>>,
     budgets: RealtimeTimeouts,
     done: CancellationToken,
     wake: Arc<Notify>,
@@ -137,6 +137,7 @@ struct Command {
 }
 #[derive(Default)]
 struct Answer {
+    info: Option<SessionInfo>,
     response: Option<ResponseRef>,
     item: Option<ItemRef>,
 }
@@ -203,6 +204,7 @@ struct Worker {
     timeouts: RealtimeTimeouts,
     interrupt: bool,
     initialized: Option<oneshot::Sender<Result<SessionInfo, Error>>>,
+    info: Arc<Mutex<Option<SessionInfo>>>,
 }
 pub(super) async fn connect(
     inner: Arc<Inner>,
@@ -219,6 +221,8 @@ pub(super) async fn connect(
     let (writes, commands) = mpsc::channel(128);
     let (events, receiver) = mpsc::channel(256);
     let (tx, rx) = oneshot::channel();
+    let info = Arc::new(Mutex::new(None));
+    let worker_info = info.clone();
     let wake = Arc::new(Notify::new());
     let notify = wake.clone();
     let authorization = inner
@@ -242,6 +246,7 @@ pub(super) async fn connect(
             timeouts: options.timeouts,
             interrupt: options.interrupt,
             initialized: Some(tx),
+            info: worker_info,
         };
         let result = worker
             .run(
@@ -269,8 +274,7 @@ pub(super) async fn connect(
         drop(worker);
         finished.cancel();
     })?;
-    let info = rx
-        .await
+    rx.await
         .map_err(|_| Error::new(ErrorKind::Stream, "realtime worker stopped"))??;
     Ok(RealtimeSession {
         lease,
@@ -288,9 +292,24 @@ pub(super) async fn connect(
     })
 }
 impl RealtimeSession {
-    /// Effective server settings.
-    pub fn info(&self) -> &SessionInfo {
-        &self.info
+    /// An owned snapshot of the current acknowledged server settings.
+    pub fn info(&self) -> SessionInfo {
+        self.info
+            .lock()
+            .expect("session info mutex")
+            .as_ref()
+            .expect("initialized session")
+            .clone()
+    }
+    /// Apply supplied settings and wait for acknowledgment. Replies already
+    /// started keep their settings. Dropping the future after submission does
+    /// not undo an accepted update.
+    pub async fn update(&self, options: RealtimeUpdateOptions) -> Result<SessionInfo, Error> {
+        let settings = super::client::patch(options)?;
+        self.invoke(Command::new(Kind::Update, json!({"session": settings})))
+            .await?
+            .info
+            .ok_or_else(|| failure("missing acknowledged settings"))
     }
     /// Take the only owned event stream. A second call fails.
     pub fn events(&self) -> Result<RealtimeEvents, Error> {

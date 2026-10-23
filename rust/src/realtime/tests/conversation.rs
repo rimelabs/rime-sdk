@@ -140,13 +140,26 @@ async fn interruption_rejects_late_audio_and_cancels_dependent_reply() {
     };
     let stop = CancellationToken::new();
     let task = tokio::spawn(
-        ConversationRunner::new(s, Source(Arc::new(AtomicBool::new(false))), playback)
-            .run(stop.clone()),
+        ConversationRunner::new(
+            s.clone(),
+            Source(Arc::new(AtomicBool::new(false))),
+            playback,
+        )
+        .run(stop.clone()),
     );
     p.send(json!({"type":"response.created","response":{"id":"r1"}}))
         .await;
     emit(&p, "r1", "i1").await;
     let output = outputs.recv().await.unwrap();
+    let clone = s.clone();
+    let update = tokio::spawn(async move {
+        clone
+            .update(crate::RealtimeUpdateOptions::default().interrupt_on_speech(false))
+            .await
+    });
+    let q = p.next("session.update").await;
+    p.send(json!({"type":"session.updated", "prism_request_event_id":q["event_id"], "session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":false,"prism_settings_revision":2}})).await;
+    update.await.unwrap().unwrap();
     p.send(
         json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
     )

@@ -39,6 +39,7 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 		p.conn <- c
 		send := func(v rtObject) error { b, _ := json.Marshal(v); return c.Write(r.Context(), websocket.MessageText, b) }
 		_ = send(rtObject{"type": "session.created", "session": rtObject{"id": "session-1"}})
+		initialized := false
 		for {
 			_, b, e := c.Read(r.Context())
 			if e != nil {
@@ -53,7 +54,8 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 				t.Errorf("request %v violates Prism schema: %v", v["type"], err)
 				return
 			}
-			if v["type"] == "session.update" {
+			if v["type"] == "session.update" && !initialized {
+				initialized = true
 				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": rtObject{"id": "session-1", "voice": "test"}})
 				if pause {
 					<-resume

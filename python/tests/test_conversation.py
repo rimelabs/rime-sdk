@@ -181,7 +181,7 @@ async def run(monkeypatch, *, enabled=True, callback=None):
 
     def configured(kind, **body):
         if kind == "session.updated":
-            body["session"]["prism_effective_interrupt_response"] = enabled
+            body["session"].setdefault("prism_effective_interrupt_response", enabled)
         emit(kind, **body)
 
     peer.emit = configured
@@ -913,3 +913,27 @@ async def test_unexpected_source_cancellation_fails_the_run(monkeypatch):
             await asyncio.wait_for(asyncio.shield(task), 1)
         assert isinstance(caught.value.__cause__, asyncio.CancelledError)
         assert playback.stopped and peer.closed
+
+
+async def test_confirmed_speech_uses_active_reply_settings_after_update(monkeypatch):
+    async with run(monkeypatch) as (current, peer, _, playback, _, events):
+        begin(peer)
+        await until(lambda: "first" in playback.outputs)
+        update = asyncio.create_task(current.update(interrupt_on_speech=False))
+        q = await peer.next("session.update")
+        peer.emit(
+            "session.updated",
+            prism_request_event_id=q["event_id"],
+            session={
+                "id": "session-1",
+                "voice": "test",
+                "prism_effective_interrupt_response": False,
+                "prism_settings_revision": 2,
+            },
+        )
+        await update
+        speech(peer)
+        await until(lambda: any(isinstance(e, r.SpeechStarted) for e in events))
+        assert playback.outputs["first"].interrupted
+        playback.outputs["first"].done.set_result(17)
+        ack_cut(peer, await peer.next("conversation.item.truncate"))

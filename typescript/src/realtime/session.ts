@@ -17,6 +17,7 @@ import { InputConverter } from "../pcm.js";
 import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";
+import { toolSettings } from "./settings.js";
 
 const NOT_READY = new Set([
   "typed_turn_busy",
@@ -35,6 +36,7 @@ interface Pending {
   result: Deferred<p.Acknowledgment>;
   target?: string;
   itemId?: string;
+  interruptOnSpeech?: boolean;
 }
 class ResponseState {
   readonly done = new Flag();
@@ -130,17 +132,7 @@ export class RealtimeSession {
       { session: settings },
       signal,
     );
-    const view = event.session;
-    this.sessionInfo = Object.freeze({
-      sessionId: this.id(),
-      model: "prism",
-      voice: view.voice ?? "",
-      interruptOnSpeech:
-        view.interruptOnSpeech ?? settings.turn_detection.interrupt_response,
-      toolResultTimeoutS: view.toolResultTimeoutS ?? null,
-      toolContinuationTimeoutS: view.toolContinuationTimeoutS ?? null,
-      turnDetection: view.turnDetection,
-    });
+    this.sessionInfo = event.info!;
   }
 
   get info(): t.SessionInfo {
@@ -322,7 +314,15 @@ export class RealtimeSession {
     const kind = request.kind;
     const eventId = `evt_${randomUUID().replaceAll("-", "")}`;
     const result = new Deferred<p.Acknowledgment>();
-    this.pending.set(eventId, { request, result, target });
+    this.pending.set(eventId, {
+      request,
+      result,
+      target,
+      interruptOnSpeech:
+        request.kind === "session.update"
+          ? (body.session as p.SessionPatch).turn_detection?.interrupt_response
+          : undefined,
+    });
     const deadline = scope(
       [this.lifetime.signal],
       this.timeouts.requestS,
@@ -427,6 +427,37 @@ export class RealtimeSession {
     } finally {
       release();
     }
+  }
+  /** Apply supplied settings and wait for acknowledgment. Tools replace the
+   * complete list. Replies already started keep their original settings.
+   * Cancellation after submission does not undo an accepted update. */
+  async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
+    const settings: p.SessionPatch = {};
+    for (const name of ["instructions", "voice"] as const) {
+      const value = options[name];
+      if (value !== undefined) {
+        if (typeof value !== "string")
+          throw new RimeInputError(`${name} must be a string`);
+        settings[name] = value;
+      }
+    }
+    if (options.tools !== undefined)
+      settings.tools = toolSettings(options.tools);
+    if (options.interruptOnSpeech !== undefined) {
+      if (typeof options.interruptOnSpeech !== "boolean")
+        throw new RimeInputError("interruptOnSpeech must be a boolean");
+      settings.turn_detection = {
+        interrupt_response: options.interruptOnSpeech,
+      };
+    }
+    return this.operation(options, async (signal) => {
+      const event = await this.request(
+        p.requests.update,
+        { session: settings },
+        signal,
+      );
+      return event.info!;
+    });
   }
   async sendText(
     value: string,
@@ -761,7 +792,27 @@ export class RealtimeSession {
           this.created.resolve(payload.session);
         }
         return;
-      case "session.updated":
+      case "session.updated": {
+        const view = payload.session;
+        const pending = this.pending.get(echo ?? "");
+        if (!pending) return;
+        this.sessionInfo = Object.freeze({
+          sessionId: this.id(),
+          model: "prism",
+          voice: view.voice,
+          interruptOnSpeech:
+            view.interruptOnSpeech ??
+            pending?.interruptOnSpeech ??
+            this.sessionInfo?.interruptOnSpeech ??
+            true,
+          toolResultTimeoutS: view.toolResultTimeoutS,
+          toolContinuationTimeoutS: view.toolContinuationTimeoutS,
+          turnDetection: view.turnDetection,
+          settingsRevision: view.settingsRevision,
+        });
+        this.settle(echo, { ...payload, info: this.sessionInfo });
+        return;
+      }
       case "tool.result.created":
         this.settle(echo, payload);
         return;

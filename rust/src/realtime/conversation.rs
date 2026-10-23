@@ -291,8 +291,10 @@ impl<O: ConversationOutput> PlaybackState<O> {
                 });
             }
             RealtimeEvent::SpeechStarted { .. } | RealtimeEvent::ResponseAbandoned { .. } => {
+                // With revisions, Prism filters speech using the playing reply's settings.
+                let info = session.info();
                 let all = matches!(&event.payload, RealtimeEvent::SpeechStarted { .. })
-                    && session.info().interrupt_on_speech;
+                    && (info.settings_revision.is_some() || info.interrupt_on_speech);
                 if let RealtimeEvent::ResponseAbandoned { response } = &event.payload {
                     self.interrupted.insert(response.response_id.clone());
                 }
