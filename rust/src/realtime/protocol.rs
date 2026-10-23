@@ -317,7 +317,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                     Some(reference(&m["prism_parent_response_id"])?)
                 };
                 let input_item_id = optional(&m["prism_input_item_id"])?;
-                let input_item_ids = match &m["prism_input_item_ids"] {
+                let input_item_ids = match &d["prism_input_item_ids"] {
                     Value::Null => input_item_id.iter().cloned().collect(),
                     Value::Array(a) => a.iter().map(id).collect::<Result<_, _>>()?,
                     _ => return Err(invalid("prism_input_item_ids")),

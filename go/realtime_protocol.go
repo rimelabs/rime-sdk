@@ -315,7 +315,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 			}
 			input := decoder.optional(m["prism_input_item_id"])
 			inputs := []string{}
-			if v := m["prism_input_item_ids"]; v != nil {
+			if v := d["prism_input_item_ids"]; v != nil {
 				a, ok := v.([]any)
 				if !ok {
 					decoder.bad("prism_input_item_ids")

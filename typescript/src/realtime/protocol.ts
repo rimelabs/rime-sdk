@@ -475,7 +475,7 @@ function decodeValue(
         "prism_input_item_id",
       );
       const inputItemIds =
-        metadata.prism_input_item_ids ??
+        response.prism_input_item_ids ??
         (inputItemId === null ? [] : [inputItemId]);
       if (!Array.isArray(inputItemIds)) return invalid("prism_input_item_ids");
       payload = {

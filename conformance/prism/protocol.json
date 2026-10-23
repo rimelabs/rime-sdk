@@ -924,9 +924,7 @@
       "type": "response.created",
       "response": {
         "id": "reply-2",
-        "metadata": {
-          "prism_input_item_ids": "item-1"
-        }
+        "prism_input_item_ids": "item-1"
       }
     },
     "invalid": true
@@ -937,9 +935,7 @@
       "type": "response.created",
       "response": {
         "id": "reply-2",
-        "metadata": {
-          "prism_input_item_ids": [1]
-        }
+        "prism_input_item_ids": [1]
       }
     },
     "invalid": true
@@ -950,9 +946,7 @@
       "type": "response.created",
       "response": {
         "id": "reply-2",
-        "metadata": {
-          "prism_input_item_ids": ["item-1"]
-        }
+        "prism_input_item_ids": ["item-1"]
       }
     },
     "expected_kind": "response.started"

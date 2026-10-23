@@ -594,10 +594,6 @@ components:
       properties:
         prism_input_item_id:
           type: string
-        prism_input_item_ids:
-          type: array
-          items:
-            type: string
         prism_call_id:
           type: string
         prism_drain_token:
@@ -760,6 +756,10 @@ components:
             $ref: '#/components/schemas/outputItem'
         metadata:
           $ref: '#/components/schemas/responseMetadata'
+        prism_input_item_ids:
+          type: array
+          items:
+            type: string
         usage:
           type: 'null'
 

@@ -84,16 +84,17 @@ test("a started reply shows the client's own metadata", () => {
   assert.deepEqual(started(undefined).metadata, {});
 });
 test("a started reply names the user items it answers", () => {
-  const started = (metadata) =>
+  const started = (metadata, response = {}) =>
     decode(
       JSON.stringify({
         type: "response.created",
-        response: { id: "reply-1", metadata },
+        response: { id: "reply-1", metadata, ...response },
       }),
       "session-1",
     ).payload;
   assert.deepEqual(
-    started({ prism_input_item_ids: ["item-1", "item-2"] }).inputItemIds,
+    started(undefined, { prism_input_item_ids: ["item-1", "item-2"] })
+      .inputItemIds,
     ["item-1", "item-2"],
   );
   assert.deepEqual(

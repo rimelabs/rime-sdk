@@ -438,7 +438,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             metadata.get("prism_parent_response_id"), "prism_parent_response_id"
         )
         input_item_id = _optional_string(metadata.get("prism_input_item_id"), "prism_input_item_id")
-        input_item_ids = metadata.get("prism_input_item_ids")
+        input_item_ids = response.get("prism_input_item_ids")
         if input_item_ids is None:
             input_item_ids = [] if input_item_id is None else [input_item_id]
         if not isinstance(input_item_ids, list):

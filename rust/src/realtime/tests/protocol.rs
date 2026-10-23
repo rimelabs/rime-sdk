@@ -168,8 +168,10 @@ async fn duplicate_tool_names_do_not_connect() {
 #[test]
 fn response_started_labels_and_inputs() {
     use crate::realtime::{Labels, RealtimeEvent};
-    let started = |metadata: Value| {
-        let raw = serde_json::json!({"type": "response.created", "response": {"id": "reply-1", "metadata": metadata}});
+    use serde_json::json;
+    let started = |mut response: Value| {
+        response["id"] = json!("reply-1");
+        let raw = json!({"type": "response.created", "response": response});
         match decode(&raw.to_string(), "session-1")
             .unwrap()
             .unwrap()
@@ -184,11 +186,11 @@ fn response_started_labels_and_inputs() {
         }
     };
     let (labels, inputs) = started(
-        serde_json::json!({"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": {"a": 1}}),
+        json!({"metadata": {"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": {"a": 1}}}),
     );
     assert_eq!(labels, Labels::from([("step".into(), "3".into())]));
     assert_eq!(inputs, ["item-3"]);
-    let inputs = started(serde_json::json!({"prism_input_item_ids": ["item-1", "item-2"]})).1;
+    let inputs = started(json!({"prism_input_item_ids": ["item-1", "item-2"]})).1;
     assert_eq!(inputs, ["item-1", "item-2"]);
-    assert_eq!(started(Value::Null), (Labels::new(), vec![]));
+    assert_eq!(started(json!({})), (Labels::new(), vec![]));
 }

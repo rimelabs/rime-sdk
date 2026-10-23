@@ -177,11 +177,12 @@ async def test_unknown_events_and_stale_acknowledgments_do_not_consume_request(m
 
 
 def test_a_started_reply_names_the_user_items_it_answers():
-    def started(metadata):
-        event = {"type": "response.created", "response": {"id": "reply-1", "metadata": metadata}}
+    def started(metadata, **response):
+        response = {"id": "reply-1", "metadata": metadata, **response}
+        event = {"type": "response.created", "response": response}
         return protocol.decode(json.dumps(event), "session-1").payload
 
-    assert started({"prism_input_item_ids": ["item-1", "item-2"]}).input_item_ids == (
+    assert started(None, prism_input_item_ids=["item-1", "item-2"]).input_item_ids == (
         "item-1",
         "item-2",
     )

@@ -92,23 +92,24 @@ func TestRealtimeOptionsValidateBeforeConnection(t *testing.T) {
 }
 
 func TestRealtimeResponseStartedLabelsAndInputs(t *testing.T) {
-	started := func(metadata any) ResponseStarted {
+	started := func(response rtObject) ResponseStarted {
 		t.Helper()
-		b, _ := json.Marshal(rtObject{"type": "response.created", "response": rtObject{"id": "reply-1", "metadata": metadata}})
+		response["id"] = "reply-1"
+		b, _ := json.Marshal(rtObject{"type": "response.created", "response": response})
 		w, e := decodeRealtime(b, "session-1")
 		if e != nil {
 			t.Fatal(e)
 		}
 		return w.payload.(ResponseStarted)
 	}
-	r := started(rtObject{"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": rtObject{"a": 1}})
+	r := started(rtObject{"metadata": rtObject{"prism_cause": "user_text", "prism_input_item_id": "item-3", "step": "3", "nested": rtObject{"a": 1}}})
 	if !reflect.DeepEqual(r.Metadata, map[string]string{"step": "3"}) || !reflect.DeepEqual(r.InputItemIDs, []string{"item-3"}) {
 		t.Fatalf("%+v", r)
 	}
 	if r = started(rtObject{"prism_input_item_ids": []string{"item-1", "item-2"}}); !reflect.DeepEqual(r.InputItemIDs, []string{"item-1", "item-2"}) {
 		t.Fatalf("%+v", r)
 	}
-	if r = started(nil); len(r.Metadata) != 0 || len(r.InputItemIDs) != 0 {
+	if r = started(rtObject{}); len(r.Metadata) != 0 || len(r.InputItemIDs) != 0 {
 		t.Fatalf("%+v", r)
 	}
 }
