@@ -70,3 +70,20 @@ cleanup contract for application adapters.
 For SDK usage and connection settings, see the
 [Python realtime guide](../../python/docs/realtime.md) or the
 [Node.js realtime guide](../../typescript/docs/realtime.md).
+
+## Deployed request IDs
+
+Local peers verify that the SDK sends `x-request-id` and reports the ID from
+Prism's session info. A gateway can replace the header before Prism sees it.
+Use the returned ID when you search service logs.
+
+With `RIME_API_KEY` set, run this check from the repository root:
+
+```sh
+RIME_PRISM_LIVE=1 uv run --project python pytest -q -s python/tests/test_prism_gateway.py
+```
+
+Each of four connections prints the supplied and returned IDs, then closes
+without requesting a reply. Set `PRISM_URL` to check another endpoint.
+To require preservation, also set `RIME_PRISM_REQUIRE_REQUEST_ID=1`. A failure
+then identifies a server or gateway behavior that a local peer cannot test.

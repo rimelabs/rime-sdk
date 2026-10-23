@@ -77,8 +77,8 @@ class Realtime:
         set_response_metadata replaces.
 
         request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
-        connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
-        makes its own; info.request_id reports the one it used.
+        connect raises RimeInputError. The server or gateway can replace it;
+        info.request_id reports the ID Prism actually used.
         """
         self._client._check_loop()
         self._client._check_open()

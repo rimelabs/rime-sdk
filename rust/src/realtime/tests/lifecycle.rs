@@ -92,6 +92,7 @@ async fn malformed_event_and_connection_loss_release_pending_requests() {
             .unwrap()
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Stream);
+        assert!(error.realtime_fault().is_none());
         c.close().await;
     }
 }
@@ -104,6 +105,7 @@ async fn structured_fault_reaches_caller() {
     let q = p.next("conversation.item.create").await;
     p.send(json!({"type":"error","error":{"scope":"event","code":"invalid","message":"bad history","owner":{"event_id":q["event_id"]}}})).await;
     let e = task.await.unwrap().unwrap_err();
+    assert_eq!(e.kind(), ErrorKind::Realtime);
     assert_eq!(e.realtime_fault().unwrap().code, "invalid");
     c.close().await;
 }

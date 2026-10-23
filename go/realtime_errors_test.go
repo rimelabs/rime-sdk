@@ -106,6 +106,9 @@ func TestRealtimeRequestErrorRetainsFault(t *testing.T) {
 		"param": "response.prism_instruction", "correlation_id": "diagnostic-1",
 	}})
 	err := <-done
+	if !errors.Is(err, ErrRealtime) || errors.Is(err, ErrStream) {
+		t.Fatalf("service fault has the wrong kind: %v", err)
+	}
 	var fault *RealtimeFault
 	if !errors.As(err, &fault) {
 		t.Fatalf("missing fault: %v", err)
@@ -119,6 +122,30 @@ func TestRealtimeRequestErrorRetainsFault(t *testing.T) {
 				t.Fatal("request error and event have different faults")
 			}
 			break
+		}
+	}
+	// A refused request leaves the session usable.
+	p.turn(s, "after-refusal")
+}
+
+func TestRealtimeSessionFaultIsTerminal(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.AddMessage(ctx, "user", "history")
+		done <- err
+	}()
+	p.next("conversation.item.create")
+	p.send(rtObject{"type": "error", "error": rtObject{"scope": "session", "code": "session_expired"}})
+	_, received := s.Recv(ctx)
+	_, later := s.AddMessage(ctx, "user", "after failure")
+	for _, err := range []error{<-done, received, later} {
+		var fault *RealtimeFault
+		if !errors.Is(err, ErrRealtime) || errors.Is(err, ErrStream) || !errors.As(err, &fault) || fault.Scope != "session" || fault.Code != "session_expired" {
+			t.Fatalf("lost terminal service fault: %v", err)
 		}
 	}
 }

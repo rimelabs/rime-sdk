@@ -122,8 +122,8 @@ impl RealtimeConnectOptions {
         self
     }
     /// Send the upgrade's x-request-id. It must be nonblank printable ASCII, or `connect`
-    /// returns an input error. Prism uses it if it is at most 128 characters,
-    /// else makes its own; `info().request_id` reports the one it used.
+    /// returns an input error. The server or gateway can replace it;
+    /// `info().request_id` reports the ID Prism actually used.
     pub fn request_id(mut self, value: impl Into<String>) -> Self {
         self.request_id = Some(value.into());
         self

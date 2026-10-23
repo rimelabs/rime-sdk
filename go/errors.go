@@ -25,6 +25,9 @@ const (
 	ErrAudioFormat    ErrorKind = "audio_format"
 	ErrCancelled      ErrorKind = "cancelled"
 	ErrStream         ErrorKind = "stream"
+
+	// ErrRealtime is a structured Prism service fault. Inspect *RealtimeFault for details.
+	ErrRealtime ErrorKind = "realtime"
 )
 
 // Error includes the service request ID when the service supplies one.

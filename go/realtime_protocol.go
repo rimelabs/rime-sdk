@@ -398,7 +398,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 	return w, nil
 }
 func rtFaultError(f *RealtimeFault) error {
-	return &Error{Kind: ErrStream, Message: f.Error(), RequestID: f.RequestID, Cause: f}
+	return &Error{Kind: ErrRealtime, Message: f.Error(), RequestID: f.RequestID, Cause: f}
 }
 func rtEncode(id, kind string, body rtObject) ([]byte, error) {
 	v := rtObject{"event_id": id, "type": kind}

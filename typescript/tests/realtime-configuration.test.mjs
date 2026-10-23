@@ -306,6 +306,7 @@ for (const eagerness of [undefined, "future"]) {
 
 for (const [requestId, used] of [
   ["client-7", "client-7"],
+  ["client-7", "gateway-made"],
   [undefined, "server-made"],
 ]) {
   test(`request id on the upgrade, and the one Prism used: ${requestId}`, async (t) => {

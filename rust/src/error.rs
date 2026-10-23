@@ -20,6 +20,8 @@ pub enum ErrorKind {
     Cancelled,
     /// Invalid or mismatched audio format.
     AudioFormat,
+    /// A structured Prism service fault. Inspect Error::realtime_fault for details.
+    Realtime,
     /// A protocol or stream failure.
     Stream,
 }

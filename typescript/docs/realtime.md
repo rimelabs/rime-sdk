@@ -166,7 +166,7 @@ session to change the others.
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `requestId` | No | Your id for the session. Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK throws `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `requestId` | No | Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK throws `RimeInputError`. A server or gateway can replace it; read `session.info.requestId` for the ID Prism actually used. |
 | `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
 

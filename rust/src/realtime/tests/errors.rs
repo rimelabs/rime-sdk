@@ -1,5 +1,7 @@
 use super::peer::{event, Peer};
 use crate::realtime::{protocol::decode, RealtimeEvent, ReplyOptions};
+use crate::ErrorKind;
+use futures_util::StreamExt;
 use serde_json::{json, Value};
 
 #[test]
@@ -99,6 +101,7 @@ async fn request_error_retains_fault() {
     }}))
     .await;
     let error = pending.await.unwrap().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Realtime);
     let fault = error.realtime_fault().expect("missing fault");
     assert!(!fault.retryable());
     assert_eq!(fault.code, "invalid_instruction");
@@ -118,5 +121,35 @@ async fn request_error_retains_fault() {
     assert_eq!(received.code, fault.code);
     assert_eq!(received.message, fault.message);
     assert_eq!(received.request_id, fault.request_id);
+    p.turn(&session, "after-refusal").await;
+    client.close().await;
+}
+
+#[tokio::test]
+async fn session_fault_is_terminal() {
+    let mut p = Peer::new().await;
+    let (client, session) = p.setup().await;
+    let mut events = session.events().unwrap();
+    let pending_session = session.clone();
+    let pending = tokio::spawn(async move { pending_session.add_message("user", "history").await });
+    p.next("conversation.item.create").await;
+    p.send(json!({"type": "error", "error": {"scope": "session", "code": "session_expired"}}))
+        .await;
+    let received = tokio::time::timeout(std::time::Duration::from_secs(3), events.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap_err();
+    let later = session
+        .add_message("user", "after failure")
+        .await
+        .unwrap_err();
+    for error in [pending.await.unwrap().unwrap_err(), received, later] {
+        assert_eq!(error.kind(), ErrorKind::Realtime);
+        let fault = error.realtime_fault().unwrap();
+        assert_eq!(fault.scope, "session");
+        assert_eq!(fault.code, "session_expired");
+    }
+    assert!(events.next().await.is_none());
     client.close().await;
 }

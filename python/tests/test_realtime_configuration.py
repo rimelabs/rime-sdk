@@ -244,7 +244,10 @@ async def test_unknown_or_missing_effective_turn_eagerness(monkeypatch, value):
         assert session.info.turn_detection.end_of_turn_timeout_ms is None
 
 
-@pytest.mark.parametrize(("request_id", "used"), [("client-7", "client-7"), (None, "server-made")])
+@pytest.mark.parametrize(
+    ("request_id", "used"),
+    [("client-7", "client-7"), ("client-7", "gateway-made"), (None, "server-made")],
+)
 async def test_request_id_on_the_upgrade_and_the_one_prism_used(monkeypatch, request_id, used):
     peer = Peer()
 

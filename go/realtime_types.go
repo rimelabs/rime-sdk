@@ -33,8 +33,8 @@ type RealtimeConnectOptions struct {
 	TurnDetection                 TurnDetection
 	Timeouts                      RealtimeTimeouts
 	// RequestID is sent as the upgrade's x-request-id. It must be nonblank
-	// printable ASCII, or Connect returns ErrInput. Prism uses it if it is at most 128
-	// characters, else makes its own; Info reports the one it used.
+	// printable ASCII, or Connect returns ErrInput. The server or gateway can replace
+	// it; Info reports the ID Prism actually used.
 	RequestID string
 	// ResponseMetadata labels every reply, such as {"step": "3"}: at most 16,
 	// keys up to 64 characters without the prism_ prefix, values up to 512.

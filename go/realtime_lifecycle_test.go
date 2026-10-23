@@ -93,7 +93,8 @@ func TestRealtimeMalformedAndConnectionLoss(t *testing.T) {
 			}
 			select {
 			case e := <-done:
-				if !errors.Is(e, ErrStream) {
+				var fault *RealtimeFault
+				if !errors.Is(e, ErrStream) || errors.Is(e, ErrRealtime) || errors.As(e, &fault) {
 					t.Fatal(e)
 				}
 			case <-time.After(3 * time.Second):
@@ -114,7 +115,7 @@ func TestRealtimeFaultPreservesErrorsAs(t *testing.T) {
 	p.send(rtObject{"type": "error", "error": rtObject{"scope": "event", "code": "invalid", "message": "bad history", "owner": rtObject{"event_id": q["event_id"]}}})
 	e := <-done
 	var f *RealtimeFault
-	if !errors.Is(e, ErrStream) || !errors.As(e, &f) || f.Code != "invalid" {
+	if !errors.Is(e, ErrRealtime) || errors.Is(e, ErrStream) || !errors.As(e, &f) || f.Code != "invalid" {
 		t.Fatal(e)
 	}
 }

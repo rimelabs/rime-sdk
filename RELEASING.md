@@ -129,11 +129,14 @@ When a release first includes an API used by the examples, update the copied
 examples' minimum SDK requirements in `python/examples/pyproject.toml` and
 `typescript/examples/package.json`, and the Rust README installation requirement,
 to the corresponding release versions. Refresh affected lockfiles and remove
-the examples' unreleased-feature notes. For append-fragment STT, these updates
-are pending the first release containing `TranscriptionOutputContract` / the
-`outputContract` option; do not substitute an older release or guess a future
-version while the feature is still under review. Verify the release version
-satisfies the declared minimum before running the published-example checks.
+the examples' unreleased-feature notes. Set the minimum to a published version
+that supports every API used by the copied examples. Verify that the release
+version satisfies this minimum before running the published-example checks.
+
+Compare public APIs with the last published tag, including alpha releases.
+Changes to return types, public struct fields, enum fields, or error kinds can
+break callers. Use a `!` PR title and a `BREAKING CHANGE:` commit footer with
+migration steps. Check that the release PR includes those steps before merging.
 
 After Python or TypeScript publication succeeds, the release workflow runs
 **Check published SDK examples**. It copies examples from the release tag into
