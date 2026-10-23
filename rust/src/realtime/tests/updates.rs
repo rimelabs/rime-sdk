@@ -369,7 +369,10 @@ async fn mixed_revision_updates_preserve_known_policies_and_reject_ambiguous_rep
         }
         p.send(json!({"type":"response.created", "response":response}))
             .await;
-        let received = events.next().await.unwrap();
+        let received = tokio::time::timeout(std::time::Duration::from_secs(3), events.next())
+            .await
+            .expect("reply event did not arrive")
+            .unwrap();
         if let Some(expected) = expected {
             let RealtimeEvent::ResponseStarted { response, .. } = received.unwrap().payload else {
                 panic!("expected response start")

@@ -606,9 +606,7 @@ pub(super) fn assert_measured_playback_is_not_interrupted<P: ConversationPlaybac
             }],
             ended: measured.is_some(),
             interrupted: false,
-            // Hold the old report's completion deterministically, independent
-            // of socket writer timing. Its cancellation token must stay live.
-            reporting: measured.is_some(),
+            reporting: false,
             finished_report: CancellationToken::new(),
         });
     }
