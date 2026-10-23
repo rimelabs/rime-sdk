@@ -1,6 +1,7 @@
 import type { PCMFormat } from "../pcm.js";
 export type { PCMFormat } from "../pcm.js";
 import { RimeError, RimeTimeoutError } from "../errors.js";
+import { normalizeFault } from "./faults.js";
 
 export type JsonValue =
   null | boolean | number | string | JsonValue[] | JsonObject;
@@ -103,6 +104,9 @@ export interface SessionInfo {
 }
 export interface RealtimeFault {
   readonly code: string;
+  /** Optional for compatibility with caller-created faults. The SDK derives
+   * its output classification from the code and ignores supplied values. */
+  readonly retryable?: boolean;
   readonly message: string;
   readonly scope:
     | "event"
@@ -118,10 +122,21 @@ export interface RealtimeFault {
   readonly correlationId: string | null;
   readonly parameter: string | null;
 }
+/** An immutable fault produced by the SDK. */
+export interface NormalizedRealtimeFault extends RealtimeFault {
+  /** Whether the same request, unchanged, may succeed on another attempt.
+   * True only for capacity_exceeded, unavailable, and response_timeout.
+   * Unknown codes return false. The application owns retry timing, limits,
+   * and recovery after partial output; this value does not replay a request. */
+  readonly retryable: boolean;
+}
 export class RealtimeAdmissionTimeout extends RimeTimeoutError {}
 export class RimeRealtimeError extends RimeError {
-  constructor(readonly fault: RealtimeFault) {
-    super(`${fault.code}: ${fault.message}`, fault.requestId);
+  readonly fault: NormalizedRealtimeFault;
+  constructor(fault: RealtimeFault) {
+    const normalized = normalizeFault(fault);
+    super(`${normalized.code}: ${normalized.message}`, normalized.requestId);
+    this.fault = normalized;
   }
 }
 export interface InputReady {
@@ -173,10 +188,10 @@ export interface TranscriptFinal {
   readonly itemId: string;
   readonly text: string;
 }
-export interface TranscriptFailed {
+export interface TranscriptFailed<Fault extends RealtimeFault = RealtimeFault> {
   readonly kind: "transcript.failed";
   readonly itemId: string;
-  readonly error: RealtimeFault;
+  readonly error: Fault;
 }
 export interface ResponseStarted {
   readonly kind: "response.started";
@@ -228,11 +243,11 @@ export interface ResponseEnded {
   readonly status: "completed" | "cancelled" | "failed" | "unknown";
   readonly reason: string | null;
 }
-export interface FaultEvent {
+export interface FaultEvent<Fault extends RealtimeFault = RealtimeFault> {
   readonly kind: "error";
-  readonly error: RealtimeFault;
+  readonly error: Fault;
 }
-export type InputEvent =
+export type InputEvent<Fault extends RealtimeFault = RealtimeFault> =
   | InputReady
   | SpeechHint
   | SpeechStarted
@@ -240,7 +255,7 @@ export type InputEvent =
   | InputCommitted
   | TranscriptDelta
   | TranscriptFinal
-  | TranscriptFailed;
+  | TranscriptFailed<Fault>;
 export type ResponseEvent =
   | ResponseStarted
   | ResponseAbandoned
@@ -251,11 +266,11 @@ export type ResponseEvent =
   | AudioDone
   | ToolCall
   | ResponseEnded;
-export interface SessionEvent {
+export interface SessionEvent<Fault extends RealtimeFault = RealtimeFault> {
   readonly sessionId: string;
   readonly eventId: string;
   readonly requestId: string | null;
-  readonly payload: InputEvent | ResponseEvent | FaultEvent;
+  readonly payload: InputEvent<Fault> | ResponseEvent | FaultEvent<Fault>;
 }
 export interface PlaybackInterrupted {
   readonly kind: "interrupted";

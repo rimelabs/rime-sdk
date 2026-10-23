@@ -11,6 +11,7 @@ import { isSessionCloseError } from "./session.js";
 import { RimeRealtimeError } from "./types.js";
 import type {
   AudioChunk,
+  NormalizedRealtimeFault,
   OutputRef,
   ResponseRef,
   SessionEvent,
@@ -50,7 +51,7 @@ export interface ConversationOptions {
   readonly playback: ConversationPlayback;
   /** Called inline for every event. Must be synchronous and nonblocking.
    * Scheduled application work remains the caller's responsibility. */
-  readonly onEvent?: (event: SessionEvent) => void;
+  readonly onEvent?: (event: SessionEvent<NormalizedRealtimeFault>) => void;
   readonly signal?: AbortSignal;
 }
 interface Output {

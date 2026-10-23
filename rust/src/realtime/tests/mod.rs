@@ -1,4 +1,5 @@
 mod conversation;
+mod errors;
 mod lifecycle;
 mod peer;
 mod protocol;

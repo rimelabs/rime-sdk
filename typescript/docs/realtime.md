@@ -406,6 +406,53 @@ with `RimeRealtimeError`. Its `.fault` has `code`, `message`, `scope`, nullable
 array. A response fault does not itself end generation. Session faults and lost
 connections end the session.
 
+`NormalizedRealtimeFault.retryable` reports whether the same request, unchanged,
+may succeed on another attempt. Read `event.payload.error.retryable` on an `error`
+event or `error.fault.retryable` on `RimeRealtimeError`. The SDK derives this
+value from the code; Prism does not send a retry flag.
+
+`RealtimeFault` accepts the previous fault shape, with an optional `retryable`
+field, for caller-created faults. `RimeRealtimeError` accepts this shape and
+ignores any supplied retry flag. Its `.fault` and SDK-emitted event faults are
+`NormalizedRealtimeFault` values with a required boolean `retryable` field.
+The SDK freezes these faults and their `callIds` arrays. Later changes to a
+constructor input do not change the error's fault.
+
+`TranscriptFailed`, `FaultEvent`, `InputEvent`, and `SessionEvent` default to
+`RealtimeFault`, so existing event literals can omit `retryable`. These types
+also accept a fault type parameter. `session.events` and the `runConversation`
+event callback use `SessionEvent<NormalizedRealtimeFault>`, which gives their
+faults a required boolean `retryable` field. An explicit `SessionEvent`
+annotation uses the default type and makes `retryable` optional.
+
+| Error code | `retryable` |
+| --- | --- |
+| `capacity_exceeded` | `true` |
+| `unavailable` | `true` |
+| `response_timeout` | `true` |
+| `context_length_exceeded` | `false` |
+| All other codes, including unknown codes | `false` |
+
+The application chooses the delay, attempt limit, and recovery operation. This
+value does not start a retry. It does not describe a local `RimeTimeoutError` or
+prove that no output or side effect occurred. The SDK's existing readiness
+retries have separate rules: an explicit refusal such as `typed_turn_busy`
+permits another attempt after a new readiness event, although its `retryable`
+value is `false` under this contract.
+
+For example, Prism can accept a user's question and then report
+`capacity_exceeded`. `sendText()` has already returned a `ResponseRef`; the
+failure arrives through an `error` event. Wait for `response.ended`, then apply
+the application's retry policy. If the question is already in history, use
+`requestReply()` to ask for another reply when appropriate. Repeating
+`sendText()` can add the question twice. A `response_timeout` can follow partial
+text or audio, which the application must handle before another attempt.
+
+For `context_length_exceeded`, the server message contains token counts.
+Unchanged attempts will fail until the conversation is shorter. Start a new
+session with shorter context. The protocol also supports history deletion, but
+this SDK does not yet expose `conversation.item.delete`.
+
 Malformed fields in known events and mismatched request acknowledgments close
 the session with `RimeStreamError`. Unknown event kinds and extra fields remain
 accepted and ignored. The SDK does not replay a request after a protocol failure.

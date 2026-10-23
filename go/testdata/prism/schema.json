@@ -120,6 +120,12 @@
     "valid": false
   },
   {
+    "name": "context length exceeded error code",
+    "schema": "errorCode",
+    "value": "context_length_exceeded",
+    "valid": true
+  },
+  {
     "name": "nonstring error scope",
     "schema": "errorInfo/properties/scope",
     "value": 123,

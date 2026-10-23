@@ -95,6 +95,19 @@ type RealtimeFault struct {
 
 func (f *RealtimeFault) Error() string { return f.Code + ": " + f.Message }
 
+// Retryable reports whether the same request, unchanged, may succeed on another
+// attempt. Only capacity_exceeded, unavailable, and response_timeout return true.
+// Unknown codes return false. The application owns retry timing, limits, and
+// recovery after partial output; this method does not replay a request.
+func (f *RealtimeFault) Retryable() bool {
+	switch f.Code {
+	case "capacity_exceeded", "unavailable", "response_timeout":
+		return true
+	default:
+		return false
+	}
+}
+
 // RealtimeEvent is one typed event payload. Unknown server events are ignored.
 type RealtimeEvent interface{ isRealtimeEvent() }
 

@@ -1,5 +1,11 @@
 import {
   Rime,
+  RimeRealtimeError,
+  type RealtimeFault,
+  type TranscriptFailed,
+  type FaultEvent,
+  type InputEvent,
+  type ConversationOptions,
   type RealtimeConnectOptions,
   type RealtimeSession,
   type ResponseRef,
@@ -11,6 +17,54 @@ import {
   type TurnDetection,
   type TurnDetectionInfo,
 } from "../../dist/index.js";
+
+const previousFault: RealtimeFault = {
+  code: "unavailable",
+  message: "Service unavailable",
+  scope: "response",
+  requestId: "request-1",
+  responseId: "response-1",
+  itemId: null,
+  callIds: [],
+  correlationId: null,
+  parameter: null,
+};
+const constructedError = new RimeRealtimeError(previousFault);
+const retryable: boolean = constructedError.fault.retryable;
+void retryable;
+// @ts-expect-error Retry classification is read-only.
+constructedError.fault.retryable = false;
+new RimeRealtimeError({ ...previousFault, retryable: false });
+
+const previousTranscript: TranscriptFailed = {
+  kind: "transcript.failed",
+  itemId: "item-1",
+  error: previousFault,
+};
+const previousError: FaultEvent = { kind: "error", error: previousFault };
+const previousInput: InputEvent = previousTranscript;
+const previousEvents: SessionEvent[] = [previousTranscript, previousError].map(
+  (payload) => ({
+    sessionId: "session-1",
+    eventId: "event-1",
+    requestId: null,
+    payload,
+  }),
+);
+void [previousInput, previousEvents];
+
+const onEvent: NonNullable<ConversationOptions["onEvent"]> = (event) => {
+  const payload = event.payload;
+  if (payload.kind === "error" || payload.kind === "transcript.failed") {
+    const retryable: boolean = payload.error.retryable;
+    void retryable;
+  }
+};
+// Existing callbacks can continue to accept the general event type.
+const previousCallback: typeof onEvent = (event: SessionEvent) => {
+  void event;
+};
+void [onEvent, previousCallback];
 
 const tool: ToolDefinition = { name: "lookup", parameters: { type: "object" } };
 const fillers: PrismFiller[] = [
@@ -54,7 +108,14 @@ async function useSession(session: RealtimeSession) {
   await session.reportPlayback(report);
   for await (const event of session.events) {
     const envelope: SessionEvent = event;
-    const payload = envelope.payload;
+    void envelope;
+    const payload = event.payload;
+    if (payload.kind === "error" || payload.kind === "transcript.failed") {
+      const retryable: boolean = payload.error.retryable;
+      void retryable;
+      // @ts-expect-error Retry classification is read-only.
+      payload.error.retryable = true;
+    }
     if (payload.kind === "audio.delta") {
       const rate: 8000 | 16000 | 24000 | 48000 =
         payload.audio.format.sampleRate;

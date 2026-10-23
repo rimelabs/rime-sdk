@@ -255,6 +255,19 @@ pub struct RealtimeFault {
     /// Invalid parameter, when supplied.
     pub parameter: Option<String>,
 }
+impl RealtimeFault {
+    /// Whether the same request, unchanged, may succeed on another attempt.
+    ///
+    /// Only `capacity_exceeded`, `unavailable`, and `response_timeout` return true.
+    /// Unknown codes return false. The application owns retry timing, limits,
+    /// and recovery after partial output; this method does not replay a request.
+    pub fn retryable(&self) -> bool {
+        matches!(
+            self.code.as_str(),
+            "capacity_exceeded" | "unavailable" | "response_timeout"
+        )
+    }
+}
 impl fmt::Display for RealtimeFault {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: {}", self.code, self.message)

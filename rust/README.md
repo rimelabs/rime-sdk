@@ -386,7 +386,8 @@ sessions. Dropping an operation future prevents submission if possible. After
 submission, the worker keeps acknowledgment matching. It cancels a reply that
 is accepted after its caller stops waiting. A write or acknowledgment with an
 unknown outcome closes the session. The SDK does not reconnect or replay it.
-Only an explicit busy refusal permits retry after a new readiness event.
+The SDK retries turn admission only after an explicit busy refusal and a new
+readiness event.
 
 Voice and session instructions must be nonblank when supplied. The SDK imposes
 no length cap on these settings, consistent with the shared Prism schema and
@@ -406,6 +407,39 @@ fails with `ErrorKind::ResourceLimit`; consume events during requests. Known
 malformed events fail the session. Unknown events and fields are ignored;
 unknown server enum values are reported as `unknown`. Service faults retain
 code, scope, owners, and correlation details through `Error::realtime_fault()`.
+
+`RealtimeFault::retryable()` reports whether the same request, unchanged, may
+succeed on another attempt. Call it on the fault in `RealtimeEvent::Fault` or
+the fault returned by `Error::realtime_fault()`. The SDK derives this value from
+the code; Prism does not send a retry flag.
+
+| Error code | `retryable()` |
+| --- | --- |
+| `capacity_exceeded` | `true` |
+| `unavailable` | `true` |
+| `response_timeout` | `true` |
+| `context_length_exceeded` | `false` |
+| All other codes, including unknown codes | `false` |
+
+The application chooses the delay, attempt limit, and recovery operation.
+`retryable()` does not start a retry or describe a local `ErrorKind::Timeout`.
+It does not prove that no output or side effect occurred. The SDK's existing
+readiness retries have separate rules: `typed_turn_busy`, for example, returns
+`false` here but permits another attempt after a new readiness event.
+
+For example, Prism can accept a user's question and then report
+`capacity_exceeded`. `send_text()` has already returned a `ResponseRef`; the
+failure arrives through `RealtimeEvent::Fault`. Wait for
+`RealtimeEvent::ResponseEnded`, then apply the application's retry policy. If
+the question is already in history, use `request_reply()` to ask for another
+reply when appropriate. Repeating `send_text()` can add the question twice.
+A `response_timeout` can follow partial text or audio, which the application
+must handle before another attempt.
+
+For `context_length_exceeded`, the server message contains token counts.
+Unchanged attempts will fail until the conversation is shorter. Start a new
+session with shorter context. The protocol also supports history deletion, but
+this SDK does not yet expose `conversation.item.delete`.
 
 ### Conversation runner and examples
 
