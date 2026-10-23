@@ -19,24 +19,18 @@ Add these dependencies to `Cargo.toml`. Tokio's `fs` and `io-util` features,
 
 ```toml
 [dependencies]
-rimelabs-sdk = "0.1.0-alpha.5"
+rimelabs-sdk = "0.1.0-alpha.9"
 bytes = "1"
 futures-util = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time", "fs", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 ```
 
-The STT streaming examples below use the unreleased `TranscriptionOutputContract`
-and `TranscriptionUpdate::Delta` APIs. Published crates through `0.1.0-alpha.7`
-do not contain them. Until append support is released, run the example from this
-source checkout's `rust/` directory:
+Prism requires `0.1.0-alpha.9` or later. Append-fragment STT requires
+`0.1.0-alpha.8` or later. The dependencies above cover both.
 
-```sh
-cargo run --example transcribe -- utterance.pcm en append_fragments
-```
-
-The installation requirement above must be raised to the first release containing
-these APIs when that release is prepared; it does not currently cover these STT
-streaming examples.
+Add `tokio-util` when you use the conversation runner. Its cancellation token
+controls the run and the audio adapters.
 
 Get an API key from the [Rime dashboard](https://app.rime.ai/). A key is required:
 `Client::builder().build()` reads `RIME_API_KEY`, or you can use
@@ -316,8 +310,17 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
-Realtime support is unreleased. Run these examples from this checkout's `rust/`
-directory until the first release that contains `realtime`.
+Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session updates,
+`RealtimeFault::retryable()`, and `ErrorKind::Realtime` are pending the next
+release. Use this checkout for those APIs.
+
+When you upgrade from alpha.9, `info()` returns an owned `SessionInfo` snapshot.
+Store it before borrowing its fields. Add `request_id`, `response_metadata`, and
+`settings_revision` to existing `SessionInfo` literals. Use `..` in
+`ResponseStarted` and `ResponseEnded` patterns to ignore fields you do not need.
+Service faults now have
+`ErrorKind::Realtime`; reserve `ErrorKind::Stream` handling for connection and
+protocol failures. Check a fault's `scope` to see whether the session ended.
 
 ```rust,no_run
 use futures_util::StreamExt;
@@ -419,8 +422,9 @@ current acknowledged setting.
 `session.info()` returns an owned `SessionInfo` snapshot. All cloned session
 handles read the latest acknowledged settings.
 `request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
-printable ASCII, or `connect` returns an input error. Prism uses it if it is at most 128
-characters, else makes its own; `info().request_id` reports the one it used.
+printable ASCII, or `connect` returns an input error. Prism replaces IDs longer
+than 128 characters. A gateway can replace shorter IDs too. `info().request_id`
+reports the ID Prism actually used.
 Include it when you report a problem; an event's or fault's `request_id` names
 the SDK request that caused it instead. `response_metadata` labels every reply, such as
 `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512,
@@ -474,8 +478,11 @@ outputs per response, and 256 queued events. Incoming messages are limited to
 1 MiB. An expired reference fails with `ErrorKind::Input`. A full event queue
 fails with `ErrorKind::ResourceLimit`; consume events during requests. Known
 malformed events fail the session. Unknown events and fields are ignored;
-unknown server enum values are reported as `unknown`. Service faults retain
-code, scope, owners, and correlation details through `Error::realtime_fault()`.
+unknown server enum values are reported as `unknown`. Service faults use
+`ErrorKind::Realtime` and retain code, scope, owners, and correlation details
+through `Error::realtime_fault()`. A refusal can leave the session usable;
+a fault with session scope ends it. Connection and protocol failures use
+`ErrorKind::Stream` and have no realtime fault.
 
 `RealtimeFault::retryable()` reports whether the same request, unchanged, may
 succeed on another attempt. Call it on the fault in `RealtimeEvent::Fault` or

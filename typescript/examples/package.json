@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@rimelabs/api": "^0.4.0",
-    "@rimelabs/sdk": ">=0.1.0-alpha.11",
+    "@rimelabs/sdk": ">=0.1.0-alpha.20",
     "ws": "^8.22.0"
   },
   "devDependencies": {

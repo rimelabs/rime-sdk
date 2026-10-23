@@ -172,7 +172,7 @@ fn fault(v: &Value) -> Result<RealtimeFault, Error> {
     })
 }
 pub(super) fn fault_error(f: RealtimeFault) -> Error {
-    Error::new(ErrorKind::Stream, f.to_string())
+    Error::new(ErrorKind::Realtime, f.to_string())
         .with_request_id(f.request_id.as_deref())
         .caused_by(f)
 }

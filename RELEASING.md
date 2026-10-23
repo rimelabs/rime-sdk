@@ -86,7 +86,7 @@ identities. npm provenance remains disabled under the current workflow policy.
 ## Routine release
 
 1. Make changes in a branch. Open a PR with a Conventional Commit title.
-   Use **Squash and merge**, and keep that title as the squash commit message.
+   Use **Squash and merge**, and keep the PR title as the squash commit subject.
 
    | Title | Intent |
    | --- | --- |
@@ -129,11 +129,16 @@ When a release first includes an API used by the examples, update the copied
 examples' minimum SDK requirements in `python/examples/pyproject.toml` and
 `typescript/examples/package.json`, and the Rust README installation requirement,
 to the corresponding release versions. Refresh affected lockfiles and remove
-the examples' unreleased-feature notes. For append-fragment STT, these updates
-are pending the first release containing `TranscriptionOutputContract` / the
-`outputContract` option; do not substitute an older release or guess a future
-version while the feature is still under review. Verify the release version
-satisfies the declared minimum before running the published-example checks.
+the examples' unreleased-feature notes. Set the minimum to a published version
+that supports every API used by the copied examples. Verify that the release
+version satisfies this minimum before running the published-example checks.
+
+Compare public APIs with the last published tag, including alpha releases.
+Changes to return types, public struct fields, enum fields, or error kinds can
+break callers. Use a `!` PR title and put a `BREAKING CHANGE:` footer with
+migration steps in the PR body. Before squash merging, copy that footer into
+the commit body. Check that the generated release PR includes those steps
+before you merge it.
 
 After Python or TypeScript publication succeeds, the release workflow runs
 **Check published SDK examples**. It copies examples from the release tag into

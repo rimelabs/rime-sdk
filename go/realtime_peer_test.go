@@ -119,13 +119,25 @@ func (p *realtimePeer) setup(t *testing.T) (*Client, *RealtimeSession) {
 	return p.setupWith(t, RealtimeConnectOptions{})
 }
 func (p *realtimePeer) setupWith(t *testing.T, o RealtimeConnectOptions) (*Client, *RealtimeSession) {
+	return p.setupWithTransport(t, o, nil)
+}
+func (p *realtimePeer) setupWithTransport(t *testing.T, o RealtimeConnectOptions, transport http.RoundTripper) (*Client, *RealtimeSession) {
 	c, e := NewClient(Config{APIKey: "test", Timeout: time.Nanosecond})
 	if e != nil {
 		t.Fatal(e)
 	}
+	c.realtimeTransport = transport
 	t.Cleanup(func() { _ = c.Close() })
 	o.Endpoint = "ws" + strings.TrimPrefix(p.server.URL, "http") + "/v1/realtime"
-	o.Timeouts = RealtimeTimeouts{Connect: time.Second, Ready: time.Second, Request: time.Second}
+	if o.Timeouts.Connect == 0 {
+		o.Timeouts.Connect = time.Second
+	}
+	if o.Timeouts.Ready == 0 {
+		o.Timeouts.Ready = time.Second
+	}
+	if o.Timeouts.Request == 0 {
+		o.Timeouts.Request = time.Second
+	}
 	s, e := c.Realtime.Connect(context.Background(), o)
 	if e != nil {
 		t.Fatal(e)

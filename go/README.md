@@ -336,8 +336,13 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
-Realtime support is unreleased. Run these examples from this checkout's `go/`
-directory until the first release that contains `Client.Realtime`.
+Prism is available from `v0.1.0-alpha.11`. Request IDs, reply labels, session updates,
+`RealtimeFault.Retryable()`, and `ErrRealtime` are pending the next release.
+Use this checkout for those APIs.
+
+When you upgrade from alpha.11, check `errors.Is(err, rime.ErrRealtime)` for
+service faults. Connection and protocol failures still use `ErrStream`.
+Read the fault's `Scope` to see whether the session ended.
 
 This excerpt belongs inside a function that returns `error`. It assumes an
 existing `ctx` and the `rime` package import. See the
@@ -362,6 +367,11 @@ settings do not apply. `RealtimeConnectOptions` selects the endpoint, voice,
 instructions, tools, interruption, turn detection, and timeouts. Plain `ws://`
 is permitted only for localhost. Zero timeouts select 10 seconds for connection,
 30 seconds for admission, and 10 seconds for writes and acknowledgments.
+
+Go uses the default HTTP transport for Prism. It honors `HTTPS_PROXY` and
+`NO_PROXY` for `wss://` connections. Set these variables before the first
+connection; Go caches the proxy environment. The transport bypasses proxies
+for localhost and loopback addresses.
 
 `TurnDetection` accepts `low`, `medium`, `high`, or `auto` eagerness and a silence
 limit of 1000 to 10000 milliseconds. `PrismFiller` selects `none`, `text`, or
@@ -425,8 +435,9 @@ a revision establishes a new known setting. Replies without a revision use the
 current acknowledged setting.
 
 `RequestID` is sent as the upgrade's `x-request-id`. It must be nonblank
-printable ASCII, or `Connect` returns `ErrInput`. Prism uses it if it is at most 128 characters,
-else makes its own; `Info().RequestID` reports the one it used. Include it when
+printable ASCII, or `Connect` returns `ErrInput`. Prism replaces IDs longer than
+128 characters. A gateway can replace shorter IDs too. `Info().RequestID`
+reports the ID Prism actually used. Include it when
 you report a problem; an event's or fault's `RequestID` names the SDK request that
 caused it instead. `ResponseMetadata` labels every reply, such as `{"step": "3"}`: up to 16
 strings, keys up to 64 characters and values up to 512, no key starting with
@@ -463,8 +474,10 @@ acknowledgment matching even if the caller stops waiting. It cancels a reply
 accepted after caller cancellation. A write or acknowledgment with an unknown
 outcome closes the session. There is no automatic reconnect or replay. The SDK
 retries turn admission only after an explicit busy refusal and a new readiness
-event. Use `errors.Is` for SDK categories or context errors. Use `errors.As` with
-`*RealtimeFault` for service code, scope, owners, and correlation details.
+event. Service faults use `ErrRealtime`. Use `errors.As` with `*RealtimeFault`
+for service code, scope, owners, and correlation details. A refusal can leave
+the session usable; a fault with session scope ends it. Connection and protocol
+failures use `ErrStream` and have no realtime fault.
 
 `RealtimeFault.Retryable()` reports whether the same request, unchanged, may
 succeed on another attempt. Call it on `FaultEvent.Fault` or the fault obtained
