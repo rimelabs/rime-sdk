@@ -71,7 +71,7 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly interruptOnSpeech?: boolean;
   readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
-  /** Sent as the upgrade's `x-request-id`. It must be printable ASCII, or
+  /** Sent as the upgrade's `x-request-id`. It must be nonblank printable ASCII, or
    * `connect` throws `RimeInputError`. Prism uses it if it is at most 128
    * characters, else makes its own; `info.requestId` reports the one it used.
    * Omitted or `null` sends none. */

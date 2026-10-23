@@ -138,5 +138,8 @@ func TestRealtimeRefusedLabelsFailOnlyTheCall(t *testing.T) {
 	if got := s.Info().ResponseMetadata; !reflect.DeepEqual(got, map[string]string{"step": "1"}) {
 		t.Fatalf("labels %v", got)
 	}
+	if e := s.SetResponseMetadata(context.Background(), map[string]string{"\xff": "x"}); !errors.Is(e, ErrInput) {
+		t.Fatalf("invalid UTF-8 %v", e)
+	}
 	p.turn(s, "reply-1")
 }

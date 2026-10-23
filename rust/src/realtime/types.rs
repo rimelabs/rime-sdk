@@ -121,7 +121,7 @@ impl RealtimeConnectOptions {
         self.timeouts = value;
         self
     }
-    /// Send the upgrade's x-request-id. It must be printable ASCII, or `connect`
+    /// Send the upgrade's x-request-id. It must be nonblank printable ASCII, or `connect`
     /// returns an input error. Prism uses it if it is at most 128 characters,
     /// else makes its own; `info().request_id` reports the one it used.
     pub fn request_id(mut self, value: impl Into<String>) -> Self {

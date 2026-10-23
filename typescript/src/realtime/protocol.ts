@@ -26,7 +26,7 @@ export function responseMetadata(value: unknown): t.Labels {
   if (
     !value ||
     typeof value !== "object" ||
-    Array.isArray(value) ||
+    ![Object.prototype, null].includes(Object.getPrototypeOf(value)) ||
     Object.values(value).some((label) => typeof label !== "string")
   )
     throw new RimeInputError("responseMetadata must map keys to strings");

@@ -166,7 +166,7 @@ session to change the others.
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `requestId` | No | Your id for the session. Sent as `x-request-id`. It must be printable ASCII, or the SDK throws `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `requestId` | No | Your id for the session. Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK throws `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
 | `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
 
@@ -178,8 +178,8 @@ After connection, `session.info` contains `sessionId`, `requestId`, `model`,
 `voice`, `interruptOnSpeech`, `turnDetection`, `responseMetadata`,
 `toolResultTimeoutS`, and `toolContinuationTimeoutS`. `requestId` is the id
 Prism's logs use; include it when you report a problem. It is `null` on servers
-that do not send it. An event's or error's `requestId` is the SDK's event ID,
-not this one.
+that do not send it. An event's or error's `requestId` names the SDK request
+that caused it instead.
 Check the effective interruption setting there. Tool wait durations are total
 server deadlines, not remaining time. A `null` duration can mean an omitted
 field; it does not prove that no deadline exists.

@@ -19,6 +19,16 @@ func rtText(s string, limit int) error {
 	}
 	return nil
 }
+
+// rtLabelsValid refuses labels that JSON would silently alter.
+func rtLabelsValid(labels map[string]string) error {
+	for k, v := range labels {
+		if !utf8.ValidString(k) || !utf8.ValidString(v) {
+			return failure(ErrInput, "response metadata must be valid UTF-8")
+		}
+	}
+	return nil
+}
 func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, error) {
 	t := o.Timeouts
 	for _, p := range []*time.Duration{&t.Connect, &t.Ready, &t.Request} {
@@ -103,6 +113,9 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if e := rtLabelsValid(o.ResponseMetadata); e != nil {
+		return "", nil, t, e
+	}
 	if o.ResponseMetadata != nil {
 		settings["prism_response_metadata"] = o.ResponseMetadata
 	}

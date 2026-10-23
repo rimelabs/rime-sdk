@@ -365,7 +365,12 @@ test("invalid response metadata fails before it is sent", async (t) => {
   t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
   const client = new Rime({ apiKey: "test" });
   t.after(() => client.close());
-  for (const responseMetadata of [[], "step", { step: 3 }])
+  for (const responseMetadata of [
+    [],
+    "step",
+    { step: 3 },
+    new Map([["step", "1"]]),
+  ])
     await assert.rejects(
       client.realtime.connect({ responseMetadata }),
       RimeInputError,
@@ -414,4 +419,7 @@ test("a refused label change fails with invalid_session and keeps the labels", a
       error.fault.code === "invalid_session",
   );
   assert.deepEqual(session.info.responseMetadata, { step: "1" });
+  peer.autoInitialize = true;
+  await session.setResponseMetadata({ step: "3" });
+  assert.deepEqual(session.info.responseMetadata, { step: "3" });
 });

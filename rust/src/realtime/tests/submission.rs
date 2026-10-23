@@ -33,6 +33,7 @@ fn worker() -> (
             timeouts: RealtimeTimeouts::default(),
             interrupt: true,
             initialized: None,
+            info: None,
         },
         writes,
         jobs,

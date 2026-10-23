@@ -294,6 +294,9 @@ func (s *RealtimeSession) Cancel(ctx context.Context, ref ResponseRef) error {
 // SetResponseMetadata replaces the labels later replies carry; a reply already
 // started keeps its own. It returns once Prism confirms the change.
 func (s *RealtimeSession) SetResponseMetadata(ctx context.Context, labels map[string]string) error {
+	if e := rtLabelsValid(labels); e != nil {
+		return e
+	}
 	labels = maps.Clone(labels)
 	if labels == nil {
 		labels = map[string]string{}

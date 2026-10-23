@@ -140,7 +140,6 @@ struct Command {
 struct Answer {
     response: Option<ResponseRef>,
     item: Option<ItemRef>,
-    labels: Option<Labels>,
 }
 impl Command {
     fn new(kind: Kind, body: Value) -> Self {
@@ -204,7 +203,9 @@ struct Worker {
     converter: Option<(crate::PcmFormat, InputAudio)>,
     timeouts: RealtimeTimeouts,
     interrupt: bool,
-    initialized: Option<oneshot::Sender<Result<SessionInfo, Error>>>,
+    initialized: Option<oneshot::Sender<Result<Arc<Mutex<SessionInfo>>, Error>>>,
+    /// The settings the session shows, updated as Prism confirms changes.
+    info: Option<Arc<Mutex<SessionInfo>>>,
 }
 pub(super) async fn connect(
     inner: Arc<Inner>,
@@ -244,6 +245,7 @@ pub(super) async fn connect(
             timeouts: options.timeouts,
             interrupt: options.interrupt,
             initialized: Some(tx),
+            info: None,
         };
         let result = worker
             .run(
@@ -283,7 +285,7 @@ pub(super) async fn connect(
             terminal: terminal.clone(),
             ended: false,
         }))),
-        info: Arc::new(Mutex::new(info)),
+        info,
         budgets,
         done,
         wake,
@@ -428,9 +430,7 @@ impl RealtimeSession {
             Kind::Labels,
             json!({"session": {"prism_response_metadata": labels}}),
         );
-        let answer = self.invoke(c).await?;
-        self.info.lock().expect("info mutex").response_metadata = answer.labels;
-        Ok(())
+        self.invoke(c).await.map(|_| ())
     }
     /// Clear input audio and reset its converter after acknowledgment.
     pub async fn clear_audio(&self) -> Result<(), Error> {

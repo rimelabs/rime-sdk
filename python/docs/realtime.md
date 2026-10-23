@@ -160,7 +160,7 @@ replaces; open a new session to change the others.
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
-| `request_id: str \| None` | No | Your id for the session. Sent as `x-request-id`. It must be printable ASCII, or the SDK raises `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
+| `request_id: str \| None` | No | Your id for the session. Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK raises `RimeInputError`. Prism uses it if it is at most 128 characters, else makes its own. |
 | `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. Prism refuses labels that break these limits, or keys starting with `prism_`, with `RimeRealtimeError` code `invalid_session`. |
 
 All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or
@@ -172,7 +172,7 @@ interruption setting, turn timing, reply labels (`response_metadata`), and any
 published tool wait durations.
 `session.info.request_id` is the id Prism's logs use; include it when you report
 a problem. It is `None` on servers that do not send it. An event's or error's
-`request_id` is the SDK's event ID, not this one. Check
+`request_id` names the SDK request that caused it instead. Check
 `session.info.interrupt_on_speech` for the setting the server actually applied.
 Prism sessions always request both text and audio output.
 

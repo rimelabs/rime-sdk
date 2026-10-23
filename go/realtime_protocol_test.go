@@ -83,6 +83,7 @@ func TestRealtimeOptionsValidateBeforeConnection(t *testing.T) {
 		{Tools: []ToolDefinition{{Name: "tool", Parameters: map[string]any{}, PrismFiller: &PrismFiller{Type: "text", Text: " "}}}},
 		{Tools: []ToolDefinition{{Name: "tool", Parameters: map[string]any{}, PrismFiller: &PrismFiller{Type: "none", Text: "invalid"}}}},
 		{RequestID: "  "}, {RequestID: "line\nbreak"}, {RequestID: "é"},
+		{ResponseMetadata: map[string]string{"step": "\xff"}},
 	}
 	for _, options := range cases {
 		if _, e := client.Realtime.Connect(context.Background(), options); !errors.Is(e, ErrInput) {

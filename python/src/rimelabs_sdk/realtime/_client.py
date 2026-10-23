@@ -76,7 +76,7 @@ class Realtime:
         Settings are fixed for the lifetime of the session, except the reply labels, which
         set_response_metadata replaces.
 
-        request_id is sent as the upgrade's x-request-id. It must be printable ASCII, or
+        request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
         connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
         makes its own; info.request_id reports the one it used.
         """
