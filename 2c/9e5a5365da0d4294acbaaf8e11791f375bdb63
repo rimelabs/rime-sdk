@@ -1,0 +1,21 @@
+rust/src/realtime/conversation.rs
+  s_a5191254627b38::t_58872d14397215 609
+rust/src/realtime/tests/updates.rs
+  s_a5191254627b38::t_58872d14397215 372-375
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2c9e5a5365da0d4294acbaaf8e11791f375bdb63",
+  "prompts": {},
+  "sessions": {
+    "s_a5191254627b38": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a169a3-9a20-78a3-a745-256e3aa289c8",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
