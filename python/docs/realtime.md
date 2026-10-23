@@ -401,6 +401,39 @@ the affected request. Its `.fault` contains `code`, `message`, `scope`, and any
 request, response, item, or tool-call identifiers. A fault does not by itself
 end a response. Session-scoped faults and transport failures end the session.
 
+`RealtimeFault.retryable` reports whether the same request, unchanged, may
+succeed on another attempt. Read `event.payload.error.retryable` on a
+`FaultEvent` or `error.fault.retryable` on `RimeRealtimeError`. The SDK derives
+this value from the code; Prism does not send a retry flag.
+
+| Error code | `retryable` |
+| --- | --- |
+| `capacity_exceeded` | `True` |
+| `unavailable` | `True` |
+| `response_timeout` | `True` |
+| `context_length_exceeded` | `False` |
+| All other codes, including unknown codes | `False` |
+
+The application chooses the delay, attempt limit, and recovery operation. This
+value does not start a retry. It does not describe a local `RimeTimeoutError` or
+prove that no output or side effect occurred. The SDK's existing readiness
+retries have separate rules: an explicit refusal such as `typed_turn_busy`
+permits another attempt after a new readiness event, although its `retryable`
+value is `False` under this contract.
+
+For example, Prism can accept a user's question and then report
+`capacity_exceeded`. `send_text()` has already returned a `ResponseRef`; the
+failure arrives through `FaultEvent`. Wait for `ResponseEnded`, then apply
+the application's retry policy. If the question is already in history, use
+`request_reply()` to ask for another reply when appropriate. Repeating
+`send_text()` can add the question twice. A `response_timeout` can follow partial
+text or audio, which the application must handle before another attempt.
+
+For `context_length_exceeded`, the server message contains token counts.
+Unchanged attempts will fail until the conversation is shorter. Start a new
+session with shorter context. The protocol also supports history deletion, but
+this SDK does not yet expose `conversation.item.delete`.
+
 Malformed fields in known events and mismatched request acknowledgments close
 the session with `RimeStreamError`. Unknown event kinds and extra fields remain
 accepted and ignored. The SDK does not replay a request after a protocol failure.

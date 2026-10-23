@@ -188,6 +188,16 @@ class RealtimeFault:
     correlation_id: str | None = None
     parameter: str | None = None
 
+    @property
+    def retryable(self) -> bool:
+        """Whether the same request, unchanged, may succeed on another attempt.
+
+        Only capacity_exceeded, unavailable, and response_timeout return True.
+        Unknown codes return False. The application owns retry timing, limits,
+        and recovery after partial output; this property does not replay a request.
+        """
+        return self.code in {"capacity_exceeded", "unavailable", "response_timeout"}
+
 
 class RimeRealtimeError(RimeError):
     def __init__(self, fault: RealtimeFault):

@@ -395,10 +395,42 @@ to own the session after a successful return.
 Cancellation before submission sends nothing. After submission, the worker keeps
 acknowledgment matching even if the caller stops waiting. It cancels a reply
 accepted after caller cancellation. A write or acknowledgment with an unknown
-outcome closes the session. There is no automatic reconnect or replay. Only an
-explicit busy refusal permits retry after a new readiness event. Use `errors.Is`
-for SDK categories or context errors. Use `errors.As` with `*RealtimeFault` for
-service code, scope, owners, and correlation details.
+outcome closes the session. There is no automatic reconnect or replay. The SDK
+retries turn admission only after an explicit busy refusal and a new readiness
+event. Use `errors.Is` for SDK categories or context errors. Use `errors.As` with
+`*RealtimeFault` for service code, scope, owners, and correlation details.
+
+`RealtimeFault.Retryable()` reports whether the same request, unchanged, may
+succeed on another attempt. Call it on `FaultEvent.Fault` or the fault obtained
+through `errors.As`. The SDK derives this value from the code; Prism does not
+send a retry flag.
+
+| Error code | `Retryable()` |
+| --- | --- |
+| `capacity_exceeded` | `true` |
+| `unavailable` | `true` |
+| `response_timeout` | `true` |
+| `context_length_exceeded` | `false` |
+| All other codes, including unknown codes | `false` |
+
+The application chooses the delay, attempt limit, and recovery operation.
+`Retryable()` does not start a retry or describe a local `ErrTimeout`. It does
+not prove that no output or side effect occurred. The SDK's existing readiness
+retries have separate rules: `typed_turn_busy`, for example, returns `false`
+here but permits another attempt after a new readiness event.
+
+For example, Prism can accept a user's question and then report
+`capacity_exceeded`. `SendText` has already returned a `ResponseRef`; the failure
+arrives through `FaultEvent`. Wait for `ResponseEnded`, then apply the
+application's retry policy. If the question is already in history, use
+`RequestReply` to ask for another reply when appropriate. Repeating `SendText`
+can add the question twice. A `response_timeout` can follow partial text or
+audio, which the application must handle before another attempt.
+
+For `context_length_exceeded`, the server message contains token counts.
+Unchanged attempts will fail until the conversation is shorter. Start a new
+session with shorter context. The protocol also supports history deletion, but
+this SDK does not yet expose `conversation.item.delete`.
 
 Numbers in `ToolCall.Arguments`, including nested values, use `json.Number` to
 preserve precision. Use `String`, `Int64`, or `Float64` to read the required form.

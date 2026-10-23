@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Decode only the protocol fields the SDK uses. Unknown events and fields stay open. */
 import { RimeStreamError } from "../errors.js";
+import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
 
 export interface SessionSettings {
@@ -65,14 +66,14 @@ export type Acknowledgment =
 export type ServerPayload =
   | SessionCreated
   | Acknowledgment
-  | t.InputEvent
+  | t.InputEvent<t.NormalizedRealtimeFault>
   | t.MessageStarted
   | t.TextDelta
   | t.TextDone
   | t.AudioDelta
   | t.AudioDone
   | t.ToolCall
-  | t.FaultEvent;
+  | t.FaultEvent<t.NormalizedRealtimeFault>;
 export interface ServerEvent {
   eventId: string;
   requestId: string | null;
@@ -228,16 +229,17 @@ function session(value: unknown): SessionView {
     ),
   };
 }
-function fault(value: unknown): t.RealtimeFault {
+function fault(value: unknown): t.NormalizedRealtimeFault {
   const error = object(value, "error");
   const owner = error.owner == null ? {} : object(error.owner, "error.owner");
   const scope =
     error.scope === undefined ? "unknown" : string(error.scope, "error.scope");
   const calls = owner.call_ids ?? [];
   if (!Array.isArray(calls)) return invalid("error.owner.call_ids");
-  return Object.freeze({
-    code:
-      error.code === undefined ? "unknown" : string(error.code, "error.code"),
+  const code =
+    error.code === undefined ? "unknown" : string(error.code, "error.code");
+  return normalizeFault({
+    code,
     message:
       error.message === undefined ? "" : string(error.message, "error.message"),
     scope:
@@ -251,9 +253,7 @@ function fault(value: unknown): t.RealtimeFault {
     requestId: optionalString(owner.event_id, "error.owner.event_id"),
     responseId: optionalString(owner.response_id, "error.owner.response_id"),
     itemId: optionalString(owner.item_id, "error.owner.item_id"),
-    callIds: Object.freeze(
-      calls.map((value) => id(value, "error.owner.call_ids")),
-    ),
+    callIds: calls.map((value) => id(value, "error.owner.call_ids")),
     correlationId: optionalString(error.correlation_id, "error.correlation_id"),
     parameter: optionalString(error.param, "error.param"),
   });

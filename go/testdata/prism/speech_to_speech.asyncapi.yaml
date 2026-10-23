@@ -790,6 +790,7 @@ components:
         - const: capacity_exceeded
         - const: unavailable
         - const: invalid_request
+        - const: context_length_exceeded
         - const: response_timeout
         - const: turn_failed
         - const: no_audio

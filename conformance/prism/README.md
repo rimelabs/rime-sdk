@@ -18,6 +18,12 @@ recognize the former `prsm` names.
   including rejection of requests with the former prefix.
 - `protocol.json` checks all four SDK decoders, including malformed messages,
   unknown events, extra fields, and unknown enum values.
+- `error-retry.json` checks retry classification for every code in the schema
+  fixture and unknown codes. The classification and `context_length_exceeded`
+  follow `rimelabs/rime#3356` at commit `61ddc5429`. Only `capacity_exceeded`,
+  `unavailable`, and `response_timeout` are retryable. This is SDK metadata,
+  derived from the code, not a field sent by Prism. Existing error codes in this
+  fixture remain supported even if newer contracts replace them.
 
 The schema describes known protocol values. The decoders tolerate unknown
 server events, fields, and enum values for forward compatibility. Separate

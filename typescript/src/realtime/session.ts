@@ -71,7 +71,7 @@ export class RealtimeSession {
   private closed = false;
   private closing: Promise<void> | null = null;
   private consuming = false;
-  private readonly queue: t.SessionEvent[] = [];
+  private readonly queue: t.SessionEvent<t.NormalizedRealtimeFault>[] = [];
   private readonly queued = new Flag();
   private readonly ready = new Flag();
   private readyEpoch = 0;
@@ -148,10 +148,14 @@ export class RealtimeSession {
       throw new RimeInputError("The session has not initialized");
     return this.sessionInfo;
   }
-  get events(): AsyncIterableIterator<t.SessionEvent> {
+  get events(): AsyncIterableIterator<
+    t.SessionEvent<t.NormalizedRealtimeFault>
+  > {
     return this.readEvents();
   }
-  private async *readEvents(): AsyncIterableIterator<t.SessionEvent> {
+  private async *readEvents(): AsyncIterableIterator<
+    t.SessionEvent<t.NormalizedRealtimeFault>
+  > {
     if (this.consuming)
       throw new RimeInputError("Only one consumer may read session events");
     this.consuming = true;
@@ -883,7 +887,7 @@ export class RealtimeSession {
     return state;
   }
   private publish(
-    payload: t.SessionEvent["payload"],
+    payload: t.SessionEvent<t.NormalizedRealtimeFault>["payload"],
     eventId = "",
     requestId: string | null = null,
   ) {
