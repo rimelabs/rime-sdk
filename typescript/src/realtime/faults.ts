@@ -13,7 +13,7 @@ export function normalizeFault(fault: RealtimeFault): NormalizedRealtimeFault {
     requestId: fault.requestId,
     responseId: fault.responseId,
     itemId: fault.itemId,
-    callIds: Object.freeze([...fault.callIds]),
+    callIds: Object.freeze([...(fault.callIds ?? [])]),
     correlationId: fault.correlationId,
     parameter: fault.parameter,
   };

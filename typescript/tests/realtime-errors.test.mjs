@@ -126,6 +126,18 @@ test("copied faults derive classification after a code change", () => {
   assert.equal(event.payload.error.retryable, true);
 });
 
+test("constructed faults default missing or null callIds to an immutable empty array", () => {
+  const input = { ...previousFault };
+  delete input.callIds;
+  for (const supplied of [{}, { callIds: undefined }, { callIds: null }]) {
+    const error = new RimeRealtimeError({ ...input, ...supplied });
+    assert.deepEqual(error.fault, { ...input, callIds: [], retryable: true });
+    assert.equal(error.message, "unavailable: Service unavailable");
+    assert.equal(error.requestId, previousFault.requestId);
+    assert.ok(Object.isFrozen(error.fault.callIds));
+  }
+});
+
 test("constructed faults preserve inherited getters", () => {
   class CallerFault {}
   for (const [field, value] of Object.entries(previousFault)) {

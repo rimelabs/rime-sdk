@@ -49,7 +49,7 @@ def test_retry_classification_comes_from_the_code(case):
     ids=lambda case: case["code"],
 )
 async def test_response_fault_preserves_details_without_replay(monkeypatch, case):
-    async with session(monkeypatch) as (current, peer, _):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
         events = current.events
         response = await accepted_turn(current, peer)
         peer.emit(
@@ -85,7 +85,7 @@ async def test_response_fault_preserves_details_without_replay(monkeypatch, case
 
 
 async def test_request_error_exposes_the_same_fault_as_the_event(monkeypatch):
-    async with session(monkeypatch) as (current, peer, _):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
         peer.emit("prism.typed_input.ready")
         pending = asyncio.create_task(current.request_reply(instruction="Say hello"))
         request = await peer.next("response.create")
