@@ -1,0 +1,23 @@
+typescript/src/realtime/faults.ts
+  s_0ef5f30da1e957::t_84584f8a462de8 16
+typescript/tests/realtime-errors.test.mjs
+  s_0ef5f30da1e957::t_767c0e779c703c 129-140
+python/tests/test_realtime_errors.py
+  s_0ef5f30da1e957::t_84584f8a462de8 52,88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bba76d9a2b4b83e81dca18d7928d5b0aaff0e2f2",
+  "prompts": {},
+  "sessions": {
+    "s_0ef5f30da1e957": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1676f-4b2d-7433-80a0-ed5da67b46d1",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
