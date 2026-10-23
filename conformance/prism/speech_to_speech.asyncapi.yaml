@@ -478,7 +478,7 @@ components:
       properties:
         id:
           type: string
-        prism_request_id:
+        request_id:
           type: string
         prism_response_metadata:
           type: object

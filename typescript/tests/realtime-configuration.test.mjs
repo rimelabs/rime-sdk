@@ -305,7 +305,7 @@ for (const [requestId, used] of [
 ]) {
   test(`request id on the upgrade, and the one Prism used: ${requestId}`, async (t) => {
     const peer = await new Peer().start();
-    peer.sessionFields = { prism_request_id: used };
+    peer.sessionFields = { request_id: used };
     const client = new Rime({ apiKey: "test" });
     t.after(async () => {
       await client.close();

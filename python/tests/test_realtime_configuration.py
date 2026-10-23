@@ -253,7 +253,7 @@ async def test_request_id_on_the_upgrade_and_the_one_prism_used(monkeypatch, req
         peer.emit(
             "session.updated",
             prism_request_event_id=event["event_id"],
-            session={"id": "session-1", "prism_request_id": used},
+            session={"id": "session-1", "request_id": used},
         )
 
     async def connect(endpoint, **kwargs):

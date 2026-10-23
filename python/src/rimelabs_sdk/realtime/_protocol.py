@@ -250,7 +250,7 @@ def _session(value: object) -> SessionView:
         interrupt = None
     return SessionView(
         id=_id(view.get("id"), "session.id"),
-        request_id=_optional_string(view.get("prism_request_id"), "session.prism_request_id"),
+        request_id=_optional_string(view.get("request_id"), "session.request_id"),
         response_metadata=_client_metadata(
             _object(view["prism_response_metadata"], "session.prism_response_metadata")
         )

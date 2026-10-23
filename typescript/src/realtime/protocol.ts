@@ -251,10 +251,7 @@ function session(value: unknown): SessionView {
     invalid("session.prism_effective_interrupt_response");
   return {
     id: id(view.id, "session.id"),
-    requestId: optionalString(
-      view.prism_request_id,
-      "session.prism_request_id",
-    ),
+    requestId: optionalString(view.request_id, "session.request_id"),
     responseMetadata:
       view.prism_response_metadata === undefined
         ? null
