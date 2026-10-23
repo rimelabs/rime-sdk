@@ -509,3 +509,9 @@ updates that keep the same interruption policy do not consume this history.
 If an unannounced reply refers to an older evicted policy, the session fails
 with a resource limit error instead of guessing its policy. A reply already
 received keeps its captured policy even after later settings updates.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and raises
+a resource limit error for an ambiguous reply instead of guessing. A later
+acknowledgment with a revision establishes a new known setting. Replies without
+a revision use the current acknowledged setting.

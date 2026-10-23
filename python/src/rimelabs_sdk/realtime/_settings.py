@@ -57,14 +57,23 @@ class InterruptionPolicies:
     """Retain bounded policy changes until a reply selects its settings revision."""
 
     def __init__(self) -> None:
-        self._changes: deque[tuple[int, bool]] = deque(maxlen=128)
+        self._changes: deque[tuple[int, bool | None]] = deque(maxlen=128)
         self._current = True
+        self._last_revision: int | None = None
 
     def record(self, revision: int | None, interrupt: bool) -> None:
-        if revision is None:
-            self._changes.clear()
-        if not self._changes or interrupt != self._current:
+        if not self._changes:
             self._changes.append((revision if revision is not None else 0, interrupt))
+        elif revision is None:
+            if interrupt != self._current and self._changes[-1][1] is not None:
+                # The change happened after the last known acknowledgment, but
+                # its exact revision cannot be assigned to a later reply.
+                first_unknown = self._last_revision + 1 if self._last_revision is not None else 0
+                self._changes.append((first_unknown, None))
+        elif self._changes[-1][1] is None or interrupt != self._current:
+            self._changes.append((revision, interrupt))
+        if revision is not None:
+            self._last_revision = revision
         self._current = interrupt
 
     def resolve(self, revision: int | None) -> bool:
@@ -72,5 +81,7 @@ class InterruptionPolicies:
             return self._current
         for first_revision, interrupt in reversed(self._changes):
             if first_revision <= revision:
+                if interrupt is None:
+                    raise RimeResourceLimitError("Reply interruption policy revision is unknown")
                 return interrupt
         raise RimeResourceLimitError("Reply settings revision is no longer retained")

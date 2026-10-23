@@ -846,38 +846,69 @@ async def test_unhashable_adapter_and_callback_errors_reach_caller(monkeypatch, 
         assert caught.value is error
 
 
-async def test_interrupted_finish_keeps_reports_while_waiting_for_earlier_playback(monkeypatch):
-    async with run(monkeypatch) as (_, peer, source, playback, task, _):
+async def test_measured_reply_keeps_finished_report_while_earlier_playback_is_cut(monkeypatch):
+    async with run(monkeypatch) as (_, peer, _, playback, _, events):
         begin(peer, "a")
         peer.ended("a")
         begin(peer, "b")
         peer.ended("b")
         await until(lambda: "b" in playback.outputs and playback.outputs["b"].ended)
         playback.outputs["b"].done.set_result(8)
-        for _ in range(10):
-            await asyncio.sleep(0)
+        await until(lambda: playback.outputs["b"].waiting == 0)
         assert peer.sent.empty()
         speech(peer)
-        cut_b = await peer.next("conversation.item.truncate")
-        assert cut_b["item_id"] == "b" and cut_b["audio_end_ms"] == 8
-        begin(peer, "c")
-        peer.ended("c")
-        await until(lambda: "c" in playback.outputs and playback.outputs["c"].ended)
-        playback.outputs["c"].done.set_result(9)
-        for _ in range(10):
-            await asyncio.sleep(0)
+        await until(lambda: any(isinstance(event, r.SpeechStarted) for event in events))
+        assert [[ref.item_id for ref in batch] for batch in playback.batches] == [["a"]]
+        assert not playback.outputs["b"].interrupted
         assert peer.sent.empty()
         playback.outputs["a"].done.set_result(4)
-        drain_c = await peer.next("prism.playback.drained")
-        assert drain_c["response_id"] == "c" and drain_c["played_ms"] == 9
-        # Completion gates physical playback, not the pending truncate ACK.
-        # Truncate requests are serialized by the session.
-        ack_cut(peer, cut_b)
-        cut_a = await peer.next("conversation.item.truncate")
+        requests = [await asyncio.wait_for(peer.sent.get(), 1) for _ in range(2)]
+        cut_a = next(
+            request for request in requests if request["type"] == "conversation.item.truncate"
+        )
+        drain_b = next(
+            request for request in requests if request["type"] == "prism.playback.drained"
+        )
         assert cut_a["item_id"] == "a" and cut_a["audio_end_ms"] == 4
+        assert drain_b["response_id"] == "b" and drain_b["played_ms"] == 8
         ack_cut(peer, cut_a)
-        source.queue.put_nowait(None)
-        await task
+
+
+@pytest.mark.parametrize("newer_reply", [False, True])
+async def test_speech_preserves_pending_finished_report(monkeypatch, newer_reply):
+    async with run(monkeypatch) as (session, peer, _, playback, _, events):
+        reporting, release = asyncio.Event(), asyncio.Event()
+        report_playback = session.report_playback
+
+        async def hold_finished(report):
+            if isinstance(report, r.PlaybackFinished):
+                reporting.set()
+                await release.wait()
+            await report_playback(report)
+
+        monkeypatch.setattr(session, "report_playback", hold_finished)
+        begin(peer, "first")
+        peer.ended("first")
+        await until(lambda: "first" in playback.outputs and playback.outputs["first"].ended)
+        playback.outputs["first"].done.set_result(12)
+        await asyncio.wait_for(reporting.wait(), 1)
+        if newer_reply:
+            begin(peer, "second")
+            await until(lambda: "second" in playback.outputs)
+        speech(peer)
+        await until(lambda: any(isinstance(event, r.SpeechStarted) for event in events))
+        assert not playback.outputs["first"].interrupted
+        assert [[ref.item_id for ref in batch] for batch in playback.batches] == (
+            [["second"]] if newer_reply else []
+        )
+        if newer_reply:
+            playback.outputs["second"].done.set_result(3)
+            cut = await peer.next("conversation.item.truncate")
+            assert cut["item_id"] == "second"
+            ack_cut(peer, cut)
+        release.set()
+        drain = await peer.next("prism.playback.drained")
+        assert drain["response_id"] == "first" and drain["played_ms"] == 12
 
 
 async def test_unrelated_input_error_during_close_is_preserved(monkeypatch):
@@ -1052,3 +1083,70 @@ async def test_queued_reply_keeps_policy_after_history_eviction(monkeypatch):
         peer.ended("first")
         playback.outputs["first"].done.set_result(17)
         ack_cut(peer, await peer.next("conversation.item.truncate"))
+
+
+@pytest.mark.parametrize("latest_known", [1, 5])
+@pytest.mark.parametrize("reply_age", ["old", "unknown", "new", "omitted"])
+async def test_missing_update_revision_does_not_guess_reply_policy(
+    monkeypatch, latest_known, reply_age
+):
+    from test_realtime_updates import acknowledge
+
+    async def updates_before_runner(current, peer):
+        if latest_known != 1:
+            update = asyncio.create_task(current.update(instructions="Same policy"))
+            request = await peer.next("session.update")
+            acknowledge(peer, request, latest_known, interrupt=True)
+            await update
+        for enabled in (False, True, False):
+            update = asyncio.create_task(current.update(interrupt_on_speech=enabled))
+            request = await peer.next("session.update")
+            # No revision was published for any of these policy changes.
+            peer.emit(
+                "session.updated",
+                prism_request_event_id=request["event_id"],
+                session={
+                    "id": "session-1",
+                    "voice": "test",
+                    "prism_effective_interrupt_response": enabled,
+                },
+            )
+            await update
+        update = asyncio.create_task(current.update(instructions="Published again"))
+        request = await peer.next("session.update")
+        acknowledge(peer, request, latest_known + 4, interrupt=False)
+        await update
+
+    # The configured peer adds initialization's revision to every acknowledgment;
+    # bypass that behavior for the deliberately revisionless updates above.
+    async with run(monkeypatch, revision=1) as (current, peer, _, playback, task, events):
+        configured = peer.emit
+        peer.emit = Peer.emit.__get__(peer, Peer)
+        await updates_before_runner(current, peer)
+        peer.emit = configured
+        response = {"id": "first"}
+        if reply_age != "omitted":
+            response["prism_settings_revision"] = {
+                "old": latest_known,
+                "unknown": latest_known + 1,
+                "new": latest_known + 4,
+            }[reply_age]
+        peer.emit("response.created", response=response)
+        if reply_age == "unknown":
+            with pytest.raises(RimeResourceLimitError, match="revision is unknown"):
+                await asyncio.wait_for(asyncio.shield(task), 1)
+            return
+        message(peer)
+        audio(peer)
+        await until(lambda: "first" in playback.outputs)
+        speech(peer)
+        await until(lambda: any(isinstance(event, r.SpeechStarted) for event in events))
+        expected = reply_age == "old"
+        assert playback.outputs["first"].interrupted is expected
+        peer.ended("first")
+        playback.outputs["first"].done.set_result(7)
+        report = await peer.next(
+            "conversation.item.truncate" if expected else "prism.playback.drained"
+        )
+        if expected:
+            ack_cut(peer, report)

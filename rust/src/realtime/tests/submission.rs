@@ -203,7 +203,7 @@ impl crate::realtime::ConversationPlayback for SilentPlayback {
 }
 
 #[tokio::test]
-async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
+async fn runner_speech_preserves_queued_drain_and_active_write() {
     use crate::realtime::ConversationRunner;
     for submitted in [false, true] {
         let (mut worker, writes, mut jobs, receiver) = worker();
@@ -284,19 +284,35 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
         tokio::time::timeout(Duration::from_secs(1), interrupted.cancelled())
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_secs(1), cancelled.cancelled())
-            .await
-            .expect("finished report remains active after interruption");
+        assert!(
+            !cancelled.is_cancelled(),
+            "speech must preserve the finished report for fully drained playback"
+        );
         if let Some((writer, release)) = active {
             release.cancel();
             let result = writer.await.unwrap();
             assert!(!result.skipped, "a submitted control write must complete");
             worker.written(result).unwrap();
+        } else {
+            worker.advance(&writes).unwrap();
+            let job = tokio::time::timeout(Duration::from_secs(1), jobs.recv())
+                .await
+                .unwrap()
+                .expect("the queued finished report must reach the writer");
+            assert_eq!(job.frames.len(), 1);
+            let frame: Value = serde_json::from_str(&job.frames[0]).unwrap();
+            assert_eq!(frame["type"], "prism.playback.drained");
+            let (mut sink, mut sent, release) = gate();
+            release.cancel();
+            let result = write_frames(&mut sink, job, Duration::from_secs(1)).await;
+            assert!(!result.skipped, "the queued finished report must be sent");
+            assert!(sent.try_recv().is_ok());
+            worker.written(result).unwrap();
         }
         worker.advance(&writes).unwrap();
         assert!(
             jobs.try_recv().is_err(),
-            "interruption must prevent queued drain submission"
+            "speech must not create an interruption report for drained playback"
         );
         done.cancel();
         stop.cancel();

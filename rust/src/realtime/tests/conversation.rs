@@ -151,15 +151,7 @@ async fn interruption_rejects_late_audio_and_cancels_dependent_reply() {
         .await;
     emit(&p, "r1", "i1").await;
     let output = outputs.recv().await.unwrap();
-    let clone = s.clone();
-    let update = tokio::spawn(async move {
-        clone
-            .update(crate::RealtimeUpdateOptions::default().interrupt_on_speech(false))
-            .await
-    });
-    let q = p.next("session.update").await;
-    p.send(json!({"type":"session.updated", "prism_request_event_id":q["event_id"], "session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":false,"prism_settings_revision":2}})).await;
-    update.await.unwrap().unwrap();
+    set_interruption(&mut p, &s, false, 2).await;
     p.send(
         json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
     )
@@ -551,5 +543,33 @@ async fn queued_response_keeps_its_captured_policy_after_history_eviction() {
         .await
         .unwrap()
         .unwrap();
+    client.close().await;
+}
+
+#[tokio::test]
+async fn speech_preserves_measured_playback_with_pending_finished_report() {
+    let p = Peer::with_initial_interruption(true).await;
+    let (client, session) = p.setup().await;
+    let (opened, mut outputs) = mpsc::channel(4);
+    let mut playback = Playback {
+        opened,
+        outputs: Arc::new(Mutex::new(HashMap::new())),
+        stopped: Arc::new(AtomicBool::new(false)),
+    };
+    for newer_reply in [false, true] {
+        crate::realtime::conversation::assert_measured_playback_is_not_interrupted(
+            &session,
+            &mut playback,
+            newer_reply,
+        );
+        let drained = outputs.try_recv().unwrap();
+        assert!(
+            !drained.done.is_cancelled(),
+            "already measured output was interrupted"
+        );
+        if newer_reply {
+            assert!(outputs.try_recv().unwrap().done.is_cancelled());
+        }
+    }
     client.close().await;
 }

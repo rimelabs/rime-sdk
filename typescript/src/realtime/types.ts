@@ -114,7 +114,8 @@ export interface OutputRef {
   readonly contentIndex: number;
 }
 export interface SessionInfo {
-  /** Settings revision published by the server; null when unavailable. */
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;
   readonly sessionId: string;
   /** The `x-request-id` Prism's logs name this session by. Null when the
@@ -222,7 +223,8 @@ export interface TranscriptFailed<Fault extends RealtimeFault = RealtimeFault> {
   readonly error: Fault;
 }
 export interface ResponseStarted {
-  /** Settings revision published by the server; null when unavailable. */
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;
   readonly kind: "response.started";
   readonly response: ResponseRef;
@@ -274,7 +276,8 @@ export interface ResponseAbandoned {
   readonly response: ResponseRef;
 }
 export interface ResponseEnded {
-  /** Settings revision published by the server; null when unavailable. */
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;

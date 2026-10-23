@@ -109,6 +109,11 @@ struct Reply<O> {
     reporting: bool,
     finished_report: CancellationToken,
 }
+impl<O> Reply<O> {
+    fn pending_playback(&self) -> bool {
+        !self.interrupted && (!self.ended || self.outputs.iter().any(|o| o.measured.is_none()))
+    }
+}
 enum Completion {
     Measured(OutputRef, f64),
     Reported(String),
@@ -297,15 +302,8 @@ impl<O: ConversationOutput> PlaybackState<O> {
                     .replies
                     .iter()
                     .rev()
-                    .find(|reply| {
-                        !reply.interrupted
-                            && (!reply.ended
-                                || reply.outputs.iter().any(|output| output.measured.is_none()))
-                    })
-                    .map_or_else(
-                        || session.info().interrupt_on_speech,
-                        |reply| reply.interrupt_on_speech,
-                    );
+                    .find(|reply| reply.pending_playback())
+                    .is_some_and(|reply| reply.interrupt_on_speech);
                 let all = matches!(&event.payload, RealtimeEvent::SpeechStarted { .. })
                     && interrupt_on_speech;
                 if let RealtimeEvent::ResponseAbandoned { response } = &event.payload {
@@ -314,7 +312,7 @@ impl<O: ConversationOutput> PlaybackState<O> {
                 let mut outputs = vec![];
                 for reply in &mut self.replies {
                     if !reply.interrupted
-                        && (all
+                        && ((all && reply.pending_playback())
                             || blocked(
                                 &reply.reference.response_id,
                                 &self.parents,
@@ -572,5 +570,72 @@ impl<S: ConversationSource, P: ConversationPlayback> ConversationRunner<S, P> {
             result = Err(Error::cancelled());
         }
         result.and(cleanup)
+    }
+}
+
+#[cfg(test)]
+pub(super) fn assert_measured_playback_is_not_interrupted<P: ConversationPlayback>(
+    session: &RealtimeSession,
+    playback: &mut P,
+    newer_reply: bool,
+) {
+    let mut state = PlaybackState::new();
+    for (id, measured) in [("drained", Some(10.0)), ("playing", None)] {
+        if measured.is_none() && !newer_reply {
+            break;
+        }
+        let response = ResponseRef {
+            session_id: session.info().session_id,
+            response_id: id.into(),
+        };
+        let reference = OutputRef {
+            response: response.clone(),
+            item_id: format!("{id}-output"),
+            output_index: 0,
+            content_index: 0,
+        };
+        state.replies.push(Reply {
+            reference: response,
+            interrupt_on_speech: true,
+            outputs: vec![Output {
+                stream: playback.open(&reference).unwrap(),
+                reference,
+                sealed: measured.is_some(),
+                measured,
+                cut: false,
+            }],
+            ended: measured.is_some(),
+            interrupted: false,
+            // Hold the old report's completion deterministically, independent
+            // of socket writer timing. Its cancellation token must stay live.
+            reporting: measured.is_some(),
+            finished_report: CancellationToken::new(),
+        });
+    }
+    let event = SessionEvent {
+        session_id: session.info().session_id,
+        event_id: String::new(),
+        request_id: None,
+        payload: RealtimeEvent::SpeechStarted {
+            item_id: "speech".into(),
+            audio_start_ms: 0,
+        },
+    };
+    let tasks = Tasks::new();
+    state
+        .event(&event, playback, session, &tasks, &CancellationToken::new())
+        .unwrap();
+    let drained = &state.replies[0];
+    assert!(!drained.interrupted);
+    assert!(!drained.finished_report.is_cancelled());
+    assert!(!drained.outputs[0].cut);
+    assert!(
+        tasks.is_empty(),
+        "measured output must not get a cut report"
+    );
+    if newer_reply {
+        let playing = &state.replies[1];
+        assert!(playing.interrupted);
+        assert!(playing.finished_report.is_cancelled());
     }
 }

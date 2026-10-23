@@ -417,6 +417,13 @@ tool-only updates do not consume this history. A newly announced reply that
 references an older, evicted policy fails with `ErrResourceLimit`. Replies whose
 policy was already captured keep it while queued or playing. Servers that omit
 revisions use the acknowledged setting in effect when the reply arrives.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and fails
+with a resource limit error for an ambiguous reply. A later acknowledgment with
+a revision establishes a new known setting. Replies without a revision use the
+current acknowledged setting.
+
 `RequestID` is sent as the upgrade's `x-request-id`. It must be nonblank
 printable ASCII, or `Connect` returns `ErrInput`. Prism uses it if it is at most 128 characters,
 else makes its own; `Info().RequestID` reports the one it used. Include it when

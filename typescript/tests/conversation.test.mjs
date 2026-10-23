@@ -1067,3 +1067,51 @@ test("queued reply retains its captured policy after revision history eviction",
   playback.outputs.get("first").done.resolve(17);
   ack(peer, await peer.next("conversation.item.truncate"));
 });
+
+for (const newer of [false, true]) {
+  test(`speech preserves a pending finished report; newer reply=${newer}`, async (t) => {
+    const { session, peer, playback, events } = await setup(t);
+    const started = deferred();
+    const release = deferred();
+    const report = session.reportPlayback.bind(session);
+    t.mock.method(session, "reportPlayback", async (value, options) => {
+      if (value.kind === "finished" && value.response.responseId === "first") {
+        started.resolve();
+        await wait(release.promise, options.signal);
+      }
+      return report(value, options);
+    });
+    begin(peer);
+    peer.ended("first");
+    await until(() => playback.outputs.get("first")?.ended);
+    playback.outputs.get("first").done.resolve(15);
+    await started.promise;
+    if (newer) {
+      begin(peer, "second");
+      await until(() => playback.outputs.has("second"));
+    }
+    speech(peer);
+    await until(() => events.some((e) => e.kind === "speech.started"));
+    assert.equal(playback.outputs.get("first").interrupted, false);
+    assert.deepEqual(
+      playback.batches.map((batch) => batch.map((ref) => ref.itemId)),
+      newer ? [["second"]] : [],
+    );
+    if (newer) {
+      playback.outputs.get("second").done.resolve(4);
+      const cut = await peer.next("conversation.item.truncate");
+      assert.equal(cut.item_id, "second");
+      ack(peer, cut);
+    }
+    release.resolve();
+    const finished = await peer.next("prism.playback.drained");
+    assert.equal(finished.response_id, "first");
+    assert.equal(finished.played_ms, 15);
+    assert.equal(
+      reports(peer).filter(
+        (r) => r.type === "conversation.item.truncate" && r.item_id === "first",
+      ).length,
+      0,
+    );
+  });
+}

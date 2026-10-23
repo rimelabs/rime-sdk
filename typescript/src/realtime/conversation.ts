@@ -313,18 +313,15 @@ export async function runConversation(
           break;
         }
         case "speech.started": {
-          const floor = [...replies.values()]
-            .reverse()
-            .find(
-              (reply) =>
-                !reply.interrupted &&
-                (!reply.ended ||
-                  [...reply.outputs.values()].some(
-                    (output) => !output.measured,
-                  )),
-            );
-          if (floor?.interruptOnSpeech ?? session.info.interruptOnSpeech)
-            interrupt([...replies.values()]);
+          // The newest eligible reply controls the playback batch.
+          // A pending finished report is no longer physical playback.
+          const eligible = [...replies.values()].filter(
+            (reply) =>
+              !reply.interrupted &&
+              (!reply.ended ||
+                [...reply.outputs.values()].some((output) => !output.measured)),
+          );
+          if (eligible.at(-1)?.interruptOnSpeech) interrupt(eligible);
           break;
         }
         case "response.abandoned": {

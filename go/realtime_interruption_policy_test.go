@@ -171,24 +171,24 @@ func TestRealtimeSpeechPolicySelectsLatestUnfinishedPlayback(t *testing.T) {
 	old := &rtPlayReply{interruptOnSpeech: false, ended: true, outputs: []*rtPlayOutput{{measured: false}}}
 	newest := &rtPlayReply{interruptOnSpeech: true, ended: true, outputs: []*rtPlayOutput{{measured: false}}}
 	replies := []*rtPlayReply{old, newest}
-	if !rtSpeechInterrupts(replies, false) {
+	if !rtSpeechInterrupts(replies) {
 		t.Fatal("latest unmeasured playback did not control interruption")
 	}
 	newest.outputs[0].measured = true
-	if rtSpeechInterrupts(replies, true) {
+	if rtSpeechInterrupts(replies) {
 		t.Fatal("measured playback hid an older protected reply")
 	}
 	newest.ended = false
-	if !rtSpeechInterrupts(replies, false) {
+	if !rtSpeechInterrupts(replies) {
 		t.Fatal("generating reply did not control interruption")
 	}
 	newest.interrupted = true
-	if rtSpeechInterrupts(replies, true) {
+	if rtSpeechInterrupts(replies) {
 		t.Fatal("interrupted reply hid an older protected reply")
 	}
 	old.outputs[0].measured = true
-	if !rtSpeechInterrupts(replies, true) || rtSpeechInterrupts(replies, false) {
-		t.Fatal("no local playback did not use current settings")
+	if rtSpeechInterrupts(replies) {
+		t.Fatal("fully measured playback was eligible for interruption")
 	}
 }
 

@@ -284,21 +284,17 @@ async def run_conversation(
                     elif isinstance(payload, t.AudioDone):
                         output.end()
             elif isinstance(payload, t.SpeechStarted):
-                floor = next(
-                    (
-                        reply
-                        for reply in reversed(tuple(replies.values()))
-                        if not reply.interrupted
-                        and (
-                            not reply.ended
-                            or any(not output.receipt.done() for output in reply.outputs.values())
-                        )
-                    ),
-                    None,
-                )
-                enabled = floor.interrupt_on_speech if floor else session.info.interrupt_on_speech
-                if enabled:
-                    interrupt(list(replies.values()))
+                eligible = [
+                    reply
+                    for reply in replies.values()
+                    if not reply.interrupted
+                    and (
+                        not reply.ended
+                        or any(not output.receipt.done() for output in reply.outputs.values())
+                    )
+                ]
+                if eligible and eligible[-1].interrupt_on_speech:
+                    interrupt(eligible)
             elif isinstance(payload, t.ResponseAbandoned):
                 if payload.response.response_id in parents:
                     interrupted.add(payload.response.response_id)

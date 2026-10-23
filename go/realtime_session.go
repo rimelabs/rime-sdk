@@ -23,6 +23,7 @@ const rtInterruptionPolicyLimit = 128
 type rtInterruptionPolicy struct {
 	revision  uint64
 	interrupt bool
+	unknown   bool
 }
 
 func realtimeClosedError() error {
@@ -45,6 +46,7 @@ type RealtimeSession struct {
 	mu                   sync.Mutex
 	info                 SessionInfo
 	interruptionPolicies []rtInterruptionPolicy
+	lastSettingsRevision *uint64
 	terminal             error
 }
 type rtResult struct {
@@ -116,12 +118,32 @@ func (s *RealtimeSession) setInfo(info SessionInfo) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	policies := s.interruptionPolicies
-	if len(policies) == 0 || (info.SettingsRevision != nil && policies[len(policies)-1].interrupt != info.InterruptOnSpeech) {
+	if info.SettingsRevision != nil {
+		latest := *info.SettingsRevision
+		s.lastSettingsRevision = &latest
+	}
+	var next *rtInterruptionPolicy
+	if len(policies) == 0 {
 		revision := uint64(0)
 		if info.SettingsRevision != nil {
 			revision = *info.SettingsRevision
 		}
-		policies = append(policies, rtInterruptionPolicy{revision: revision, interrupt: info.InterruptOnSpeech})
+		next = &rtInterruptionPolicy{revision: revision, interrupt: info.InterruptOnSpeech}
+	} else if info.SettingsRevision == nil {
+		if s.info.InterruptOnSpeech != info.InterruptOnSpeech && !policies[len(policies)-1].unknown {
+			// The change happened after the last published acknowledgment, but
+			// its precise revision is unknown. Do not apply an older policy there.
+			revision := uint64(0)
+			if s.lastSettingsRevision != nil {
+				revision = *s.lastSettingsRevision + 1
+			}
+			next = &rtInterruptionPolicy{revision: revision, unknown: true}
+		}
+	} else if policies[len(policies)-1].unknown || policies[len(policies)-1].interrupt != info.InterruptOnSpeech {
+		next = &rtInterruptionPolicy{revision: *info.SettingsRevision, interrupt: info.InterruptOnSpeech}
+	}
+	if next != nil {
+		policies = append(policies, *next)
 		if len(policies) > rtInterruptionPolicyLimit {
 			copy(policies, policies[len(policies)-rtInterruptionPolicyLimit:])
 			policies = policies[:rtInterruptionPolicyLimit]
@@ -140,6 +162,9 @@ func (s *RealtimeSession) interruptionPolicy(revision *uint64) (bool, error) {
 	for i := len(s.interruptionPolicies) - 1; i >= 0; i-- {
 		policy := s.interruptionPolicies[i]
 		if policy.revision <= *revision {
+			if policy.unknown {
+				return false, failure(ErrResourceLimit, "reply interruption policy has an unknown settings revision")
+			}
 			return policy.interrupt, nil
 		}
 	}

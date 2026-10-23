@@ -57,8 +57,12 @@ async fn partial_update_clear_and_shared_settings() {
         q["session"],
         json!({"instructions":"","tools":[],"voice":"","turn_detection":{"interrupt_response":false}})
     );
-    acknowledge(&p, &q, 3).await;
-    assert_eq!(task.await.unwrap().unwrap().settings_revision, Some(3));
+    p.send(json!({"type":"session.updated", "prism_request_event_id":q["event_id"],
+        "session":{"id":"session-1", "voice":"deployment-default", "prism_effective_interrupt_response":false, "prism_settings_revision":3}})).await;
+    let cleared = task.await.unwrap().unwrap();
+    assert_eq!(cleared.settings_revision, Some(3));
+    assert_eq!(cleared.voice, "deployment-default");
+    assert_eq!(s.info().voice, "deployment-default");
     assert_eq!(s.clone().info().settings_revision, Some(3));
     let tool = ToolDefinition {
         name: "same".into(),
@@ -313,4 +317,73 @@ async fn reply_labels_keep_settings_revision() {
     assert!(!info.interrupt_on_speech);
     assert_eq!(info.response_metadata.unwrap()["step"], "billing");
     c.close().await;
+}
+
+#[tokio::test]
+async fn mixed_revision_updates_preserve_known_policies_and_reject_ambiguous_replies() {
+    use futures_util::StreamExt;
+    for (revision, expected) in [
+        (Some(1), Some(true)),
+        (Some(100), Some(true)),
+        (Some(101), None),
+        (Some(102), None),
+        (Some(103), Some(false)),
+        (None, Some(false)),
+    ] {
+        let mut p = Peer::with_initial_interruption(true).await;
+        let (client, session) = p.setup().await;
+        // Same-policy acknowledgments still locate a later unknown boundary.
+        // Repeated revisionless policy changes must preserve that boundary.
+        for (published, interrupt) in [
+            (Some(100), true),
+            (None, false),
+            (None, true),
+            (None, false),
+            (Some(103), false),
+        ] {
+            let clone = session.clone();
+            let task = tokio::spawn(async move {
+                clone
+                    .update(RealtimeUpdateOptions::default().interrupt_on_speech(interrupt))
+                    .await
+            });
+            let request = p.next("session.update").await;
+            let mut view = json!({"id":"session-1", "voice":"test",
+                "prism_effective_interrupt_response":interrupt});
+            if let Some(published) = published {
+                view["prism_settings_revision"] = json!(published);
+            }
+            p.send(
+                json!({"type":"session.updated", "prism_request_event_id":request["event_id"],
+                "session":view}),
+            )
+            .await;
+            let info = task.await.unwrap().unwrap();
+            assert_eq!(info.settings_revision, published);
+            assert_eq!(info.interrupt_on_speech, interrupt);
+        }
+        let mut events = session.events().unwrap();
+        let mut response = json!({"id":"mixed-revision-reply"});
+        if let Some(revision) = revision {
+            response["prism_settings_revision"] = json!(revision);
+        }
+        p.send(json!({"type":"response.created", "response":response}))
+            .await;
+        let received = events.next().await.unwrap();
+        if let Some(expected) = expected {
+            let RealtimeEvent::ResponseStarted { response, .. } = received.unwrap().payload else {
+                panic!("expected response start")
+            };
+            assert_eq!(
+                session.response_interrupt_on_speech(&response).unwrap(),
+                expected
+            );
+        } else {
+            assert_eq!(
+                received.unwrap_err().kind(),
+                crate::ErrorKind::ResourceLimit
+            );
+        }
+        client.close().await;
+    }
 }

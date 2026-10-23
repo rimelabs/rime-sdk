@@ -69,22 +69,29 @@ type rtPlayReply struct {
 	stopReport                    context.CancelFunc
 }
 
-func rtSpeechInterrupts(replies []*rtPlayReply, fallback bool) bool {
-	for i := len(replies) - 1; i >= 0; i-- {
-		reply := replies[i]
-		if reply.interrupted {
-			continue
-		}
-		if !reply.ended {
-			return reply.interruptOnSpeech
-		}
-		for _, output := range reply.outputs {
-			if !output.measured {
-				return reply.interruptOnSpeech
-			}
+// A finished report can remain pending after physical playback has drained.
+func (reply *rtPlayReply) pendingPlayback() bool {
+	if reply.interrupted {
+		return false
+	}
+	if !reply.ended {
+		return true
+	}
+	for _, output := range reply.outputs {
+		if !output.measured {
+			return true
 		}
 	}
-	return fallback
+	return false
+}
+
+func rtSpeechInterrupts(replies []*rtPlayReply) bool {
+	for i := len(replies) - 1; i >= 0; i-- {
+		if replies[i].pendingPlayback() {
+			return replies[i].interruptOnSpeech
+		}
+	}
+	return false
 }
 
 // Run ends at source EOF, session closure, failure, or cancellation. It waits for
@@ -371,8 +378,14 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 				}
 			case SpeechStarted:
-				if rtSpeechInterrupts(replies, r.Session.Info().InterruptOnSpeech) {
-					if e := interrupt(replies); e != nil {
+				if rtSpeechInterrupts(replies) {
+					var eligible []*rtPlayReply
+					for _, reply := range replies {
+						if reply.pendingPlayback() {
+							eligible = append(eligible, reply)
+						}
+					}
+					if e := interrupt(eligible); e != nil {
 						return e
 					}
 				}

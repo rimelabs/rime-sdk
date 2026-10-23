@@ -54,24 +54,36 @@ impl Drop for CallGuard {
 }
 #[derive(Default)]
 struct InterruptPolicies {
-    changes: VecDeque<(u64, bool)>,
+    changes: VecDeque<(u64, bool, bool)>,
+    current: bool,
+    last_revision: Option<u64>,
 }
 impl InterruptPolicies {
     fn record(&mut self, revision: Option<u64>, interrupt: bool) {
-        if self.changes.is_empty() {
-            self.changes.push_back((0, interrupt));
-        } else if let Some(revision) = revision {
-            if self
+        match self.changes.back() {
+            None => self
                 .changes
-                .back()
-                .is_some_and(|(_, value)| *value != interrupt)
-            {
-                self.changes.push_back((revision, interrupt));
-                if self.changes.len() > 128 {
-                    self.changes.pop_front();
+                .push_back((revision.unwrap_or(0), interrupt, false)),
+            Some((_, _, unknown)) => match revision {
+                None if interrupt != self.current && !unknown => {
+                    // Earlier published revisions stay known. Later replies
+                    // are ambiguous until a new acknowledgment has a revision.
+                    let start = self.last_revision.map_or(0, |value| value + 1);
+                    self.changes.push_back((start, interrupt, true));
                 }
-            }
+                Some(revision) if *unknown || interrupt != self.current => {
+                    self.changes.push_back((revision, interrupt, false));
+                }
+                _ => {}
+            },
         }
+        if revision.is_some() {
+            self.last_revision = revision;
+        }
+        if self.changes.len() > 128 {
+            self.changes.pop_front();
+        }
+        self.current = interrupt;
     }
     fn resolve(&self, revision: Option<u64>, fallback: bool) -> Result<bool, Error> {
         let Some(revision) = revision else {
@@ -80,13 +92,22 @@ impl InterruptPolicies {
         self.changes
             .iter()
             .rev()
-            .find(|(start, _)| *start <= revision)
-            .map(|(_, value)| *value)
+            .find(|(start, _, _)| *start <= revision)
             .ok_or_else(|| {
                 Error::new(
                     ErrorKind::ResourceLimit,
                     "response interruption policy revision expired",
                 )
+            })
+            .and_then(|(_, value, unknown)| {
+                if *unknown {
+                    Err(Error::new(
+                        ErrorKind::ResourceLimit,
+                        "response settings revision crosses an unreported interruption policy change",
+                    ))
+                } else {
+                    Ok(*value)
+                }
             })
     }
 }

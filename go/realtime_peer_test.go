@@ -19,10 +19,12 @@ type realtimePeer struct {
 	conn     chan *websocket.Conn
 	socket   *websocket.Conn
 	requests chan rtObject
-	// The upgrade's x-request-id, and each session.update's settings.
+	// The upgrade's x-request-id.
 	requestID string
-	updates   chan rtObject
-	// Refuse session updates with invalid_session.
+	// Settings from automatically acknowledged initialization and label updates.
+	// Other session updates go to requests for manual acknowledgment.
+	updates chan rtObject
+	// Refuse automatically handled updates with invalid_session.
 	refuse atomic.Bool
 }
 

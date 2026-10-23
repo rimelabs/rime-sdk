@@ -335,53 +335,6 @@ func TestRealtimeReceiptWaitOverlapsWriteEndAndInterrupt(t *testing.T) {
 	}
 }
 
-func TestRealtimeRunnerCancelsPendingFinishedReportOnInterruption(t *testing.T) {
-	// Hold commands at the session boundary to interrupt a finished report before
-	// the session can submit it. Already submitted socket writes cannot be undone.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	s := newRealtimeSession(&operation{ctx: ctx, cancel: func(error) {}}, RealtimeTimeouts{Ready: time.Second})
-	s.info.InterruptOnSpeech = true
-	go func() { <-ctx.Done(); close(s.done) }()
-	playback := &rtControlledPlayback{opened: make(chan *rtControlledOutput, 1), outputs: map[OutputRef]*rtControlledOutput{}}
-	interrupted := make(chan struct{})
-	done := make(chan error, 1)
-	go func() {
-		done <- (&ConversationRunner{Session: s, Source: &rtControlledSource{stopped: make(chan struct{})}, Playback: playback, OnEvent: func(event SessionEvent) error {
-			if _, ok := event.Payload.(SpeechStarted); ok {
-				close(interrupted)
-			}
-			return nil
-		}}).Run(ctx)
-	}()
-	defer func() { cancel(); <-done }()
-	response := ResponseRef{"session-1", "r1"}
-	output := OutputRef{response: response, itemID: "i1"}
-	s.events <- SessionEvent{Payload: ResponseStarted{Response: response}}
-	s.events <- SessionEvent{Payload: MessageStarted{Output: output}}
-	o := rtOutput(t, playback)
-	s.events <- SessionEvent{Payload: ResponseEnded{Response: response, Status: "completed"}}
-	o.receipt <- 10
-	var report *rtCommand
-	select {
-	case report = <-s.commands:
-	case <-time.After(time.Second):
-		t.Fatal("no finished report")
-	}
-	if report.kind != "drain" {
-		t.Fatalf("got %s, want drain", report.kind)
-	}
-	s.events <- SessionEvent{Payload: SpeechStarted{}}
-	select {
-	case <-interrupted:
-	case <-time.After(time.Second):
-		t.Fatal("interruption was not processed")
-	}
-	if report.ctx.Err() == nil {
-		t.Fatal("finished report remains active after interruption")
-	}
-}
-
 type rtShutdownReceipt struct {
 	release, returned chan struct{}
 	err               error
@@ -543,6 +496,90 @@ func TestRealtimeRunnerRetainsReceiptFailureRacingSourceEOF(t *testing.T) {
 			case <-output.completed:
 			default:
 				t.Fatal("runner returned before receipt cleanup")
+			}
+		})
+	}
+}
+
+// Hold finished reports at the session boundary before the writer can submit
+// them, then deliver speech with and without a newer reply still playing.
+func TestRealtimeRunnerKeepsPendingFinishedReportOnSpeech(t *testing.T) {
+	for _, newer := range []bool{false, true} {
+		t.Run(map[bool]string{false: "no newer reply", true: "newer active reply"}[newer], func(t *testing.T) {
+			sessionCtx, sessionCancel := context.WithCancelCause(context.Background())
+			defer sessionCancel(context.Canceled)
+			session := newRealtimeSession(&operation{ctx: sessionCtx, cancel: sessionCancel}, RealtimeTimeouts{})
+			session.info = SessionInfo{SessionID: "s", InterruptOnSpeech: true}
+			go func() { <-sessionCtx.Done(); close(session.done) }()
+			source := &rtControlledSource{stopped: make(chan struct{})}
+			playback := &rtControlledPlayback{opened: make(chan *rtControlledOutput, 4), outputs: map[OutputRef]*rtControlledOutput{}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			observed := make(chan struct{}, 1)
+			done := make(chan error, 1)
+			go func() {
+				done <- (&ConversationRunner{Session: session, Source: source, Playback: playback, OnEvent: func(event SessionEvent) error {
+					if _, ok := event.Payload.(SpeechStarted); ok {
+						observed <- struct{}{}
+					}
+					return nil
+				}}).Run(ctx)
+			}()
+			first := ResponseRef{"s", "first"}
+			out := OutputRef{response: first, itemID: "first"}
+			session.events <- SessionEvent{Payload: ResponseStarted{Response: first}}
+			session.events <- SessionEvent{Payload: MessageStarted{Output: out}}
+			output := rtOutput(t, playback)
+			session.events <- SessionEvent{Payload: ResponseEnded{Response: first, Status: "completed"}}
+			output.receipt <- 15
+			var finished *rtCommand
+			select {
+			case finished = <-session.commands:
+			case <-time.After(3 * time.Second):
+				t.Fatal("finished report did not start")
+			}
+			if finished.kind != "drain" {
+				t.Fatal(finished.kind)
+			}
+			if newer {
+				second := ResponseRef{"s", "second"}
+				session.events <- SessionEvent{Payload: ResponseStarted{Response: second}}
+				session.events <- SessionEvent{Payload: MessageStarted{Output: OutputRef{response: second, itemID: "second"}}}
+				rtOutput(t, playback)
+			}
+			session.events <- SessionEvent{Payload: SpeechStarted{ItemID: "speech"}}
+			select {
+			case <-observed:
+			case <-time.After(3 * time.Second):
+				t.Fatal("speech not observed")
+			}
+			if finished.ctx.Err() != nil {
+				t.Fatal("speech cancelled finished report")
+			}
+			if newer {
+				select {
+				case cut := <-session.commands:
+					if cut.kind != "truncate" || cut.output.itemID != "second" {
+						t.Fatalf("unexpected report %+v", cut)
+					}
+					cut.result <- rtResult{}
+					cut.stop()
+				case <-time.After(3 * time.Second):
+					t.Fatal("newer playback not interrupted")
+				}
+			} else if playback.interrupts.Load() != 0 {
+				t.Fatal("fully measured reply interrupted")
+			}
+			finished.result <- rtResult{}
+			finished.stop()
+			cancel()
+			select {
+			case err := <-done:
+				if !errors.Is(err, ErrCancelled) {
+					t.Fatal(err)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("runner did not stop")
 			}
 		})
 	}

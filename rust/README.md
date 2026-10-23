@@ -410,6 +410,12 @@ session retains at most 128 interruption policy changes; updates that keep the
 same policy do not consume history. A reply that refers to an evicted policy
 ends the session with `ErrorKind::ResourceLimit`, rather than guessing its policy.
 
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and fails
+with a resource limit error for an ambiguous reply. A later acknowledgment with
+a revision establishes a new known setting. Replies without a revision use the
+current acknowledged setting.
+
 `session.info()` returns an owned `SessionInfo` snapshot. All cloned session
 handles read the latest acknowledged settings.
 `request_id` is sent as the upgrade's `x-request-id`. It must be nonblank

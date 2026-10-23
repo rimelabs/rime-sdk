@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,67 @@ func rtText(s string, limit int) error {
 	}
 	return nil
 }
+
+// Inspect strings before encoding/json can replace invalid UTF-8. Remember
+// containers so cyclic input reaches json.Marshal's normal cycle rejection.
+func rtJSONStringsValid(value any) bool {
+	type reference struct {
+		typeOf  reflect.Type
+		pointer uintptr
+		length  int
+	}
+	seen := map[reference]bool{}
+	var valid func(reflect.Value) bool
+	valid = func(v reflect.Value) bool {
+		if !v.IsValid() {
+			return true
+		}
+		switch v.Kind() {
+		case reflect.String:
+			return utf8.ValidString(v.String())
+		case reflect.Interface:
+			return v.IsNil() || valid(v.Elem())
+		case reflect.Pointer, reflect.Map, reflect.Slice:
+			if v.IsNil() {
+				return true
+			}
+			key := reference{typeOf: v.Type(), pointer: uintptr(v.UnsafePointer())}
+			if v.Kind() == reflect.Slice {
+				key.length = v.Len()
+			}
+			if seen[key] {
+				return true
+			}
+			seen[key] = true
+		}
+		switch v.Kind() {
+		case reflect.Pointer:
+			return valid(v.Elem())
+		case reflect.Map:
+			for entries := v.MapRange(); entries.Next(); {
+				if !valid(entries.Key()) || !valid(entries.Value()) {
+					return false
+				}
+			}
+		case reflect.Array, reflect.Slice:
+			for i := 0; i < v.Len(); i++ {
+				if !valid(v.Index(i)) {
+					return false
+				}
+			}
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Type().Field(i)
+				if (field.PkgPath == "" || field.Anonymous) && strings.Split(field.Tag.Get("json"), ",")[0] != "-" && !valid(v.Field(i)) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	return valid(reflect.ValueOf(value))
+}
+
 func rtTools(tools []ToolDefinition) ([]any, error) {
 	ts := []any{}
 	names := make(map[string]struct{}, len(tools))
@@ -28,6 +90,9 @@ func rtTools(tools []ToolDefinition) ([]any, error) {
 		}
 		if !utf8.ValidString(tool.Description) {
 			return nil, failure(ErrInput, "tool descriptions must be valid UTF-8")
+		}
+		if !rtJSONStringsValid(tool.Parameters) {
+			return nil, failure(ErrInput, "tool schema strings and keys must be valid UTF-8")
 		}
 		if _, exists := names[tool.Name]; exists {
 			return nil, failure(ErrInput, "tool names must be unique")
@@ -75,7 +140,7 @@ func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
 		settings["turn_detection"] = rtObject{"interrupt_response": *o.InterruptOnSpeech}
 	}
 	b, err := json.Marshal(settings)
-	if err != nil {
+	if err != nil || !utf8.Valid(b) {
 		return nil, failure(ErrInput, "invalid tool schema")
 	}
 	result, err := rtJSONObject(b)
@@ -167,7 +232,7 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 	}
 	// Snapshot nested schemas before any network operation.
 	b, e := json.Marshal(settings)
-	if e != nil {
+	if e != nil || !utf8.Valid(b) {
 		return "", nil, t, failure(ErrInput, "invalid tool schema")
 	}
 	settings, e = rtJSONObject(b)
