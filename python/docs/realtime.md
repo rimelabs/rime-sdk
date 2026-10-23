@@ -106,11 +106,13 @@ The runner is the only event reader. Do not consume `session.events` at the same
 time, call `report_playback` independently, or send a second audio source. Other
 session methods remain available for manual tools and application actions.
 
-On confirmed `SpeechStarted`, the runner follows the server's decision about
-the playing reply's interruption setting. For older servers that do not publish
-settings revisions, it uses `session.info.interrupt_on_speech`. It stops affected
-output, waits for the interrupted receipt, and reports the measured position. It ignores late
-audio for that response. A `SpeechHint` alone does not stop playback. A server
+On confirmed `SpeechStarted`, the runner uses the interruption setting of the
+latest reply that is still generating or has unmeasured physical playback. It
+resolves that setting from the reply's revision when the session receives the
+reply. Updates and late event consumption cannot change it. If interruption is
+enabled, the runner stops affected output, waits for the interrupted receipt,
+and reports the measured position. It ignores late audio for that response.
+A `SpeechHint` alone does not stop playback. A server
 `truncate_not_current` refusal is forwarded as an event; it does not stop a newer
 response. Finished reports wait for generation completion and every output
 receipt, including outstanding playback from earlier responses. Prism treats
@@ -493,3 +495,9 @@ There is no automatic reconnect or history replay.
 
 Local peer tests cover the SDK protocol handling. Validate the gateway handshake
 and endpoint behavior for the deployment you use.
+
+The SDK retains the latest 128 interruption policy changes. Instructions or tools
+updates that keep the same interruption policy do not consume this history.
+If an unannounced reply refers to an older evicted policy, the session fails
+with a resource limit error instead of guessing its policy. A reply already
+received keeps its captured policy even after later settings updates.

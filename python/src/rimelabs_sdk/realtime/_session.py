@@ -17,7 +17,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any, Literal, TypeVar
-from weakref import WeakSet
+from weakref import WeakKeyDictionary, WeakSet
 
 from websockets.exceptions import ConnectionClosed
 
@@ -32,13 +32,20 @@ from .._errors import (
 from .._pcm import InputConverter
 from . import _protocol as p
 from . import _types as t
-from ._settings import tool_settings
+from ._settings import InterruptionPolicies, tool_settings
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
 _NOT_READY = {"typed_turn_busy", "instructions_busy", "proactive_unavailable"}
 _LIMIT = 128
 _close_errors: WeakSet[RimeError] = WeakSet()
+
+
+def _response_interrupts_speech(session: RealtimeSession, response: t.ResponseRef) -> bool:
+    """Read the policy captured before the response entered the event queue."""
+    if isinstance(session, RealtimeSession):
+        return session._response_interruptions.get(response, session.info.interrupt_on_speech)
+    return session.info.interrupt_on_speech
 
 
 def _is_session_close_error(error: BaseException) -> bool:
@@ -101,6 +108,8 @@ class RealtimeSession:
         self._tool_lock = asyncio.Lock()
         self._pending: dict[str, _Pending] = {}
         self._responses: OrderedDict[str, _Response] = OrderedDict()
+        self._interruption_policies = InterruptionPolicies()
+        self._response_interruptions: WeakKeyDictionary[t.ResponseRef, bool] = WeakKeyDictionary()
         self._latest: str | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
         self._input_converter: InputConverter | None = None
@@ -670,6 +679,9 @@ class RealtimeSession:
                 turn_detection=view.turn_detection,
                 settings_revision=view.settings_revision,
             )
+            self._interruption_policies.record(
+                view.settings_revision, self._info.interrupt_on_speech
+            )
             self._settle(echo, replace(payload, info=self._info))
             return
         if isinstance(payload, p.ToolResultCreated):
@@ -711,6 +723,9 @@ class RealtimeSession:
             ref = payload.response
             if ref.response_id in self._responses:
                 raise RimeStreamError("Duplicate response.created")
+            self._response_interruptions[ref] = self._interruption_policies.resolve(
+                payload.settings_revision
+            )
             self._responses[ref.response_id] = _Response(ref)
             for state in self._responses.values():
                 state.changed.set()

@@ -2,9 +2,10 @@
 
 import copy
 import json
+from collections import deque
 from collections.abc import Sequence
 
-from .._errors import RimeInputError
+from .._errors import RimeInputError, RimeResourceLimitError
 from ._protocol import _Tool
 from ._types import JsonObject, PrismFiller, ToolDefinition
 
@@ -50,3 +51,26 @@ def tool_settings(tools: Sequence[ToolDefinition]) -> list[_Tool]:
     except (ValueError, TypeError):
         raise RimeInputError("Tool schemas must contain finite JSON values") from None
     return result
+
+
+class InterruptionPolicies:
+    """Retain bounded policy changes until a reply selects its settings revision."""
+
+    def __init__(self) -> None:
+        self._changes: deque[tuple[int, bool]] = deque(maxlen=128)
+        self._current = True
+
+    def record(self, revision: int | None, interrupt: bool) -> None:
+        if revision is None:
+            self._changes.clear()
+        if not self._changes or interrupt != self._current:
+            self._changes.append((revision if revision is not None else 0, interrupt))
+        self._current = interrupt
+
+    def resolve(self, revision: int | None) -> bool:
+        if revision is None or not self._changes:
+            return self._current
+        for first_revision, interrupt in reversed(self._changes):
+            if first_revision <= revision:
+                return interrupt
+        raise RimeResourceLimitError("Reply settings revision is no longer retained")

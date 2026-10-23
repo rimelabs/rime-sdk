@@ -41,6 +41,8 @@ impl Worker {
                         .unwrap_or(self.interrupt)
                 }
                 self.interrupt = info.interrupt_on_speech;
+                self.interrupt_policies
+                    .record(info.settings_revision, self.interrupt);
                 *self.info.lock().expect("session info mutex") = Some(info.clone());
                 answer.info = Some(info.clone());
                 if let Some(tx) = self.initialized.take() {
@@ -60,7 +62,7 @@ impl Worker {
         }
         Ok(())
     }
-    pub(super) fn dispatch(&mut self, e: Wire) -> Result<(), Error> {
+    pub(super) fn dispatch(&mut self, mut e: Wire) -> Result<(), Error> {
         let mut matched = vec![];
         for (i, c) in self.pending.iter_mut().enumerate() {
             if c.finished || !c.submitted {
@@ -96,6 +98,26 @@ impl Worker {
                 matched.push(i)
             }
         }
+        // An acknowledgment can arrive before the transport confirms its write.
+        // Capture accepted policy before a subsequent response is dispatched.
+        if e.kind == "session.updated" {
+            if let Some(&i) = matched.first() {
+                let info = e
+                    .info
+                    .as_mut()
+                    .ok_or_else(|| failure("missing session view"))?;
+                if !e.interrupt_known {
+                    info.interrupt_on_speech = self.pending[i].body["session"]["turn_detection"]
+                        ["interrupt_response"]
+                        .as_bool()
+                        .unwrap_or(self.interrupt);
+                }
+                self.interrupt = info.interrupt_on_speech;
+                self.interrupt_policies
+                    .record(info.settings_revision, self.interrupt);
+                e.interrupt_known = true;
+            }
+        }
         if let Some(p) = &e.payload {
             use RealtimeEvent::*;
             match p {
@@ -108,7 +130,14 @@ impl Worker {
                     self.ready = false;
                     self.latest.clear()
                 }
-                ResponseStarted { response, .. } => {
+                ResponseStarted {
+                    response,
+                    settings_revision,
+                    ..
+                } => {
+                    let interrupt = self
+                        .interrupt_policies
+                        .resolve(*settings_revision, self.interrupt)?;
                     self.epoch += 1;
                     let id = &response.response_id;
                     if self.responses.contains_key(id) {
@@ -130,10 +159,18 @@ impl Worker {
                                 "too many retained active responses",
                             ));
                         }
+                        self.response_policies
+                            .lock()
+                            .expect("response policy mutex")
+                            .remove(&self.responses[old].reference);
                         self.responses.remove(old);
                         self.order.pop_front();
                     }
                     self.order.push_back(id.clone());
+                    self.response_policies
+                        .lock()
+                        .expect("response policy mutex")
+                        .insert(response.clone(), interrupt);
                     self.responses.insert(
                         id.clone(),
                         Response {

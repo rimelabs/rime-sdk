@@ -17,7 +17,7 @@ import { InputConverter } from "../pcm.js";
 import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";
-import { toolSettings } from "./settings.js";
+import { InterruptionPolicies, toolSettings } from "./settings.js";
 
 const NOT_READY = new Set([
   "typed_turn_busy",
@@ -26,6 +26,15 @@ const NOT_READY = new Set([
 ]);
 const LIMIT = 128;
 const closeErrors = new WeakSet<object>();
+const responseInterruptions = new WeakMap<t.ResponseRef, boolean>();
+
+/** @internal Read the policy captured before queuing the response event. */
+export function responseInterruptsSpeech(
+  session: RealtimeSession,
+  response: t.ResponseRef,
+): boolean {
+  return responseInterruptions.get(response) ?? session.info.interruptOnSpeech;
+}
 
 /** @internal Recognize only failures created by intentional session closure. */
 export function isSessionCloseError(error: unknown): boolean {
@@ -84,6 +93,7 @@ export class RealtimeSession {
   private readonly toolLock = new Mutex();
   private readonly pending = new Map<string, Pending>();
   private readonly responses = new Map<string, ResponseState>();
+  private readonly interruptionPolicies = new InterruptionPolicies();
   private latest: string | null = null;
   private readonly tasks = new Set<Promise<unknown>>();
   private converter: InputConverter | null = null;
@@ -810,6 +820,10 @@ export class RealtimeSession {
           turnDetection: view.turnDetection,
           settingsRevision: view.settingsRevision,
         });
+        this.interruptionPolicies.record(
+          view.settingsRevision,
+          this.sessionInfo.interruptOnSpeech,
+        );
         this.settle(echo, { ...payload, info: this.sessionInfo });
         return;
       }
@@ -853,6 +867,10 @@ export class RealtimeSession {
         const ref = payload.response;
         if (this.responses.has(ref.responseId))
           throw new RimeStreamError("Duplicate response.created");
+        responseInterruptions.set(
+          ref,
+          this.interruptionPolicies.resolve(payload.settingsRevision),
+        );
         this.responses.set(ref.responseId, new ResponseState(ref));
         for (const state of this.responses.values()) state.changed.set();
         this.latest = ref.responseId;

@@ -406,6 +406,18 @@ Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
 as `*uint64`. It is `nil` when the server does not publish it. Users do not need
 to manage it. Use each reply's revision to identify its settings.
 
+The conversation runner captures each reply's interruption policy from its own
+settings revision. On confirmed speech, the newest reply still generating or
+awaiting a measured playback receipt controls interruption of the playback batch.
+A later update does not change that policy, even if the server has finished its
+estimated playback before the device finishes playing.
+
+The SDK retains the latest 128 interruption policy changes. Prompt-only and
+tool-only updates do not consume this history. A newly announced reply that
+references an older, evicted policy fails with `ErrResourceLimit`. Replies whose
+policy was already captured keep it while queued or playing. Servers that omit
+revisions use the acknowledged setting in effect when the reply arrives.
+
 | Session method | Behavior |
 | --- | --- |
 | `Update` | Apply supplied settings and return acknowledged `SessionInfo`. |

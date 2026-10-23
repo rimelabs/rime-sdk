@@ -32,8 +32,10 @@ fn worker() -> (
             converter: None,
             timeouts: RealtimeTimeouts::default(),
             interrupt: true,
+            interrupt_policies: InterruptPolicies::default(),
             initialized: None,
             info: Arc::new(Mutex::new(None)),
+            response_policies: Arc::new(Mutex::new(HashMap::new())),
         },
         writes,
         jobs,
@@ -226,6 +228,7 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
                 .unwrap()
                 .info,
             )),
+            response_policies: worker.response_policies.clone(),
             budgets: RealtimeTimeouts::default(),
             done: done.clone(),
             wake: Arc::new(Notify::new()),
@@ -302,4 +305,31 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Cancelled);
     }
+}
+
+#[tokio::test]
+async fn update_acknowledgment_captures_policy_before_write_confirmation() {
+    let (mut worker, writes, mut jobs, _events) = worker();
+    worker.interrupt_policies.record(Some(1), true);
+    let mut update = Command::new(
+        Kind::Update,
+        json!({"session":{"turn_detection":{"interrupt_response":false}}}),
+    );
+    update.deadline = Instant::now() + Duration::from_secs(1);
+    update.admission_deadline = update.deadline;
+    worker.pending.push(update);
+    worker.advance(&writes).unwrap();
+    let writing = jobs.recv().await.unwrap();
+    worker.dispatch(protocol::decode(&json!({"type":"session.updated","prism_request_event_id":format!("evt_{}",writing.id),
+        "session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":false,"prism_settings_revision":2}}).to_string(),"session-1").unwrap().unwrap()).unwrap();
+    assert!(!worker.pending[0].written);
+    worker.dispatch(protocol::decode(&json!({"type":"response.created","response":{"id":"before-write-confirmation","prism_settings_revision":2}}).to_string(),"session-1").unwrap().unwrap()).unwrap();
+    let reference = ResponseRef {
+        session_id: "session-1".into(),
+        response_id: "before-write-confirmation".into(),
+    };
+    assert_eq!(
+        worker.response_policies.lock().unwrap().get(&reference),
+        Some(&false)
+    );
 }

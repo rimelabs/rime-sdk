@@ -147,6 +147,7 @@ type TranscriptFailed struct {
 	Fault  *RealtimeFault
 }
 type ResponseStarted struct {
+	interruptOnSpeech *bool
 	// SettingsRevision names the settings this reply began with, if published.
 	SettingsRevision *uint64
 	Response         ResponseRef

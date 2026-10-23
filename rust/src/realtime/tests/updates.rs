@@ -187,3 +187,54 @@ async fn update_preserves_tool_round_and_response_revisions() {
     ));
     c.close().await;
 }
+
+#[tokio::test]
+async fn unchanged_policies_remain_available_and_evicted_changes_fail_explicitly() {
+    let mut p = Peer::with_initial_interruption(true).await;
+    let (client, session) = p.setup().await;
+    for revision in 2..=141 {
+        let clone = session.clone();
+        let update = tokio::spawn(async move {
+            clone
+                .update(RealtimeUpdateOptions::default().instructions("Keep the same policy"))
+                .await
+        });
+        let q = p.next("session.update").await;
+        p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],"session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":true,"prism_settings_revision":revision}})).await;
+        update.await.unwrap().unwrap();
+    }
+    let mut events = session.events().unwrap();
+    p.send(json!({"type":"response.created","response":{"id":"same-policy","prism_settings_revision":1}})).await;
+    assert!(matches!(
+        event(&mut events).await.payload,
+        RealtimeEvent::ResponseStarted {
+            settings_revision: Some(1),
+            ..
+        }
+    ));
+    p.ended("same-policy").await;
+    event(&mut events).await;
+    for revision in 142..=270 {
+        let interrupt = revision % 2 != 0;
+        let clone = session.clone();
+        let update = tokio::spawn(async move {
+            clone
+                .update(RealtimeUpdateOptions::default().interrupt_on_speech(interrupt))
+                .await
+        });
+        let q = p.next("session.update").await;
+        p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],"session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":interrupt,"prism_settings_revision":revision}})).await;
+        update.await.unwrap().unwrap();
+    }
+    p.send(json!({"type":"response.created","response":{"id":"expired-policy","prism_settings_revision":141}})).await;
+    let failure = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        futures_util::StreamExt::next(&mut events),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .unwrap_err();
+    assert_eq!(failure.kind(), crate::ErrorKind::ResourceLimit);
+    client.close().await;
+}

@@ -37,10 +37,11 @@ func (o *rtControlledOutput) Completion(ctx context.Context) (float64, error) {
 }
 
 type rtControlledPlayback struct {
-	opened  chan *rtControlledOutput
-	mu      sync.Mutex
-	outputs map[OutputRef]*rtControlledOutput
-	stopped atomic.Bool
+	opened     chan *rtControlledOutput
+	mu         sync.Mutex
+	outputs    map[OutputRef]*rtControlledOutput
+	stopped    atomic.Bool
+	interrupts atomic.Int32
 }
 
 func (p *rtControlledPlayback) Open(ref OutputRef) (ConversationOutput, error) {
@@ -52,6 +53,7 @@ func (p *rtControlledPlayback) Open(ref OutputRef) (ConversationOutput, error) {
 	return o, nil
 }
 func (p *rtControlledPlayback) Interrupt(refs []OutputRef) error {
+	p.interrupts.Add(1)
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, ref := range refs {

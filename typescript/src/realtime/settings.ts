@@ -1,4 +1,4 @@
-import { RimeInputError } from "../errors.js";
+import { RimeInputError, RimeResourceLimitError } from "../errors.js";
 import type { JsonValue, PrismFiller, ToolDefinition } from "./types.js";
 import type { SessionSettings } from "./protocol.js";
 
@@ -106,4 +106,28 @@ export function toolSettings(
       },
     };
   });
+}
+
+/** Bounded policy changes used to resolve each reply's settings revision. */
+export class InterruptionPolicies {
+  private changes: { revision: number; interrupt: boolean }[] = [];
+  private current = true;
+  record(revision: number | null, interrupt: boolean): void {
+    if (revision === null) this.changes = [];
+    if (this.changes.length === 0 || interrupt !== this.current) {
+      this.changes.push({ revision: revision ?? 0, interrupt });
+      if (this.changes.length > 128) this.changes.shift();
+    }
+    this.current = interrupt;
+  }
+  resolve(revision: number | null | undefined): boolean {
+    if (revision == null || this.changes.length === 0) return this.current;
+    for (let i = this.changes.length - 1; i >= 0; i--) {
+      if (this.changes[i].revision <= revision)
+        return this.changes[i].interrupt;
+    }
+    throw new RimeResourceLimitError(
+      "Reply settings revision is no longer retained",
+    );
+  }
 }

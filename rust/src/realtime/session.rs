@@ -52,6 +52,45 @@ impl Drop for CallGuard {
         self.wake.notify_one()
     }
 }
+#[derive(Default)]
+struct InterruptPolicies {
+    changes: VecDeque<(u64, bool)>,
+}
+impl InterruptPolicies {
+    fn record(&mut self, revision: Option<u64>, interrupt: bool) {
+        if self.changes.is_empty() {
+            self.changes.push_back((0, interrupt));
+        } else if let Some(revision) = revision {
+            if self
+                .changes
+                .back()
+                .is_some_and(|(_, value)| *value != interrupt)
+            {
+                self.changes.push_back((revision, interrupt));
+                if self.changes.len() > 128 {
+                    self.changes.pop_front();
+                }
+            }
+        }
+    }
+    fn resolve(&self, revision: Option<u64>, fallback: bool) -> Result<bool, Error> {
+        let Some(revision) = revision else {
+            return Ok(fallback);
+        };
+        self.changes
+            .iter()
+            .rev()
+            .find(|(start, _)| *start <= revision)
+            .map(|(_, value)| *value)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::ResourceLimit,
+                    "response interruption policy revision expired",
+                )
+            })
+    }
+}
+
 /// A cloneable Prism session handle. Dropping the last handle requests cleanup.
 #[derive(Clone)]
 pub struct RealtimeSession {
@@ -59,6 +98,7 @@ pub struct RealtimeSession {
     commands: mpsc::Sender<Command>,
     events: Arc<Mutex<Option<RealtimeEvents>>>,
     info: Arc<Mutex<Option<SessionInfo>>>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
     budgets: RealtimeTimeouts,
     done: CancellationToken,
     wake: Arc<Notify>,
@@ -203,8 +243,10 @@ struct Worker {
     converter: Option<(crate::PcmFormat, InputAudio)>,
     timeouts: RealtimeTimeouts,
     interrupt: bool,
+    interrupt_policies: InterruptPolicies,
     initialized: Option<oneshot::Sender<Result<SessionInfo, Error>>>,
     info: Arc<Mutex<Option<SessionInfo>>>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
 }
 pub(super) async fn connect(
     inner: Arc<Inner>,
@@ -223,6 +265,8 @@ pub(super) async fn connect(
     let (tx, rx) = oneshot::channel();
     let info = Arc::new(Mutex::new(None));
     let worker_info = info.clone();
+    let response_policies = Arc::new(Mutex::new(HashMap::new()));
+    let worker_response_policies = response_policies.clone();
     let wake = Arc::new(Notify::new());
     let notify = wake.clone();
     let authorization = inner
@@ -245,8 +289,10 @@ pub(super) async fn connect(
             converter: None,
             timeouts: options.timeouts,
             interrupt: options.interrupt,
+            interrupt_policies: InterruptPolicies::default(),
             initialized: Some(tx),
             info: worker_info,
+            response_policies: worker_response_policies,
         };
         let result = worker
             .run(
@@ -285,6 +331,7 @@ pub(super) async fn connect(
             ended: false,
         }))),
         info,
+        response_policies,
         budgets,
         done,
         wake,
@@ -300,6 +347,22 @@ impl RealtimeSession {
             .as_ref()
             .expect("initialized session")
             .clone()
+    }
+    pub(super) fn response_interrupt_on_speech(
+        &self,
+        response: &ResponseRef,
+    ) -> Result<bool, Error> {
+        self.response_policies
+            .lock()
+            .expect("response policy mutex")
+            .get(response)
+            .copied()
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::ResourceLimit,
+                    "response interruption policy expired",
+                )
+            })
     }
     /// Apply supplied settings and wait for acknowledgment. Replies already
     /// started keep their settings. Dropping the future after submission does

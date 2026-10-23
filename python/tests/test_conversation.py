@@ -175,13 +175,15 @@ async def until(condition):
 
 
 @asynccontextmanager
-async def run(monkeypatch, *, enabled=True, callback=None):
+async def run(monkeypatch, *, enabled=True, callback=None, revision=None, before_run=None):
     peer = Peer()
     emit = peer.emit
 
     def configured(kind, **body):
         if kind == "session.updated":
             body["session"].setdefault("prism_effective_interrupt_response", enabled)
+            if revision is not None:
+                body["session"].setdefault("prism_settings_revision", revision)
         emit(kind, **body)
 
     peer.emit = configured
@@ -194,6 +196,8 @@ async def run(monkeypatch, *, enabled=True, callback=None):
         Rime(api_key="test") as client,
         client.realtime.connect(endpoint="ws://localhost/v1/realtime") as current,
     ):
+        if before_run is not None:
+            await before_run(current, peer)
         source, playback = Source(), Playback()
         events = []
 
@@ -326,8 +330,16 @@ async def test_interruption_late_audio_and_old_receipt_cannot_stop_new_output(mo
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-async def test_effective_setting_and_hint(monkeypatch, enabled):
-    async with run(monkeypatch, enabled=enabled) as (current, peer, _, playback, _, events):
+@pytest.mark.parametrize("revision", [None, 1])
+async def test_effective_setting_and_hint(monkeypatch, enabled, revision):
+    async with run(monkeypatch, enabled=enabled, revision=revision) as (
+        current,
+        peer,
+        _,
+        playback,
+        _,
+        events,
+    ):
         assert current.info.interrupt_on_speech is enabled
         begin(peer)
         peer.emit("prism.input_audio_buffer.speech_hint", audio_start_ms=0)
@@ -915,11 +927,43 @@ async def test_unexpected_source_cancellation_fails_the_run(monkeypatch):
         assert playback.stopped and peer.closed
 
 
-async def test_confirmed_speech_uses_active_reply_settings_after_update(monkeypatch):
-    async with run(monkeypatch) as (current, peer, _, playback, _, events):
-        begin(peer)
-        await until(lambda: "first" in playback.outputs)
-        update = asyncio.create_task(current.update(interrupt_on_speech=False))
+@pytest.mark.parametrize("ended", [False, True])
+@pytest.mark.parametrize(
+    "initial,updated,late,reply_revision",
+    [
+        (True, False, False, 1),
+        (False, True, False, 1),
+        (True, False, True, 1),
+        (False, True, True, 1),
+        (True, False, True, 2),
+        (False, True, True, 2),
+        (False, False, True, 1),
+    ],
+)
+async def test_confirmed_speech_uses_reply_policy(
+    monkeypatch, initial, updated, late, reply_revision, ended
+):
+    async with run(monkeypatch, enabled=initial, revision=1) as (
+        current,
+        peer,
+        _,
+        playback,
+        _,
+        events,
+    ):
+
+        def begin_reply():
+            peer.emit(
+                "response.created",
+                response={"id": "first", "prism_settings_revision": reply_revision},
+            )
+            message(peer)
+            audio(peer)
+
+        if not late:
+            begin_reply()
+            await until(lambda: "first" in playback.outputs)
+        update = asyncio.create_task(current.update(interrupt_on_speech=updated))
         q = await peer.next("session.update")
         peer.emit(
             "session.updated",
@@ -927,13 +971,84 @@ async def test_confirmed_speech_uses_active_reply_settings_after_update(monkeypa
             session={
                 "id": "session-1",
                 "voice": "test",
-                "prism_effective_interrupt_response": False,
+                "prism_effective_interrupt_response": updated,
                 "prism_settings_revision": 2,
             },
         )
         await update
+        if late:
+            begin_reply()
+            await until(lambda: "first" in playback.outputs)
+        if ended:
+            # The server's playback estimate has expired, but the physical receipt is pending.
+            peer.ended("first")
+            await until(lambda: any(isinstance(event, r.ResponseEnded) for event in events))
         speech(peer)
-        await until(lambda: any(isinstance(e, r.SpeechStarted) for e in events))
+        await until(lambda: any(isinstance(event, r.SpeechStarted) for event in events))
+        expected = initial if reply_revision == 1 else updated
+        output = playback.outputs["first"]
+        assert output.interrupted is expected
+        if not ended:
+            peer.ended("first")
+        output.done.set_result(17)
+        report = await peer.next(
+            "conversation.item.truncate" if expected else "prism.playback.drained"
+        )
+        if expected:
+            ack_cut(peer, report)
+
+
+@pytest.mark.parametrize("change", [False, True])
+async def test_interruption_policy_history_is_bounded_by_changes(monkeypatch, change):
+    from test_realtime import session
+    from test_realtime_updates import acknowledge
+
+    from rimelabs_sdk import RimeResourceLimitError
+
+    async with session(monkeypatch) as (current, peer, _):
+        for revision in range(1, 131):
+            enabled = bool(revision % 2) if change else False
+            update = asyncio.create_task(current.update(interrupt_on_speech=enabled))
+            q = await peer.next("session.update")
+            acknowledge(peer, q, revision, interrupt=enabled)
+            await update
+        peer.emit("response.created", response={"id": "old-guess", "prism_settings_revision": 1})
+        events = current.events
+        if change:
+            with pytest.raises(RimeResourceLimitError):
+                await anext(events)
+        else:
+            assert (await anext(events)).payload.settings_revision == 1
+        await events.aclose()
+
+
+async def test_queued_reply_keeps_policy_after_history_eviction(monkeypatch):
+    from test_realtime_updates import acknowledge
+
+    async def queue_before_runner(current, peer):
+        peer.emit("response.created", response={"id": "first", "prism_settings_revision": 1})
+        for revision in range(2, 131):
+            enabled = bool(revision % 2)
+            update = asyncio.create_task(current.update(interrupt_on_speech=enabled))
+            q = await peer.next("session.update")
+            acknowledge(peer, q, revision, interrupt=enabled)
+            await update
+        message(peer)
+        audio(peer)
+
+    async with run(monkeypatch, revision=1, before_run=queue_before_runner) as (
+        current,
+        peer,
+        _,
+        playback,
+        _,
+        events,
+    ):
+        assert not current.info.interrupt_on_speech
+        await until(lambda: "first" in playback.outputs)
+        speech(peer)
+        await until(lambda: any(isinstance(event, r.SpeechStarted) for event in events))
         assert playback.outputs["first"].interrupted
+        peer.ended("first")
         playback.outputs["first"].done.set_result(17)
         ack_cut(peer, await peer.next("conversation.item.truncate"))

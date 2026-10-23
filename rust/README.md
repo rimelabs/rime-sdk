@@ -403,6 +403,13 @@ Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
 It is `None` when the server does not publish it. Users do not need to manage it.
 Use each reply's revision to identify its settings.
 
+The conversation runner captures each reply's interruption setting when the
+reply is announced. It keeps that setting while a physical playback receipt is
+pending, even if generation has ended or the session settings change. The
+session retains at most 128 interruption policy changes; updates that keep the
+same policy do not consume history. A reply that refers to an evicted policy
+ends the session with `ErrorKind::ResourceLimit`, rather than guessing its policy.
+
 `session.info()` now returns an owned `SessionInfo` snapshot instead of
 `&SessionInfo`. All cloned session handles read the latest acknowledged settings.
 Code that needs a reference can borrow a local snapshot with `&info`.

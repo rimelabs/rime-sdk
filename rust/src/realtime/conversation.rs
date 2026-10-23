@@ -101,6 +101,7 @@ struct Output<O> {
     cut: bool,
 }
 struct Reply<O> {
+    interrupt_on_speech: bool,
     reference: ResponseRef,
     outputs: Vec<Output<O>>,
     ended: bool,
@@ -282,6 +283,7 @@ impl<O: ConversationOutput> PlaybackState<O> {
                     })?
                 }
                 self.replies.push(Reply {
+                    interrupt_on_speech: session.response_interrupt_on_speech(response)?,
                     reference: response.clone(),
                     outputs: vec![],
                     ended: false,
@@ -291,10 +293,21 @@ impl<O: ConversationOutput> PlaybackState<O> {
                 });
             }
             RealtimeEvent::SpeechStarted { .. } | RealtimeEvent::ResponseAbandoned { .. } => {
-                // With revisions, Prism filters speech using the playing reply's settings.
-                let info = session.info();
+                let interrupt_on_speech = self
+                    .replies
+                    .iter()
+                    .rev()
+                    .find(|reply| {
+                        !reply.interrupted
+                            && (!reply.ended
+                                || reply.outputs.iter().any(|output| output.measured.is_none()))
+                    })
+                    .map_or_else(
+                        || session.info().interrupt_on_speech,
+                        |reply| reply.interrupt_on_speech,
+                    );
                 let all = matches!(&event.payload, RealtimeEvent::SpeechStarted { .. })
-                    && (info.settings_revision.is_some() || info.interrupt_on_speech);
+                    && interrupt_on_speech;
                 if let RealtimeEvent::ResponseAbandoned { response } = &event.payload {
                     self.interrupted.insert(response.response_id.clone());
                 }

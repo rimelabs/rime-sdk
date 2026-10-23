@@ -7,7 +7,7 @@ import {
 } from "../errors.js";
 import { Deferred } from "./async.js";
 import type { RealtimeSession } from "./session.js";
-import { isSessionCloseError } from "./session.js";
+import { isSessionCloseError, responseInterruptsSpeech } from "./session.js";
 import { RimeRealtimeError } from "./types.js";
 import type {
   AudioChunk,
@@ -59,10 +59,12 @@ interface Output {
   stream: ConversationOutput;
   receipt: Promise<number>;
   sealed: boolean;
+  measured: boolean;
   report?: Promise<void>;
 }
 interface Reply {
   ref: ResponseRef;
+  interruptOnSpeech: boolean;
   outputs: Map<string, Output>;
   interrupted: boolean;
   ended: boolean;
@@ -241,7 +243,15 @@ export async function runConversation(
         stream,
         receipt: start(() => measure(stream)),
         sealed: false,
+        measured: false,
       };
+      const measuredOutput = output;
+      void output.receipt.then(
+        () => {
+          measuredOutput.measured = true;
+        },
+        () => {},
+      );
       reply.outputs.set(key, output);
       if (reply.interrupted) {
         playback.interrupt([ref]);
@@ -279,6 +289,10 @@ export async function runConversation(
           if (blocked) interrupted.add(id);
           replies.set(id, {
             ref: payload.response,
+            interruptOnSpeech: responseInterruptsSpeech(
+              session,
+              payload.response,
+            ),
             outputs: new Map(),
             interrupted: blocked,
             ended: false,
@@ -298,15 +312,21 @@ export async function runConversation(
           }
           break;
         }
-        case "speech.started":
-          // With revisions, Prism filters speech using the playing reply's settings.
-          // The latest session setting may belong to a later reply.
-          if (
-            session.info.settingsRevision != null ||
-            session.info.interruptOnSpeech
-          )
+        case "speech.started": {
+          const floor = [...replies.values()]
+            .reverse()
+            .find(
+              (reply) =>
+                !reply.interrupted &&
+                (!reply.ended ||
+                  [...reply.outputs.values()].some(
+                    (output) => !output.measured,
+                  )),
+            );
+          if (floor?.interruptOnSpeech ?? session.info.interruptOnSpeech)
             interrupt([...replies.values()]);
           break;
+        }
         case "response.abandoned": {
           if (parents.has(payload.response.responseId))
             interrupted.add(payload.response.responseId);

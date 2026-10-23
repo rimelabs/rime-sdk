@@ -62,10 +62,29 @@ type rtPlayOutput struct {
 	played                float64
 }
 type rtPlayReply struct {
+	interruptOnSpeech             bool
 	ref                           ResponseRef
 	outputs                       []*rtPlayOutput
 	ended, interrupted, reporting bool
 	stopReport                    context.CancelFunc
+}
+
+func rtSpeechInterrupts(replies []*rtPlayReply, fallback bool) bool {
+	for i := len(replies) - 1; i >= 0; i-- {
+		reply := replies[i]
+		if reply.interrupted {
+			continue
+		}
+		if !reply.ended {
+			return reply.interruptOnSpeech
+		}
+		for _, output := range reply.outputs {
+			if !output.measured {
+				return reply.interruptOnSpeech
+			}
+		}
+	}
+	return fallback
 }
 
 // Run ends at source EOF, session closure, failure, or cancellation. It waits for
@@ -339,8 +358,12 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					delete(blocked, history[0])
 					history = history[1:]
 				}
+				interruptOnSpeech := r.Session.Info().InterruptOnSpeech
+				if p.interruptOnSpeech != nil {
+					interruptOnSpeech = *p.interruptOnSpeech
+				}
 				interrupted := wasInterrupted(id)
-				replies = append(replies, &rtPlayReply{ref: p.Response, interrupted: interrupted})
+				replies = append(replies, &rtPlayReply{ref: p.Response, interrupted: interrupted, interruptOnSpeech: interruptOnSpeech})
 				if interrupted {
 					blocked[id] = true
 					if e := start(func() error { return r.Session.Cancel(running, p.Response) }); e != nil {
@@ -348,9 +371,7 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 				}
 			case SpeechStarted:
-				// With revisions, Prism filters speech using the playing reply's settings.
-				info := r.Session.Info()
-				if info.SettingsRevision != nil || info.InterruptOnSpeech {
+				if rtSpeechInterrupts(replies, r.Session.Info().InterruptOnSpeech) {
 					if e := interrupt(replies); e != nil {
 						return e
 					}

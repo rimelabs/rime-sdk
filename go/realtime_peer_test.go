@@ -22,6 +22,12 @@ type realtimePeer struct {
 
 func newRealtimePeer(t *testing.T) *realtimePeer { return newRealtimePeerWithPause(t, false) }
 func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
+	return newRealtimePeerWithSession(t, pause, nil)
+}
+func newRealtimePeerWithSession(t *testing.T, pause bool, initial rtObject) *realtimePeer {
+	if initial == nil {
+		initial = rtObject{"id": "session-1", "voice": "test"}
+	}
 	if _, err := rtRequestSchemas(); err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +62,7 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 			}
 			if v["type"] == "session.update" && !initialized {
 				initialized = true
-				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": rtObject{"id": "session-1", "voice": "test"}})
+				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": initial})
 				if pause {
 					<-resume
 				}
