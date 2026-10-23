@@ -50,10 +50,11 @@ type RealtimeSession struct {
 	terminal             error
 }
 type rtResult struct {
-	info SessionInfo
-	ref  ResponseRef
-	item ItemRef
-	err  error
+	history []HistoryItem
+	info    SessionInfo
+	ref     ResponseRef
+	item    ItemRef
+	err     error
 }
 type rtCommand struct {
 	epoch                         uint64
@@ -349,8 +350,7 @@ func (s *RealtimeSession) AddMessage(ctx context.Context, role, text string) (It
 	if e := rtText(text, 4000); e != nil {
 		return ItemRef{}, e
 	}
-	r, e := s.invoke(ctx, &rtCommand{kind: "history", body: rtObject{"item": rtObject{"type": "message", "role": role, "text": text}}})
-	return r.item, e
+	return s.CreateItem(ctx, HistoryItem{Type: HistoryMessage, Role: role, Text: text}, "")
 }
 func (s *RealtimeSession) RequestReply(ctx context.Context, o ReplyOptions) (ResponseRef, error) {
 	b := rtObject{"metadata": rtObject{"prism_cause": "proactive"}}
@@ -807,6 +807,15 @@ func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 			wire = "prism.playback.drained"
 			c.body = rtObject{"response_id": r.ref.responseID, "drain_token": r.token, "played_ms": c.report.PlayedMS, "audible_tail_ms": c.report.AudibleTailMS}
 		}
+	case "history_get":
+		wire = "prism.conversation.get"
+		c.expected = "history.listed"
+	case "history_delete":
+		wire = "conversation.item.delete"
+		c.expected = "item.deleted"
+	case "history_result":
+		wire = "conversation.item.create"
+		c.expected = "tool.result.created"
 	case "history":
 		wire = "conversation.item.create"
 		c.expected = "item.created"
@@ -859,7 +868,7 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 	if e.kind != c.expected {
 		return failure(ErrStream, "unexpected request acknowledgment")
 	}
-	if c.kind == "tool" && e.target != c.target {
+	if (c.kind == "tool" || c.kind == "history_result" || c.kind == "history_delete") && e.target != c.target {
 		return failure(ErrStream, "tool acknowledgment names another call")
 	}
 	result := rtResult{}
@@ -880,8 +889,28 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 			w.s.initialized <- nil
 		}
 	}
-	if c.kind == "history" {
-		result.item = ItemRef{w.sessionID, e.target}
+	if c.kind == "history_get" {
+		result.history = e.history
+	}
+	if c.kind == "history" || c.kind == "history_result" {
+		id := e.createdID
+		if id == "" || (c.kind == "history" && c.target != "" && c.target != id) {
+			return failure(ErrStream, "history acknowledgment names an invalid item")
+		}
+		if item, ok := c.body["item"].(rtObject); ok {
+			if want, ok := item["id"].(string); ok && want != id {
+				return failure(ErrStream, "history acknowledgment names another item")
+			}
+		}
+		result.item = ItemRef{w.sessionID, id}
+	}
+	if c.kind == "history_result" {
+		for _, response := range w.responses {
+			if previous, ok := response.calls[c.target]; ok && previous == nil {
+				digest := c.digest
+				response.calls[c.target] = &digest
+			}
+		}
 	}
 	if c.kind == "tool" {
 		d := c.digest

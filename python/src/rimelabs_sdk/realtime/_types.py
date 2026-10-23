@@ -142,6 +142,37 @@ class ToolDefinition:
 
 
 @dataclass(frozen=True, kw_only=True)
+class HistoryMessage:
+    """A user, assistant, or system message, without starting a reply."""
+
+    role: Literal["user", "assistant", "system"]
+    text: str
+    id: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class HistoryFunctionCall:
+    """A past tool call. Add its result separately; this never runs a tool."""
+
+    call_id: str
+    name: str
+    arguments: str = ""
+    id: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class HistoryFunctionResult:
+    """The result of a call in the conversation, identified by call_id."""
+
+    call_id: str
+    output: str
+    id: str | None = None
+
+
+HistoryItem: TypeAlias = HistoryMessage | HistoryFunctionCall | HistoryFunctionResult
+
+
+@dataclass(frozen=True, kw_only=True)
 class ResponseRef:
     session_id: str
     response_id: str

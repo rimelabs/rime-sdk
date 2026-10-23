@@ -483,8 +483,7 @@ text or audio, which the application must handle before another attempt.
 
 For `context_length_exceeded`, the server message contains token counts.
 Unchanged attempts will fail until the conversation is shorter. Start a new
-session with shorter context. The protocol also supports history deletion, but
-this SDK does not yet expose `conversation.item.delete`.
+session with shorter context. Use the history deletion method to remove items before retrying.
 
 Malformed fields in known events and mismatched request acknowledgments close
 the session with `RimeStreamError`. Unknown event kinds and extra fields remain
@@ -515,3 +514,32 @@ revisions can be ambiguous. The SDK preserves earlier known settings and raises
 a resource limit error for an ambiguous reply instead of guessing. A later
 acknowledgment with a revision establishes a new known setting. Replies without
 a revision use the current acknowledged setting.
+
+## Conversation history operations
+
+Available in the next SDK release. The Prism server must support history operations.
+Read history to obtain the items the next reply would see, in server order.
+Create messages with user, assistant, or system roles, past function calls, and
+function results. Creating an item does not start a reply or execute a tool.
+Message text is limited to 4000 Unicode characters. Optional client item IDs have
+1 to 32 characters. Tool arguments and results preserve the supplied strings.
+
+Omit the insertion anchor to append, use `root` to insert first, or give an item
+ID to insert after its whole turn. Results go after their calls and cannot take
+an anchor. Add a past call before adding its result.
+
+Deletion hides items from subsequent replies and keeps the conversation record.
+Deleting a call or its result hides both. An active reply keeps its original
+context. A deleted active call still needs a result and continuation through the
+existing tool APIs. Deleting an already deleted item succeeds; an unknown ID fails.
+History excludes replies still running and their inputs until those replies end.
+Requests work without typed-turn readiness. A canceled submitted request can still
+take effect; the SDK tracks its acknowledgment and does not replay it.
+
+```text
+item = await session.create_item(HistoryMessage(role="system", text="Transferred to billing."), previous_item_id="root")
+items = await session.get_history()
+await session.delete_item(item.item_id)
+```
+
+Import `HistoryMessage`, `HistoryFunctionCall`, and `HistoryFunctionResult` from `rimelabs_sdk.realtime`.

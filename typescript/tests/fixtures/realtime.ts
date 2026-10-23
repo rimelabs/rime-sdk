@@ -162,8 +162,10 @@ function checkAcknowledgmentTypes(ack: Acknowledgment) {
   const voice: string = requests.update.result(ack).session.voice;
   // @ts-expect-error A response acknowledgment cannot return a session view.
   requests.create.result(ack).session;
-  // @ts-expect-error A tool result acknowledgment need not contain an item ID.
-  requests.toolResult.result(ack).itemId;
+  const maybeItemId: string | null = requests.toolResult.result(ack).itemId;
+  // @ts-expect-error Older tool result acknowledgments can omit an item ID.
+  const requiredItemId: string = requests.toolResult.result(ack).itemId;
+  void [maybeItemId, requiredItemId];
   void [created, item, call, voice];
 }
 void checkAcknowledgmentTypes;

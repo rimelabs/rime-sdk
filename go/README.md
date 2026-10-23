@@ -508,8 +508,7 @@ audio, which the application must handle before another attempt.
 
 For `context_length_exceeded`, the server message contains token counts.
 Unchanged attempts will fail until the conversation is shorter. Start a new
-session with shorter context. The protocol also supports history deletion, but
-this SDK does not yet expose `conversation.item.delete`.
+session with shorter context. Use the history deletion method to remove items before retrying.
 
 Numbers in `ToolCall.Arguments`, including nested values, use `json.Number` to
 preserve precision. Use `String`, `Int64`, or `Float64` to read the required form.
@@ -585,3 +584,30 @@ interrupted, using device measurements. Reply to `stop` with
 `{"type":"stopped"}` only after all playback stops. Send `{"type":"eof"}` to
 end capture, and keep reading until the stop handshake completes. This bridge
 protocol belongs to the example, not the SDK.
+
+## Conversation history operations
+
+Available in the next SDK release. The Prism server must support history operations.
+Read history to obtain the items the next reply would see, in server order.
+Create messages with user, assistant, or system roles, past function calls, and
+function results. Creating an item does not start a reply or execute a tool.
+Message text is limited to 4000 Unicode characters. Optional client item IDs have
+1 to 32 characters. Tool arguments and results preserve the supplied strings.
+
+Omit the insertion anchor to append, use `root` to insert first, or give an item
+ID to insert after its whole turn. Results go after their calls and cannot take
+an anchor. Add a past call before adding its result.
+
+Deletion hides items from subsequent replies and keeps the conversation record.
+Deleting a call or its result hides both. An active reply keeps its original
+context. A deleted active call still needs a result and continuation through the
+existing tool APIs. Deleting an already deleted item succeeds; an unknown ID fails.
+History excludes replies still running and their inputs until those replies end.
+Requests work without typed-turn readiness. A canceled submitted request can still
+take effect; the SDK tracks its acknowledgment and does not replay it.
+
+```text
+item, err := session.CreateItem(ctx, rime.HistoryItem{Type: rime.HistoryMessage, Role: "system", Text: "Transferred to billing."}, "root")
+items, err := session.GetHistory(ctx)
+err = session.DeleteItem(ctx, item.ItemID())
+```

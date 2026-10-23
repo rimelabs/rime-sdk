@@ -97,6 +97,31 @@ export interface AudioChunk {
   readonly data: Uint8Array;
   readonly format?: PCMFormat;
 }
+/** An item without audio. IDs are optional on input and present in history results. */
+export type HistoryItem =
+  | {
+      readonly type: "message";
+      readonly id?: string;
+      readonly role: "user" | "assistant" | "system";
+      readonly text: string;
+    }
+  | {
+      readonly type: "function_call";
+      readonly id?: string;
+      readonly callId: string;
+      readonly name: string;
+      readonly arguments: string;
+    }
+  | {
+      readonly type: "function_call_output";
+      readonly id?: string;
+      readonly callId: string;
+      readonly output: string;
+    };
+export interface HistoryCreateOptions extends RealtimeOperationOptions {
+  /** Omit to append, root to insert first, or an item ID to follow its whole turn. */
+  readonly previousItemId?: string;
+}
 export interface ResponseRef {
   readonly sessionId: string;
   readonly responseId: string;

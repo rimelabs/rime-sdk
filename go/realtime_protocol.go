@@ -54,6 +54,8 @@ func rtFiniteJSON(value any) bool {
 }
 
 type rtWire struct {
+	history                                 []HistoryItem
+	createdID                               string
 	interruptKnown                          bool
 	kind, eventID, requestID, target, token string
 	index                                   uint64
@@ -247,17 +249,33 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.info = decoder.view(o["session"])
 		_, w.interruptKnown = decoder.object(o["session"])["prism_effective_interrupt_response"]
 	case "conversation.item.created":
+		if item := decoder.object(o["item"]); item["id"] != nil {
+			w.createdID = decoder.id(item["id"])
+		}
 		d := decoder.object(o["item"])
 		if d["type"] == "function_call_output" {
 			w.kind = "tool.result.created"
 			w.target = decoder.id(d["call_id"])
 		} else {
-			if v, ok := d["type"]; ok && v != "message" {
+			if v, ok := d["type"]; ok && v != "message" && v != "function_call" {
 				decoder.bad("item.type")
 			}
 			w.kind = "item.created"
 			w.target = decoder.id(d["id"])
 		}
+	case "prism.conversation":
+		w.kind = "history.listed"
+		items, ok := o["items"].([]any)
+		if !ok {
+			decoder.bad("items")
+		}
+		w.history = make([]HistoryItem, 0, len(items))
+		for _, item := range items {
+			w.history = append(w.history, decoder.historyItem(item))
+		}
+	case "conversation.item.deleted":
+		w.kind = "item.deleted"
+		w.target = decoder.id(o["item_id"])
 	case "input_audio_buffer.cleared":
 		w.kind = "audio.cleared"
 	case "conversation.item.truncated":
