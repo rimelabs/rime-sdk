@@ -1,0 +1,31 @@
+go/realtime_proxy_test.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 62
+go/realtime_lifecycle_test.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 8-9,11-12,339-349,352-373,375-376,378-406
+  s_4a20e3ec5ae1cd::t_679204696af829 350-351
+go/realtime_transport.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 27-28
+go/client.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 9,70
+go/realtime_session.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 376
+go/realtime_peer_test.go
+  s_4a20e3ec5ae1cd::t_2ee2dc7ff68026 107-109,114
+  s_4a20e3ec5ae1cd::t_679204696af829 117-125
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2a9c0df240c959d0a26c1cbd6e84b48cf8d1904a",
+  "prompts": {},
+  "sessions": {
+    "s_4a20e3ec5ae1cd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a34-efd2-7262-92e1-61f423fa0cd3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
