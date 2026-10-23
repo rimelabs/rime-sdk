@@ -472,7 +472,7 @@ class RealtimeSession:
                     p.CANCEL, {"response_id": response.response_id}, response.response_id
                 )
 
-    async def set_response_metadata(self, metadata: t.JsonObject) -> None:
+    async def set_response_metadata(self, metadata: t.Labels) -> None:
         """Replace the labels later replies carry; a reply already started keeps its own.
 
         Returns once Prism confirms the change.

@@ -14,7 +14,7 @@ import type {
   JsonValue,
   PrismFiller,
 } from "./types.js";
-import { copyJson, responseMetadata } from "./protocol.js";
+import { responseMetadata } from "./protocol.js";
 import type { SessionSettings } from "./protocol.js";
 
 const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
@@ -66,6 +66,21 @@ function timeouts(options: RealtimeTimeouts = {}): Required<RealtimeTimeouts> {
 }
 
 /** Reject values that JSON.stringify would silently drop or change. */
+function copyJson(value: unknown): JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean")
+    return value;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (Array.isArray(value)) return Array.from(value, copyJson);
+  if (
+    value &&
+    typeof value === "object" &&
+    [Object.prototype, null].includes(Object.getPrototypeOf(value))
+  )
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, copyJson(item)]),
+    );
+  throw new RimeInputError("Tool schemas must contain finite JSON values");
+}
 
 function fillerSettings(value: PrismFiller): PrismFiller {
   if (!value || typeof value !== "object" || Array.isArray(value))

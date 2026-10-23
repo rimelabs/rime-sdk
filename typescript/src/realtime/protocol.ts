@@ -19,41 +19,23 @@ export interface SessionSettings {
   }[];
   voice?: string;
   instructions?: string;
-  prism_response_metadata?: t.JsonObject;
+  prism_response_metadata?: t.Labels;
 }
-export function copyJson(value: unknown): t.JsonValue {
-  if (value === null || typeof value === "string" || typeof value === "boolean")
-    return value;
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (Array.isArray(value)) return Array.from(value, copyJson);
+/** A copy of the client's labels for every reply: keys to strings. */
+export function responseMetadata(value: unknown): t.Labels {
   if (
-    value &&
-    typeof value === "object" &&
-    [Object.prototype, null].includes(Object.getPrototypeOf(value))
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.values(value).some((label) => typeof label !== "string")
   )
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, copyJson(item)]),
-    );
-  throw new RimeInputError("Tool schemas must contain finite JSON values");
-}
-/** A copy of the client's labels for every reply: a JSON object. */
-export function responseMetadata(value: unknown): t.JsonObject {
-  let copy: t.JsonValue;
-  try {
-    copy = copyJson(value);
-  } catch {
-    throw new RimeInputError(
-      "responseMetadata must contain finite JSON values",
-    );
-  }
-  if (copy === null || typeof copy !== "object" || Array.isArray(copy))
-    throw new RimeInputError("responseMetadata must be a JSON object");
-  return copy;
+    throw new RimeInputError("responseMetadata must map keys to strings");
+  return Object.freeze({ ...(value as t.Labels) });
 }
 export interface SessionView {
   id: string;
   requestId: string | null;
-  responseMetadata: t.JsonObject | null;
+  responseMetadata: t.Labels | null;
   voice: string;
   interruptOnSpeech: boolean | null;
   toolResultTimeoutS: number | null;
@@ -271,13 +253,15 @@ function session(value: unknown): SessionView {
     ),
   };
 }
-/** The client's own keys of `metadata`: all but Prism's `prism_` ones. */
-function clientMetadata(metadata: Record<string, unknown>): t.JsonObject {
+/** The client's labels in `metadata`: its string values under keys that are
+ * not Prism's `prism_` ones. */
+function clientMetadata(metadata: Record<string, unknown>): t.Labels {
   return Object.freeze(
     Object.fromEntries(
-      Object.entries(metadata)
-        .filter(([key]) => !key.startsWith("prism_"))
-        .map(([key, value]) => [key, json(value)]),
+      Object.entries(metadata).filter(
+        (entry): entry is [string, string] =>
+          !entry[0].startsWith("prism_") && typeof entry[1] === "string",
+      ),
     ),
   );
 }

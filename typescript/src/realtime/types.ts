@@ -5,6 +5,10 @@ import { normalizeFault } from "./faults.js";
 
 export type JsonValue =
   null | boolean | number | string | JsonValue[] | JsonObject;
+/** Your labels for replies, keys to strings, such as `{ step: "3" }`. Prism
+ * takes at most 16, keys up to 64 characters and values up to 512, and
+ * refuses keys starting with `prism_`. */
+export type Labels = Readonly<Record<string, string>>;
 export interface JsonObject {
   [key: string]: JsonValue;
 }
@@ -74,7 +78,7 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   /** Labels every reply's `response.started` carries in `metadata`, such as
    * `{ step: "3" }`; change them with `session.setResponseMetadata`. Prism
    * refuses keys starting with `prism_`. */
-  readonly responseMetadata?: JsonObject;
+  readonly responseMetadata?: Labels;
 }
 export interface ReplyOptions extends RealtimeOperationOptions {
   readonly instruction?: string | null;
@@ -108,7 +112,7 @@ export interface SessionInfo {
   readonly requestId: string | null;
   /** The labels replies carry, as Prism last confirmed them. Null when the
    * server does not publish them. */
-  readonly responseMetadata: Readonly<JsonObject> | null;
+  readonly responseMetadata: Labels | null;
   readonly model: "prism";
   readonly voice: string;
   readonly interruptOnSpeech: boolean;
@@ -215,7 +219,7 @@ export interface ResponseStarted {
   readonly inputItemId: string | null;
   /** The client's own metadata keys: the session's labels, with the
    * request's own over them. Prism's `prism_` keys are left out. */
-  readonly metadata: Readonly<JsonObject>;
+  readonly metadata: Labels;
   /** The user items the reply answers: a spoken reply's committed turns, or
    * a typed turn's item. Empty when the server names none. */
   readonly inputItemIds: readonly string[];

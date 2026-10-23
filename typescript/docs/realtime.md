@@ -166,7 +166,7 @@ once. Open a new session to change them.
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `requestId` | No | Your id for the session, sent as `x-request-id`. Prism uses it if it is 1 to 128 printable ASCII characters, else makes its own. |
-| `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`. Prism refuses keys starting with `prism_`. |
+| `responseMetadata` | No | Labels every reply carries in `response.started.metadata`, such as `{ step: "3" }`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. |
 | `signal` | No | An `AbortSignal` that cancels connection setup. It does not cancel an established session. |
 
 Credentials come from `new Rime({ apiKey: "..." })` or `RIME_API_KEY`. Prism uses

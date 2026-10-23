@@ -360,7 +360,7 @@ test("invalid response metadata fails before it is sent", async (t) => {
   t.mock.method(https, "request", () => assert.fail("Must not open a socket"));
   const client = new Rime({ apiKey: "test" });
   t.after(() => client.close());
-  for (const responseMetadata of [[], "step", { step: Number.NaN }])
+  for (const responseMetadata of [[], "step", { step: 3 }])
     await assert.rejects(
       client.realtime.connect({ responseMetadata }),
       RimeInputError,

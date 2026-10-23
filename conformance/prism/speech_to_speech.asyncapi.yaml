@@ -459,7 +459,12 @@ components:
             $ref: '#/components/schemas/clientCapability'
         prism_response_metadata:
           type: object
-          additionalProperties: true
+          maxProperties: 16
+          propertyNames:
+            maxLength: 64
+          additionalProperties:
+            type: string
+            maxLength: 512
 
     sessionView:
       type: object
@@ -482,7 +487,12 @@ components:
           type: string
         prism_response_metadata:
           type: object
-          additionalProperties: true
+          maxProperties: 16
+          propertyNames:
+            maxLength: 64
+          additionalProperties:
+            type: string
+            maxLength: 512
         object:
           const: realtime.session
         model:

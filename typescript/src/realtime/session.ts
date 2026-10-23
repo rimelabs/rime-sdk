@@ -595,7 +595,7 @@ export class RealtimeSession {
   /** Replaces the labels later replies carry; a reply already started keeps
    * its own. Resolves once Prism confirms the change. */
   async setResponseMetadata(
-    metadata: t.JsonObject,
+    metadata: t.Labels,
     options: t.RealtimeOperationOptions = {},
   ): Promise<void> {
     const labels = p.responseMetadata(metadata);

@@ -79,7 +79,7 @@ test("a started reply shows the client's own metadata", () => {
     ).payload;
   assert.deepEqual(
     started({ prism_cause: "user_text", step: "3", nested: { a: 1 } }).metadata,
-    { step: "3", nested: { a: 1 } },
+    { step: "3" },
   );
   assert.deepEqual(started(undefined).metadata, {});
 });

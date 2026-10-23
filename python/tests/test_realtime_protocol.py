@@ -197,7 +197,6 @@ def test_a_started_reply_shows_the_clients_own_metadata():
         return protocol.decode(json.dumps(event), "session-1").payload
 
     assert started({"prism_cause": "user_text", "step": "3", "nested": {"a": 1}}).metadata == {
-        "step": "3",
-        "nested": {"a": 1},
+        "step": "3"
     }
     assert started(None).metadata == {}

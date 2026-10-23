@@ -22,7 +22,7 @@ from .._errors import (
 from ._protocol import SessionSettings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
-from ._types import JsonObject, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
+from ._types import JsonObject, Labels, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -64,7 +64,7 @@ class Realtime:
         turn_detection: TurnDetection | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
         request_id: str | None = None,
-        response_metadata: JsonObject | None = None,
+        response_metadata: Labels | None = None,
     ) -> AsyncIterator[RealtimeSession]:
         """Open and initialize a session on the public Prism endpoint.
 

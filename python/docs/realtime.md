@@ -160,7 +160,7 @@ Settings apply once; open a new session to change them.
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `request_id: str \| None` | No | Your id for the session, sent as `x-request-id`. Prism uses it if it is 1 to 128 printable ASCII characters, else makes its own. |
-| `response_metadata: JsonObject \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`. Prism refuses keys starting with `prism_`. |
+| `response_metadata: Labels \| None` | No | Labels every reply carries in `ResponseStarted.metadata`, such as `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512, no key starting with `prism_`. |
 
 All arguments are keyword-only. Credentials come from `Rime(api_key=...)` or
 `RIME_API_KEY`, sent as `Authorization: Bearer <key>`. The endpoint must accept

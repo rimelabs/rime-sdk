@@ -325,7 +325,7 @@ async def test_response_metadata_is_set_changed_and_shown(monkeypatch):
         assert session.info.response_metadata is None
 
 
-@pytest.mark.parametrize("value", [[], "step", {"step": float("nan")}])
+@pytest.mark.parametrize("value", [[], "step", {"step": 3}])
 async def test_invalid_response_metadata_is_not_sent(monkeypatch, value):
     peer = _LabelPeer()
 

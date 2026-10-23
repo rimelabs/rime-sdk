@@ -16,6 +16,9 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
 
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
+# Your labels for replies, keys to strings, such as {"step": "3"}. Prism takes at most 16,
+# keys up to 64 characters and values up to 512, and refuses keys starting with prism_.
+Labels: TypeAlias = dict[str, str]
 TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
 # What ended the user's turn:
 # - semantic: Prism judged from the user's speech that they had finished;
@@ -179,7 +182,7 @@ class SessionInfo:
     request_id: str | None = None
     # The labels replies carry, as Prism last confirmed them; None when the server does not
     # publish them.
-    response_metadata: JsonObject | None = None
+    response_metadata: Labels | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -280,7 +283,7 @@ class ResponseStarted:
     input_item_id: str | None = None
     # The client's own metadata keys: the session's labels, with the request's own over
     # them. Prism's prism_ keys are left out.
-    metadata: JsonObject = field(default_factory=dict)
+    metadata: Labels = field(default_factory=dict)
     # The user items the reply answers: a spoken reply's committed turns, or a typed
     # turn's item. Empty when the server names none.
     input_item_ids: tuple[str, ...] = ()
