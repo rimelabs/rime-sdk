@@ -1,0 +1,36 @@
+rust/src/realtime/tests/protocol.rs
+  s_4fd1a95407470e::t_40b0d5c4d713f8 5-7,9-16
+  s_4fd1a95407470e::t_e14600f03163eb 8
+  s_4fd1a95407470e::t_b6f3c5fac70977 4
+go/README.md
+  s_4fd1a95407470e::t_26334500d9d5a3 342-346,355
+rust/Cargo.toml
+  s_4fd1a95407470e::t_730c3df6d1fbdf 39-42
+rust/examples/realtime_live.rs
+  s_4fd1a95407470e::t_3cb2ca6913edcb 104-168,196,218-221
+go/realtime_conversation_test.go
+  s_4fd1a95407470e::t_b334c4b221e7e7 423-428,437-450,462-539
+  s_4fd1a95407470e::t_02915500c8a265 429-436,451-453,461
+  s_4fd1a95407470e::t_74133bf8104cab 454-460
+go/realtime_conversation.go
+  s_4fd1a95407470e::t_b334c4b221e7e7 21-23
+rust/examples/realtime_live/tests.rs
+  s_4fd1a95407470e::t_d75391a6174587 1-16,19,22-37,40,43-69,72-77,81-93,98-104,108-111,116-117,122-123,128-138
+  s_4fd1a95407470e::t_a503ef9b77a8aa 17-18,20-21,38-39,41-42,70-71,78-80,94-97,105-107,112-115,118-121,124-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1108284873e40b396711dbad2d30cd14db8b642b",
+  "prompts": {},
+  "sessions": {
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
