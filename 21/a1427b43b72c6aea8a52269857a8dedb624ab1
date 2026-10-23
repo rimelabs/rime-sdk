@@ -1,0 +1,75 @@
+go/README.md
+  s_a5191254627b38::t_f0b00d3f2b0a14 409-420
+go/realtime_conversation.go
+  s_a5191254627b38::t_e5261ce2435b25 65,72-89,361-364,366,374
+go/realtime_conversation_test.go
+  s_a5191254627b38::t_2e6a0a6fc85818 40-44,56
+go/realtime_interruption_policy_test.go
+  s_a5191254627b38::t_4023bf1aacd3c1 1-242
+go/realtime_peer_test.go
+  s_a5191254627b38::t_0c69e8e5dc912e 25-30,65
+go/realtime_session.go
+  s_a5191254627b38::t_a46d0902f2d379 20-26,35-47,112-147,832,851-867,907-912,1018-1020
+go/realtime_types.go
+  s_a5191254627b38::t_5441d8fb968a5e 150
+python/docs/realtime.md
+  s_a5191254627b38::t_d8c9cf779d2cea 109-115,498-503
+python/src/rimelabs_sdk/realtime/_conversation.py
+  s_a5191254627b38::t_cba3535dae695b 15,85,272-274,287-300
+python/src/rimelabs_sdk/realtime/_session.py
+  s_a5191254627b38::t_2d47e4f3da4684 20,35,44-50,111-112,682-684,726-728
+python/src/rimelabs_sdk/realtime/_settings.py
+  s_a5191254627b38::t_11dc1d937ca0cb 5,8,54-76
+python/tests/test_conversation.py
+  s_a5191254627b38::t_293dfdabd3df4f 178,185-186,199-200,333-342,930-966,974,979-985,987-1050,1052
+rust/README.md
+  s_a5191254627b38::t_5f4ecd3971d098 406-412
+rust/src/realtime/conversation.rs
+  s_9adf3ae3c793b8::t_ca6869b910bb82 104,286,296-308,310
+rust/src/realtime/dispatch.rs
+  s_9adf3ae3c793b8::t_41be5af7c959b7 44-45,65,101-120,133-140,162-165,170-173
+rust/src/realtime/session.rs
+  s_9adf3ae3c793b8::t_676413abb680d3 55-93,101,246,249,268-269,292,295,334,351-366
+rust/src/realtime/tests/conversation.rs
+  s_a5191254627b38::t_066e4ec9afc4f1 404-555
+rust/src/realtime/tests/peer.rs
+  s_a5191254627b38::t_465e4698133de2 35-41,63-67,71
+rust/src/realtime/tests/submission.rs
+  s_a5191254627b38::t_32b69cfa5221bb 35,38,231,309-335
+rust/src/realtime/tests/updates.rs
+  s_a5191254627b38::t_747c893c534a4b 190-240
+typescript/docs/realtime.md
+  s_a5191254627b38::t_f3efc06717e8e7 113-119,519-524
+typescript/src/realtime/conversation.ts
+  s_a5191254627b38::t_59cfbc792ce74a 10,62,67,246,248-254,292-295,315-326,329
+typescript/src/realtime/session.ts
+  s_a5191254627b38::t_0e58d3912f8e9d 20,29-37,96,823-826,870-873
+typescript/src/realtime/settings.ts
+  s_a5191254627b38::t_7f4b0f3725af92 1,110-133
+typescript/tests/conversation.test.mjs
+  s_a5191254627b38::t_405249133c03f9 210-213,224-226,234,390-395,397,400-403,936-1058,1061-1062,1066
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "21a1427b43b72c6aea8a52269857a8dedb624ab1",
+  "prompts": {},
+  "sessions": {
+    "s_9adf3ae3c793b8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16946-a9c4-7072-842a-6e48b3e671fa",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_a5191254627b38": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a169a3-9a20-78a3-a745-256e3aa289c8",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
