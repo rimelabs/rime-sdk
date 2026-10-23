@@ -44,6 +44,13 @@ impl Peer {
     }
     #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
     pub async fn with_paused_reads(pause: bool) -> Self {
+        Self::configured(pause, None).await
+    }
+    pub async fn with_initial_interruption(interrupt: bool) -> Self {
+        Self::configured(false, Some(interrupt)).await
+    }
+    #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
+    async fn configured(pause: bool, interrupt: Option<bool>) -> Self {
         super::schema::prepare();
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
@@ -79,10 +86,27 @@ impl Peer {
                 .clone()
                 .unwrap_or_else(|| "server-made".into());
             let mut initialized = false;
+            let mut initial_session = json!({"id":"session-1","voice":"test","request_id":used});
+            if let Some(interrupt) = interrupt {
+                initial_session["prism_effective_interrupt_response"] = json!(interrupt);
+                initial_session["prism_settings_revision"] = json!(1);
+            }
             loop {
                 tokio::select! {
                  v=incoming.recv()=>match v{Some(v)=>if ws.send(Message::Text(v.to_string().into())).await.is_err(){break},None=>break},
-                 message=ws.next(), if !(pause && initialized)=>{let Some(Ok(Message::Text(message)))=message else{break};let v:Value=serde_json::from_str(&message).unwrap();super::schema::validate_request(&v);if v["type"]=="session.update"{initialized=true;let mut session=json!({"id":"session-1","voice":"test","request_id":used});if let Some(labels)=v["session"].get("prism_response_metadata"){session["prism_response_metadata"]=labels.clone()}let _=update.try_send(v["session"].clone());let reply=if refusing.load(Ordering::Relaxed){json!({"type":"error","error":{"code":"invalid_session","scope":"event","owner":{"event_id":v["event_id"]}}})}else{json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":session})};if ws.send(Message::Text(reply.to_string().into())).await.is_err(){break}}else if out.send(v).await.is_err(){break}}
+                 message=ws.next(), if !(pause && initialized)=>{
+                    let Some(Ok(Message::Text(message)))=message else{break};
+                    let v:Value=serde_json::from_str(&message).unwrap();
+                    super::schema::validate_request(&v);
+                    if v["type"]=="session.update" && (!initialized || v["session"].get("prism_response_metadata").is_some()) {
+                        initialized=true;
+                        let mut session=initial_session.clone();
+                        if let Some(labels)=v["session"].get("prism_response_metadata"){session["prism_response_metadata"]=labels.clone()}
+                        let _=update.try_send(v["session"].clone());
+                        let reply=if refusing.load(Ordering::Relaxed){json!({"type":"error","error":{"code":"invalid_session","scope":"event","owner":{"event_id":v["event_id"]}}})}else{json!({"type":"session.updated","prism_request_event_id":v["event_id"],"session":session})};
+                        if ws.send(Message::Text(reply.to_string().into())).await.is_err(){break}
+                    }else if out.send(v).await.is_err(){break}
+                 }
                 }
             }
         });

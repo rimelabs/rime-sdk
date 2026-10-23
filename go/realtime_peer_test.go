@@ -19,15 +19,23 @@ type realtimePeer struct {
 	conn     chan *websocket.Conn
 	socket   *websocket.Conn
 	requests chan rtObject
-	// The upgrade's x-request-id, and each session.update's settings.
+	// The upgrade's x-request-id.
 	requestID string
-	updates   chan rtObject
-	// Refuse session updates with invalid_session.
+	// Settings from automatically acknowledged initialization and label updates.
+	// Other session updates go to requests for manual acknowledgment.
+	updates chan rtObject
+	// Refuse automatically handled updates with invalid_session.
 	refuse atomic.Bool
 }
 
 func newRealtimePeer(t *testing.T) *realtimePeer { return newRealtimePeerWithPause(t, false) }
 func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
+	return newRealtimePeerWithSession(t, pause, nil)
+}
+func newRealtimePeerWithSession(t *testing.T, pause bool, initial rtObject) *realtimePeer {
+	if initial == nil {
+		initial = rtObject{"id": "session-1", "voice": "test"}
+	}
 	if _, err := rtRequestSchemas(); err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +58,7 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 		p.conn <- c
 		send := func(v rtObject) error { b, _ := json.Marshal(v); return c.Write(r.Context(), websocket.MessageText, b) }
 		_ = send(rtObject{"type": "session.created", "session": rtObject{"id": "session-1"}})
+		initialized := false
 		for {
 			_, b, e := c.Read(r.Context())
 			if e != nil {
@@ -64,9 +73,15 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 				t.Errorf("request %v violates Prism schema: %v", v["type"], err)
 				return
 			}
-			if v["type"] == "session.update" {
-				settings := v["session"].(map[string]any)
-				session := rtObject{"id": "session-1", "voice": "test", "request_id": requestID}
+			settings, _ := v["session"].(map[string]any)
+			_, labelsUpdate := settings["prism_response_metadata"]
+			if v["type"] == "session.update" && (!initialized || labelsUpdate) {
+				initialized = true
+				session := rtObject{}
+				for key, value := range initial {
+					session[key] = value
+				}
+				session["request_id"] = requestID
 				if labels, ok := settings["prism_response_metadata"]; ok {
 					session["prism_response_metadata"] = labels
 				}

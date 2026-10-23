@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,135 @@ func rtText(s string, limit int) error {
 		return failure(ErrInput, "text must be valid, nonblank UTF-8 within the character limit")
 	}
 	return nil
+}
+
+// Inspect strings before encoding/json can replace invalid UTF-8. Remember
+// containers so cyclic input reaches json.Marshal's normal cycle rejection.
+func rtJSONStringsValid(value any) bool {
+	type reference struct {
+		typeOf  reflect.Type
+		pointer uintptr
+		length  int
+	}
+	seen := map[reference]bool{}
+	var valid func(reflect.Value) bool
+	valid = func(v reflect.Value) bool {
+		if !v.IsValid() {
+			return true
+		}
+		switch v.Kind() {
+		case reflect.String:
+			return utf8.ValidString(v.String())
+		case reflect.Interface:
+			return v.IsNil() || valid(v.Elem())
+		case reflect.Pointer, reflect.Map, reflect.Slice:
+			if v.IsNil() {
+				return true
+			}
+			key := reference{typeOf: v.Type(), pointer: uintptr(v.UnsafePointer())}
+			if v.Kind() == reflect.Slice {
+				key.length = v.Len()
+			}
+			if seen[key] {
+				return true
+			}
+			seen[key] = true
+		}
+		switch v.Kind() {
+		case reflect.Pointer:
+			return valid(v.Elem())
+		case reflect.Map:
+			for entries := v.MapRange(); entries.Next(); {
+				if !valid(entries.Key()) || !valid(entries.Value()) {
+					return false
+				}
+			}
+		case reflect.Array, reflect.Slice:
+			for i := 0; i < v.Len(); i++ {
+				if !valid(v.Index(i)) {
+					return false
+				}
+			}
+		case reflect.Struct:
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Type().Field(i)
+				if (field.PkgPath == "" || field.Anonymous) && strings.Split(field.Tag.Get("json"), ",")[0] != "-" && !valid(v.Field(i)) {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	return valid(reflect.ValueOf(value))
+}
+
+func rtTools(tools []ToolDefinition) ([]any, error) {
+	ts := []any{}
+	names := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		if rtText(tool.Name, 4000) != nil || tool.Parameters == nil {
+			return nil, failure(ErrInput, "tools require a name and parameters object")
+		}
+		if !utf8.ValidString(tool.Description) {
+			return nil, failure(ErrInput, "tool descriptions must be valid UTF-8")
+		}
+		if !rtJSONStringsValid(tool.Parameters) {
+			return nil, failure(ErrInput, "tool schema strings and keys must be valid UTF-8")
+		}
+		if _, exists := names[tool.Name]; exists {
+			return nil, failure(ErrInput, "tool names must be unique")
+		}
+		names[tool.Name] = struct{}{}
+		v := rtObject{"type": "function", "function": rtObject{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}}
+		if f := tool.PrismFiller; f != nil {
+			valid := false
+			switch f.Type {
+			case "none":
+				valid = f.Text == "" && f.Instructions == ""
+			case "text":
+				valid = f.Instructions == "" && rtText(f.Text, 500) == nil
+			case "auto":
+				valid = f.Text == "" && (f.Instructions == "" || rtText(f.Instructions, 500) == nil)
+			}
+			if !valid {
+				return nil, failure(ErrInput, "invalid tool filler")
+			}
+			v["prism_filler"] = f
+		}
+		ts = append(ts, v)
+	}
+	return ts, nil
+}
+
+func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
+	settings := rtObject{}
+	for k, v := range map[string]*string{"voice": o.Voice, "instructions": o.Instructions} {
+		if v != nil {
+			if !utf8.ValidString(*v) {
+				return nil, failure(ErrInput, "invalid "+k)
+			}
+			settings[k] = *v
+		}
+	}
+	if o.Tools != nil {
+		tools, err := rtTools(o.Tools)
+		if err != nil {
+			return nil, err
+		}
+		settings["tools"] = tools
+	}
+	if o.InterruptOnSpeech != nil {
+		settings["turn_detection"] = rtObject{"interrupt_response": *o.InterruptOnSpeech}
+	}
+	b, err := json.Marshal(settings)
+	if err != nil || !utf8.Valid(b) {
+		return nil, failure(ErrInput, "invalid tool schema")
+	}
+	result, err := rtJSONObject(b)
+	if err != nil {
+		return nil, failure(ErrInput, "invalid tool schema")
+	}
+	return result, nil
 }
 
 // rtLabelsValid refuses labels that JSON would silently alter.
@@ -78,36 +208,9 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		}
 		d["prism_end_of_turn_timeout_ms"] = n
 	}
-	ts := []any{}
-	names := make(map[string]struct{}, len(o.Tools))
-	for _, tool := range o.Tools {
-		if rtText(tool.Name, 4000) != nil || tool.Parameters == nil {
-			return "", nil, t, failure(ErrInput, "tools require a name and parameters object")
-		}
-		if !utf8.ValidString(tool.Description) {
-			return "", nil, t, failure(ErrInput, "tool descriptions must be valid UTF-8")
-		}
-		if _, exists := names[tool.Name]; exists {
-			return "", nil, t, failure(ErrInput, "tool names must be unique")
-		}
-		names[tool.Name] = struct{}{}
-		v := rtObject{"type": "function", "function": rtObject{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}}
-		if f := tool.PrismFiller; f != nil {
-			valid := false
-			switch f.Type {
-			case "none":
-				valid = f.Text == "" && f.Instructions == ""
-			case "text":
-				valid = f.Instructions == "" && rtText(f.Text, 500) == nil
-			case "auto":
-				valid = f.Text == "" && (f.Instructions == "" || rtText(f.Instructions, 500) == nil)
-			}
-			if !valid {
-				return "", nil, t, failure(ErrInput, "invalid tool filler")
-			}
-			v["prism_filler"] = f
-		}
-		ts = append(ts, v)
+	ts, e := rtTools(o.Tools)
+	if e != nil {
+		return "", nil, t, e
 	}
 	if id := o.RequestID; id != "" && (strings.TrimSpace(id) == "" || strings.IndexFunc(id, func(r rune) bool { return r < 0x20 || r > 0x7e }) >= 0) {
 		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
@@ -129,7 +232,7 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 	}
 	// Snapshot nested schemas before any network operation.
 	b, e := json.Marshal(settings)
-	if e != nil {
+	if e != nil || !utf8.Valid(b) {
 		return "", nil, t, failure(ErrInput, "invalid tool schema")
 	}
 	settings, e = rtJSONObject(b)

@@ -310,14 +310,15 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
-Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels,
+Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session updates,
 `RealtimeFault::retryable()`, and `ErrorKind::Realtime` are pending the next
 release. Use this checkout for those APIs.
 
 When you upgrade from alpha.9, `info()` returns an owned `SessionInfo` snapshot.
-Store it before borrowing its fields. Add `request_id` and `response_metadata`
-to existing `SessionInfo` literals, and use `..` in `ResponseStarted` patterns
-to ignore fields you do not need. Service faults now have
+Store it before borrowing its fields. Add `request_id`, `response_metadata`, and
+`settings_revision` to existing `SessionInfo` literals. Use `..` in
+`ResponseStarted` and `ResponseEnded` patterns to ignore fields you do not need.
+Service faults now have
 `ErrorKind::Realtime`; reserve `ErrorKind::Stream` handling for connection and
 protocol failures. Check a fault's `scope` to see whether the session ended.
 
@@ -363,6 +364,63 @@ nonblank and have at most 500 Unicode scalar values. Omit these settings to use
 server defaults. `session.info()` returns the effective settings that Prism
 published.
 
+### Update session settings
+
+```rust,no_run
+use rimelabs_sdk::{Error, RealtimeSession, RealtimeUpdateOptions, ToolDefinition};
+
+async fn switch_to_billing(
+    session: &RealtimeSession,
+    refund_tool: ToolDefinition,
+) -> Result<(), Error> {
+    let info = session.update(
+        RealtimeUpdateOptions::default()
+            .instructions("Handle billing. Use only the supplied tools.")
+            .tools(vec![refund_tool]),
+    ).await?;
+    println!("{:?}", info.settings_revision);
+    Ok(())
+}
+```
+
+`RealtimeUpdateOptions` has `instructions`, `tools`, `voice`, and
+`interrupt_on_speech` builders. Call only the builders for settings to change.
+
+Omitted fields keep their values. A supplied tool list replaces the complete
+list. Empty instructions clear the prompt; an empty tool list removes all tools.
+An empty voice selects the deployment default. Instructions and tools supplied
+together change in one request.
+
+The method waits for the matching `session.updated` acknowledgment and returns
+session information. The stored session information changes only after that
+acknowledgment. A rejected update leaves it unchanged and keeps the connection
+open. Cancellation after submission does not undo an accepted update.
+
+Updates do not wait for turn readiness or tool results. Each reply keeps the
+settings it began with. A reply prepared on an early turn-end guess can be
+announced after an update but still use the previous settings revision.
+Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
+
+`SessionInfo`, `RealtimeEvent::ResponseStarted`, and
+`RealtimeEvent::ResponseEnded` expose `settings_revision` as `Option<u64>`.
+It is `None` when the server does not publish it. Users do not need to manage it.
+Use each reply's revision to identify its settings.
+
+The conversation runner captures each reply's interruption setting when the
+reply is announced. It keeps that setting while a physical playback receipt is
+pending, even if generation has ended or the session settings change. The
+session retains at most 128 interruption policy changes; updates that keep the
+same policy do not consume history. A reply that refers to an evicted policy
+ends the session with `ErrorKind::ResourceLimit`, rather than guessing its policy.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and fails
+with a resource limit error for an ambiguous reply. A later acknowledgment with
+a revision establishes a new known setting. Replies without a revision use the
+current acknowledged setting.
+
+`session.info()` returns an owned `SessionInfo` snapshot. All cloned session
+handles read the latest acknowledged settings.
 `request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
 printable ASCII, or `connect` returns an input error. Prism accepts IDs up to 128
 characters, but a server or gateway can replace them. `info().request_id`
@@ -371,12 +429,12 @@ Include it when you report a problem; an event's or fault's `request_id` names
 the SDK request that caused it instead. `response_metadata` labels every reply, such as
 `{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512,
 no key starting with `prism_`. Prism refuses labels that break these rules with a
-realtime fault whose code is `invalid_session`. Settings apply once, except these
-labels, which `set_response_metadata` replaces. `ResponseStarted`'s `metadata`
+realtime fault whose code is `invalid_session`. `set_response_metadata` replaces these labels. `ResponseStarted`'s `metadata`
 carries them, and its `input_item_ids` names the user items a reply answers.
 
 | Session method | Behavior |
 | --- | --- |
+| `update` | Apply supplied settings and return acknowledged `SessionInfo`. |
 | `send_text` | Wait for admission, add a typed turn, and return its response reference. |
 | `add_message` | Add user or assistant history without a reply. |
 | `request_reply` | Request a proactive reply, with optional instructions or a recorded tool call. |
@@ -404,7 +462,7 @@ unknown outcome closes the session. The SDK does not reconnect or replay it.
 The SDK retries turn admission only after an explicit busy refusal and a new
 readiness event.
 
-Voice and session instructions must be nonblank when supplied. The SDK imposes
+Voice and session instructions must be nonblank at connection setup. Updates accept empty strings. The SDK imposes
 no length cap on these settings, consistent with the shared Prism schema and
 the Python and TypeScript SDKs. This does not guarantee that the service accepts
 every value.

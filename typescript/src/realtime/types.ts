@@ -81,6 +81,13 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
    * refuses keys starting with `prism_`. Omitted or `null` sets none. */
   readonly responseMetadata?: Labels | null;
 }
+/** Omitted fields keep their values. Empty instructions or tools clear them. */
+export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
+  readonly instructions?: string;
+  readonly tools?: readonly ToolDefinition[];
+  readonly voice?: string;
+  readonly interruptOnSpeech?: boolean;
+}
 export interface ReplyOptions extends RealtimeOperationOptions {
   readonly instruction?: string | null;
   readonly toolCall?: ToolCallRef | null;
@@ -107,6 +114,9 @@ export interface OutputRef {
   readonly contentIndex: number;
 }
 export interface SessionInfo {
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
+  readonly settingsRevision?: number | null;
   readonly sessionId: string;
   /** The `x-request-id` Prism's logs name this session by. Null when the
    * server does not publish it. */
@@ -213,6 +223,9 @@ export interface TranscriptFailed<Fault extends RealtimeFault = RealtimeFault> {
   readonly error: Fault;
 }
 export interface ResponseStarted {
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
+  readonly settingsRevision?: number | null;
   readonly kind: "response.started";
   readonly response: ResponseRef;
   readonly cause: "speech" | "text" | "proactive" | "tools" | "unknown";
@@ -263,6 +276,9 @@ export interface ResponseAbandoned {
   readonly response: ResponseRef;
 }
 export interface ResponseEnded {
+  /** Settings revision published by the server; null when unavailable.
+   * Optional on caller-created values for compatibility. */
+  readonly settingsRevision?: number | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;
   readonly status: "completed" | "cancelled" | "failed" | "unknown";

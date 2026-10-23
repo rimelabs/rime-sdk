@@ -207,7 +207,10 @@ async function until(condition) {
     await sleep(1);
   }
 }
-async function setup(t, { enabled = true, callback } = {}) {
+async function setup(
+  t,
+  { enabled = true, callback, revision, beforeRun } = {},
+) {
   const peer = await new Peer().start();
   peer.autoInitialize = false;
   peer.onRequest = (request) => {
@@ -218,6 +221,9 @@ async function setup(t, { enabled = true, callback } = {}) {
           id: "session-1",
           voice: "test",
           prism_effective_interrupt_response: enabled,
+          ...(revision === undefined
+            ? {}
+            : { prism_settings_revision: revision }),
         },
       });
     } else if (peer.waiters.length) peer.waiters.shift()(request);
@@ -225,6 +231,7 @@ async function setup(t, { enabled = true, callback } = {}) {
   };
   const client = new Rime({ apiKey: "test" });
   const session = await client.realtime.connect({ endpoint: peer.endpoint });
+  await beforeRun?.(session, peer);
   const source = new Source(),
     playback = new Playback(),
     controller = new AbortController();
@@ -380,12 +387,20 @@ for (const stage of ["before_message", "before_audio", "draining"]) {
   );
 }
 
-for (const enabled of [true, false]) {
+for (const [enabled, revision] of [
+  [true, undefined],
+  [false, undefined],
+  [true, 1],
+  [false, 1],
+]) {
   test(
-    `effective server interruption setting ${enabled}; hints do not interrupt`,
+    `effective server interruption setting ${enabled}, revision ${revision}; hints do not interrupt`,
     { timeout: 4000 },
     async (t) => {
-      const { session, peer, playback, events } = await setup(t, { enabled });
+      const { session, peer, playback, events } = await setup(t, {
+        enabled,
+        revision,
+      });
       assert.equal(session.info.interruptOnSpeech, enabled);
       begin(peer);
       peer.emit("prism.input_audio_buffer.speech_hint", { audio_start_ms: 0 });
@@ -917,3 +932,186 @@ test(
     assert.deepEqual(reports(peer), []);
   },
 );
+
+for (const ended of [false, true]) {
+  for (const [initial, updated, late, replyRevision] of [
+    [true, false, false, 1],
+    [false, true, false, 1],
+    [true, false, true, 1],
+    [false, true, true, 1],
+    [true, false, true, 2],
+    [false, true, true, 2],
+    [false, false, true, 1],
+  ]) {
+    test(`reply policy: ${initial} -> ${updated}, late=${late}, revision=${replyRevision}, ended=${ended}`, async (t) => {
+      const { session, peer, playback, events } = await setup(t, {
+        enabled: initial,
+        revision: 1,
+      });
+      const beginReply = () => {
+        peer.emit("response.created", {
+          response: { id: "first", prism_settings_revision: replyRevision },
+        });
+        peer.message("first", "first");
+        audio(peer);
+      };
+      if (!late) {
+        beginReply();
+        await until(() => playback.outputs.has("first"));
+      }
+      peer.onRequest = null;
+      const update = session.update({ interruptOnSpeech: updated });
+      const q = await peer.next("session.update");
+      peer.emit("session.updated", {
+        prism_request_event_id: q.event_id,
+        session: {
+          id: "session-1",
+          voice: "test",
+          prism_effective_interrupt_response: updated,
+          prism_settings_revision: 2,
+        },
+      });
+      await update;
+      if (late) {
+        beginReply();
+        await until(() => playback.outputs.has("first"));
+      }
+      if (ended) {
+        // The device still plays after the server's estimate expires.
+        peer.ended("first");
+        await until(() => events.some((e) => e.kind === "response.ended"));
+      }
+      speech(peer);
+      await until(() => events.some((e) => e.kind === "speech.started"));
+      const expected = replyRevision === 1 ? initial : updated;
+      const output = playback.outputs.get("first");
+      assert.equal(output.interrupted, expected);
+      if (!ended) peer.ended("first");
+      output.done.resolve(17);
+      const report = await peer.next(
+        expected ? "conversation.item.truncate" : "prism.playback.drained",
+      );
+      if (expected) ack(peer, report);
+    });
+  }
+}
+
+for (const change of [false, true]) {
+  test(`interruption history retains policy changes only: change=${change}`, async (t) => {
+    const peer = await new Peer().start();
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await peer.close();
+    });
+    const session = await client.realtime.connect({ endpoint: peer.endpoint });
+    peer.autoInitialize = false;
+    for (let revision = 1; revision <= 130; revision++) {
+      const enabled = change ? Boolean(revision % 2) : false;
+      const update = session.update({ interruptOnSpeech: enabled });
+      const q = await peer.next("session.update");
+      peer.emit("session.updated", {
+        prism_request_event_id: q.event_id,
+        session: {
+          id: "session-1",
+          voice: "test",
+          prism_effective_interrupt_response: enabled,
+          prism_settings_revision: revision,
+        },
+      });
+      await update;
+    }
+    peer.emit("response.created", {
+      response: { id: "old-guess", prism_settings_revision: 1 },
+    });
+    const events = session.events;
+    if (change) await assert.rejects(events.next(), RimeResourceLimitError);
+    else assert.equal((await events.next()).value.payload.settingsRevision, 1);
+    await events.return();
+  });
+}
+
+test("queued reply retains its captured policy after revision history eviction", async (t) => {
+  const { session, peer, playback, events } = await setup(t, {
+    revision: 1,
+    async beforeRun(session, peer) {
+      peer.onRequest = null;
+      peer.emit("response.created", {
+        response: { id: "first", prism_settings_revision: 1 },
+      });
+      for (let revision = 2; revision <= 130; revision++) {
+        const enabled = Boolean(revision % 2);
+        const update = session.update({ interruptOnSpeech: enabled });
+        const q = await peer.next("session.update");
+        peer.emit("session.updated", {
+          prism_request_event_id: q.event_id,
+          session: {
+            id: "session-1",
+            voice: "test",
+            prism_effective_interrupt_response: enabled,
+            prism_settings_revision: revision,
+          },
+        });
+        await update;
+      }
+      peer.message("first", "first");
+      audio(peer);
+    },
+  });
+  assert.equal(session.info.interruptOnSpeech, false);
+  await until(() => playback.outputs.has("first"));
+  speech(peer);
+  await until(() => events.some((e) => e.kind === "speech.started"));
+  assert.equal(playback.outputs.get("first").interrupted, true);
+  peer.ended("first");
+  playback.outputs.get("first").done.resolve(17);
+  ack(peer, await peer.next("conversation.item.truncate"));
+});
+
+for (const newer of [false, true]) {
+  test(`speech preserves a pending finished report; newer reply=${newer}`, async (t) => {
+    const { session, peer, playback, events } = await setup(t);
+    const started = deferred();
+    const release = deferred();
+    const report = session.reportPlayback.bind(session);
+    t.mock.method(session, "reportPlayback", async (value, options) => {
+      if (value.kind === "finished" && value.response.responseId === "first") {
+        started.resolve();
+        await wait(release.promise, options.signal);
+      }
+      return report(value, options);
+    });
+    begin(peer);
+    peer.ended("first");
+    await until(() => playback.outputs.get("first")?.ended);
+    playback.outputs.get("first").done.resolve(15);
+    await started.promise;
+    if (newer) {
+      begin(peer, "second");
+      await until(() => playback.outputs.has("second"));
+    }
+    speech(peer);
+    await until(() => events.some((e) => e.kind === "speech.started"));
+    assert.equal(playback.outputs.get("first").interrupted, false);
+    assert.deepEqual(
+      playback.batches.map((batch) => batch.map((ref) => ref.itemId)),
+      newer ? [["second"]] : [],
+    );
+    if (newer) {
+      playback.outputs.get("second").done.resolve(4);
+      const cut = await peer.next("conversation.item.truncate");
+      assert.equal(cut.item_id, "second");
+      ack(peer, cut);
+    }
+    release.resolve();
+    const finished = await peer.next("prism.playback.drained");
+    assert.equal(finished.response_id, "first");
+    assert.equal(finished.played_ms, 15);
+    assert.equal(
+      reports(peer).filter(
+        (r) => r.type === "conversation.item.truncate" && r.item_id === "first",
+      ).length,
+      0,
+    );
+  });
+}

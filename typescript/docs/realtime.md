@@ -110,10 +110,13 @@ The runner is the only event reader. Do not consume `session.events` at the same
 time, call `reportPlayback` independently, or send a second audio source. Other
 session methods remain available for manual tools and application actions.
 
-On confirmed `speech.started`, the runner uses the effective
-`session.info.interruptOnSpeech` setting. It stops affected output, waits for the
-interrupted receipt, and reports the measured position. It ignores late audio
-for that response. A `speech.hint` alone does not stop playback. A server
+On confirmed `speech.started`, the runner uses the interruption setting of the
+latest reply that is still generating or has unmeasured physical playback. It
+resolves that setting from the reply's revision when the session receives the
+reply. Updates and late event consumption cannot change it. If interruption is
+enabled, the runner stops affected output, waits for the interrupted receipt,
+and reports the measured position. It ignores late audio for that response.
+A `speech.hint` alone does not stop playback. A server
 `truncate_not_current` refusal is forwarded as an event; it does not stop a newer
 response. Finished reports wait for generation completion and every output
 receipt, including outstanding playback from earlier responses. Prism treats
@@ -152,9 +155,9 @@ tool execution outside the runner.
 ## Connect
 
 Use `await client.realtime.connect()` with `RIME_API_KEY` set. It opens a WebSocket,
-initializes one conversation, and returns a `RealtimeSession`. Settings apply
-once, except the reply labels, which `setResponseMetadata` replaces. Open a new
-session to change the others.
+initializes one conversation, and returns a `RealtimeSession`. Use
+`session.update` to change instructions, tools, voice, or interruption.
+Use `session.setResponseMetadata` to replace reply labels.
 
 | Option | Required? | Default and behavior |
 | --- | --- | --- |
@@ -221,12 +224,54 @@ server reported in its initialization acknowledgment. A missing field is
 default. An unrecognized server eagerness becomes `"unknown"`.
 `interruptOnSpeech` remains a separate connection option.
 
+## Update session settings
+
+This method is available in the repository source and requires an SDK release
+that includes session updates.
+
+```ts
+const info = await session.update({
+  instructions: "Handle billing. Use only the supplied tools.",
+  tools: [refundTool], // An existing ToolDefinition.
+});
+console.log(info.settingsRevision);
+
+// For a transfer triggered by a tool call:
+await session.submitToolResult(call, "Transferred to billing.");
+await session.continueReply(parent);
+```
+
+`RealtimeUpdateOptions` has optional `instructions`, `tools`, `voice`,
+`interruptOnSpeech`, and `signal` fields. Omitted fields and `undefined` keep
+their values. `null` is not accepted.
+
+Omitted fields keep their values. A supplied tool list replaces the complete
+list. Empty instructions clear the prompt; an empty tool list removes all tools.
+An empty voice selects the deployment default. Instructions and tools supplied
+together change in one request.
+
+The method waits for the matching `session.updated` acknowledgment and returns
+session information. The stored session information changes only after that
+acknowledgment. A rejected update leaves it unchanged and keeps the connection
+open. Cancellation after submission does not undo an accepted update.
+
+Updates do not wait for turn readiness or tool results. Each reply keeps the
+settings it began with. A reply prepared on an early turn-end guess can be
+announced after an update but still use the previous settings revision.
+Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
+
+`SessionInfo`, `ResponseStarted`, and `ResponseEnded` expose `settingsRevision`.
+It is `null` when the server does not publish it. The field is optional on
+caller-created values. Users do not need to manage it. Use each reply's revision
+to identify its settings, rather than the latest session revision.
+
 ## Choose an operation
 
 Every method returns a promise. Arguments without `?` are required.
 
 | Method | Result and behavior |
 | --- | --- |
+| `update(options?)` | Changes supplied settings without reconnecting; returns `SessionInfo` after acknowledgment. |
 | `sendText(text, options?)` | Starts a typed user turn after readiness; returns `ResponseRef` at response creation. |
 | `sendAudio(chunk, options?)` | Sends microphone audio with transport backpressure. |
 | `requestReply(options?)` | Requests a reply without new user input; returns `ResponseRef`. Options can include `instruction` and `toolCall`. |
@@ -240,8 +285,8 @@ Every method returns a promise. Arguments without `?` are required.
 | `close()` | Closes the session and releases its resources. |
 
 Operation options accept `signal?: AbortSignal`. `requestReply` accepts its
-instruction, tool call, and signal in one object. Methods other than `sendText`,
-`requestReply`, `addMessage`, and `continueReply` return `Promise<void>`.
+instruction, tool call, and signal in one object. Methods other than `update`,
+`sendText`, `requestReply`, `addMessage`, and `continueReply` return `Promise<void>`.
 
 Text must be nonblank and contain at most 4,000 Unicode characters. History
 roles are `"user"` and `"assistant"`. A reply instruction applies to one response;
@@ -311,7 +356,7 @@ also checks TypeScript callers.
 
 Filler applies when the reply has said nothing before calling a tool. If a reply
 calls several tools, the first call's tool controls the filler. `none` suppresses
-filler only; it does not silence other speech. Settings are fixed for the session.
+filler only; it does not silence other speech. Use `session.update({ tools })` to replace tools and their filler settings.
 
 Execute a tool once for each `tool.call` event. Validate its parsed `arguments`,
 then submit a string result with `submitToolResult(payload.call, output)`.
@@ -474,7 +519,19 @@ unknown outcome.
 
 Keep up with the event stream. The queue holds 256 events; incoming messages
 are limited to 1 MiB. A slow consumer ends the session. There is no automatic
-reconnect, history replay, or live configuration update.
+reconnect or history replay.
 
 Local peer tests cover the SDK protocol handling. Validate the gateway handshake
 and endpoint behavior for the deployment you use.
+
+The SDK retains the latest 128 interruption policy changes. Instructions or tools
+updates that keep the same interruption policy do not consume this history.
+If an unannounced reply refers to an older evicted policy, the session fails
+with a resource limit error instead of guessing its policy. A reply already
+received keeps its captured policy even after later settings updates.
+
+If an interruption setting changes without a published revision, later reply
+revisions can be ambiguous. The SDK preserves earlier known settings and raises
+a resource limit error for an ambiguous reply instead of guessing. A later
+acknowledgment with a revision establishes a new known setting. Replies without
+a revision use the current acknowledged setting.

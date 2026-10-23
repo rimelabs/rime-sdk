@@ -62,10 +62,36 @@ type rtPlayOutput struct {
 	played                float64
 }
 type rtPlayReply struct {
+	interruptOnSpeech             bool
 	ref                           ResponseRef
 	outputs                       []*rtPlayOutput
 	ended, interrupted, reporting bool
 	stopReport                    context.CancelFunc
+}
+
+// A finished report can remain pending after physical playback has drained.
+func (reply *rtPlayReply) pendingPlayback() bool {
+	if reply.interrupted {
+		return false
+	}
+	if !reply.ended {
+		return true
+	}
+	for _, output := range reply.outputs {
+		if !output.measured {
+			return true
+		}
+	}
+	return false
+}
+
+func rtSpeechInterrupts(replies []*rtPlayReply) bool {
+	for i := len(replies) - 1; i >= 0; i-- {
+		if replies[i].pendingPlayback() {
+			return replies[i].interruptOnSpeech
+		}
+	}
+	return false
 }
 
 // Run ends at source EOF, session closure, failure, or cancellation. It waits for
@@ -339,8 +365,12 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					delete(blocked, history[0])
 					history = history[1:]
 				}
+				interruptOnSpeech := r.Session.Info().InterruptOnSpeech
+				if p.interruptOnSpeech != nil {
+					interruptOnSpeech = *p.interruptOnSpeech
+				}
 				interrupted := wasInterrupted(id)
-				replies = append(replies, &rtPlayReply{ref: p.Response, interrupted: interrupted})
+				replies = append(replies, &rtPlayReply{ref: p.Response, interrupted: interrupted, interruptOnSpeech: interruptOnSpeech})
 				if interrupted {
 					blocked[id] = true
 					if e := start(func() error { return r.Session.Cancel(running, p.Response) }); e != nil {
@@ -348,8 +378,14 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 				}
 			case SpeechStarted:
-				if r.Session.Info().InterruptOnSpeech {
-					if e := interrupt(replies); e != nil {
+				if rtSpeechInterrupts(replies) {
+					var eligible []*rtPlayReply
+					for _, reply := range replies {
+						if reply.pendingPlayback() {
+							eligible = append(eligible, reply)
+						}
+					}
+					if e := interrupt(eligible); e != nil {
 						return e
 					}
 				}

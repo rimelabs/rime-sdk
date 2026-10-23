@@ -176,7 +176,15 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 			}
 		}
 	}
+	s.SettingsRevision = decoder.revision(o)
 	return s
+}
+func (decoder *rtDecoder) revision(o rtObject) *uint64 {
+	if v, ok := o["prism_settings_revision"]; ok {
+		n := decoder.integer(v)
+		return &n
+	}
+	return nil
 }
 func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 	o := decoder.object(v)
@@ -326,7 +334,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 			} else if input != "" {
 				inputs = append(inputs, input)
 			}
-			w.payload = ResponseStarted{r, cause, parent, input, rtLabels(m), inputs}
+			w.payload = ResponseStarted{Response: r, Cause: cause, Parent: parent, InputItemID: input, Metadata: rtLabels(m), InputItemIDs: inputs, SettingsRevision: decoder.revision(d)}
 		} else {
 			w.kind = "response.ended"
 			details := rtObject{}
@@ -334,7 +342,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 				details = decoder.object(d["status_details"])
 			}
 			w.token = decoder.optional(m["prism_drain_token"])
-			w.payload = ResponseEnded{r, rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), decoder.optional(details["reason"])}
+			w.payload = ResponseEnded{Response: r, Status: rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), Reason: decoder.optional(details["reason"]), SettingsRevision: decoder.revision(d)}
 		}
 	case "response.function_call_arguments.done":
 		w.kind = "tool.call"

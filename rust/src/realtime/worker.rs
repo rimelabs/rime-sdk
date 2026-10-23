@@ -138,7 +138,14 @@ impl Worker {
                 request_id,
                 payload,
             })
-            .map_err(|_| {
+            .map_err(|error| {
+                if let RealtimeEvent::ResponseStarted { response, .. } = error.into_inner().payload
+                {
+                    self.response_policies
+                        .lock()
+                        .expect("response policy mutex")
+                        .remove(&response);
+                }
                 Error::new(
                     ErrorKind::ResourceLimit,
                     "realtime event consumer is too slow",

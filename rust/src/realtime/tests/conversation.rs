@@ -140,13 +140,18 @@ async fn interruption_rejects_late_audio_and_cancels_dependent_reply() {
     };
     let stop = CancellationToken::new();
     let task = tokio::spawn(
-        ConversationRunner::new(s, Source(Arc::new(AtomicBool::new(false))), playback)
-            .run(stop.clone()),
+        ConversationRunner::new(
+            s.clone(),
+            Source(Arc::new(AtomicBool::new(false))),
+            playback,
+        )
+        .run(stop.clone()),
     );
     p.send(json!({"type":"response.created","response":{"id":"r1"}}))
         .await;
     emit(&p, "r1", "i1").await;
     let output = outputs.recv().await.unwrap();
+    set_interruption(&mut p, &s, false, 2).await;
     p.send(
         json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
     )
@@ -387,4 +392,184 @@ async fn dropped_run_future_keeps_cleanup_alive() {
             .is_realtime_closed());
         client.close().await;
     }
+}
+
+async fn set_interruption(
+    p: &mut Peer,
+    session: &crate::RealtimeSession,
+    value: bool,
+    revision: u64,
+) {
+    let clone = session.clone();
+    let update = tokio::spawn(async move {
+        clone
+            .update(crate::RealtimeUpdateOptions::default().interrupt_on_speech(value))
+            .await
+    });
+    let q = p.next("session.update").await;
+    p.send(json!({"type":"session.updated", "prism_request_event_id":q["event_id"],
+        "session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":value,"prism_settings_revision":revision}})).await;
+    update.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn delayed_playback_uses_each_reply_policy_across_settings_changes() {
+    for (initial, updated, early_guess) in [
+        (false, None, false),
+        (true, Some(false), false),
+        (false, Some(true), false),
+        (true, Some(false), true),
+        (false, Some(true), true),
+    ] {
+        let mut p = Peer::with_initial_interruption(initial).await;
+        let (client, session) = p.setup().await;
+        if early_guess {
+            set_interruption(&mut p, &session, updated.unwrap(), 2).await;
+        }
+        let (opened, mut outputs) = mpsc::channel(4);
+        let playback = Playback {
+            opened,
+            outputs: Arc::new(Mutex::new(HashMap::new())),
+            stopped: Arc::new(AtomicBool::new(false)),
+        };
+        let (seen, mut speech_seen) = mpsc::channel(1);
+        let stop = CancellationToken::new();
+        let task = tokio::spawn(
+            ConversationRunner::new(
+                session.clone(),
+                Source(Arc::new(AtomicBool::new(false))),
+                playback,
+            )
+            .on_event(move |event| {
+                if matches!(&event.payload, crate::RealtimeEvent::SpeechStarted { .. }) {
+                    seen.try_send(()).unwrap();
+                }
+                Ok(())
+            })
+            .run(stop.clone()),
+        );
+        p.send(json!({"type":"response.created","response":{"id":"reply-policy","prism_settings_revision":1}})).await;
+        emit(&p, "reply-policy", "policy-output").await;
+        let output = outputs.recv().await.unwrap();
+        p.ended("reply-policy").await;
+        if !early_guess {
+            if let Some(updated) = updated {
+                set_interruption(&mut p, &session, updated, 2).await;
+            }
+        }
+        // Finished generation and a server speech event do not prove that a
+        // delayed physical device has finished playing the false-policy reply.
+        p.send(json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0})).await;
+        tokio::time::timeout(Duration::from_secs(3), speech_seen.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            output.done.is_cancelled(),
+            initial,
+            "initial={initial} updated={updated:?} early_guess={early_guess}"
+        );
+        if initial {
+            let q = p.next("conversation.item.truncate").await;
+            assert_eq!(q["item_id"], "policy-output");
+            p.send(json!({"type":"conversation.item.truncated","item_id":"policy-output","content_index":0})).await;
+        } else {
+            p.no_request().await;
+            output.finish(19.0);
+            assert_eq!(p.next("prism.playback.drained").await["played_ms"], 19.0);
+        }
+        stop.cancel();
+        let _ = tokio::time::timeout(Duration::from_secs(3), task)
+            .await
+            .unwrap()
+            .unwrap();
+        client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn queued_response_keeps_its_captured_policy_after_history_eviction() {
+    let mut p = Peer::with_initial_interruption(true).await;
+    let (client, session) = p.setup().await;
+    p.send(json!({"type":"response.created","response":{"id":"queued-policy","prism_settings_revision":1}})).await;
+    emit(&p, "queued-policy", "queued-output").await;
+    p.ended("queued-policy").await;
+    for revision in 2..=130 {
+        set_interruption(&mut p, &session, revision % 2 != 0, revision).await;
+    }
+    assert!(!session.info().interrupt_on_speech);
+    let (opened, mut outputs) = mpsc::channel(4);
+    let playback = Playback {
+        opened,
+        outputs: Arc::new(Mutex::new(HashMap::new())),
+        stopped: Arc::new(AtomicBool::new(false)),
+    };
+    let (seen, mut speech_seen) = mpsc::channel(1);
+    let stop = CancellationToken::new();
+    let task = tokio::spawn(
+        ConversationRunner::new(
+            session.clone(),
+            Source(Arc::new(AtomicBool::new(false))),
+            playback,
+        )
+        .on_event(move |event| {
+            if matches!(&event.payload, crate::RealtimeEvent::SpeechStarted { .. }) {
+                seen.try_send(()).unwrap();
+            }
+            Ok(())
+        })
+        .run(stop.clone()),
+    );
+    let output = tokio::time::timeout(Duration::from_secs(3), outputs.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    p.send(
+        json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
+    )
+    .await;
+    tokio::time::timeout(Duration::from_secs(3), speech_seen.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(output.done.is_cancelled());
+    p.next("conversation.item.truncate").await;
+    p.send(
+        json!({"type":"conversation.item.truncated","item_id":"queued-output","content_index":0}),
+    )
+    .await;
+    stop.cancel();
+    let _ = tokio::time::timeout(Duration::from_secs(3), task)
+        .await
+        .unwrap()
+        .unwrap();
+    client.close().await;
+}
+
+#[tokio::test]
+async fn speech_preserves_measured_playback_with_pending_finished_report() {
+    let p = Peer::with_initial_interruption(true).await;
+    let (client, session) = p.setup().await;
+    let (opened, mut outputs) = mpsc::channel(4);
+    let mut playback = Playback {
+        opened,
+        outputs: Arc::new(Mutex::new(HashMap::new())),
+        stopped: Arc::new(AtomicBool::new(false)),
+    };
+    for newer_reply in [false, true] {
+        crate::realtime::conversation::assert_measured_playback_is_not_interrupted(
+            &session,
+            &mut playback,
+            newer_reply,
+        );
+        let drained = outputs.try_recv().unwrap();
+        assert!(
+            !drained.done.is_cancelled(),
+            "already measured output was interrupted"
+        );
+        if newer_reply {
+            assert!(outputs.try_recv().unwrap().done.is_cancelled());
+        }
+    }
+    client.close().await;
 }

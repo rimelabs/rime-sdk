@@ -32,8 +32,10 @@ fn worker() -> (
             converter: None,
             timeouts: RealtimeTimeouts::default(),
             interrupt: true,
+            interrupt_policies: InterruptPolicies::default(),
             initialized: None,
-            info: None,
+            info: Arc::new(Mutex::new(None)),
+            response_policies: Arc::new(Mutex::new(HashMap::new())),
         },
         writes,
         jobs,
@@ -201,7 +203,7 @@ impl crate::realtime::ConversationPlayback for SilentPlayback {
 }
 
 #[tokio::test]
-async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
+async fn runner_speech_preserves_queued_drain_and_active_write() {
     use crate::realtime::ConversationRunner;
     for submitted in [false, true] {
         let (mut worker, writes, mut jobs, receiver) = worker();
@@ -214,6 +216,8 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
             commands,
             events: Arc::new(Mutex::new(Some(RealtimeEvents {
                 receiver,
+                response_policies: worker.response_policies.clone(),
+                previous_response: None,
                 terminal: terminal.clone(),
                 ended: false,
             }))),
@@ -224,9 +228,9 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
                 )
                 .unwrap()
                 .unwrap()
-                .info
-                .unwrap(),
+                .info,
             )),
+            response_policies: worker.response_policies.clone(),
             budgets: RealtimeTimeouts::default(),
             done: done.clone(),
             wake: Arc::new(Notify::new()),
@@ -280,19 +284,35 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
         tokio::time::timeout(Duration::from_secs(1), interrupted.cancelled())
             .await
             .unwrap();
-        tokio::time::timeout(Duration::from_secs(1), cancelled.cancelled())
-            .await
-            .expect("finished report remains active after interruption");
+        assert!(
+            !cancelled.is_cancelled(),
+            "speech must preserve the finished report for fully drained playback"
+        );
         if let Some((writer, release)) = active {
             release.cancel();
             let result = writer.await.unwrap();
             assert!(!result.skipped, "a submitted control write must complete");
             worker.written(result).unwrap();
+        } else {
+            worker.advance(&writes).unwrap();
+            let job = tokio::time::timeout(Duration::from_secs(1), jobs.recv())
+                .await
+                .unwrap()
+                .expect("the queued finished report must reach the writer");
+            assert_eq!(job.frames.len(), 1);
+            let frame: Value = serde_json::from_str(&job.frames[0]).unwrap();
+            assert_eq!(frame["type"], "prism.playback.drained");
+            let (mut sink, mut sent, release) = gate();
+            release.cancel();
+            let result = write_frames(&mut sink, job, Duration::from_secs(1)).await;
+            assert!(!result.skipped, "the queued finished report must be sent");
+            assert!(sent.try_recv().is_ok());
+            worker.written(result).unwrap();
         }
         worker.advance(&writes).unwrap();
         assert!(
             jobs.try_recv().is_err(),
-            "interruption must prevent queued drain submission"
+            "speech must not create an interruption report for drained playback"
         );
         done.cancel();
         stop.cancel();
@@ -303,4 +323,64 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::Cancelled);
     }
+}
+
+#[tokio::test]
+async fn update_acknowledgment_captures_policy_before_write_confirmation() {
+    let (mut worker, writes, mut jobs, _events) = worker();
+    worker.interrupt_policies.record(Some(1), true);
+    let mut update = Command::new(
+        Kind::Update,
+        json!({"session":{"turn_detection":{"interrupt_response":false}}}),
+    );
+    update.deadline = Instant::now() + Duration::from_secs(1);
+    update.admission_deadline = update.deadline;
+    worker.pending.push(update);
+    worker.advance(&writes).unwrap();
+    let writing = jobs.recv().await.unwrap();
+    worker.dispatch(protocol::decode(&json!({"type":"session.updated","prism_request_event_id":format!("evt_{}",writing.id),
+        "session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":false,"prism_settings_revision":2}}).to_string(),"session-1").unwrap().unwrap()).unwrap();
+    assert!(!worker.pending[0].written);
+    worker.dispatch(protocol::decode(&json!({"type":"response.created","response":{"id":"before-write-confirmation","prism_settings_revision":2}}).to_string(),"session-1").unwrap().unwrap()).unwrap();
+    let reference = ResponseRef {
+        session_id: "session-1".into(),
+        response_id: "before-write-confirmation".into(),
+    };
+    assert_eq!(
+        worker.response_policies.lock().unwrap().get(&reference),
+        Some(&false)
+    );
+}
+
+#[tokio::test]
+async fn dropping_event_stream_releases_queued_and_failed_publish_policies() {
+    let (mut worker, _writes, _jobs, receiver) = worker();
+    let events = RealtimeEvents {
+        receiver,
+        response_policies: worker.response_policies.clone(),
+        previous_response: None,
+        terminal: Arc::new(Mutex::new(None)),
+        ended: false,
+    };
+    let first = protocol::decode(
+        r#"{"type":"response.created","response":{"id":"queued-first"}}"#,
+        "session-1",
+    )
+    .unwrap()
+    .unwrap();
+    worker.dispatch(first).unwrap();
+    assert_eq!(worker.response_policies.lock().unwrap().len(), 1);
+    drop(events);
+    assert!(worker.response_policies.lock().unwrap().is_empty());
+    let next = protocol::decode(
+        r#"{"type":"response.created","response":{"id":"after-drop"}}"#,
+        "session-1",
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        worker.dispatch(next).unwrap_err().kind(),
+        ErrorKind::ResourceLimit
+    );
+    assert!(worker.response_policies.lock().unwrap().is_empty());
 }

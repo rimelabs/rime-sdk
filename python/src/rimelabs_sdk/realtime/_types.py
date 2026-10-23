@@ -170,6 +170,9 @@ class OutputRef:
 
 @dataclass(frozen=True, kw_only=True)
 class SessionInfo:
+    """Current acknowledged settings. The revision is None when not published."""
+
+    settings_revision: int | None = None
     session_id: str
     model: Literal["prism"]
     voice: str
@@ -277,6 +280,9 @@ class TranscriptFailed:
 
 @dataclass(frozen=True, kw_only=True)
 class ResponseStarted:
+    """A reply started. Its settings revision is None when not published."""
+
+    settings_revision: int | None = None
     response: ResponseRef
     cause: Literal["speech", "text", "proactive", "tools", "unknown"]
     parent: ResponseRef | None = None
@@ -345,6 +351,9 @@ class ResponseAbandoned:
 
 @dataclass(frozen=True, kw_only=True)
 class ResponseEnded:
+    """A reply ended. Its settings revision is None when not published."""
+
+    settings_revision: int | None = None
     response: ResponseRef
     status: Literal["completed", "cancelled", "failed", "unknown"]
     reason: str | None = None
