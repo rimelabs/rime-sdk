@@ -165,3 +165,30 @@ jobs:
       - run: cargo test --locked
       - run: cargo doc --locked --no-deps
       - run: cargo package --locked
+  ci-passed:
+    name: CI passed
+    if: ${{ always() }}
+    needs: [changes, python, typescript, go, rust]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify required job results
+        shell: bash
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          if [[ "$(jq -r '.changes.result' <<< "$JOB_RESULTS")" != success ]]; then
+            echo '::error::Change detection did not succeed.'
+            exit 1
+          fi
+          for package in python typescript go rust; do
+            required=$(jq -r --arg package "$package" '.changes.outputs[$package]' <<< "$JOB_RESULTS")
+            result=$(jq -r --arg package "$package" '.[$package].result' <<< "$JOB_RESULTS")
+            echo "$package: required=$required, result=$result"
+            case "$required:$result" in
+              true:success|false:success|false:skipped) ;;
+              *)
+                echo "::error::$package checks did not satisfy the required result."
+                exit 1
+                ;;
+            esac
+          done
