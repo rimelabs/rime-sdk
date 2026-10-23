@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.21](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.20...typescript-v0.1.0-alpha.21) (2026-10-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rust RealtimeSession::info returns an owned SessionInfo snapshot instead of a reference so cloned handles can read current settings.
+
+### Features
+
+* expose Prism error retry classification ([#99](https://github.com/rimelabs/rime-sdk/issues/99)) ([c04309c](https://github.com/rimelabs/rime-sdk/commit/c04309c174c2eed82df3b676581c45cab2a95db6))
+* **realtime:** request ids, reply labels, and the items a reply answers ([#95](https://github.com/rimelabs/rime-sdk/issues/95)) ([f33950b](https://github.com/rimelabs/rime-sdk/commit/f33950b2d0fdb960f4701c1a1ec208c0d539d5ec))
+* support mid-session Prism settings updates in all SDKs ([#101](https://github.com/rimelabs/rime-sdk/issues/101)) ([83f5347](https://github.com/rimelabs/rime-sdk/commit/83f534761418217292fbbce8dbdc47454ad5ddb8))
+
 ## [0.1.0-alpha.20](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.19...typescript-v0.1.0-alpha.20) (2026-10-22)
 
 
