@@ -1,0 +1,19 @@
+.github/scripts/tests/test_ci_gate.py
+  s_4fd1a95407470e::t_4256921334b1bf 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5cd8fe5599cd673fe6cd281cf441cb82bac3f800",
+  "prompts": {},
+  "sessions": {
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
