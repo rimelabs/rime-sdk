@@ -31,12 +31,20 @@ impl Worker {
                     .insert(c.target.clone(), c.digest);
             }
             Kind::Clear => self.converter = None,
+            Kind::Labels => {
+                if let Some(info) = &self.info {
+                    info.lock().expect("info mutex").response_metadata =
+                        e.info.and_then(|info| info.response_metadata)
+                }
+            }
             Kind::Update => {
                 let mut info = e.info.ok_or_else(|| failure("missing session view"))?;
                 info.session_id = self.id.clone();
                 if !e.interrupt_known {
                     info.interrupt_on_speech = self.interrupt
                 }
+                let info = Arc::new(Mutex::new(info));
+                self.info = Some(info.clone());
                 if let Some(tx) = self.initialized.take() {
                     let _ = tx.send(Ok(info));
                 }

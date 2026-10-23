@@ -58,7 +58,7 @@ pub struct RealtimeSession {
     lease: Arc<Lease>,
     commands: mpsc::Sender<Command>,
     events: Arc<Mutex<Option<RealtimeEvents>>>,
-    info: SessionInfo,
+    info: Arc<Mutex<SessionInfo>>,
     budgets: RealtimeTimeouts,
     done: CancellationToken,
     wake: Arc<Notify>,
@@ -108,6 +108,7 @@ enum Kind {
     Truncate,
     Drain,
     Update,
+    Labels,
 }
 struct Command {
     epoch: u64,
@@ -202,7 +203,9 @@ struct Worker {
     converter: Option<(crate::PcmFormat, InputAudio)>,
     timeouts: RealtimeTimeouts,
     interrupt: bool,
-    initialized: Option<oneshot::Sender<Result<SessionInfo, Error>>>,
+    initialized: Option<oneshot::Sender<Result<Arc<Mutex<SessionInfo>>, Error>>>,
+    /// The settings the session shows, updated as Prism confirms changes.
+    info: Option<Arc<Mutex<SessionInfo>>>,
 }
 pub(super) async fn connect(
     inner: Arc<Inner>,
@@ -242,11 +245,13 @@ pub(super) async fn connect(
             timeouts: options.timeouts,
             interrupt: options.interrupt,
             initialized: Some(tx),
+            info: None,
         };
         let result = worker
             .run(
                 &options.endpoint,
                 &authorization,
+                options.request_id.as_deref(),
                 settings,
                 stop.clone(),
                 notify,
@@ -288,9 +293,9 @@ pub(super) async fn connect(
     })
 }
 impl RealtimeSession {
-    /// Effective server settings.
-    pub fn info(&self) -> &SessionInfo {
-        &self.info
+    /// Effective server settings, as Prism last confirmed them.
+    pub fn info(&self) -> SessionInfo {
+        self.info.lock().expect("info mutex").clone()
     }
     /// Take the only owned event stream. A second call fails.
     pub fn events(&self) -> Result<RealtimeEvents, Error> {
@@ -416,6 +421,15 @@ impl RealtimeSession {
     pub async fn cancel(&self, reference: &ResponseRef) -> Result<(), Error> {
         let mut c = Command::new(Kind::Cancel, json!({"response_id":reference.response_id}));
         c.reference = Some(reference.clone());
+        self.invoke(c).await.map(|_| ())
+    }
+    /// Replace the labels later replies carry; a reply already started keeps
+    /// its own. Returns once Prism confirms the change.
+    pub async fn set_response_metadata(&self, labels: Labels) -> Result<(), Error> {
+        let c = Command::new(
+            Kind::Labels,
+            json!({"session": {"prism_response_metadata": labels}}),
+        );
         self.invoke(c).await.map(|_| ())
     }
     /// Clear input audio and reset its converter after acknowledgment.

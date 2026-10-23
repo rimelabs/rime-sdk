@@ -19,6 +19,16 @@ func rtText(s string, limit int) error {
 	}
 	return nil
 }
+
+// rtLabelsValid refuses labels that JSON would silently alter.
+func rtLabelsValid(labels map[string]string) error {
+	for k, v := range labels {
+		if !utf8.ValidString(k) || !utf8.ValidString(v) {
+			return failure(ErrInput, "response metadata must be valid UTF-8")
+		}
+	}
+	return nil
+}
 func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, error) {
 	t := o.Timeouts
 	for _, p := range []*time.Duration{&t.Connect, &t.Ready, &t.Request} {
@@ -99,7 +109,16 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		}
 		ts = append(ts, v)
 	}
+	if id := o.RequestID; id != "" && (strings.TrimSpace(id) == "" || strings.IndexFunc(id, func(r rune) bool { return r < 0x20 || r > 0x7e }) >= 0) {
+		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
+	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if e := rtLabelsValid(o.ResponseMetadata); e != nil {
+		return "", nil, t, e
+	}
+	if o.ResponseMetadata != nil {
+		settings["prism_response_metadata"] = o.ResponseMetadata
+	}
 	for k, v := range map[string]string{"voice": o.Voice, "instructions": o.Instructions} {
 		if v != "" {
 			if !utf8.ValidString(v) || strings.TrimSpace(v) == "" {
@@ -148,7 +167,7 @@ func (r *RealtimeService) Connect(ctx context.Context, options RealtimeConnectOp
 	r.client.realtimeSessions[s] = struct{}{}
 	key := r.client.key
 	r.client.mu.Unlock()
-	go s.run(address, key, settings)
+	go s.run(address, key, options.RequestID, settings)
 	return s.awaitInitialization(ctx)
 }
 

@@ -457,6 +457,19 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/clientCapability'
+        prism_response_metadata:
+          $ref: '#/components/schemas/labels'
+
+    labels:
+      type: object
+      maxProperties: 16
+      propertyNames:
+        maxLength: 64
+        not:
+          pattern: '^prism_'
+      additionalProperties:
+        type: string
+        maxLength: 512
 
     sessionView:
       type: object
@@ -475,6 +488,10 @@ components:
       properties:
         id:
           type: string
+        request_id:
+          type: string
+        prism_response_metadata:
+          $ref: '#/components/schemas/labels'
         object:
           const: realtime.session
         model:
@@ -738,6 +755,10 @@ components:
             $ref: '#/components/schemas/outputItem'
         metadata:
           $ref: '#/components/schemas/responseMetadata'
+        prism_input_item_ids:
+          type: array
+          items:
+            type: string
         usage:
           type: 'null'
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +19,11 @@ type realtimePeer struct {
 	conn     chan *websocket.Conn
 	socket   *websocket.Conn
 	requests chan rtObject
+	// The upgrade's x-request-id, and each session.update's settings.
+	requestID string
+	updates   chan rtObject
+	// Refuse session updates with invalid_session.
+	refuse atomic.Bool
 }
 
 func newRealtimePeer(t *testing.T) *realtimePeer { return newRealtimePeerWithPause(t, false) }
@@ -26,7 +32,7 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 		t.Fatal(err)
 	}
 	resume := make(chan struct{})
-	p := &realtimePeer{t: t, conn: make(chan *websocket.Conn, 1), requests: make(chan rtObject, 512)}
+	p := &realtimePeer{t: t, conn: make(chan *websocket.Conn, 1), requests: make(chan rtObject, 512), updates: make(chan rtObject, 16)}
 	p.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer test" {
 			t.Error("missing bearer credentials")
@@ -36,6 +42,11 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 			return
 		}
 		defer c.CloseNow()
+		p.requestID = r.Header.Get("x-request-id")
+		requestID := p.requestID
+		if requestID == "" {
+			requestID = "server-made"
+		}
 		p.conn <- c
 		send := func(v rtObject) error { b, _ := json.Marshal(v); return c.Write(r.Context(), websocket.MessageText, b) }
 		_ = send(rtObject{"type": "session.created", "session": rtObject{"id": "session-1"}})
@@ -54,7 +65,20 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 				return
 			}
 			if v["type"] == "session.update" {
-				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": rtObject{"id": "session-1", "voice": "test"}})
+				settings := v["session"].(map[string]any)
+				session := rtObject{"id": "session-1", "voice": "test", "request_id": requestID}
+				if labels, ok := settings["prism_response_metadata"]; ok {
+					session["prism_response_metadata"] = labels
+				}
+				select {
+				case p.updates <- settings:
+				default:
+				}
+				if p.refuse.Load() {
+					_ = send(rtObject{"type": "error", "error": rtObject{"code": "invalid_session", "scope": "event", "owner": rtObject{"event_id": v["event_id"]}}})
+					continue
+				}
+				_ = send(rtObject{"type": "session.updated", "prism_request_event_id": v["event_id"], "session": session})
 				if pause {
 					<-resume
 				}
@@ -77,12 +101,17 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 	return p
 }
 func (p *realtimePeer) setup(t *testing.T) (*Client, *RealtimeSession) {
+	return p.setupWith(t, RealtimeConnectOptions{})
+}
+func (p *realtimePeer) setupWith(t *testing.T, o RealtimeConnectOptions) (*Client, *RealtimeSession) {
 	c, e := NewClient(Config{APIKey: "test", Timeout: time.Nanosecond})
 	if e != nil {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { _ = c.Close() })
-	s, e := c.Realtime.Connect(context.Background(), RealtimeConnectOptions{Endpoint: "ws" + strings.TrimPrefix(p.server.URL, "http") + "/v1/realtime", Timeouts: RealtimeTimeouts{Connect: time.Second, Ready: time.Second, Request: time.Second}})
+	o.Endpoint = "ws" + strings.TrimPrefix(p.server.URL, "http") + "/v1/realtime"
+	o.Timeouts = RealtimeTimeouts{Connect: time.Second, Ready: time.Second, Request: time.Second}
+	s, e := c.Realtime.Connect(context.Background(), o)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -108,6 +137,16 @@ func (p *realtimePeer) next(kind string) rtObject {
 		return v
 	case <-time.After(3 * time.Second):
 		p.t.Fatalf("no %s request", kind)
+		return nil
+	}
+}
+func (p *realtimePeer) update() rtObject {
+	p.t.Helper()
+	select {
+	case v := <-p.updates:
+		return v
+	case <-time.After(3 * time.Second):
+		p.t.Fatal("no session.update")
 		return nil
 	}
 }

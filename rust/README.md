@@ -361,6 +361,17 @@ nonblank and have at most 500 Unicode scalar values. Omit these settings to use
 server defaults. `session.info()` returns the effective settings that Prism
 published.
 
+`request_id` is sent as the upgrade's `x-request-id`. It must be nonblank
+printable ASCII, or `connect` returns an input error. Prism uses it if it is at most 128
+characters, else makes its own; `info().request_id` reports the one it used.
+Include it when you report a problem; an event's or fault's `request_id` names
+the SDK request that caused it instead. `response_metadata` labels every reply, such as
+`{"step": "3"}`: up to 16 strings, keys up to 64 characters and values up to 512,
+no key starting with `prism_`. Prism refuses labels that break these rules with a
+realtime fault whose code is `invalid_session`. Settings apply once, except these
+labels, which `set_response_metadata` replaces. `ResponseStarted`'s `metadata`
+carries them, and its `input_item_ids` names the user items a reply answers.
+
 | Session method | Behavior |
 | --- | --- |
 | `send_text` | Wait for admission, add a typed turn, and return its response reference. |
@@ -369,6 +380,7 @@ published.
 | `submit_tool_result` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `continue_reply` | Wait for the latest tool response and all its results, then request continuation. |
 | `cancel` | Cancel a retained response. |
+| `set_response_metadata` | Replace the labels for later replies once Prism confirms. |
 | `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |
 | `report_playback` | Report measured device playback completion or interruption. |
 | `events` | Take the single owned `Stream<Item = Result<SessionEvent, Error>>`. |

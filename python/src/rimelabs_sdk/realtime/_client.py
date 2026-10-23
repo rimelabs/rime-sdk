@@ -20,8 +20,9 @@ from .._errors import (
     RimeUnavailableError,
 )
 from ._protocol import SessionSettings
+from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
-from ._types import JsonObject, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
+from ._types import JsonObject, Labels, PrismFiller, RealtimeTimeouts, ToolDefinition, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -62,6 +63,8 @@ class Realtime:
         interrupt_on_speech: bool = True,
         turn_detection: TurnDetection | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
+        request_id: str | None = None,
+        response_metadata: Labels | None = None,
     ) -> AsyncIterator[RealtimeSession]:
         """Open and initialize a session on the public Prism endpoint.
 
@@ -70,7 +73,12 @@ class Realtime:
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
-        Settings are fixed for the lifetime of the session.
+        Settings are fixed for the lifetime of the session, except the reply labels, which
+        set_response_metadata replaces.
+
+        request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
+        connect raises RimeInputError. Prism uses it if it is at most 128 characters, else
+        makes its own; info.request_id reports the one it used.
         """
         self._client._check_loop()
         self._client._check_open()
@@ -119,6 +127,14 @@ class Realtime:
                 settings["turn_detection"]["prism_end_of_turn_timeout_ms"] = (
                     turn_detection.end_of_turn_timeout_ms
                 )
+        if response_metadata is not None:
+            settings["prism_response_metadata"] = _response_metadata(response_metadata)
+        if request_id is not None and (
+            not isinstance(request_id, str)
+            or not request_id.strip()
+            or not all(" " <= character <= "~" for character in request_id)
+        ):
+            raise RimeInputError("request_id must be nonblank printable ASCII")
         for name, value in (("voice", voice), ("instructions", instructions)):
             if value is not None:
                 if not isinstance(value, str) or not value.strip():
@@ -138,13 +154,17 @@ class Realtime:
         except (ValueError, TypeError):
             raise RimeInputError("Tool schemas must contain finite JSON values") from None
 
+        headers = self._client._credentials.realtime_headers()
+        if request_id is not None:
+            headers = {**headers, "x-request-id": request_id}
+
         async def open_session() -> RealtimeSession:
             session = None
             try:
                 try:
                     socket = await connect(
                         endpoint,
-                        additional_headers=self._client._credentials.realtime_headers(),
+                        additional_headers=headers,
                         open_timeout=timeouts.connect_s,
                         close_timeout=2,
                         max_size=1024 * 1024,

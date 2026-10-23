@@ -87,6 +87,8 @@ test("Prism config, direct credentials, typed output and large incoming audio", 
   });
   assert.deepEqual(session.info, {
     sessionId: "session-1",
+    requestId: null,
+    responseMetadata: null,
     model: "prism",
     voice: "test",
     interruptOnSpeech: false,

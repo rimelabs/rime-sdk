@@ -1,7 +1,12 @@
 use crate::PcmFormat;
 use bytes::Bytes;
 use serde_json::{Map, Value};
-use std::{fmt, time::Duration};
+use std::{collections::BTreeMap, fmt, time::Duration};
+
+/// Your labels for replies, keys to strings, such as `{"step": "3"}`. Prism
+/// takes at most 16, keys up to 64 characters without the `prism_` prefix and
+/// values up to 512.
+pub type Labels = BTreeMap<String, String>;
 
 /// Independent Prism connection, admission, and acknowledgment timeouts.
 #[derive(Clone, Copy, Debug)]
@@ -62,6 +67,8 @@ pub struct RealtimeConnectOptions {
     pub(crate) interrupt: bool,
     pub(crate) detection: TurnDetection,
     pub(crate) timeouts: RealtimeTimeouts,
+    pub(crate) request_id: Option<String>,
+    pub(crate) response_metadata: Option<Labels>,
 }
 impl Default for RealtimeConnectOptions {
     fn default() -> Self {
@@ -73,6 +80,8 @@ impl Default for RealtimeConnectOptions {
             interrupt: true,
             detection: TurnDetection::default(),
             timeouts: RealtimeTimeouts::default(),
+            request_id: None,
+            response_metadata: None,
         }
     }
 }
@@ -110,6 +119,18 @@ impl RealtimeConnectOptions {
     /// Set positive operation budgets.
     pub fn timeouts(mut self, value: RealtimeTimeouts) -> Self {
         self.timeouts = value;
+        self
+    }
+    /// Send the upgrade's x-request-id. It must be nonblank printable ASCII, or `connect`
+    /// returns an input error. Prism uses it if it is at most 128 characters,
+    /// else makes its own; `info().request_id` reports the one it used.
+    pub fn request_id(mut self, value: impl Into<String>) -> Self {
+        self.request_id = Some(value.into());
+        self
+    }
+    /// Label every reply. Change the labels with `set_response_metadata`.
+    pub fn response_metadata(mut self, value: Labels) -> Self {
+        self.response_metadata = Some(value);
         self
     }
 }
@@ -232,6 +253,10 @@ pub struct SessionInfo {
     pub eagerness: Option<String>,
     /// Effective maximum silence.
     pub end_of_turn_timeout_ms: Option<u64>,
+    /// The x-request-id Prism's logs name the session by.
+    pub request_id: Option<String>,
+    /// The labels replies carry, as Prism last confirmed them.
+    pub response_metadata: Option<Labels>,
 }
 /// Structured service error, available from Error::realtime_fault.
 #[derive(Clone, Debug)]
@@ -349,6 +374,10 @@ pub enum RealtimeEvent {
         parent: Option<ResponseRef>,
         /// Typed input history item.
         input_item_id: Option<String>,
+        /// The session's labels when the reply began.
+        metadata: Labels,
+        /// The user items the reply answers; empty when Prism names none.
+        input_item_ids: Vec<String>,
     },
     /// A caller cancelled a submitted reply request.
     ResponseAbandoned {

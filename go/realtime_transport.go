@@ -24,9 +24,13 @@ type rtWritten struct {
 	skipped bool
 }
 
-func rtDial(ctx context.Context, address, key string) (*websocket.Conn, error) {
+func rtDial(ctx context.Context, address, key, requestID string) (*websocket.Conn, error) {
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	c, response, err := websocket.Dial(ctx, address, &websocket.DialOptions{HTTPClient: client, HTTPHeader: http.Header{"Authorization": []string{"Bearer " + key}}, CompressionMode: websocket.CompressionDisabled})
+	header := http.Header{"Authorization": []string{"Bearer " + key}}
+	if requestID != "" {
+		header.Set("x-request-id", requestID)
+	}
+	c, response, err := websocket.Dial(ctx, address, &websocket.DialOptions{HTTPClient: client, HTTPHeader: header, CompressionMode: websocket.CompressionDisabled})
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, operationError(context.Cause(ctx), "")
