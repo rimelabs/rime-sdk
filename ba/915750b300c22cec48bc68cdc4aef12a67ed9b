@@ -1,0 +1,35 @@
+rust/README.md
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 425-426
+typescript/docs/realtime.md
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 172
+RELEASING.md
+  s_4a20e3ec5ae1cd::t_80fb4330966b29 89,138-141
+python/docs/realtime.md
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 166
+go/README.md
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 438-439
+go/realtime_types.go
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 36-38
+rust/src/realtime/types.rs
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 125-127
+python/src/rimelabs_sdk/realtime/_client.py
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 67-68
+typescript/src/realtime/types.ts
+  s_4a20e3ec5ae1cd::t_df2f1ebb31305a 75-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ba915750b300c22cec48bc68cdc4aef12a67ed9b",
+  "prompts": {},
+  "sessions": {
+    "s_4a20e3ec5ae1cd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a34-efd2-7262-92e1-61f423fa0cd3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
