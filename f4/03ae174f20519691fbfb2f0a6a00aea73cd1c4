@@ -1,0 +1,90 @@
+go/examples/realtime/typed/main.go
+  s_4fd1a95407470e::t_cbbe08e6bf4a76 9,21,26-32,36-42,49-51,54-55
+rust/src/realtime/tests/protocol.rs
+  s_4fd1a95407470e::t_9c6aa9665c99cc 25-34,46-49
+  s_4fd1a95407470e::t_53f05fb144f2f5 3-24,35-45,50-59
+go/examples/realtime/live/main.go
+  s_4fd1a95407470e::t_cbbe08e6bf4a76 25,163-166,171-173,175,217
+rust/src/realtime/tests/peer.rs
+  s_4fd1a95407470e::t_9c6aa9665c99cc 124-130
+  s_4fd1a95407470e::t_0a61bf5e6dac26 123,131
+go/examples/realtime/tools/main_test.go
+  s_4fd1a95407470e::t_0c8d6f1befef96 1-40
+go/realtime_transport.go
+  s_4fd1a95407470e::t_dcdaa1f7e78322 50-54
+go/realtime_session.go
+  s_4fd1a95407470e::t_dcdaa1f7e78322 162-167,427-430,438-441
+rust/Cargo.toml
+  s_4fd1a95407470e::t_8b0f304985a2f2 17
+go/realtime_regression_test.go
+  s_4fd1a95407470e::t_f39a37f2724706 51
+  s_4fd1a95407470e::t_63a2d10abcd940 1-3,10-12,31-33,57-59,70-72,80-82,94-96,114
+  s_4fd1a95407470e::t_9d1a5fb0bae157 4-9,13-30,34-50,52-56,60-69,73-79,83-93,97-113
+rust/src/realtime/protocol.rs
+  s_4fd1a95407470e::t_9c6aa9665c99cc 47-49
+  s_4fd1a95407470e::t_53f05fb144f2f5 46,50
+go/examples/realtime/recorded/main.go
+  s_4fd1a95407470e::t_cbbe08e6bf4a76 63,78-84,93-95,97-100
+rust/examples/realtime_typed.rs
+  s_4fd1a95407470e::t_e4dd1868d3f70e 14,16,25-26,28-29,32-33
+go/realtime_conversation.go
+  s_4fd1a95407470e::t_af3210239f6aa1 65,215-217,264-265,267-271,280
+go/realtime_conversation_test.go
+  s_4fd1a95407470e::t_9d1a5fb0bae157 341-343,358-359,361-363,367-371
+  s_4fd1a95407470e::t_e43ed7c554efe9 374-376,378-380,382-387,389-390,392-405,409-411,414-415,421-422
+  s_4fd1a95407470e::t_ad87e03c2202a5 377,381,388,391,406-408,412-413,416-420
+  s_4fd1a95407470e::t_b325260bc202c8 327-340,344-357,360,364-366,372-373
+go/realtime.go
+  s_4fd1a95407470e::t_6a7124600de323 116
+  s_4fd1a95407470e::t_dcdaa1f7e78322 77-79,164-167
+  s_4fd1a95407470e::t_6ef7acd102fc2d 117-119
+rust/src/realtime/tests/session.rs
+  s_4fd1a95407470e::t_53f05fb144f2f5 6
+  s_4fd1a95407470e::t_9c6aa9665c99cc 80-83
+rust/src/realtime/client.rs
+  s_4fd1a95407470e::t_53f05fb144f2f5 102
+rust/src/realtime/tests/lifecycle.rs
+  s_4fd1a95407470e::t_53f05fb144f2f5 156,158-161,169-170
+  s_4fd1a95407470e::t_9c6aa9665c99cc 162-168
+  s_4fd1a95407470e::t_0a61bf5e6dac26 157
+rust/examples/realtime_tools.rs
+  s_4fd1a95407470e::t_9c6aa9665c99cc 59-61
+  s_4fd1a95407470e::t_e4dd1868d3f70e 26-27,31,35-45,62-64,76,83,86
+go/examples/realtime/internal/testpeer/peer.go
+  s_4fd1a95407470e::t_0c8d6f1befef96 1-65,67-117
+  s_4fd1a95407470e::t_1b39be272ac67c 66
+go/examples/realtime/typed/main_test.go
+  s_4fd1a95407470e::t_0c8d6f1befef96 1-32
+go/README.md
+  s_4fd1a95407470e::t_14c0c264639a10 363,438
+  s_4fd1a95407470e::t_4e7aa26776e6db 398-400
+  s_4fd1a95407470e::t_26874aadbeec0b 364-366,439-441
+  s_4fd1a95407470e::t_cbbe08e6bf4a76 411-412,436-437,458-459
+  s_4fd1a95407470e::t_c3bf9ccb1ebdad 460
+go/examples/realtime/live/main_test.go
+  s_4fd1a95407470e::t_4e7aa26776e6db 1-81
+go/examples/realtime/tools/main.go
+  s_4fd1a95407470e::t_cbbe08e6bf4a76 9,21,53-55,69-70
+go/examples/realtime/recorded/main_test.go
+  s_4fd1a95407470e::t_0c8d6f1befef96 1-20
+go/realtime_protocol.go
+  s_4fd1a95407470e::t_31d1b9d170fa2e 28-30,32-52
+  s_4fd1a95407470e::t_dcdaa1f7e78322 4,13-14,16-27,31,53-54,309
+  s_4fd1a95407470e::t_6a7124600de323 15,308
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f403ae174f20519691fbfb2f0a6a00aea73cd1c4",
+  "prompts": {},
+  "sessions": {
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
