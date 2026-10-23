@@ -1,0 +1,50 @@
+go/realtime_regression_test.go
+  s_4fd1a95407470e::t_17b07b2fcc3458 8,116-163,178-180
+  s_4fd1a95407470e::t_6fe25b4a3e5195 164-166,175-177
+  s_470f51fa25de21::t_92379082e04c5b 167-174
+go/examples/realtime/tools/main_test.go
+  s_4fd1a95407470e::t_b5b4c82a7e4e50 17,19,24-41
+  s_4fd1a95407470e::t_b1b773c2ae9e71 42-44
+rust/examples/realtime_tools.rs
+  s_4fd1a95407470e::t_6a72eefcf34c4a 76-77,82-84
+  s_4fd1a95407470e::t_dd1fb2e91d7f06 78-81
+go/examples/realtime/tools/main.go
+  s_4fd1a95407470e::t_b5b4c82a7e4e50 70-76
+go/examples/realtime/recorded/main.go
+  s_4fd1a95407470e::t_b5b4c82a7e4e50 98-103
+go/realtime_session.go
+  s_4fd1a95407470e::t_330f00d1245e65 202-204,232-234
+go/examples/realtime/typed/main.go
+  s_4fd1a95407470e::t_b5b4c82a7e4e50 55-61
+go/examples/realtime/typed/main_test.go
+  s_4fd1a95407470e::t_b5b4c82a7e4e50 16,18-52
+rust/src/realtime/tests/submission.rs
+  s_4fd1a95407470e::t_8d2f953c0d5690 169-244,253,257-263,268-269,277,280,283-289,294-296,301-303
+  s_4fd1a95407470e::t_dd1fb2e91d7f06 245-252,254-256,264-267,270-276,278-279,281-282,290-293,297-300
+rust/src/realtime/conversation.rs
+  s_4fd1a95407470e::t_f0359a5caaa83c 109,290,310,467,471-477
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2031e9efdc78bc7371d9d6aad142cbfeb1c599f0",
+  "prompts": {},
+  "sessions": {
+    "s_470f51fa25de21": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16670-8427-7260-bdff-5112aa29877a",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
