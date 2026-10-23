@@ -1,0 +1,109 @@
+typescript/src/realtime/session.ts
+  s_c89120f256460b::t_4b3563b62e322f 151-153,156-158
+  s_c89120f256460b::t_ab71395dc8cf49 74,890
+.github/workflows/checks.yml
+  s_0ef5f30da1e957::t_2f4e08c3778ad0 130,159
+conformance/prism/schema.json
+  s_0ef5f30da1e957::t_e55d8ed0a02573 123-127
+  s_0ef5f30da1e957::t_ec4f043b885caf 122
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_0ef5f30da1e957::t_afed4f696c8dd2 793
+rust/src/realtime/tests/mod.rs
+  s_0ef5f30da1e957::t_4cff26ee990ffd 2
+conformance/prism/error-retry.json
+  s_0ef5f30da1e957::t_2f4e08c3778ad0 1-45
+typescript/tests/realtime-errors.test.mjs
+  s_0ef5f30da1e957::t_8945d5f9c33e16 1-7,27-34,39-41,47-50,61,69-75,80-81,83-87,100-106,108,110-114,172-178,189-194,196-204
+  s_0ef5f30da1e957::t_da098a1a22ca9f 8-15,35-38,42-46,62-68,76-79,82,88-99,179-188,195
+  s_c89120f256460b::t_4040e831f10144 16-26,51-60,115-128,155-163,170-171
+  s_0ef5f30da1e957::t_ccc91fa8a5fa53 107,109
+  s_c89120f256460b::t_66658df2ce60f7 129-154
+  s_c89120f256460b::t_5700f96140c584 164-169
+go/realtime_errors_test.go
+  s_0ef5f30da1e957::t_4cff26ee990ffd 1-124
+rust/src/realtime/tests/errors.rs
+  s_0ef5f30da1e957::t_4cff26ee990ffd 1-100
+  s_0ef5f30da1e957::t_b2d32a82834a6f 101-122
+typescript/src/realtime/conversation.ts
+  s_c89120f256460b::t_ab71395dc8cf49 14,54
+typescript/tests/fixtures/realtime.ts
+  s_c89120f256460b::t_4040e831f10144 3-4,21-37
+  s_c89120f256460b::t_4b3563b62e322f 64-66
+  s_0ef5f30da1e957::t_8945d5f9c33e16 113-118
+  s_c89120f256460b::t_da62213f98fd23 5-8,39-63,67-68,111-112
+  s_c89120f256460b::t_3716c75061b749 38
+go/realtime_types.go
+  s_0ef5f30da1e957::t_e55d8ed0a02573 98-110
+rust/README.md
+  s_0ef5f30da1e957::t_6afed1a347283d 389-390,411-442
+  s_0ef5f30da1e957::t_374c85d8be433a 443
+typescript/docs/realtime.md
+  s_c89120f256460b::t_dfa2ee72a0834a 416
+  s_c89120f256460b::t_ab71395dc8cf49 421-427
+  s_0ef5f30da1e957::t_6afed1a347283d 411-412,420,428-455
+  s_c89120f256460b::t_4d3c0f3558625e 413-415,417-419
+  s_c89120f256460b::t_33ae7801863087 409-410
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_0ef5f30da1e957::t_e55d8ed0a02573 793
+rust/testdata/prism/error-retry.json
+  s_0ef5f30da1e957::t_afed4f696c8dd2 1-45
+python/docs/realtime.md
+  s_0ef5f30da1e957::t_6afed1a347283d 404-436
+typescript/src/realtime/faults.ts
+  s_c89120f256460b::t_42c88c58da6b35 9-19
+  s_c89120f256460b::t_4d3c0f3558625e 1-8,20-29
+typescript/src/realtime/types.ts
+  s_c89120f256460b::t_ab71395dc8cf49 191,194,246,248,250,258,269,273
+  s_c89120f256460b::t_4d3c0f3558625e 4,107-109,125-132,135-139
+typescript/src/realtime/protocol.ts
+  s_c89120f256460b::t_ab71395dc8cf49 69,76
+  s_0ef5f30da1e957::t_e55d8ed0a02573 239-240,242
+  s_c89120f256460b::t_4d3c0f3558625e 4,232,241,256
+conformance/prism/README.md
+  s_0ef5f30da1e957::t_2f4e08c3778ad0 21-26
+rust/src/realtime/types.rs
+  s_0ef5f30da1e957::t_e55d8ed0a02573 258-270
+go/testdata/prism/schema.json
+  s_0ef5f30da1e957::t_afed4f696c8dd2 123-127
+  s_0ef5f30da1e957::t_3ba69e9a41efa3 122
+rust/testdata/prism/schema.json
+  s_0ef5f30da1e957::t_afed4f696c8dd2 123-127
+  s_0ef5f30da1e957::t_00e5cda5c6b611 122
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_0ef5f30da1e957::t_afed4f696c8dd2 793
+go/README.md
+  s_0ef5f30da1e957::t_6afed1a347283d 398,402-433
+  s_0ef5f30da1e957::t_7e356c9ef8e46d 399-401
+python/src/rimelabs_sdk/realtime/_types.py
+  s_0ef5f30da1e957::t_e55d8ed0a02573 191-200
+python/tests/test_realtime_errors.py
+  s_0ef5f30da1e957::t_8945d5f9c33e16 1-13,17-29,33-43,49-52,54-58,62-66,68-75,79,81,83-116
+  s_0ef5f30da1e957::t_5608b5a098a439 14-16,30-32,44-48,59-61,76-78
+  s_0ef5f30da1e957::t_da098a1a22ca9f 53,67,80,82
+go/testdata/prism/error-retry.json
+  s_0ef5f30da1e957::t_afed4f696c8dd2 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "26e207b3a62b9fdbda43cc23c99cbe2ecbf846d4",
+  "prompts": {},
+  "sessions": {
+    "s_0ef5f30da1e957": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1676f-4b2d-7433-80a0-ed5da67b46d1",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_c89120f256460b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16918-c20e-7c43-b621-19bdcf91aac3",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
