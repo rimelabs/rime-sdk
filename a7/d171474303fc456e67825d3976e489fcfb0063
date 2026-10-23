@@ -1,0 +1,85 @@
+typescript/src/realtime/protocol.ts
+  s_d7ddabe0130f0d::t_8f8b2875c53b50 8-9,38,45,207-235,282-283
+typescript/tests/fixtures/realtime.ts
+  s_d7ddabe0130f0d::t_8f8b2875c53b50 157-176
+conformance/prism/protocol.json
+  s_d7ddabe0130f0d::t_4b5b4eb06ff882 1242-1405
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_96fbfbb45e4f93 460-461,465-478,512-513
+go/README.md
+  s_d7ddabe0130f0d::t_7a40bd12d8688e 588-604
+go/realtime.go
+  s_d7ddabe0130f0d::t_fa76f91ed6cd8a 122-134,137-143,239-245
+go/realtime_protocol.go
+  s_d7ddabe0130f0d::t_2090e6c59da8cd 131-147
+go/realtime_session.go
+  s_d7ddabe0130f0d::t_736eb81db21fa6 176-179
+go/realtime_truncation_test.go
+  s_d7ddabe0130f0d::t_06f95aa392b9f2 1-53
+go/realtime_types.go
+  s_d7ddabe0130f0d::t_4a7bd30fc07da7 14-29,46-47,112-113,122-123
+go/testdata/prism/protocol.json
+  s_d7ddabe0130f0d::t_d1af89d89f17b9 1242-1405
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_0570c074834f14 460-461,465-478,512-513
+python/docs/realtime.md
+  s_d7ddabe0130f0d::t_65252f977afb8c 518-536
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_d7ddabe0130f0d::t_d2a9730425dbbf 38,54,92,108
+python/src/rimelabs_sdk/realtime/_client.py
+  s_d7ddabe0130f0d::t_43f19990aa7497 20,24,56,96-97
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_d7ddabe0130f0d::t_8ff4256d5f771d 43,56,65,237-256,291
+python/src/rimelabs_sdk/realtime/_session.py
+  s_d7ddabe0130f0d::t_0d86ac755cac13 370,380-381,692
+python/src/rimelabs_sdk/realtime/_types.py
+  s_d7ddabe0130f0d::t_f376545e6014f0 47-61,191
+python/tests/test_realtime_truncation.py
+  s_d7ddabe0130f0d::t_36760610c04b6c 1-66
+rust/README.md
+  s_d7ddabe0130f0d::t_3c3fc8828cc0dc 571-589
+rust/src/lib.rs
+  s_d7ddabe0130f0d::t_53835800d56c88 30
+rust/src/realtime/client.rs
+  s_d7ddabe0130f0d::t_ac7db1c23bbec3 51-63,66-68,134-136
+rust/src/realtime/protocol.rs
+  s_d7ddabe0130f0d::t_0dbf2d9daa6d16 77-93
+rust/src/realtime/tests/mod.rs
+  s_d7ddabe0130f0d::t_230f4b6b45ee3d 11-12
+rust/src/realtime/tests/truncation.rs
+  s_d7ddabe0130f0d::t_710836f4aa69fa 1-48
+rust/src/realtime/types.rs
+  s_d7ddabe0130f0d::t_a6b2bd53672b2e 60-69,79,93,101-105,162,165-169,294-295
+rust/testdata/prism/protocol.json
+  s_d7ddabe0130f0d::t_97006f27d3a33b 1242-1405
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_510b86d947394c 460-461,465-478,512-513
+typescript/docs/realtime.md
+  s_d7ddabe0130f0d::t_646a678e5eb1f0 538-554
+typescript/src/realtime/client.ts
+  s_d7ddabe0130f0d::t_bb9c38f93379dc 13,96-97
+typescript/src/realtime/session.ts
+  s_d7ddabe0130f0d::t_f9ddce2a902473 446-447,839
+typescript/src/realtime/types.ts
+  s_d7ddabe0130f0d::t_8daaec5666efb9 51-53,68,91,123-124
+typescript/tests/realtime-truncation.test.mjs
+  s_d7ddabe0130f0d::t_6b4f387ebd120c 1-71
+typescript/tests/realtime.test.mjs
+  s_d7ddabe0130f0d::t_21af32e9121814 91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a7d171474303fc456e67825d3976e489fcfb0063",
+  "prompts": {},
+  "sessions": {
+    "s_d7ddabe0130f0d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a70-317d-7611-ba01-b75004363a9e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
