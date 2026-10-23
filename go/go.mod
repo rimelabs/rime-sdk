@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/coder/websocket v1.8.14
-	github.com/dlclark/regexp2 v1.11.5
+	github.com/dlclark/regexp2 v1.12.0
 	github.com/rimelabs/rime-api/go v0.4.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217
