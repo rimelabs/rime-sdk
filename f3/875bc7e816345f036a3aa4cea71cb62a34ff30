@@ -1,0 +1,24 @@
+.github/workflows/checks.yml
+  s_4fd1a95407470e::t_661edd539048a4 168-194
+.github/scripts/tests/test_ci_gate.py
+  s_4fd1a95407470e::t_661edd539048a4 1-89
+RELEASING.md
+  s_4fd1a95407470e::t_661edd539048a4 208-212
+  s_4fd1a95407470e::t_ab519e22bbfe0d 213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f3875bc7e816345f036a3aa4cea71cb62a34ff30",
+  "prompts": {},
+  "sessions": {
+    "s_4fd1a95407470e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1666d-ba1b-7aa0-97cd-cf314dbc438a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
