@@ -339,6 +339,11 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 Realtime support is unreleased. Run these examples from this checkout's `go/`
 directory until the first release that contains `Client.Realtime`.
 
+This excerpt belongs inside a function that returns `error`. It assumes an
+existing `ctx` and the `rime` package import. See the
+[typed example](https://github.com/rimelabs/rime-sdk/blob/main/go/examples/realtime/typed/main.go)
+for a complete program with an event consumer and a timeout.
+
 ```go
 client, err := rime.NewClient(rime.Config{})
 if err != nil { return err }
@@ -347,7 +352,7 @@ session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{})
 if err != nil { return err }
 defer session.Close()
 // Read session.Recv(ctx) concurrently with requests.
-response, err := session.SendText(ctx, "Hello")
+if _, err := session.SendText(ctx, "Hello"); err != nil { return err }
 ```
 
 `RealtimeSession` owns authentication, initialization, request matching, events,

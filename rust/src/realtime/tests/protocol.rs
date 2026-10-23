@@ -2,6 +2,19 @@ use crate::realtime::protocol::decode;
 use serde_json::Value;
 
 #[test]
+fn ipv6_loopback_endpoint_is_accepted() {
+    use crate::realtime::{client::settings, RealtimeConnectOptions};
+    let endpoint = "ws://[::1]:8765/v1/realtime";
+    let uri: tokio_tungstenite::tungstenite::http::Uri = endpoint.parse().unwrap();
+    assert_eq!(uri.host(), Some("[::1]"));
+    assert!(settings(&RealtimeConnectOptions::default().endpoint(endpoint)).is_ok());
+    assert!(settings(
+        &RealtimeConnectOptions::default().endpoint("ws://[2001:db8::1]:8765/v1/realtime")
+    )
+    .is_err());
+}
+
+#[test]
 fn integer_fields_accept_integral_json_numbers() {
     use crate::realtime::RealtimeEvent;
     for (number, expected) in [

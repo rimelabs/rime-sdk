@@ -101,6 +101,71 @@ impl ConversationPlayback for Playback {
         tokio::select! {_=self.0.stopped.cancelled()=>Ok(()),_=stop.cancelled()=>Err(Error::cancelled()),_=self.0.failed.cancelled()=>Err(input("audio bridge failed"))}
     }
 }
+async fn read_bridge(
+    read: tokio::net::tcp::OwnedReadHalf,
+    audio: mpsc::Sender<Vec<u8>>,
+    reader: Arc<Shared>,
+) {
+    let mut read = BufReader::new(read);
+    let mut line = Vec::new();
+    let mut audio = Some(audio);
+    let result: Result<(), Error> = async {
+        loop {
+            line.clear();
+            while !line.ends_with(b"\n") {
+                let available = read.fill_buf().await.map_err(Error::input)?;
+                if available.is_empty() {
+                    return Err(input("audio bridge disconnected"));
+                }
+                let n = available
+                    .iter()
+                    .position(|b| *b == b'\n')
+                    .map_or(available.len(), |i| i + 1);
+                if line.len() + n > 1024 * 1024 {
+                    return Err(input("audio bridge message exceeds 1 MiB"));
+                }
+                line.extend_from_slice(&available[..n]);
+                read.consume(n);
+            }
+            let v: Value = serde_json::from_slice(&line).map_err(Error::input)?;
+            match v["type"].as_str() {
+                Some("audio") => {
+                    let data = STANDARD
+                        .decode(v["data"].as_str().ok_or_else(|| input("missing audio"))?)
+                        .map_err(Error::input)?;
+                    if data.len() > 192000 || data.len() % 2 != 0 {
+                        return Err(input("invalid capture chunk"));
+                    }
+                    audio
+                        .as_ref()
+                        .ok_or_else(|| input("audio after capture EOF"))?
+                        .try_send(data)
+                        .map_err(|_| input("capture queue is full"))?;
+                }
+                Some("played") => {
+                    let id = v["id"]
+                        .as_str()
+                        .ok_or_else(|| input("missing receipt id"))?;
+                    let n = v["played_ms"]
+                        .as_f64()
+                        .ok_or_else(|| input("missing measurement"))?;
+                    if let Some(tx) = reader.receipts.lock().unwrap().remove(id) {
+                        let _ = tx.send(Some(n));
+                    }
+                }
+                Some("stopped") => reader.stopped.cancel(),
+                Some("eof") => {
+                    audio.take();
+                }
+                _ => return Err(input("unknown bridge message")),
+            }
+        }
+    }
+    .await;
+    if result.is_err() {
+        reader.failed.cancel()
+    }
+}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let address = std::env::args()
@@ -128,68 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     });
-    let reader = shared.clone();
-    tasks.spawn(async move {
-        let mut read = BufReader::new(read);
-        let mut line = Vec::new();
-        let mut audio = Some(audio);
-        let result: Result<(), Error> = async {
-            loop {
-                line.clear();
-                while !line.ends_with(b"\n") {
-                    let available = read.fill_buf().await.map_err(Error::input)?;
-                    if available.is_empty() {
-                        return Err(input("audio bridge disconnected"));
-                    }
-                    let n = available
-                        .iter()
-                        .position(|b| *b == b'\n')
-                        .map_or(available.len(), |i| i + 1);
-                    if line.len() + n > 1024 * 1024 {
-                        return Err(input("audio bridge message exceeds 1 MiB"));
-                    }
-                    line.extend_from_slice(&available[..n]);
-                    read.consume(n);
-                }
-                let v: Value = serde_json::from_slice(&line).map_err(Error::input)?;
-                match v["type"].as_str() {
-                    Some("audio") => {
-                        let data = STANDARD
-                            .decode(v["data"].as_str().ok_or_else(|| input("missing audio"))?)
-                            .map_err(Error::input)?;
-                        if data.len() > 192000 || data.len() % 2 != 0 {
-                            return Err(input("invalid capture chunk"));
-                        }
-                        audio
-                            .as_ref()
-                            .ok_or_else(|| input("audio after capture EOF"))?
-                            .try_send(data)
-                            .map_err(|_| input("capture queue is full"))?;
-                    }
-                    Some("played") => {
-                        let id = v["id"]
-                            .as_str()
-                            .ok_or_else(|| input("missing receipt id"))?;
-                        let n = v["played_ms"]
-                            .as_f64()
-                            .ok_or_else(|| input("missing measurement"))?;
-                        if let Some(tx) = reader.receipts.lock().unwrap().remove(id) {
-                            let _ = tx.send(Some(n));
-                        }
-                    }
-                    Some("stopped") => reader.stopped.cancel(),
-                    Some("eof") => {
-                        audio.take();
-                    }
-                    _ => return Err(input("unknown bridge message")),
-                }
-            }
-        }
-        .await;
-        if result.is_err() {
-            reader.failed.cancel()
-        }
-    });
+    tasks.spawn(read_bridge(read, audio, shared.clone()));
     let client = Client::builder().build()?;
     let session = client
         .realtime()
@@ -211,3 +215,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     result?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "realtime_live/tests.rs"]
+mod tests;

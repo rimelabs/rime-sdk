@@ -420,3 +420,120 @@ func TestRealtimeRunnerRetainsReceiptFailureDuringNormalShutdown(t *testing.T) {
 		t.Fatal("runner did not stop")
 	}
 }
+
+type rtEOFReceiptSource struct {
+	ready <-chan struct{}
+	eof   chan struct{}
+}
+
+func (s rtEOFReceiptSource) Read(ctx context.Context) (AudioChunk, error) {
+	select {
+	case <-s.ready:
+		close(s.eof)
+		return AudioChunk{}, io.EOF
+	case <-ctx.Done():
+		return AudioChunk{}, ctx.Err()
+	}
+}
+
+type rtEOFReceiptOutput struct {
+	ready              <-chan struct{}
+	started, completed chan struct{}
+	afterCancellation  bool
+	err                error
+}
+
+func (o *rtEOFReceiptOutput) Write(AudioChunk) error { return nil }
+func (o *rtEOFReceiptOutput) End() error             { return nil }
+func (o *rtEOFReceiptOutput) Completion(ctx context.Context) (float64, error) {
+	close(o.started)
+	defer close(o.completed)
+	select {
+	case <-o.ready:
+	case <-ctx.Done():
+		// The adapter owns this race. Preserve its known device failure even
+		// when cancellation becomes ready before its goroutine resumes.
+		select {
+		case <-o.ready:
+		default:
+			return 0, ctx.Err()
+		}
+	}
+	if o.afterCancellation {
+		// Hold a known device failure until shutdown cancels the receipt wait.
+		// This models an adapter whose completion code resumes during shutdown.
+		<-ctx.Done()
+	}
+	return 0, o.err
+}
+
+type rtEOFReceiptPlayback struct {
+	output  *rtEOFReceiptOutput
+	stopped atomic.Bool
+}
+
+func (p *rtEOFReceiptPlayback) Open(OutputRef) (ConversationOutput, error) {
+	return p.output, nil
+}
+func (p *rtEOFReceiptPlayback) Interrupt([]OutputRef) error { return nil }
+func (p *rtEOFReceiptPlayback) Stop(context.Context) error {
+	p.stopped.Store(true)
+	return nil
+}
+
+func TestRealtimeRunnerRetainsReceiptFailureRacingSourceEOF(t *testing.T) {
+	for _, afterCancellation := range []bool{false, true} {
+		name := "receipt-ready-with-EOF"
+		if afterCancellation {
+			name = "receipt-returns-after-shutdown-cancellation"
+		}
+		t.Run(name, func(t *testing.T) {
+			p := newRealtimePeer(t)
+			_, session := p.setup(t)
+			ready := make(chan struct{})
+			source := rtEOFReceiptSource{ready: ready, eof: make(chan struct{})}
+			expected := errors.New("device measurement failed before source EOF")
+			output := &rtEOFReceiptOutput{
+				ready: ready, started: make(chan struct{}), completed: make(chan struct{}),
+				afterCancellation: afterCancellation, err: expected,
+			}
+			playback := &rtEOFReceiptPlayback{output: output}
+			done := make(chan error, 1)
+			go func() {
+				done <- (&ConversationRunner{
+					Session: session, Source: source, Playback: playback,
+					OnEvent: func(event SessionEvent) error {
+						if _, ok := event.Payload.(MessageStarted); ok {
+							<-output.started
+							// Release EOF and the device failure from the same barrier.
+							close(ready)
+							<-source.eof
+							if !afterCancellation {
+								<-output.completed
+							}
+						}
+						return nil
+					},
+				}).Run(context.Background())
+			}()
+			p.send(rtObject{"type": "response.created", "response": rtObject{"id": "r1"}})
+			p.send(rtObject{"type": "response.output_item.added", "response_id": "r1", "output_index": 0, "item": rtObject{"type": "message", "id": "i1"}})
+			select {
+			case err := <-done:
+				if !errors.Is(err, expected) {
+					t.Fatalf("source EOF hid device failure: got %v, want %v", err, expected)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("runner did not stop")
+			}
+			if !playback.stopped.Load() {
+				t.Fatal("runner returned before playback stopped")
+			}
+			select {
+			case <-output.completed:
+			default:
+				t.Fatal("runner returned before receipt cleanup")
+			}
+		})
+	}
+}

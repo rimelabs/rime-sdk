@@ -36,3 +36,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
+
+[[example]]
+name = "realtime_live"
+test = true

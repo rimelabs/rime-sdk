@@ -18,6 +18,9 @@ type ConversationSource interface {
 // ConversationOutput is one independent playback receipt. Write and End must not
 // block. Completion reports measured played milliseconds, even after interruption.
 // Cancellation releases the wait without changing the device receipt.
+// If a device failure is already known when cancellation is observed, Completion
+// must return that failure. The runner cannot recover failures hidden by an
+// adapter returning context.Canceled instead.
 // Completion runs concurrently with Write, End, and playback Interrupt or Stop.
 // Do not hold a lock across the wait if those operations need the same lock.
 type ConversationOutput interface {
