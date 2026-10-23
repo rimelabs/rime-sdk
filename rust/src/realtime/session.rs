@@ -108,12 +108,21 @@ pub struct RealtimeSession {
 /// A terminal failure takes precedence over queued events, then ends the stream.
 pub struct RealtimeEvents {
     receiver: mpsc::Receiver<SessionEvent>,
+    response_policies: Arc<Mutex<HashMap<ResponseRef, bool>>>,
+    previous_response: Option<ResponseRef>,
     terminal: Arc<Mutex<Option<Error>>>,
     ended: bool,
 }
 impl Stream for RealtimeEvents {
     type Item = Result<SessionEvent, Error>;
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // Keep a delivered response's policy until the consumer asks for another event.
+        if let Some(previous) = self.previous_response.take() {
+            self.response_policies
+                .lock()
+                .expect("response policy mutex")
+                .remove(&previous);
+        }
         if self.ended {
             return Poll::Ready(None);
         }
@@ -123,7 +132,12 @@ impl Stream for RealtimeEvents {
             return Poll::Ready(Some(Err(e)));
         }
         match self.receiver.poll_recv(cx) {
-            Poll::Ready(Some(e)) => Poll::Ready(Some(Ok(e))),
+            Poll::Ready(Some(e)) => {
+                if let RealtimeEvent::ResponseStarted { response, .. } = &e.payload {
+                    self.previous_response = Some(response.clone());
+                }
+                Poll::Ready(Some(Ok(e)))
+            }
             Poll::Ready(None) => {
                 self.ended = true;
                 // Failure can be published after the first check but before the
@@ -133,6 +147,16 @@ impl Stream for RealtimeEvents {
             }
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+impl Drop for RealtimeEvents {
+    fn drop(&mut self) {
+        // Closing first makes concurrent publication fail and release its policy.
+        self.receiver.close();
+        self.response_policies
+            .lock()
+            .expect("response policy mutex")
+            .clear();
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -327,6 +351,8 @@ pub(super) async fn connect(
         commands: writes,
         events: Arc::new(Mutex::new(Some(RealtimeEvents {
             receiver,
+            response_policies: response_policies.clone(),
+            previous_response: None,
             terminal: terminal.clone(),
             ended: false,
         }))),

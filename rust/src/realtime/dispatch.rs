@@ -159,10 +159,6 @@ impl Worker {
                                 "too many retained active responses",
                             ));
                         }
-                        self.response_policies
-                            .lock()
-                            .expect("response policy mutex")
-                            .remove(&self.responses[old].reference);
                         self.responses.remove(old);
                         self.order.pop_front();
                     }

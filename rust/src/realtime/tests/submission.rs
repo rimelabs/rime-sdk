@@ -216,6 +216,8 @@ async fn runner_interruption_cancels_queued_drain_and_preserves_active_write() {
             commands,
             events: Arc::new(Mutex::new(Some(RealtimeEvents {
                 receiver,
+                response_policies: worker.response_policies.clone(),
+                previous_response: None,
                 terminal: terminal.clone(),
                 ended: false,
             }))),
@@ -332,4 +334,37 @@ async fn update_acknowledgment_captures_policy_before_write_confirmation() {
         worker.response_policies.lock().unwrap().get(&reference),
         Some(&false)
     );
+}
+
+#[tokio::test]
+async fn dropping_event_stream_releases_queued_and_failed_publish_policies() {
+    let (mut worker, _writes, _jobs, receiver) = worker();
+    let events = RealtimeEvents {
+        receiver,
+        response_policies: worker.response_policies.clone(),
+        previous_response: None,
+        terminal: Arc::new(Mutex::new(None)),
+        ended: false,
+    };
+    let first = protocol::decode(
+        r#"{"type":"response.created","response":{"id":"queued-first"}}"#,
+        "session-1",
+    )
+    .unwrap()
+    .unwrap();
+    worker.dispatch(first).unwrap();
+    assert_eq!(worker.response_policies.lock().unwrap().len(), 1);
+    drop(events);
+    assert!(worker.response_policies.lock().unwrap().is_empty());
+    let next = protocol::decode(
+        r#"{"type":"response.created","response":{"id":"after-drop"}}"#,
+        "session-1",
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        worker.dispatch(next).unwrap_err().kind(),
+        ErrorKind::ResourceLimit
+    );
+    assert!(worker.response_policies.lock().unwrap().is_empty());
 }
