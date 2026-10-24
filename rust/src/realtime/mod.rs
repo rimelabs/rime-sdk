@@ -4,6 +4,8 @@
 //! future cancels its wait. A submitted request remains tracked, and a late accepted
 //! reply is cancelled. Writes with unknown outcomes close the session without replay.
 mod client;
+mod history;
+pub use history::{HistoryItem, HistoryRole};
 mod conversation;
 mod protocol;
 mod session;

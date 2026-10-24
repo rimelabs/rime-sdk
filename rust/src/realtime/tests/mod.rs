@@ -8,3 +8,5 @@ mod session;
 mod schema;
 
 mod updates;
+
+mod history;

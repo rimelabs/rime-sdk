@@ -32,6 +32,7 @@ from .._errors import (
 from .._pcm import InputConverter
 from . import _protocol as p
 from . import _types as t
+from ._history import history_id, item_settings
 from ._settings import InterruptionPolicies, tool_settings
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
@@ -77,6 +78,9 @@ class _Pending:
     target: str | None = None
     item_id: str | None = None
     interrupt_on_speech: bool | None = None
+    tool_output_digest: str | None = None
+    requires_item_id: bool = False
+    expected_item_id: str | None = None
 
 
 class RealtimeSession:
@@ -287,6 +291,13 @@ class RealtimeSession:
                 pending.interrupt_on_speech = settings.get("turn_detection", {}).get(
                     "interrupt_response"
                 )
+        item = body.get("item")
+        if request is p.HISTORY_ITEM or request is p.HISTORY_RESULT:
+            pending.requires_item_id = True
+            if isinstance(item, dict):
+                pending.expected_item_id = item.get("id")
+        if isinstance(item, dict) and item.get("type") == "function_call_output":
+            pending.tool_output_digest = hashlib.sha256(str(item["output"]).encode()).hexdigest()
         self._pending[event_id] = pending
         submitted = asyncio.Event()
         try:
@@ -415,14 +426,49 @@ class RealtimeSession:
             body["prism_call_id"] = tool_call.call_id
         return await self._create(body)
 
+    async def get_history(self) -> tuple[t.HistoryItem, ...]:
+        """Read the items the next reply would see, in server order."""
+        return (await self._request(p.GET_HISTORY, {})).items
+
+    async def delete_item(self, item_id: str) -> None:
+        """Hide an item from future replies. A call and its result are hidden together."""
+        if not isinstance(item_id, str) or not item_id:
+            raise RimeInputError("item_id must be a nonempty string")
+        history_id(item_id)
+        await self._request(p.DELETE_ITEM, {"item_id": item_id}, item_id)
+
+    async def create_item(
+        self, item: t.HistoryItem, *, previous_item_id: str | None = None
+    ) -> t.ItemRef:
+        """Add history without a reply. Placement is after the anchor's whole turn.
+
+        Omit the anchor to append; use root to insert first. Tool results follow
+        their calls and cannot take an anchor. The server validates item identity.
+        """
+        value = item_settings(item)
+        body: dict[str, object] = {"item": value}
+        if previous_item_id is not None:
+            if not isinstance(previous_item_id, str) or not previous_item_id:
+                raise RimeInputError("previous_item_id must be a nonempty string")
+            if isinstance(item, t.HistoryFunctionResult):
+                raise RimeInputError("tool results cannot take previous_item_id")
+            body["previous_item_id"] = history_id(previous_item_id)
+        if isinstance(item, t.HistoryFunctionResult):
+            result = await self._request(p.HISTORY_RESULT, body, item.call_id)
+            created_id = result.item_id
+        else:
+            created_id = (await self._request(p.HISTORY_ITEM, body)).item_id
+        if not created_id or (item.id is not None and item.id != created_id):
+            error = RimeStreamError("History acknowledgment names an invalid item")
+            self._fail(error)
+            raise error
+        return t.ItemRef(session_id=self.info.session_id, item_id=created_id)
+
     async def add_message(self, role: Literal["user", "assistant"], text: str) -> t.ItemRef:
         if role not in ("user", "assistant"):
             raise RimeInputError("History role must be user or assistant")
         self._text(text)
-        event = await self._request(
-            p.ITEM, {"item": {"type": "message", "role": role, "text": text}}
-        )
-        return t.ItemRef(session_id=self.info.session_id, item_id=event.item_id)
+        return await self.create_item(t.HistoryMessage(role=role, text=text))
 
     async def submit_tool_result(self, call: t.ToolCallRef, output: str) -> None:
         self._response(call)
@@ -650,13 +696,34 @@ class RealtimeSession:
         payload, echo = event.payload, event.request_id
         # Reject mismatched echoed acknowledgments before changing session state.
         if isinstance(
-            payload, (p.SessionUpdated, p.ItemCreated, p.ToolResultCreated, t.ResponseStarted)
+            payload,
+            (
+                p.SessionUpdated,
+                p.ItemCreated,
+                p.ToolResultCreated,
+                p.HistoryListed,
+                p.ItemDeleted,
+                t.ResponseStarted,
+            ),
         ):
             pending = self._pending.get(echo or "")
             if pending and not (
                 isinstance(payload, p.ItemCreated) and pending.request.allows_item_created
             ):
                 pending.request.result(payload)
+            if (
+                pending
+                and pending.requires_item_id
+                and (
+                    not isinstance(payload, (p.ItemCreated, p.ToolResultCreated))
+                    or not payload.item_id
+                    or (
+                        pending.expected_item_id is not None
+                        and pending.expected_item_id != payload.item_id
+                    )
+                )
+            ):
+                raise RimeStreamError("History acknowledgment names an invalid item")
             if (
                 pending
                 and isinstance(payload, p.ToolResultCreated)
@@ -694,7 +761,25 @@ class RealtimeSession:
             )
             self._settle(echo, replace(payload, info=self._info))
             return
+        if isinstance(payload, p.ItemDeleted):
+            pending = self._pending.get(echo or "")
+            if pending and pending.target != payload.item_id:
+                raise RimeStreamError("Deletion acknowledgment names another item")
+            self._settle(echo, payload)
+            return
+        if isinstance(payload, p.HistoryListed):
+            self._settle(echo, payload)
+            return
         if isinstance(payload, p.ToolResultCreated):
+            pending = self._pending.get(echo or "")
+            if pending and pending.tool_output_digest is not None:
+                for response in self._responses.values():
+                    if (
+                        payload.call_id in response.calls
+                        and response.calls[payload.call_id] is None
+                    ):
+                        response.calls[payload.call_id] = pending.tool_output_digest
+                        response.changed.set()
             self._settle(echo, payload)
             return
         if isinstance(payload, p.ItemCreated):

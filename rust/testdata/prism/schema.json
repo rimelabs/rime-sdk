@@ -333,5 +333,281 @@
       }
     },
     "valid": false
+  },
+  {
+    "name": "history anchor ''",
+    "schema": "conversationItemCreateEvent",
+    "value": {
+      "type": "conversation.item.create",
+      "event_id": "create-1",
+      "item": {
+        "type": "message",
+        "role": "system",
+        "text": ""
+      },
+      "previous_item_id": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "history anchor 'root'",
+    "schema": "conversationItemCreateEvent",
+    "value": {
+      "type": "conversation.item.create",
+      "event_id": "create-1",
+      "item": {
+        "type": "message",
+        "role": "system",
+        "text": ""
+      },
+      "previous_item_id": "root"
+    },
+    "valid": true
+  },
+  {
+    "name": "listed message accepts nonempty identities",
+    "schema": "listedItem",
+    "value": {
+      "type": "message",
+      "id": "note",
+      "role": "system",
+      "text": ""
+    },
+    "valid": true
+  },
+  {
+    "name": "listed message rejects empty id",
+    "schema": "listedItem",
+    "value": {
+      "type": "message",
+      "id": "",
+      "role": "system",
+      "text": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "listed function_call accepts nonempty identities",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call",
+      "id": "call-item",
+      "call_id": "call",
+      "name": "lookup",
+      "arguments": "{}"
+    },
+    "valid": true
+  },
+  {
+    "name": "listed function_call rejects empty id",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call",
+      "id": "",
+      "call_id": "call",
+      "name": "lookup",
+      "arguments": "{}"
+    },
+    "valid": false
+  },
+  {
+    "name": "listed function_call rejects empty call_id",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call",
+      "id": "call-item",
+      "call_id": "",
+      "name": "lookup",
+      "arguments": "{}"
+    },
+    "valid": false
+  },
+  {
+    "name": "listed function_call rejects empty name",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call",
+      "id": "call-item",
+      "call_id": "call",
+      "name": "",
+      "arguments": "{}"
+    },
+    "valid": false
+  },
+  {
+    "name": "listed function_call_output accepts nonempty identities",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call_output",
+      "id": "result",
+      "call_id": "call",
+      "output": ""
+    },
+    "valid": true
+  },
+  {
+    "name": "listed function_call_output rejects empty id",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call_output",
+      "id": "",
+      "call_id": "call",
+      "output": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "listed function_call_output rejects empty call_id",
+    "schema": "listedItem",
+    "value": {
+      "type": "function_call_output",
+      "id": "result",
+      "call_id": "",
+      "output": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment with ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call",
+        "id": "call-item",
+        "call_id": "call"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "created acknowledgment without ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call",
+        "call_id": "call"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment with empty ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call",
+        "id": "",
+        "call_id": "call"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment with empty call ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call",
+        "id": "call-item",
+        "call_id": ""
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment legacy result without ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call_output",
+        "call_id": "call"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "deletion acknowledgment ID ''",
+    "schema": "conversationItemDeletedEvent",
+    "value": {
+      "type": "conversation.item.deleted",
+      "event_id": "server-deleted",
+      "item_id": ""
+    },
+    "valid": false
+  },
+  {
+    "name": "deletion acknowledgment ID 'item'",
+    "schema": "conversationItemDeletedEvent",
+    "value": {
+      "type": "conversation.item.deleted",
+      "event_id": "server-deleted",
+      "item_id": "item"
+    },
+    "valid": true
+  },
+  {
+    "name": "created acknowledgment message with ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "message",
+        "id": "note",
+        "role": "system"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "created acknowledgment message with empty ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "message",
+        "id": "",
+        "role": "system"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment result with empty ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call_output",
+        "id": "",
+        "call_id": "call"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "created acknowledgment result with empty call ID",
+    "schema": "conversationItemCreatedEvent",
+    "value": {
+      "type": "conversation.item.created",
+      "event_id": "server-created",
+      "item": {
+        "type": "function_call_output",
+        "call_id": ""
+      }
+    },
+    "valid": false
   }
 ]

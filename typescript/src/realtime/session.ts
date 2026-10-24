@@ -17,6 +17,7 @@ import { InputConverter } from "../pcm.js";
 import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";
+import { historyId, itemSettings } from "./history.js";
 import { InterruptionPolicies, toolSettings } from "./settings.js";
 
 const NOT_READY = new Set([
@@ -41,6 +42,9 @@ export function isSessionCloseError(error: unknown): boolean {
   return error instanceof Error && closeErrors.has(error);
 }
 interface Pending {
+  toolOutputDigest?: string;
+  expectedItemId?: string;
+  requiresItemId?: boolean;
   request: p.Request<p.Acknowledgment>;
   result: Deferred<p.Acknowledgment>;
   target?: string;
@@ -328,6 +332,17 @@ export class RealtimeSession {
       request,
       result,
       target,
+      requiresItemId:
+        request === p.requests.historyItem ||
+        request === p.requests.historyResult,
+      expectedItemId: (body.item as { id?: string })?.id,
+      toolOutputDigest:
+        request.kind === "conversation.item.create" &&
+        (body.item as { type?: string })?.type === "function_call_output"
+          ? createHash("sha256")
+              .update((body.item as { output: string }).output)
+              .digest("hex")
+          : undefined,
       interruptOnSpeech:
         request.kind === "session.update"
           ? (body.session as p.SessionPatch).turn_detection?.interrupt_response
@@ -500,6 +515,75 @@ export class RealtimeSession {
     }
     return this.operation(options, (signal) => this.create(body, signal));
   }
+  /** Read the items the next reply would see, in server order. */
+  async getHistory(
+    options: t.RealtimeOperationOptions = {},
+  ): Promise<readonly t.HistoryItem[]> {
+    return this.operation(
+      options,
+      async (signal) =>
+        (await this.request(p.requests.history, {}, signal)).items,
+    );
+  }
+  /** Hide an item from future replies. A call and its result are hidden together. */
+  async deleteItem(
+    itemId: string,
+    options: t.RealtimeOperationOptions = {},
+  ): Promise<void> {
+    if (typeof itemId !== "string" || !itemId)
+      throw new RimeInputError("itemId must be nonempty");
+    historyId(itemId);
+    return this.operation(options, async (signal) => {
+      await this.request(
+        p.requests.delete,
+        { item_id: itemId },
+        signal,
+        itemId,
+      );
+    });
+  }
+  /** Add history without a reply. The server owns placement and identity checks. */
+  async createItem(
+    item: t.HistoryItem,
+    options: t.HistoryCreateOptions = {},
+  ): Promise<t.ItemRef> {
+    const value = itemSettings(item);
+    const body: Record<string, unknown> = { item: value };
+    if (options.previousItemId !== undefined) {
+      if (
+        typeof options.previousItemId !== "string" ||
+        !options.previousItemId ||
+        item.type === "function_call_output"
+      )
+        throw new RimeInputError("invalid previousItemId for history item");
+      body.previous_item_id = historyId(options.previousItemId);
+    }
+    return this.operation(options, async (signal) => {
+      const event =
+        value.type === "function_call_output"
+          ? await this.request(
+              p.requests.historyResult,
+              body,
+              signal,
+              value.call_id,
+            )
+          : await this.request(p.requests.historyItem, body, signal);
+      if (
+        !event.itemId ||
+        (value.id !== undefined && event.itemId !== value.id)
+      ) {
+        const error = new RimeStreamError(
+          "history acknowledgment names an invalid item",
+        );
+        this.fail(error);
+        throw error;
+      }
+      return Object.freeze({
+        sessionId: this.info.sessionId,
+        itemId: event.itemId,
+      });
+    });
+  }
   async addMessage(
     role: "user" | "assistant",
     value: string,
@@ -508,17 +592,10 @@ export class RealtimeSession {
     if (role !== "user" && role !== "assistant")
       throw new RimeInputError("History role must be user or assistant");
     text(value);
-    return this.operation(options, async (signal) => {
-      const event = await this.request(
-        p.requests.item,
-        { item: { type: "message", role, text: value } },
-        signal,
-      );
-      return Object.freeze({
-        sessionId: this.info.sessionId,
-        itemId: event.itemId,
-      });
-    });
+    return this.createItem(
+      { type: "message", role, text: value },
+      { signal: options.signal },
+    );
   }
   async submitToolResult(
     call: t.ToolCallRef,
@@ -791,6 +868,8 @@ export class RealtimeSession {
     // Check echoed acknowledgments before changing response or item state.
     if (
       payload.kind === "session.updated" ||
+      payload.kind === "history.listed" ||
+      payload.kind === "item.deleted" ||
       payload.kind === "item.created" ||
       payload.kind === "tool.result.created" ||
       payload.kind === "response.started"
@@ -801,6 +880,17 @@ export class RealtimeSession {
         !(payload.kind === "item.created" && pending.request.allowsItemCreated)
       )
         pending.request.check(payload);
+      if (
+        pending?.requiresItemId &&
+        ((payload.kind !== "item.created" &&
+          payload.kind !== "tool.result.created") ||
+          !payload.itemId ||
+          (pending.expectedItemId !== undefined &&
+            pending.expectedItemId !== payload.itemId))
+      )
+        throw new RimeStreamError(
+          "history acknowledgment names an invalid item",
+        );
       if (
         pending &&
         payload.kind === "tool.result.created" &&
@@ -844,9 +934,30 @@ export class RealtimeSession {
         this.settle(echo, { ...payload, info: this.sessionInfo });
         return;
       }
-      case "tool.result.created":
+      case "history.listed":
         this.settle(echo, payload);
         return;
+      case "item.deleted": {
+        const pending = this.pending.get(echo ?? "");
+        if (pending && pending.target !== payload.itemId)
+          throw new RimeStreamError(
+            "deletion acknowledgment names another item",
+          );
+        this.settle(echo, payload);
+        return;
+      }
+      case "tool.result.created": {
+        const pending = this.pending.get(echo ?? "");
+        if (pending?.toolOutputDigest !== undefined)
+          for (const response of this.responses.values()) {
+            if (response.calls.get(payload.callId) === null) {
+              response.calls.set(payload.callId, pending.toolOutputDigest);
+              response.changed.set();
+            }
+          }
+        this.settle(echo, payload);
+        return;
+      }
       case "item.created": {
         const pending = this.pending.get(echo ?? "");
         if (pending?.request.allowsItemCreated) pending.itemId = payload.itemId;
