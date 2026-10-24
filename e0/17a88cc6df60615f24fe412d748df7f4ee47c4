@@ -1,0 +1,93 @@
+conformance/prism/protocol.json
+  s_d7ddabe0130f0d::t_e2bc8fb06b3b2b 1243-1394
+conformance/prism/schema.json
+  s_d7ddabe0130f0d::t_ad2cc8508df73b 336-611
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_ffa82ae8d84ab6 16-23,100-101,116-117,311-330,589,606-607,624-625,1000-1002,1006-1017,1406,1411-1422,1428-1430,1433,1517-1694
+go/README.md
+  s_d7ddabe0130f0d::t_ba842766381455 511,588-614
+go/realtime_history.go
+  s_d7ddabe0130f0d::t_fb8da19a4ff8cc 1-126
+go/realtime_history_test.go
+  s_d7ddabe0130f0d::t_0c0ec13b9757c4 1-155
+go/realtime_protocol.go
+  s_d7ddabe0130f0d::t_eb8b72caa29683 57-58,269-271,277,283-295
+go/realtime_session.go
+  s_d7ddabe0130f0d::t_bed7fbe6153d09 53-57,357,814-822,875,896-917
+go/testdata/prism/protocol.json
+  s_d7ddabe0130f0d::t_fce30086eed68a 1243-1394
+go/testdata/prism/schema.json
+  s_d7ddabe0130f0d::t_1bf4230c9db607 336-611
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_e19efbfca0e303 16-23,100-101,116-117,311-330,589,606-607,624-625,1000-1002,1006-1017,1406,1411-1422,1428-1430,1433,1517-1694
+python/docs/realtime.md
+  s_d7ddabe0130f0d::t_9dff105e5c01ea 486,518-546
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_d7ddabe0130f0d::t_1c54610afcda7a 16-19,72-75
+python/src/rimelabs_sdk/realtime/_history.py
+  s_d7ddabe0130f0d::t_b3516f19118ffd 1-87
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_d7ddabe0130f0d::t_71cd987a3dc908 15,99,104-115,135-136,168-169,193-194,197-198,426-429,431,434-440
+python/src/rimelabs_sdk/realtime/_session.py
+  s_d7ddabe0130f0d::t_2a12ac89b67e5f 35,81-83,294-300,432-469,474,702-710,717-729,768-776,778-786
+python/src/rimelabs_sdk/realtime/_types.py
+  s_d7ddabe0130f0d::t_edcb3a071723e6 159-189
+python/tests/test_realtime_history.py
+  s_d7ddabe0130f0d::t_3b9e449228fb80 1-209
+rust/README.md
+  s_d7ddabe0130f0d::t_22c9e59d79f1ed 517,571-597
+rust/src/lib.rs
+  s_d7ddabe0130f0d::t_2196b0999f8a40 27-30
+rust/src/realtime/dispatch.rs
+  s_d7ddabe0130f0d::t_96063767588298 17-42,45-46
+rust/src/realtime/history.rs
+  s_d7ddabe0130f0d::t_32d9326ae9e740 1-137
+rust/src/realtime/mod.rs
+  s_d7ddabe0130f0d::t_fdaab0ed3bde48 7-8
+rust/src/realtime/protocol.rs
+  s_d7ddabe0130f0d::t_f4dc5e48803801 8-9,205-206,234,240-242,249-261
+rust/src/realtime/session.rs
+  s_d7ddabe0130f0d::t_e7be6675a8de67 188-190,229,482-530,538-556
+rust/src/realtime/tests/history.rs
+  s_d7ddabe0130f0d::t_e1adc142edcf91 1-225
+rust/src/realtime/tests/mod.rs
+  s_d7ddabe0130f0d::t_78baef2c4f320e 12
+rust/src/realtime/worker.rs
+  s_d7ddabe0130f0d::t_91f6f49d9cf275 392-403
+rust/testdata/prism/protocol.json
+  s_d7ddabe0130f0d::t_32d8d4ce6ec6fc 1243-1394
+rust/testdata/prism/schema.json
+  s_d7ddabe0130f0d::t_cc7e06525b0f55 336-611
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_79c8635d1c646a 16-23,100-101,116-117,311-330,589,606-607,624-625,1000-1002,1006-1017,1406,1411-1422,1428-1430,1433,1517-1694
+typescript/docs/realtime.md
+  s_d7ddabe0130f0d::t_eb5c6cc8ea4957 279-281,291-301,513,546-572
+typescript/src/realtime/history.ts
+  s_d7ddabe0130f0d::t_abf60a80eb2fd9 1-88
+typescript/src/realtime/protocol.ts
+  s_d7ddabe0130f0d::t_3b80b026160686 6,71,75-82,96-97,123-124,149-164,447,451-455,461-470
+typescript/src/realtime/session.ts
+  s_d7ddabe0130f0d::t_a54212df5e1ec1 20,45-47,335-345,520-521,523-537,539-541,543,545-582,589-601,873-874,885-895,940-960,963
+typescript/src/realtime/types.ts
+  s_d7ddabe0130f0d::t_cf0760e62af2ce 105-129
+typescript/tests/fixtures/realtime.ts
+  s_d7ddabe0130f0d::t_094c197b013167 184-187
+typescript/tests/realtime-history.test.mjs
+  s_d7ddabe0130f0d::t_4c863fd8afe729 1-238
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e017a88cc6df60615f24fe412d748df7f4ee47c4",
+  "prompts": {},
+  "sessions": {
+    "s_d7ddabe0130f0d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a70-317d-7611-ba01-b75004363a9e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
