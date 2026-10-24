@@ -1,0 +1,40 @@
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_cccf0eebe1ab6e 991,1395-1404,1409
+  s_d7ddabe0130f0d::t_f3de5cb4a1a3f4 1388,1412,1415
+  s_d7ddabe0130f0d::t_0d02666f08fd96 1555,1581,1585,1589,1602,1606,1675
+  s_d7ddabe0130f0d::t_b0fbcb94ce277a 1394
+go/realtime_history_test.go
+  s_d7ddabe0130f0d::t_cccf0eebe1ab6e 34-40
+go/README.md
+  s_d7ddabe0130f0d::t_cccf0eebe1ab6e 597-599
+typescript/docs/realtime.md
+  s_d7ddabe0130f0d::t_cccf0eebe1ab6e 279-281,297-301
+  s_d7ddabe0130f0d::t_f3de5cb4a1a3f4 291-295
+  s_d7ddabe0130f0d::t_51c051bea1c733 296
+conformance/prism/schema.json
+  s_d7ddabe0130f0d::t_b87c0c4d24376e 336-611
+go/testdata/prism/schema.json
+  s_d7ddabe0130f0d::t_c161bd30dfc83f 336-611
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_046595e9448420 991,1388,1394-1404,1409,1412,1415,1555,1581,1585,1589,1602,1606,1675
+rust/testdata/prism/schema.json
+  s_d7ddabe0130f0d::t_8e47eecc83636c 336-611
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_d7ddabe0130f0d::t_ca9ac059a68801 991,1388,1394-1404,1409,1412,1415,1555,1581,1585,1589,1602,1606,1675
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f6a6915ba22dd09348e93e151190b21dbf54f51",
+  "prompts": {},
+  "sessions": {
+    "s_d7ddabe0130f0d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a70-317d-7611-ba01-b75004363a9e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
