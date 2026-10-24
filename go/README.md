@@ -594,9 +594,9 @@ function results. Creating an item does not start a reply or execute a tool.
 Message text is limited to 4000 Unicode characters. Optional client item IDs have
 1 to 32 characters. Tool arguments and results preserve the supplied strings.
 
-Omit the insertion anchor to append, use `root` to insert first, or give an item
-ID to insert after its whole turn. Results go after their calls and cannot take
-an anchor. Add a past call before adding its result.
+Pass an empty string as the insertion anchor to append, use `root` to insert
+first, or give an item ID to insert after its whole turn. Results go after their
+calls and require an empty anchor. Add a past call before adding its result.
 
 Deletion hides items from subsequent replies and keeps the conversation record.
 Deleting a call or its result hides both. An active reply keeps its original

@@ -988,6 +988,7 @@ components:
             - $ref: '#/components/schemas/functionCall'
         previous_item_id:
           type: string
+          minLength: 1
           description: >-
             Where the item goes: after the item with this id, deleted or not,
             and after the whole turn it belongs to (the user's words, the
@@ -1384,20 +1385,34 @@ components:
                       const: message
                     id:
                       type: string
+                      minLength: 1
                     role:
                       oneOf:
                         - const: user
                         - const: assistant
                         - const: system
                 - type: object
+                  required: [type, id, call_id]
+                  properties:
+                    type:
+                      const: function_call
+                    id:
+                      type: string
+                      minLength: 1
+                    call_id:
+                      type: string
+                      minLength: 1
+                - type: object
                   required: [type, call_id]
                   properties:
                     type:
-                      enum: [function_call_output, function_call]
+                      const: function_call_output
                     id:
                       type: string
+                      minLength: 1
                     call_id:
                       type: string
+                      minLength: 1
 
     conversationItemTruncatedEvent:
       allOf:
@@ -1537,6 +1552,7 @@ components:
               const: message
             id:
               type: string
+              minLength: 1
               description: >-
                 The item, which `conversation.item.delete` takes, for example
                 "item_6e117c727990f830".
@@ -1562,12 +1578,15 @@ components:
               const: function_call
             id:
               type: string
+              minLength: 1
               description: The call's item.
             call_id:
               type: string
+              minLength: 1
               description: The call, as its result names it.
             name:
               type: string
+              minLength: 1
               description: The tool's name.
             arguments:
               type: string
@@ -1580,9 +1599,11 @@ components:
               const: function_call_output
             id:
               type: string
+              minLength: 1
               description: The result's item.
             call_id:
               type: string
+              minLength: 1
               description: The call it answers.
             output:
               type: string
@@ -1651,4 +1672,5 @@ components:
               $ref: '#/components/schemas/requestEventIdEcho'
             item_id:
               type: string
+              minLength: 1
               description: The item the request named.

@@ -276,6 +276,9 @@ Every method returns a promise. Arguments without `?` are required.
 | `sendAudio(chunk, options?)` | Sends microphone audio with transport backpressure. |
 | `requestReply(options?)` | Requests a reply without new user input; returns `ResponseRef`. Options can include `instruction` and `toolCall`. |
 | `addMessage(role, text, options?)` | Adds user or assistant history without a reply; returns `ItemRef` after acknowledgment. |
+| `getHistory(options?)` | Returns the ordered `readonly HistoryItem[]` that the next reply would see. |
+| `createItem(item, options?)` | Adds a message, past tool call, or tool result without a reply; returns `ItemRef` after acknowledgment. Options can include `previousItemId`. |
+| `deleteItem(itemId, options?)` | Hides an item from later replies and waits for acknowledgment. |
 | `submitToolResult(call, output, options?)` | Records a string result and waits for acknowledgment. |
 | `continueReply(parent, options?)` | Waits for parent completion and all tool result acknowledgments, then returns a new `ResponseRef`. |
 | `cancel(response, options?)` | Requests generation cancellation and waits for a terminal response or refusal. |
@@ -285,12 +288,17 @@ Every method returns a promise. Arguments without `?` are required.
 | `close()` | Closes the session and releases its resources. |
 
 Operation options accept `signal?: AbortSignal`. `requestReply` accepts its
-instruction, tool call, and signal in one object. Methods other than `update`,
-`sendText`, `requestReply`, `addMessage`, and `continueReply` return `Promise<void>`.
+instruction, tool call, and signal in one object. `update` returns
+`Promise<SessionInfo>`. `sendText`, `requestReply`, and `continueReply` return
+`Promise<ResponseRef>`. `addMessage` and `createItem` return `Promise<ItemRef>`.
+`getHistory` returns `Promise<readonly HistoryItem[]>`. The other methods return
+`Promise<void>`.
 
-Text must be nonblank and contain at most 4,000 Unicode characters. History
-roles are `"user"` and `"assistant"`. A reply instruction applies to one response;
-it does not replace session instructions.
+`sendText` and `addMessage` require nonblank text of at most 4,000 Unicode
+characters. `addMessage` accepts `"user"` and `"assistant"` roles. `createItem`
+also accepts `"system"` messages and allows blank message text, with the same
+length limit. A reply instruction applies to one response; it does not replace
+session instructions.
 
 A returned `ResponseRef` means generation started. Read `response.ended` for the
 terminal status. Generation can finish before cancellation takes effect, so a

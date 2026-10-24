@@ -31,6 +31,13 @@ func TestRealtimeHistory(t *testing.T) {
 		if !reflect.DeepEqual(q["item"], wire) {
 			t.Fatal(q)
 		}
+		if got, present := q["previous_item_id"]; anchor == "" {
+			if present {
+				t.Fatal("sent an omitted anchor", q)
+			}
+		} else if !present || got != anchor {
+			t.Fatal("incorrect history anchor", q)
+		}
 		p.send(rtObject{"type": "conversation.item.created", "prism_request_event_id": q["event_id"], "item": wire})
 		rtWait(t, done)
 	}
