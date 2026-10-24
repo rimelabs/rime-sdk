@@ -10,3 +10,4 @@ mod schema;
 mod updates;
 
 mod history;
+mod truncation;

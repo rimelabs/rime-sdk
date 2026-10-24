@@ -6,6 +6,8 @@ import * as t from "./types.js";
 import { listedItem } from "./history.js";
 
 export interface SessionSettings {
+  truncation?:
+    "auto" | "disabled" | { type: "retention_ratio"; retention_ratio: number };
   modalities: ("text" | "audio")[];
   input_audio_format: "pcm16";
   turn_detection: {
@@ -34,12 +36,14 @@ export function responseMetadata(value: unknown): t.Labels {
   return Object.freeze({ ...(value as t.Labels) });
 }
 export interface SessionPatch {
+  truncation?: SessionSettings["truncation"];
   voice?: string;
   instructions?: string;
   tools?: SessionSettings["tools"];
   turn_detection?: { interrupt_response: boolean };
 }
 export interface SessionView {
+  truncation: t.Truncation | null;
   settingsRevision: number | null;
   id: string;
   requestId: string | null;
@@ -230,6 +234,35 @@ function duration(value: unknown, field: string): number | null {
     return invalid(field);
   return value;
 }
+export function truncationSettings(
+  value: t.Truncation,
+): NonNullable<SessionSettings["truncation"]> {
+  if (value === "auto" || value === "disabled") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((key) => key === "retentionRatio") &&
+    typeof value.retentionRatio === "number" &&
+    value.retentionRatio > 0 &&
+    value.retentionRatio <= 1
+  )
+    return { type: "retention_ratio", retention_ratio: value.retentionRatio };
+  throw new RimeInputError(
+    "truncation must be auto, disabled, or a retentionRatio above zero and at most one",
+  );
+}
+function truncation(value: unknown): t.Truncation {
+  if (value === "auto" || value === "disabled") return value;
+  const o = object(value, "session.truncation");
+  if (
+    o.type !== "retention_ratio" ||
+    typeof o.retention_ratio !== "number" ||
+    !(o.retention_ratio > 0 && o.retention_ratio <= 1)
+  )
+    return invalid("session.truncation");
+  return Object.freeze({ retentionRatio: o.retention_ratio });
+}
 function session(value: unknown): SessionView {
   const view = object(value, "session");
   const detection =
@@ -276,6 +309,8 @@ function session(value: unknown): SessionView {
     invalid("session.prism_effective_interrupt_response");
   return {
     settingsRevision: revision(view),
+    truncation:
+      view.truncation === undefined ? null : truncation(view.truncation),
     id: id(view.id, "session.id"),
     requestId: optionalString(view.request_id, "session.request_id"),
     responseMetadata:

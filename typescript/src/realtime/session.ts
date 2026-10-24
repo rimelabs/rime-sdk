@@ -458,6 +458,8 @@ export class RealtimeSession {
    * Cancellation after submission does not undo an accepted update. */
   async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
     const settings: p.SessionPatch = {};
+    if (options.truncation !== undefined)
+      settings.truncation = p.truncationSettings(options.truncation);
     for (const name of ["instructions", "voice"] as const) {
       const value = options[name];
       if (value !== undefined) {
@@ -924,6 +926,7 @@ export class RealtimeSession {
           toolContinuationTimeoutS: view.toolContinuationTimeoutS,
           turnDetection: view.turnDetection,
           settingsRevision: view.settingsRevision,
+          truncation: view.truncation,
           requestId: view.requestId,
           responseMetadata: view.responseMetadata,
         });

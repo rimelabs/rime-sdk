@@ -27,7 +27,7 @@ pub use realtime::{
     HistoryItem, HistoryRole, ItemRef, OutputRef, PlaybackReport, PrismFiller, Realtime,
     RealtimeConnectOptions, RealtimeEvent, RealtimeEvents, RealtimeFault, RealtimeSession,
     RealtimeTimeouts, RealtimeUpdateOptions, ReplyOptions, ResponseRef, SessionEvent, SessionInfo,
-    ToolCallRef, ToolDefinition, TurnDetection,
+    ToolCallRef, ToolDefinition, Truncation, TurnDetection,
 };
 pub use stream::AudioStream;
 pub use stt::{

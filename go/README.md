@@ -611,3 +611,20 @@ item, err := session.CreateItem(ctx, rime.HistoryItem{Type: rime.HistoryMessage,
 items, err := session.GetHistory(ctx)
 err = session.DeleteItem(ctx, item.ItemID())
 ```
+
+## History truncation
+
+Available in the next SDK release. Set `truncation` at connection setup or during
+an existing session. Omit it to preserve compatibility with older Prism servers.
+The server must support truncation before you send this setting.
+
+`auto` drops the oldest turns and retains 0.8 of the available history capacity.
+`disabled` keeps all history and reports `context_length_exceeded` when it no
+longer fits. A retention ratio above zero and at most one selects how much history
+capacity to retain. Instructions and tools remain. This setting does not delete
+items from the conversation record. Session information reports the acknowledged
+policy, or an absent value when an older server does not publish it.
+
+```text
+session.Update(ctx, rime.RealtimeUpdateOptions{Truncation: &rime.Truncation{Mode: rime.TruncationDisabled}})
+```

@@ -174,6 +174,10 @@ func (s *RealtimeSession) interruptionPolicy(revision *uint64) (bool, error) {
 
 func cloneSessionInfo(info SessionInfo) SessionInfo {
 	v := info
+	if v.Truncation != nil {
+		t := *v.Truncation
+		v.Truncation = &t
+	}
 	if v.SettingsRevision != nil {
 		n := *v.SettingsRevision
 		v.SettingsRevision = &n

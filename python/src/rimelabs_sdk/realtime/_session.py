@@ -378,6 +378,7 @@ class RealtimeSession:
         tools: Sequence[t.ToolDefinition] | None = None,
         voice: str | None = None,
         interrupt_on_speech: bool | None = None,
+        truncation: t.Truncation | None = None,
     ) -> t.SessionInfo:
         """Apply supplied settings and wait for the server acknowledgment.
 
@@ -387,6 +388,8 @@ class RealtimeSession:
         """
         self._check()
         settings: p.SessionPatch = {}
+        if truncation is not None:
+            settings["truncation"] = p.truncation_settings(truncation)
         for name, value in (("instructions", instructions), ("voice", voice)):
             if value is not None:
                 if not isinstance(value, str):
@@ -753,6 +756,7 @@ class RealtimeSession:
                 tool_continuation_timeout_s=view.tool_continuation_timeout_s,
                 turn_detection=view.turn_detection,
                 settings_revision=view.settings_revision,
+                truncation=view.truncation,
                 request_id=view.request_id,
                 response_metadata=view.response_metadata,
             )

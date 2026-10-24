@@ -154,7 +154,26 @@ const invalidTiming: TurnDetection = {
 void invalidTiming;
 
 // Internal request descriptors must retain their specific result types.
-import { requests, type Acknowledgment } from "../../dist/realtime/protocol.js";
+import {
+  requests,
+  type Acknowledgment,
+  type SessionPatch,
+  type SessionSettings,
+} from "../../dist/realtime/protocol.js";
+const truncationSettings: SessionSettings["truncation"][] = [
+  "auto",
+  "disabled",
+  { type: "retention_ratio", retention_ratio: 0.9 },
+  // @ts-expect-error Unsupported truncation strings cannot be sent.
+  "future",
+  // @ts-expect-error Ratio objects must use the known wire discriminator.
+  { type: "future", retention_ratio: 0.9 },
+];
+const invalidTruncationPatch: SessionPatch = {
+  // @ts-expect-error Partial updates use the same closed wire type.
+  truncation: "future",
+};
+void [truncationSettings, invalidTruncationPatch];
 function checkAcknowledgmentTypes(ack: Acknowledgment) {
   const created: ResponseRef = requests.create.result(ack).response;
   const item: string = requests.item.result(ack).itemId;

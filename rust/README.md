@@ -594,3 +594,22 @@ let item = session.create_item(HistoryItem::Message { id: None, role: HistoryRol
 let items = session.get_history().await?;
 session.delete_item(item.item_id()).await?;
 ```
+
+## History truncation
+
+Available in the next SDK release. Set `truncation` at connection setup or during
+an existing session. Omit it to preserve compatibility with older Prism servers.
+The server must support truncation before you send this setting.
+
+`auto` drops the oldest turns and retains 0.8 of the available history capacity.
+`disabled` keeps all history and reports `context_length_exceeded` when it no
+longer fits. A retention ratio above zero and at most one selects how much history
+capacity to retain. Instructions and tools remain. This setting does not delete
+items from the conversation record. Session information reports the acknowledged
+policy, or an absent value when an older server does not publish it.
+
+```text
+session.update(RealtimeUpdateOptions::default().truncation(Truncation::Disabled)).await?;
+```
+
+Migration: existing `SessionInfo` struct literals must add `truncation: None`.

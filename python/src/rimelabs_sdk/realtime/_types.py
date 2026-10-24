@@ -44,6 +44,21 @@ _FILLER_WHITESPACE = (
 )
 
 
+@dataclass(frozen=True)
+class RetentionRatio:
+    """Fraction of history capacity to keep after truncation, above zero and at most one."""
+
+    retention_ratio: float
+
+    def __post_init__(self):
+        value = self.retention_ratio
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < value <= 1:
+            raise RimeInputError("retention_ratio must be above zero and at most one")
+
+
+Truncation: TypeAlias = Literal["auto", "disabled"] | RetentionRatio
+
+
 @dataclass(frozen=True, kw_only=True)
 class TurnDetection:
     """Optional turn timing overrides. None leaves a setting to the server.
@@ -204,6 +219,7 @@ class SessionInfo:
     """Current acknowledged settings. The revision is None when not published."""
 
     settings_revision: int | None = None
+    truncation: Truncation | None = None
     session_id: str
     model: Literal["prism"]
     voice: str
