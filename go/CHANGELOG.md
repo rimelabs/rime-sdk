@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.0-alpha.13](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.12...go/v0.1.0-alpha.13) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rust SessionInfo struct literals must add truncation: None. The optional field reports the policy published by the server.
+* Go Prism service faults now match ErrRealtime instead of ErrStream. Rust service faults now use ErrorKind::Realtime instead of Stream. Keep fault inspection for code, scope, and retry classification.
+
+### Features
+
+* add Prism conversation history operations ([#108](https://github.com/rimelabs/rime-sdk/issues/108)) ([1f33051](https://github.com/rimelabs/rime-sdk/commit/1f330517163cd521bd03321a0728295f84da0316))
+* add Prism history truncation controls ([#109](https://github.com/rimelabs/rime-sdk/issues/109)) ([b8b1aa1](https://github.com/rimelabs/rime-sdk/commit/b8b1aa172e69df650bfeda274bb91329f7e5bc52))
+
+
+### Bug Fixes
+
+* distinguish Prism faults and correct SDK release guidance ([#102](https://github.com/rimelabs/rime-sdk/issues/102)) ([b152abb](https://github.com/rimelabs/rime-sdk/commit/b152abb1ac4e5dabb92e747c04a6bc70aa72b60e))
+
 ## [0.1.0-alpha.12](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.11...go/v0.1.0-alpha.12) (2026-10-23)
 
 
