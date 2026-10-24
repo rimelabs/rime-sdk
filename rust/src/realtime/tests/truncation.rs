@@ -3,18 +3,23 @@ use crate::realtime::{RealtimeConnectOptions, RealtimeUpdateOptions, Truncation}
 use serde_json::json;
 #[tokio::test]
 async fn truncation_connect_update_and_acknowledgment() {
-    for value in [
-        Truncation::Auto,
-        Truncation::Disabled,
-        Truncation::RetentionRatio(0.9),
-        Truncation::RetentionRatio(1.0),
+    for (value, wire) in [
+        (Truncation::Auto, json!("auto")),
+        (Truncation::Disabled, json!("disabled")),
+        (
+            Truncation::RetentionRatio(0.9),
+            json!({"type":"retention_ratio","retention_ratio":0.9}),
+        ),
+        (
+            Truncation::RetentionRatio(1.0),
+            json!({"type":"retention_ratio","retention_ratio":1.0}),
+        ),
     ] {
-        let settings = crate::realtime::client::settings(
-            &RealtimeConnectOptions::default().truncation(value.clone()),
-        )
-        .unwrap();
         let mut p = Peer::new().await;
-        let (c, s) = p.setup().await;
+        let (c, s) = p
+            .setup_with(RealtimeConnectOptions::default().truncation(value.clone()))
+            .await;
+        assert_eq!(p.update().await["truncation"], wire);
         assert!(s.info().truncation.is_none());
         let clone = s.clone();
         let setting = value.clone();
@@ -24,8 +29,8 @@ async fn truncation_connect_update_and_acknowledgment() {
                 .await
         });
         let q = p.next("session.update").await;
-        assert_eq!(q["session"], json!({"truncation":settings["truncation"]}));
-        p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],"session":{"id":"session-1","truncation":settings["truncation"]}})).await;
+        assert_eq!(q["session"], json!({"truncation":wire}));
+        p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],"session":{"id":"session-1","truncation":wire}})).await;
         assert_eq!(task.await.unwrap().unwrap().truncation, Some(value.clone()));
         assert_eq!(s.info().truncation, Some(value));
         c.close().await;

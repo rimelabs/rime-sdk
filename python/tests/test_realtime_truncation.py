@@ -36,6 +36,23 @@ async def test_connect_omits_or_sends_explicit_truncation(monkeypatch, setting, 
         assert current.info.truncation is None
 
 
+@pytest.mark.parametrize("value", [False, {}, "unknown", 0.9, float("nan"), float("inf")])
+async def test_invalid_connect_setting_never_opens_transport(monkeypatch, value):
+    opened = False
+
+    async def connect(*args, **kwargs):
+        nonlocal opened
+        opened = True
+        raise AssertionError("invalid settings opened the transport")
+
+    monkeypatch.setattr(_client, "connect", connect)
+    async with Rime(api_key="test") as client:
+        with pytest.raises(RimeInputError):
+            async with client.realtime.connect(truncation=value):
+                pytest.fail("invalid truncation was accepted")
+    assert not opened
+
+
 @pytest.mark.parametrize("setting,wire", CASES)
 async def test_update_returns_acknowledged_truncation(monkeypatch, setting, wire):
     async with session(monkeypatch) as (current, peer, _):

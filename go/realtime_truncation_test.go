@@ -9,19 +9,29 @@ import (
 )
 
 func TestRealtimeTruncation(t *testing.T) {
-	for _, setting := range []*Truncation{nil, {Mode: TruncationAuto}, {Mode: TruncationDisabled}, {Mode: TruncationRetentionRatio, Ratio: 0.9}, {Mode: TruncationRetentionRatio, Ratio: 1}} {
-		_, settings, _, err := rtSettings(RealtimeConnectOptions{Truncation: setting})
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, scenario := range []struct {
+		setting *Truncation
+		wire    any
+	}{
+		{nil, nil},
+		{&Truncation{Mode: TruncationAuto}, "auto"},
+		{&Truncation{Mode: TruncationDisabled}, "disabled"},
+		{&Truncation{Mode: TruncationRetentionRatio, Ratio: 0.9}, rtObject{"type": "retention_ratio", "retention_ratio": 0.9}},
+		{&Truncation{Mode: TruncationRetentionRatio, Ratio: 1}, rtObject{"type": "retention_ratio", "retention_ratio": float64(1)}},
+	} {
+		setting, want := scenario.setting, scenario.wire
+		p := newRealtimePeer(t)
+		_, s := p.setupWith(t, RealtimeConnectOptions{Truncation: setting})
+		settings := p.update()
 		if setting == nil {
 			if _, ok := settings["truncation"]; ok {
 				t.Fatal("sent an omitted policy")
 			}
 			continue
 		}
-		p := newRealtimePeer(t)
-		_, s := p.setup(t)
+		if !reflect.DeepEqual(settings["truncation"], want) {
+			t.Fatal(settings)
+		}
 		done := make(chan error, 1)
 		result := make(chan SessionInfo, 1)
 		go func() {
@@ -30,7 +40,6 @@ func TestRealtimeTruncation(t *testing.T) {
 			done <- err
 		}()
 		q := p.next("session.update")
-		want, _ := rtTruncation(*setting)
 		if !reflect.DeepEqual(q["session"], rtObject{"truncation": want}) {
 			t.Fatal(q)
 		}

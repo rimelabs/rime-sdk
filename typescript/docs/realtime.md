@@ -547,7 +547,8 @@ The server must support truncation before you send this setting.
 longer fits. A retention ratio above zero and at most one selects how much history
 capacity to retain. Instructions and tools remain. This setting does not delete
 items from the conversation record. Session information reports the acknowledged
-policy, or an absent value when an older server does not publish it.
+policy in `session.info.truncation`, or `null` when an older server does not
+publish it.
 
 ```text
 await session.update({ truncation: { retentionRatio: 0.9 } });
