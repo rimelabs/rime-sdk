@@ -1,0 +1,26 @@
+python/tests/test_realtime_truncation.py
+  s_d7ddabe0130f0d::t_89bc1d4186873a 40-55
+  s_d7ddabe0130f0d::t_2178392f9bbd15 39
+rust/src/realtime/tests/truncation.rs
+  s_d7ddabe0130f0d::t_89bc1d4186873a 6-16,19-22,32-33
+typescript/docs/realtime.md
+  s_d7ddabe0130f0d::t_89bc1d4186873a 550-551
+go/realtime_truncation_test.go
+  s_d7ddabe0130f0d::t_89bc1d4186873a 12-25,32-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b269d2b167d1c408dc447a64a554b6a4a4e9c3d6",
+  "prompts": {},
+  "sessions": {
+    "s_d7ddabe0130f0d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a16a70-317d-7611-ba01-b75004363a9e",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
