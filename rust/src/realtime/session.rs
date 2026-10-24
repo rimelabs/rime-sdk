@@ -185,6 +185,9 @@ enum Kind {
     Text,
     Reply,
     History,
+    HistoryGet,
+    HistoryDelete,
+    HistoryResult,
     Continue,
     Tool,
     Cancel,
@@ -223,6 +226,7 @@ struct Command {
 }
 #[derive(Default)]
 struct Answer {
+    history: Vec<super::HistoryItem>,
     info: Option<SessionInfo>,
     response: Option<ResponseRef>,
     item: Option<ItemRef>,
@@ -475,7 +479,55 @@ impl RealtimeSession {
         a.response
             .ok_or_else(|| Error::new(ErrorKind::Stream, "missing accepted response"))
     }
-    /// Add a user or assistant history message without a reply.
+    /// Read the items the next reply would see, in server order.
+    pub async fn get_history(&self) -> Result<Vec<super::HistoryItem>, Error> {
+        Ok(self
+            .invoke(Command::new(Kind::HistoryGet, json!({})))
+            .await?
+            .history)
+    }
+    /// Hide an item from future replies. A call and its result are hidden together.
+    pub async fn delete_item(&self, item_id: &str) -> Result<(), Error> {
+        if item_id.is_empty() {
+            return Err(Error::new(ErrorKind::Input, "item ID must not be empty"));
+        }
+        let mut command = Command::new(Kind::HistoryDelete, json!({"item_id":item_id}));
+        command.target = item_id.into();
+        self.invoke(command).await?;
+        Ok(())
+    }
+    /// Add history without a reply. Omit the anchor to append, use root to insert
+    /// first, or an item ID to follow its whole turn. Results cannot take an anchor.
+    pub async fn create_item(
+        &self,
+        item: super::HistoryItem,
+        previous_item_id: Option<&str>,
+    ) -> Result<ItemRef, Error> {
+        let value = super::history::settings(&item)?;
+        let mut body = json!({"item":value});
+        if let Some(anchor) = previous_item_id {
+            if anchor.is_empty() || matches!(item, super::HistoryItem::FunctionResult { .. }) {
+                return Err(Error::new(ErrorKind::Input, "invalid history anchor"));
+            }
+            body["previous_item_id"] = json!(anchor);
+        }
+        let mut command = Command::new(Kind::History, body);
+        command.target = item.id().unwrap_or_default().into();
+        if let super::HistoryItem::FunctionResult {
+            call_id, output, ..
+        } = item
+        {
+            command.kind = Kind::HistoryResult;
+            command.target = call_id;
+            command.digest = Some(Sha256::digest(output.as_bytes()).into());
+        }
+        Ok(self
+            .invoke(command)
+            .await?
+            .item
+            .expect("history acknowledgment"))
+    }
+    /// Add a user or assistant message without requesting a reply.
     pub async fn add_message(
         &self,
         role: &str,
@@ -483,19 +535,25 @@ impl RealtimeSession {
     ) -> Result<ItemRef, Error> {
         let value = value.into();
         text(&value, 4000)?;
-        if !matches!(role, "user" | "assistant") {
-            return Err(Error::new(
-                ErrorKind::Input,
-                "history role must be user or assistant",
-            ));
-        }
-        self.invoke(Command::new(
-            Kind::History,
-            json!({"item":{"type":"message","role":role,"text":value}}),
-        ))
-        .await?
-        .item
-        .ok_or_else(|| Error::new(ErrorKind::Stream, "missing history item"))
+        let role = match role {
+            "user" => super::HistoryRole::User,
+            "assistant" => super::HistoryRole::Assistant,
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::Input,
+                    "history role must be user or assistant",
+                ))
+            }
+        };
+        self.create_item(
+            super::HistoryItem::Message {
+                id: None,
+                role,
+                text: value,
+            },
+            None,
+        )
+        .await
     }
     /// Request a proactive reply, optionally about a recorded tool result.
     pub async fn request_reply(&self, options: ReplyOptions) -> Result<ResponseRef, Error> {

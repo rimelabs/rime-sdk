@@ -389,6 +389,18 @@ impl Worker {
                     _ => unreachable!(),
                 }
             }
+            Kind::HistoryGet => {
+                c.expected = "history.listed";
+                "prism.conversation.get"
+            }
+            Kind::HistoryDelete => {
+                c.expected = "item.deleted";
+                "conversation.item.delete"
+            }
+            Kind::HistoryResult => {
+                c.expected = "tool.result.created";
+                "conversation.item.create"
+            }
             Kind::History => {
                 c.expected = "item.created";
                 "conversation.item.create"

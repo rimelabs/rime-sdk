@@ -1241,6 +1241,158 @@
     "invalid": true
   },
   {
+    "name": "history listing all item types",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "message",
+          "id": "note",
+          "role": "system",
+          "text": " Transferred. "
+        },
+        {
+          "type": "function_call",
+          "id": "call-item",
+          "call_id": "call-1",
+          "name": "lookup",
+          "arguments": " {\"n\": 1} "
+        },
+        {
+          "type": "function_call_output",
+          "id": "result-item",
+          "call_id": "call-1",
+          "output": " raw output "
+        }
+      ]
+    },
+    "expected_kind": "history.listed"
+  },
+  {
+    "name": "empty history listing",
+    "event": {
+      "type": "prism.conversation",
+      "items": []
+    },
+    "expected_kind": "history.listed"
+  },
+  {
+    "name": "history deletion acknowledgment",
+    "event": {
+      "type": "conversation.item.deleted",
+      "item_id": "note"
+    },
+    "expected_kind": "item.deleted"
+  },
+  {
+    "name": "past function call acknowledgment",
+    "event": {
+      "type": "conversation.item.created",
+      "item": {
+        "type": "function_call",
+        "id": "call-item",
+        "call_id": "call-1"
+      }
+    },
+    "expected_kind": "item.created"
+  },
+  {
+    "name": "invalid history None",
+    "event": {
+      "type": "prism.conversation",
+      "items": null
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history {}",
+    "event": {
+      "type": "prism.conversation",
+      "items": {}
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history [{'type': 'message', 'id': 'x', 'role': 'user', 'text': False}]",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "message",
+          "id": "x",
+          "role": "user",
+          "text": false
+        }
+      ]
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history [{'type': 'message', 'id': '', 'role': 'user', 'text': 'x'}]",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "message",
+          "id": "",
+          "role": "user",
+          "text": "x"
+        }
+      ]
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history [{'type': 'function_call', 'id': 'x', 'call_id': 'c', 'name': 'f', 'arguments': {}}]",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "function_call",
+          "id": "x",
+          "call_id": "c",
+          "name": "f",
+          "arguments": {}
+        }
+      ]
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history [{'type': 'function_call_output', 'id': 'x', 'call_id': 'c'}]",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "function_call_output",
+          "id": "x",
+          "call_id": "c"
+        }
+      ]
+    },
+    "invalid": true
+  },
+  {
+    "name": "invalid history [{'type': 'unknown', 'id': 'x'}]",
+    "event": {
+      "type": "prism.conversation",
+      "items": [
+        {
+          "type": "unknown",
+          "id": "x"
+        }
+      ]
+    },
+    "invalid": true
+  },
+  {
+    "name": "missing history deletion item ID",
+    "event": {
+      "type": "conversation.item.deleted"
+    },
+    "invalid": true
+  },
+  {
     "name": "session truncation auto",
     "event": {
       "type": "session.updated",

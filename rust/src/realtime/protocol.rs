@@ -5,6 +5,8 @@ use serde_json::{Map, Value};
 
 pub(super) struct Wire {
     pub kind: String,
+    pub history: Vec<super::HistoryItem>,
+    pub created_id: Option<String>,
     pub interrupt_known: bool,
     pub event_id: String,
     pub request_id: Option<String>,
@@ -200,6 +202,8 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
     let mut w = Wire {
         interrupt_known: false,
         kind: String::new(),
+        history: vec![],
+        created_id: None,
         event_id: String::new(),
         request_id: None,
         target: String::new(),
@@ -227,17 +231,33 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                 .is_some()
         }
         "conversation.item.created" => {
+            w.created_id = optional(&v["item"]["id"])?;
             let d = object(&v["item"])?;
             if v["item"]["type"] == "function_call_output" {
                 w.kind = "tool.result.created".into();
                 w.target = id(&v["item"]["call_id"])?
             } else {
-                if d.get("type").is_some_and(|v| v != "message") {
+                if d.get("type")
+                    .is_some_and(|v| v != "message" && v != "function_call")
+                {
                     return Err(invalid("item.type"));
                 }
                 w.kind = "item.created".into();
                 w.target = id(&v["item"]["id"])?
             }
+        }
+        "prism.conversation" => {
+            w.kind = "history.listed".into();
+            w.history = v["items"]
+                .as_array()
+                .ok_or_else(|| invalid("items"))?
+                .iter()
+                .map(super::history::listed)
+                .collect::<Result<_, _>>()?;
+        }
+        "conversation.item.deleted" => {
+            w.kind = "item.deleted".into();
+            w.target = id(&v["item_id"])?;
         }
         "input_audio_buffer.cleared" => w.kind = "audio.cleared".into(),
         "conversation.item.truncated" => {

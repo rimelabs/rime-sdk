@@ -3,6 +3,7 @@
 import { RimeInputError, RimeStreamError } from "../errors.js";
 import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
+import { listedItem } from "./history.js";
 
 export interface SessionSettings {
   truncation?:
@@ -67,8 +68,17 @@ export interface ItemCreated {
   itemId: string;
 }
 export interface ToolResultCreated {
+  itemId: string | null;
   kind: "tool.result.created";
   callId: string;
+}
+export interface HistoryListed {
+  kind: "history.listed";
+  items: readonly t.HistoryItem[];
+}
+export interface ItemDeleted {
+  kind: "item.deleted";
+  itemId: string;
 }
 export interface AudioCleared {
   kind: "audio.cleared";
@@ -83,6 +93,8 @@ export interface ResponseEnded extends t.ResponseEnded {
 }
 export type Acknowledgment =
   | SessionUpdated
+  | HistoryListed
+  | ItemDeleted
   | ItemCreated
   | ToolResultCreated
   | AudioCleared
@@ -108,6 +120,8 @@ export interface ServerEvent {
 export type RequestKind =
   | "session.update"
   | "conversation.item.create"
+  | "prism.conversation.get"
+  | "conversation.item.delete"
   | "response.create"
   | "response.cancel"
   | "input_audio_buffer.clear"
@@ -132,6 +146,22 @@ export class Request<T extends Acknowledgment> {
   }
 }
 export const requests = {
+  historyItem: new Request(
+    "conversation.item.create",
+    (e): e is ItemCreated => e.kind === "item.created",
+  ),
+  historyResult: new Request(
+    "conversation.item.create",
+    (e): e is ToolResultCreated => e.kind === "tool.result.created",
+  ),
+  history: new Request(
+    "prism.conversation.get",
+    (e): e is HistoryListed => e.kind === "history.listed",
+  ),
+  delete: new Request(
+    "conversation.item.delete",
+    (e): e is ItemDeleted => e.kind === "item.deleted",
+  ),
   update: new Request(
     "session.update",
     (e): e is SessionUpdated => e.kind === "session.updated",
@@ -414,15 +444,30 @@ function decodeValue(
       if (item.type === "function_call_output")
         payload = {
           kind: "tool.result.created",
+          itemId: optionalString(item.id, "item.id"),
           callId: id(item.call_id, "item.call_id"),
         };
       else {
-        if (item.type !== undefined && item.type !== "message")
+        if (
+          item.type !== undefined &&
+          item.type !== "message" &&
+          item.type !== "function_call"
+        )
           invalid("item.type");
         payload = { kind: "item.created", itemId: id(item.id, "item.id") };
       }
       break;
     }
+    case "prism.conversation":
+      if (!Array.isArray(event.items)) return invalid("items");
+      payload = {
+        kind: "history.listed",
+        items: Object.freeze(event.items.map(listedItem)),
+      };
+      break;
+    case "conversation.item.deleted":
+      payload = { kind: "item.deleted", itemId: id(event.item_id, "item_id") };
+      break;
     case "input_audio_buffer.cleared":
       payload = { kind: "audio.cleared" };
       break;

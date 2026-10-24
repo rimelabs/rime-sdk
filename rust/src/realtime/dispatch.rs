@@ -14,11 +14,36 @@ impl Worker {
             answer.response = Some(response.clone())
         }
         match c.kind {
-            Kind::History => {
+            Kind::HistoryGet => answer.history = e.history,
+            Kind::HistoryDelete => {
+                if c.target != e.target {
+                    return Err(failure("deletion acknowledgment names another item"));
+                }
+            }
+            Kind::History | Kind::HistoryResult => {
+                let id = e
+                    .created_id
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| failure("history acknowledgment has no item ID"))?;
+                if let Some(want) = c.body["item"]["id"].as_str() {
+                    if want != id {
+                        return Err(failure("history acknowledgment names another item"));
+                    }
+                }
+                if c.kind == Kind::HistoryResult {
+                    if c.target != e.target {
+                        return Err(failure("result acknowledgment names another call"));
+                    }
+                    for response in self.responses.values_mut() {
+                        if matches!(response.calls.get(&c.target), Some(None)) {
+                            response.calls.insert(c.target.clone(), c.digest);
+                        }
+                    }
+                }
                 answer.item = Some(ItemRef {
                     session_id: self.id.clone(),
-                    item_id: e.target,
-                })
+                    item_id: id,
+                });
             }
             Kind::Tool => {
                 if e.target != c.target {

@@ -12,6 +12,7 @@ from typing import Generic, Literal, NoReturn, NotRequired, TypeAlias, TypedDict
 
 from .._errors import RimeInputError, RimeStreamError
 from . import _types as t
+from ._history import listed_item
 
 
 class _TurnDetection(TypedDict):
@@ -95,8 +96,21 @@ class ItemCreated:
 
 @dataclass(frozen=True, kw_only=True)
 class ToolResultCreated:
+    item_id: str | None = None
     call_id: str
     kind: Literal["tool.result.created"] = field(default="tool.result.created", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
+class HistoryListed:
+    items: tuple[t.HistoryItem, ...]
+    kind: Literal["history.listed"] = field(default="history.listed", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
+class ItemDeleted:
+    item_id: str
+    kind: Literal["item.deleted"] = field(default="item.deleted", init=False)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -118,6 +132,8 @@ class ResponseEnded(t.ResponseEnded):
 
 Acknowledgment: TypeAlias = (
     SessionUpdated
+    | HistoryListed
+    | ItemDeleted
     | ItemCreated
     | ToolResultCreated
     | AudioCleared
@@ -149,6 +165,8 @@ class ServerEvent:
 RequestKind: TypeAlias = Literal[
     "session.update",
     "conversation.item.create",
+    "prism.conversation.get",
+    "conversation.item.delete",
     "response.create",
     "response.cancel",
     "input_audio_buffer.clear",
@@ -172,8 +190,12 @@ class Request(Generic[ResultT_co]):
 
 
 UPDATE = Request("session.update", SessionUpdated)
+GET_HISTORY = Request("prism.conversation.get", HistoryListed)
+DELETE_ITEM = Request("conversation.item.delete", ItemDeleted)
 ITEM = Request("conversation.item.create", ItemCreated)
 TOOL_RESULT = Request("conversation.item.create", ToolResultCreated)
+HISTORY_ITEM = Request("conversation.item.create", ItemCreated)
+HISTORY_RESULT = Request("conversation.item.create", ToolResultCreated)
 CREATE = Request("response.create", t.ResponseStarted)
 TEXT = Request("response.create", t.ResponseStarted, allows_item_created=True)
 CANCEL = Request("response.cancel", ResponseEnded)
@@ -401,11 +423,21 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
     elif kind == "conversation.item.created":
         ack_item = _object(event.get("item"), "item")
         if ack_item.get("type") == "function_call_output":
-            payload = ToolResultCreated(call_id=_id(ack_item.get("call_id"), "item.call_id"))
+            payload = ToolResultCreated(
+                call_id=_id(ack_item.get("call_id"), "item.call_id"),
+                item_id=_optional_string(ack_item.get("id"), "item.id"),
+            )
         else:
-            if "type" in ack_item and ack_item["type"] != "message":
+            if "type" in ack_item and ack_item["type"] not in ("message", "function_call"):
                 _invalid("item.type")
             payload = ItemCreated(item_id=_id(ack_item.get("id"), "item.id"))
+    elif kind == "prism.conversation":
+        items = event.get("items")
+        if not isinstance(items, list):
+            _invalid("items")
+        payload = HistoryListed(items=tuple(listed_item(item) for item in items))
+    elif kind == "conversation.item.deleted":
+        payload = ItemDeleted(item_id=_id(event.get("item_id"), "item_id"))
     elif kind == "input_audio_buffer.cleared":
         payload = AudioCleared()
     elif kind == "conversation.item.truncated":

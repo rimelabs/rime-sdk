@@ -13,6 +13,14 @@ channels:
       ws:
         method: GET
     messages:
+      conversationItemDeleted:
+        $ref: '#/components/messages/conversationItemDeleted'
+      conversation:
+        $ref: '#/components/messages/conversation'
+      conversationItemDelete:
+        $ref: '#/components/messages/conversationItemDelete'
+      conversationGet:
+        $ref: '#/components/messages/conversationGet'
       sessionUpdate:
         $ref: '#/components/messages/sessionUpdate'
       inputAudioBufferAppend:
@@ -89,6 +97,8 @@ operations:
       $ref: '#/channels/realtime'
     messages:
       - $ref: '#/channels/realtime/messages/sessionUpdate'
+      - $ref: '#/channels/realtime/messages/conversationItemDelete'
+      - $ref: '#/channels/realtime/messages/conversationGet'
       - $ref: '#/channels/realtime/messages/inputAudioBufferAppend'
       - $ref: '#/channels/realtime/messages/inputAudioBufferClear'
       - $ref: '#/channels/realtime/messages/conversationItemCreate'
@@ -103,6 +113,8 @@ operations:
       $ref: '#/channels/realtime'
     messages:
       - $ref: '#/channels/realtime/messages/sessionCreated'
+      - $ref: '#/channels/realtime/messages/conversationItemDeleted'
+      - $ref: '#/channels/realtime/messages/conversation'
       - $ref: '#/channels/realtime/messages/sessionUpdated'
       - $ref: '#/channels/realtime/messages/sessionIdleTimeout'
       - $ref: '#/channels/realtime/messages/typedInputReady'
@@ -295,6 +307,26 @@ components:
       title: Error
       payload:
         $ref: '#/components/schemas/errorEvent'
+
+    conversationGet:
+      name: prism.conversation.get
+      payload:
+        $ref: '#/components/schemas/conversationGetEvent'
+
+    conversationItemDelete:
+      name: conversation.item.delete
+      payload:
+        $ref: '#/components/schemas/conversationItemDeleteEvent'
+
+    conversation:
+      name: prism.conversation
+      payload:
+        $ref: '#/components/schemas/conversationEvent'
+
+    conversationItemDeleted:
+      name: conversation.item.deleted
+      payload:
+        $ref: '#/components/schemas/conversationItemDeletedEvent'
 
   schemas:
     clientEventId:
@@ -554,6 +586,7 @@ components:
       oneOf:
         - const: user
         - const: assistant
+        - const: system
     messageContentPart:
       type: object
       additionalProperties: false
@@ -570,6 +603,8 @@ components:
       additionalProperties: false
       required: [type, role]
       properties:
+        id:
+          $ref: '#/components/schemas/clientItemId'
         type:
           const: message
         role:
@@ -586,6 +621,8 @@ components:
       additionalProperties: false
       required: [type, call_id]
       properties:
+        id:
+          $ref: '#/components/schemas/clientItemId'
         type:
           const: function_call_output
         call_id:
@@ -960,9 +997,24 @@ components:
         event_id:
           $ref: '#/components/schemas/clientEventId'
         item:
+          description: >-
+            The item; any other `type` is refused with
+            `invalid_client_event`.
           oneOf:
             - $ref: '#/components/schemas/inputMessage'
             - $ref: '#/components/schemas/functionResult'
+            - $ref: '#/components/schemas/functionCall'
+        previous_item_id:
+          type: string
+          minLength: 1
+          description: >-
+            Where the item goes: after the item with this id, deleted or not,
+            and after the whole turn it belongs to (the user's words, the
+            reply to them, its calls and their results), or first for
+            "root". Without it the item goes at the end. An id that names no
+            item of the conversation is refused with `item_not_found`. Not
+            taken with a tool's result, which goes after its call:
+            `invalid_client_event`, `param` "previous_item_id".
 
     responseCreateEvent:
       type: object
@@ -1351,17 +1403,34 @@ components:
                       const: message
                     id:
                       type: string
+                      minLength: 1
                     role:
                       oneOf:
                         - const: user
                         - const: assistant
+                        - const: system
+                - type: object
+                  required: [type, id, call_id]
+                  properties:
+                    type:
+                      const: function_call
+                    id:
+                      type: string
+                      minLength: 1
+                    call_id:
+                      type: string
+                      minLength: 1
                 - type: object
                   required: [type, call_id]
                   properties:
                     type:
                       const: function_call_output
+                    id:
+                      type: string
+                      minLength: 1
                     call_id:
                       type: string
+                      minLength: 1
 
     conversationItemTruncatedEvent:
       allOf:
@@ -1445,3 +1514,181 @@ components:
               const: error
             error:
               $ref: '#/components/schemas/errorInfo'
+
+    clientItemId:
+      type: string
+      minLength: 1
+      maxLength: 32
+      description: >-
+        The client's name for the item, for example "msg_greeting"; the
+        server names it when absent. Any other length is refused with
+        `invalid_client_event`; the id of an item in the conversation that
+        is not deleted with `item_id_in_use`, and one whose item was deleted
+        names the new item.
+
+
+    functionCall:
+      type: object
+      additionalProperties: false
+      required: [type, call_id, name]
+      description: >-
+        A past call, for example one copied from another conversation. The
+        model is shown it once its result is added, as a `function_call_output`
+        with its `call_id`; it never starts a tool round.
+      properties:
+        type:
+          const: function_call
+          description: A past call.
+        id:
+          $ref: '#/components/schemas/clientItemId'
+        call_id:
+          type: string
+          minLength: 1
+          description: >-
+            The call, for example "call_6aad71312c2946fab1210919"; refused
+            with `call_id_in_use` while a call with it is not deleted, or is
+            a call the model made that was deleted and still waits for its
+            result.
+        name:
+          type: string
+          minLength: 1
+          description: The tool's name, for example "search_flights".
+        arguments:
+          type: string
+          default: ''
+          description: The arguments as a JSON object, for example `{"to":"Paris"}`.
+
+
+    listedItem:
+      description: An item of the conversation, its words without audio.
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [type, id, role, text]
+          properties:
+            type:
+              const: message
+            id:
+              type: string
+              minLength: 1
+              description: >-
+                The item, which `conversation.item.delete` takes, for example
+                "item_6e117c727990f830".
+            role:
+              description: Who says it.
+              oneOf:
+                - const: user
+                  description: The user's speech (its transcript) or a user message.
+                - const: assistant
+                  description: A reply's words as the model is shown them, or an assistant message the client added.
+                - const: system
+                  description: >-
+                    An instruction to the model: a nudge's, or a note the
+                    client added.
+            text:
+              type: string
+              description: The words.
+        - type: object
+          additionalProperties: false
+          required: [type, id, call_id, name, arguments]
+          properties:
+            type:
+              const: function_call
+            id:
+              type: string
+              minLength: 1
+              description: The call's item.
+            call_id:
+              type: string
+              minLength: 1
+              description: The call, as its result names it.
+            name:
+              type: string
+              minLength: 1
+              description: The tool's name.
+            arguments:
+              type: string
+              description: The arguments as a JSON object, for example `{"to":"Paris"}`.
+        - type: object
+          additionalProperties: false
+          required: [type, id, call_id, output]
+          properties:
+            type:
+              const: function_call_output
+            id:
+              type: string
+              minLength: 1
+              description: The result's item.
+            call_id:
+              type: string
+              minLength: 1
+              description: The call it answers.
+            output:
+              type: string
+              description: >-
+                The result as the model is shown it: the client's output, or
+                the unknown outcome the server recorded when none came in
+                time.
+
+
+    conversationGetEvent:
+      type: object
+      additionalProperties: false
+      required: [type, event_id]
+      properties:
+        type:
+          const: prism.conversation.get
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+
+
+    conversationItemDeleteEvent:
+      type: object
+      additionalProperties: false
+      required: [type, event_id, item_id]
+      properties:
+        type:
+          const: conversation.item.delete
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        item_id:
+          type: string
+          description: >-
+            The item, by the id the conversation gave it: a
+            `conversation.item.created`'s `item.id`, a reply's message or
+            call from `response.output_item.added`, the speech of
+            `input_audio_buffer.speech_started`, or a nudge's
+            `metadata.prism_instruction_item_id`.
+
+
+    conversationEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, items]
+          properties:
+            type:
+              const: prism.conversation
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            items:
+              type: array
+              description: The items, in the order the next reply is shown them.
+              items:
+                $ref: '#/components/schemas/listedItem'
+
+
+    conversationItemDeletedEvent:
+      allOf:
+        - $ref: '#/components/schemas/serverEvent'
+        - type: object
+          required: [type, item_id]
+          properties:
+            type:
+              const: conversation.item.deleted
+            prism_request_event_id:
+              $ref: '#/components/schemas/requestEventIdEcho'
+            item_id:
+              type: string
+              minLength: 1
+              description: The item the request named.
