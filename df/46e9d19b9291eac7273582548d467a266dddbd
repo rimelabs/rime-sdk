@@ -1,0 +1,29 @@
+python/docs/realtime.md
+  s_5911e830bd94ce::t_9d5c53d3898504 565-628
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_5911e830bd94ce::t_ee8dc5c2877cd4 11,111-113
+python/src/rimelabs_sdk/realtime/_session.py
+  s_5911e830bd94ce::t_551ef52a87ca31 37,85,116,221,236-238,240-242,292,297-299,314,325-326,340-341,343-346,348-349,367-371,393-395,397-401,443-454,695-696,702-703,841-842,875-877,879,989
+python/src/rimelabs_sdk/realtime/_submission.py
+  s_5911e830bd94ce::t_3ccc2c1bda363c 1-155
+python/src/rimelabs_sdk/realtime/_types.py
+  s_5911e830bd94ce::t_52ef3612464315 330-332
+python/tests/test_realtime_submissions.py
+  s_5911e830bd94ce::t_a1229641afdc8a 1-356
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df46e9d19b9291eac7273582548d467a266dddbd",
+  "prompts": {},
+  "sessions": {
+    "s_5911e830bd94ce": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a170af-549d-7e30-82fd-bec4cd7bb3d6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
