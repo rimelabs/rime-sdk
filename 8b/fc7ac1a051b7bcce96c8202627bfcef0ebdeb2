@@ -1,0 +1,56 @@
+typescript/README.md
+  s_74c923ff975e80::t_de63847827fd11 31-36
+rust/src/realtime/tests/mod.rs
+  s_74c923ff975e80::t_602ff48e743d3b 12
+python/src/rimelabs_sdk/realtime/_client.py
+  s_74c923ff975e80::t_aae2929b5705d3 6,19,38-39,41-66,68-73,182
+  s_74c923ff975e80::t_f02c5a095a9b08 17,37,40
+  s_74c923ff975e80::t_b6189d03c06882 67
+typescript/src/realtime/transport.ts
+  s_74c923ff975e80::t_b1733ecb145a24 5,16-49,57-58,78-86,94-107,128,139-140,158
+  s_74c923ff975e80::t_6274b80b652b07 11-15,87-93,110-118
+typescript/tests/realtime-handshake.test.mjs
+  s_74c923ff975e80::t_6274b80b652b07 13-18,20-25,27-32,34-39,49-98,100-105,115-126
+  s_74c923ff975e80::t_48cf1cd0dee1db 1-12,19,26,33,40-48,99,106-114
+go/realtime_transport.go
+  s_74c923ff975e80::t_d2ee33124cafc7 71-73,86-88
+  s_74c923ff975e80::t_7978716bf0ba3c 5-7,9,11,43-44,46,51-70,74-85,89-92
+  s_74c923ff975e80::t_9f5def33edc666 93
+go/realtime_handshake_test.go
+  s_74c923ff975e80::t_bcf4e40e934203 1-18,21-39,41-47,51-54,58-65,72,79,83,87-102,106-110,112,116-117,120-121
+  s_74c923ff975e80::t_d2ee33124cafc7 19-20,50,55-57,66-71,73-78,81,84-86,103-105,111,113-115,118-119
+  s_74c923ff975e80::t_7e98ed34e35df0 40,48-49,80,82
+rust/README.md
+  s_74c923ff975e80::t_de63847827fd11 313-319
+rust/src/realtime/transport.rs
+  s_74c923ff975e80::t_2401ec73a0d129 23-30,32-35,43-45,47-48,54-56,58-62,65-66,69-71,76-79
+  s_74c923ff975e80::t_c30fcfc4e7659b 17-22,31,36-42,46,49-53,57,63-64,67-68,72-75,80-82,132
+python/README.md
+  s_74c923ff975e80::t_de63847827fd11 26-31
+go/README.md
+  s_74c923ff975e80::t_de63847827fd11 339-344
+python/tests/test_realtime_handshake.py
+  s_74c923ff975e80::t_fd71cc557cdb07 1-25,32-34,36-47,49-52,55-57,60-62,64-80,82-108
+  s_74c923ff975e80::t_b6d2ba455f5523 58
+  s_74c923ff975e80::t_ae1adcc54bf601 26-31,53-54
+  s_74c923ff975e80::t_b6189d03c06882 35,48,59,63,81
+rust/src/realtime/tests/handshake.rs
+  s_74c923ff975e80::t_602ff48e743d3b 1-2,7-10,59,66,73-83,91-125
+  s_74c923ff975e80::t_2401ec73a0d129 3-6,11-58,60-65,67-72,84-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8bfc7ac1a051b7bcce96c8202627bfcef0ebdeb2",
+  "prompts": {},
+  "sessions": {
+    "s_74c923ff975e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17a8a-8f43-7171-a9a5-4abcc3eb8cf2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
