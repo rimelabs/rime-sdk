@@ -14,6 +14,72 @@ use tokio_tungstenite::{
 };
 use tokio_util::sync::CancellationToken;
 
+fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
+    let tokio_tungstenite::tungstenite::Error::Http(response) = error else {
+        return Error::new(ErrorKind::Unavailable, "realtime handshake failed");
+    };
+    let status = response.status().as_u16();
+    let (kind, reason) = match status {
+        401 | 403 => (
+            ErrorKind::Authentication,
+            "realtime endpoint rejected credentials",
+        ),
+        429 => (
+            ErrorKind::ResourceLimit,
+            "realtime connection or rate limit reached",
+        ),
+        503 => (ErrorKind::Unavailable, "realtime endpoint is unavailable"),
+        _ => (
+            ErrorKind::Unavailable,
+            "realtime endpoint rejected the connection",
+        ),
+    };
+    let mut message = format!("{reason} (HTTP {status})");
+    // Tungstenite retains only bytes received with the headers. Use a complete,
+    // bounded body; partial or chunked bodies cannot provide a reliable message.
+    if let Some(body) = response.body().as_ref().filter(|body| {
+        body.len() < 1024
+            && !response.headers().contains_key("transfer-encoding")
+            && response
+                .headers()
+                .get("content-length")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<usize>().ok())
+                == Some(body.len())
+    }) {
+        if let Ok(text) = std::str::from_utf8(body) {
+            let text = text.trim();
+            let json = if text.starts_with(['{', '[']) {
+                serde_json::from_str::<serde_json::Value>(text).ok()
+            } else {
+                None
+            };
+            let detail = if text.starts_with(['{', '[']) {
+                json.as_ref()
+                    .and_then(|v| v.get("error")?.get("message")?.as_str())
+            } else {
+                Some(text)
+            };
+            if let Some(detail) = detail.filter(|s| {
+                !s.trim_start().starts_with('<')
+                    && s.chars()
+                        .all(|c| c >= ' ' || matches!(c, '\r' | '\n' | '\t'))
+            }) {
+                let detail = detail.split_whitespace().collect::<Vec<_>>().join(" ");
+                if !detail.is_empty() {
+                    message.push_str(&format!(": {detail}"));
+                }
+            }
+        }
+    }
+    Error::new(kind, message).with_request_id(
+        response
+            .headers()
+            .get("x-request-id")
+            .and_then(|v| v.to_str().ok()),
+    )
+}
+
 pub(super) struct Write {
     pub id: u64,
     pub frames: Vec<String>,
@@ -63,17 +129,7 @@ impl Transport {
             .max_frame_size(Some(1024 * 1024));
         let (socket, _) = connect_async_with_config(request, Some(config), false)
             .await
-            .map_err(|e| {
-                let kind = match e {
-                    tokio_tungstenite::tungstenite::Error::Http(ref r)
-                        if matches!(r.status().as_u16(), 401 | 403) =>
-                    {
-                        ErrorKind::Authentication
-                    }
-                    _ => ErrorKind::Unavailable,
-                };
-                Error::new(kind, "realtime handshake failed")
-            })?;
+            .map_err(handshake_error)?;
         let (mut sink, mut stream) = socket.split();
         let (read_tx, reads) = mpsc::channel(1);
         let (writes, mut write_rx) = mpsc::channel::<Write>(1);

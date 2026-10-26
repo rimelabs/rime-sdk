@@ -1,0 +1,108 @@
+"""HTTP refusals through the public realtime connection interface."""
+
+import asyncio
+
+import pytest
+
+from rimelabs_sdk import (
+    Rime,
+    RimeAuthenticationError,
+    RimeResourceLimitError,
+    RimeTimeoutError,
+    RimeUnavailableError,
+)
+from rimelabs_sdk.realtime import RealtimeTimeouts
+
+
+@pytest.mark.parametrize(
+    "status,body,error_type,detail",
+    [
+        (401, b"Authentication failed", RimeAuthenticationError, "Authentication failed"),
+        (403, b"Forbidden", RimeAuthenticationError, "Forbidden"),
+        (429, b"Currently at websocket limit", RimeResourceLimitError, "websocket limit"),
+        (429, b"", RimeResourceLimitError, "connection or rate limit reached"),
+        (503, b"conversation capacity reached", RimeUnavailableError, "capacity reached"),
+        (503, b"engine is draining", RimeUnavailableError, "engine is draining"),
+        (
+            503,
+            b'{"error":{"message":"graph is not ready"}}',
+            RimeUnavailableError,
+            "graph is not ready",
+        ),
+        (503, b"<html>proxy error</html>", RimeUnavailableError, None),
+        (503, b'{"error":', RimeUnavailableError, None),
+        (503, b'{"error":null}', RimeUnavailableError, None),
+        (429, b"[" * 1023, RimeResourceLimitError, None),
+        (503, b"\xff", RimeUnavailableError, None),
+        (503, b"bad\x00message", RimeUnavailableError, None),
+        (429, b"x" * 2048, RimeResourceLimitError, None),
+    ],
+)
+async def test_http_refusal_preserves_category_and_diagnostics(status, body, error_type, detail):
+    closed = asyncio.Queue()
+    attempts = 0
+
+    async def refuse(reader, writer):
+        nonlocal attempts
+        attempts += 1
+        failure = None
+        try:
+            await reader.readuntil(b"\r\n\r\n")
+            writer.write(
+                f"HTTP/1.1 {status} Refused\r\nContent-Length: {len(body)}\r\n"
+                "x-request-id: server-request\r\n\r\n".encode()
+                + body
+            )
+            await writer.drain()
+            assert await asyncio.wait_for(reader.read(), 2) == b""
+        except (AssertionError, TimeoutError, OSError, asyncio.IncompleteReadError) as error:
+            failure = error
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            closed.put_nowait(failure)
+
+    async with await asyncio.start_server(refuse, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        async with Rime(api_key="test") as client:
+            for _ in range(2):
+                with pytest.raises(error_type) as caught:
+                    async with client.realtime.connect(
+                        endpoint=f"ws://127.0.0.1:{port}/v1/realtime"
+                    ):
+                        pytest.fail("refused connection was accepted")
+                error = caught.value
+                assert f"HTTP {status}" in str(error)
+                assert error.request_id == "server-request"
+                if detail:
+                    assert detail in str(error)
+                else:
+                    assert ": " not in str(error)
+                assert await asyncio.wait_for(closed.get(), 2) is None
+        assert attempts == 2
+
+
+async def test_unfinished_http_body_obeys_connect_timeout_and_closes():
+    closed = asyncio.Event()
+
+    async def refuse(reader, writer):
+        try:
+            await reader.readuntil(b"\r\n\r\n")
+            writer.write(b"HTTP/1.1 429 Refused\r\nContent-Length: 100\r\n\r\n")
+            await writer.drain()
+            await reader.read()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            closed.set()
+
+    async with await asyncio.start_server(refuse, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        async with Rime(api_key="test") as client:
+            with pytest.raises(RimeTimeoutError):
+                async with client.realtime.connect(
+                    endpoint=f"ws://127.0.0.1:{port}/v1/realtime",
+                    timeouts=RealtimeTimeouts(connect_s=0.1),
+                ):
+                    pytest.fail("unfinished handshake was accepted")
+            await asyncio.wait_for(closed.wait(), 2)

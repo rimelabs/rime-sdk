@@ -28,6 +28,12 @@ STT use the SDK and Node.js built-ins.
 
 ## Prism: send recorded speech
 
+If Prism refuses the connection with HTTP 429, `realtime.connect()` throws
+`RimeResourceLimitError`. HTTP 503 throws `RimeUnavailableError`. Handshake
+errors include the HTTP status, the server request ID when supplied, and a
+short server explanation when available. Missing or invalid error bodies use
+a default message. The SDK does not retry the connection automatically.
+
 With `RIME_API_KEY` set, the SDK connects to
 `wss://prism.api.rime.ai/v1/realtime` and uses the server's default voice.
 Pass `endpoint` or `voice` to select another deployment or voice.
