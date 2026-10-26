@@ -82,6 +82,37 @@ async def test_http_refusal_preserves_category_and_diagnostics(status, body, err
         assert attempts == 2
 
 
+@pytest.mark.parametrize(
+    "header,expected",
+    [
+        (b"", None),
+        (b"x-request-id: \r\n", None),
+        (b"x-request-id: server-request\r\n", "server-request"),
+    ],
+)
+async def test_http_refusal_normalizes_missing_request_id(header, expected):
+    async def refuse(reader, writer):
+        try:
+            await reader.readuntil(b"\r\n\r\n")
+            writer.write(
+                b"HTTP/1.1 429 Refused\r\nContent-Length: 0\r\n"
+                + header
+                + b"Connection: close\r\n\r\n"
+            )
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    async with await asyncio.start_server(refuse, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        async with Rime(api_key="test") as client:
+            with pytest.raises(RimeResourceLimitError) as caught:
+                async with client.realtime.connect(endpoint=f"ws://127.0.0.1:{port}/v1/realtime"):
+                    pytest.fail("refused connection was accepted")
+            assert caught.value.request_id == expected
+
+
 async def test_unfinished_http_body_obeys_connect_timeout_and_closes():
     closed = asyncio.Event()
 

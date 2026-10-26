@@ -67,7 +67,7 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
         except (UnicodeError, ValueError, AttributeError, RecursionError):
             pass
     request_ids = response.headers.get_all("x-request-id")
-    request_id = request_ids[0] if len(request_ids) == 1 else None
+    request_id = request_ids[0] if len(request_ids) == 1 and request_ids[0] else None
     return error_type(message, request_id=request_id)
 
 

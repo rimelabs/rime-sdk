@@ -315,7 +315,8 @@ If Prism refuses the connection with HTTP 429, `realtime().connect()` returns
 Handshake errors include the HTTP status, the server request ID when supplied,
 and a short server explanation when available. The WebSocket transport retains
 only body bytes received with the headers. Incomplete, chunked, or invalid error
-bodies use a default message. The SDK does not retry the connection automatically.
+bodies use a default message. Bodies of 1024 bytes or more also use the default
+message. The SDK does not retry the connection automatically.
 
 Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session updates,
 `RealtimeFault::retryable()`, and `ErrorKind::Realtime` are pending the next

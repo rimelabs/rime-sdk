@@ -103,7 +103,8 @@ async fn check(
                 response.extend_from_slice(&body);
                 socket.write_all(&response).await.unwrap();
                 // The SDK must release the connection, even if the peer waits.
-                let result = socket.read(&mut [0]).await;
+                let mut byte = [0u8; 1];
+                let result = socket.read(&mut byte).await;
                 assert!(matches!(result, Ok(0)) || result.is_err());
             }
         });
