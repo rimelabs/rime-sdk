@@ -1,0 +1,26 @@
+python/src/rimelabs_sdk/realtime/_client.py
+  s_74c923ff975e80::t_1a84ec9295d17d 70
+rust/src/realtime/tests/handshake.rs
+  s_74c923ff975e80::t_1a84ec9295d17d 106-107
+python/tests/test_realtime_handshake.py
+  s_74c923ff975e80::t_fd8aa878f3190a 111
+  s_74c923ff975e80::t_0ab3df7ea02e36 85-110,112-115
+rust/README.md
+  s_74c923ff975e80::t_3b7bfce361fce0 318-319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "120d39e35aae922b3df33319a5df490d6c1f4d82",
+  "prompts": {},
+  "sessions": {
+    "s_74c923ff975e80": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17a8a-8f43-7171-a9a5-4abcc3eb8cf2",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
