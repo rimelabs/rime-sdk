@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.13](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.12...rust-v0.1.0-alpha.13) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* Python and TypeScript SessionEvent payload unions now include ItemTruncated. Update exhaustive event handlers to accept ItemTruncated or the item.truncated kind. Handle unavailable retained text separately from an empty string. Rust's event enum remains non-exhaustive.
+
+### Features
+
+* expose realtime truncation events and summaries ([#112](https://github.com/rimelabs/rime-sdk/issues/112)) ([15d6802](https://github.com/rimelabs/rime-sdk/commit/15d6802f71c849ce08b1d0b46e78bd44d5dfc3b7))
+
 ## [0.1.0-alpha.12](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.11...rust-v0.1.0-alpha.12) (2026-10-27)
 
 
