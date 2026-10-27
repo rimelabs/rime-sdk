@@ -223,6 +223,27 @@ function revision(value: ObjectValue): number | null {
     ? null
     : integer(value.prism_settings_revision, "prism_settings_revision");
 }
+function responseTruncation(
+  response: ObjectValue,
+): t.ResponseTruncation | null {
+  if (response.prism_truncation === undefined) return null;
+  const value = object(response.prism_truncation, "response.prism_truncation");
+  const count = integer(
+    value.items_left_out,
+    "prism_truncation.items_left_out",
+  );
+  if (count === 0) return invalid("prism_truncation.items_left_out");
+  return Object.freeze({
+    itemsLeftOut: count,
+    firstKeptItemId:
+      value.first_kept_item_id === undefined
+        ? null
+        : string(
+            value.first_kept_item_id,
+            "prism_truncation.first_kept_item_id",
+          ),
+  });
+}
 function duration(value: unknown, field: string): number | null {
   if (value == null) return null;
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0)
@@ -609,6 +630,7 @@ function decodeValue(
       payload = {
         kind: "response.ended",
         settingsRevision: revision(response),
+        truncation: responseTruncation(response),
         response: ref(response.id),
         status:
           status === "completed" ||

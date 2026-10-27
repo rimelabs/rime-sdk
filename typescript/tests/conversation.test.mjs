@@ -1142,3 +1142,35 @@ for (const keptText of [null, "", "Hello, 世界"]) {
     },
   );
 }
+
+for (const summary of [
+  null,
+  { items_left_out: 12 },
+  { items_left_out: 12, first_kept_item_id: "item-kept" },
+]) {
+  test(
+    `runner forwards response truncation: ${JSON.stringify(summary)}`,
+    { timeout: 4000 },
+    async (t) => {
+      const { peer, events } = await setup(t);
+      peer.emit("response.created", { response: { id: "history-reply" } });
+      peer.emit("response.done", {
+        response: {
+          id: "history-reply",
+          status: "completed",
+          ...(summary === null ? {} : { prism_truncation: summary }),
+        },
+      });
+      await until(() => events.some((e) => e.kind === "response.ended"));
+      assert.deepEqual(
+        events.find((e) => e.kind === "response.ended").truncation,
+        summary === null
+          ? null
+          : {
+              itemsLeftOut: 12,
+              firstKeptItemId: summary.first_kept_item_id ?? null,
+            },
+      );
+    },
+  );
+}

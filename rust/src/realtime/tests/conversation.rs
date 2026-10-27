@@ -619,6 +619,44 @@ async fn runner_forwards_truncation_without_retained_response() {
         assert_eq!(audio_end_ms, 12);
         assert_eq!(kept_text.as_deref(), expected);
     }
+    for (id, summary) in [
+        ("no-summary", None),
+        ("all-prior", Some(json!({"items_left_out":12}))),
+        (
+            "partial-history",
+            Some(json!({"items_left_out":12,"first_kept_item_id":"item-kept"})),
+        ),
+    ] {
+        p.send(json!({"type":"response.created","response":{"id":id}}))
+            .await;
+        let mut body = json!({"id":id,"status":"completed"});
+        if let Some(value) = &summary {
+            body["prism_truncation"] = value.clone();
+        }
+        p.send(json!({"type":"response.done","response":body}))
+            .await;
+        for n in 0..2 {
+            let event = tokio::time::timeout(Duration::from_secs(3), seen.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            if n == 1 {
+                let RealtimeEvent::ResponseEnded { truncation, .. } = event.payload else {
+                    panic!("missing response completion");
+                };
+                if let Some(value) = &summary {
+                    let truncation = truncation.unwrap();
+                    assert_eq!(truncation.items_left_out, 12);
+                    assert_eq!(
+                        truncation.first_kept_item_id.as_deref(),
+                        value["first_kept_item_id"].as_str()
+                    );
+                } else {
+                    assert!(truncation.is_none());
+                }
+            }
+        }
+    }
     stop.cancel();
     tokio::time::timeout(Duration::from_secs(3), task)
         .await

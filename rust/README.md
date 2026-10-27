@@ -643,3 +643,25 @@ if let RealtimeEvent::ItemTruncated { item_id, kept_text: Some(text), .. } = &ev
     println!("Retained text for {item_id}: {text:?}");
 }
 ```
+
+## History excluded from a reply
+
+Available in the next SDK release. `RealtimeEvent::ResponseEnded` includes
+`truncation: Option<ResponseTruncation>`, with `items_left_out` and optional
+`first_kept_item_id`. It exposes `response.prism_truncation` through session events
+and conversation callbacks. The count refers to items excluded from this reply's
+prompt, not turns or items deleted from history. Already hidden items do not count.
+The first ID is None when no item from before this turn was retained.
+
+A None summary means the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+It does not change the session's truncation policy.
+
+```rust,ignore
+if let RealtimeEvent::ResponseEnded { truncation: Some(summary), .. } = &event.payload {
+    println!("Items excluded from prompt: {}", summary.items_left_out);
+}
+```
+
+Migration: add `truncation: None` to constructed `ResponseEnded` values without a
+summary. Add `truncation` or `..` to patterns that list every variant field.

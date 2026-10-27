@@ -615,6 +615,36 @@ func TestRealtimeRunnerForwardsTruncationWithoutRetainedResponse(t *testing.T) {
 			t.Fatal("missing truncation callback")
 		}
 	}
+	for _, id := range []string{"no-summary", "all-prior", "partial-history"} {
+		p.send(rtObject{"type": "response.created", "response": rtObject{"id": id}})
+		body := rtObject{"id": id, "status": "completed"}
+		var want *ResponseTruncation
+		if id != "no-summary" {
+			value := rtObject{"items_left_out": 12}
+			want = &ResponseTruncation{ItemsLeftOut: 12}
+			if id == "partial-history" {
+				first := "item-kept"
+				value["first_kept_item_id"] = first
+				want.FirstKeptItemID = &first
+			}
+			body["prism_truncation"] = value
+		}
+		p.send(rtObject{"type": "response.done", "response": body})
+		for n := 0; n < 2; n++ {
+			select {
+			case e := <-seen:
+				if n == 1 {
+					ended, ok := e.Payload.(ResponseEnded)
+					if !ok || !reflect.DeepEqual(ended.Truncation, want) {
+						t.Fatal(e)
+					}
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("missing response callback")
+			}
+		}
+	}
+
 	cancel()
 	select {
 	case <-done:

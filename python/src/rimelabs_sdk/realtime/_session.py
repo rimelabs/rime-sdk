@@ -857,6 +857,7 @@ class RealtimeSession:
                     status=payload.status,
                     reason=payload.reason,
                     settings_revision=payload.settings_revision,
+                    truncation=payload.truncation,
                 ),
                 event_id=event.event_id,
                 request_id=echo,

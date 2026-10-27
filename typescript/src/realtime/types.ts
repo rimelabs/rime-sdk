@@ -308,10 +308,20 @@ export interface ResponseAbandoned {
   readonly kind: "response.abandoned";
   readonly response: ResponseRef;
 }
+/** History items excluded from this reply's prompt, not deleted from history. */
+export interface ResponseTruncation {
+  /** Number of excluded items, not turns. Already hidden items are not counted. */
+  readonly itemsLeftOut: number;
+  /** Oldest retained item; null when no earlier item was retained. */
+  readonly firstKeptItemId: string | null;
+}
 export interface ResponseEnded {
   /** Settings revision published by the server; null when unavailable.
    * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;
+  /** Null when the server reports no exclusions or the information is unavailable.
+   * Optional on caller-created values for compatibility. */
+  readonly truncation?: ResponseTruncation | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;
   readonly status: "completed" | "cancelled" | "failed" | "unknown";

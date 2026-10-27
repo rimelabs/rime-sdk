@@ -104,3 +104,9 @@ The optional `prism_kept_text` field on `conversation.item.truncated` follows
 `rimelabs/rime#3622`. The shared cases distinguish absent, empty, and nonempty
 text and reject non-string values. All four SDKs expose this acknowledgment as a
 public session event, including when no response reference remains.
+
+The optional `response.prism_truncation` summary on `response.done` follows
+`rimelabs/rime#3623`. Its `items_left_out` is a positive item count; the optional
+`first_kept_item_id` names the oldest retained item. Decoders preserve absence,
+reject malformed known fields, and accept unknown fields for forward compatibility.
+This reports prompt exclusions and does not remove stored conversation history.

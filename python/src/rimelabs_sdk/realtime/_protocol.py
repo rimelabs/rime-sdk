@@ -239,6 +239,23 @@ def _revision(value: dict, name: str) -> int | None:
     )
 
 
+def _response_truncation(response: dict) -> t.ResponseTruncation | None:
+    if "prism_truncation" not in response:
+        return None
+    value = _object(response["prism_truncation"], "response.prism_truncation")
+    count = _integer(value.get("items_left_out"), "prism_truncation.items_left_out")
+    if count == 0:
+        _invalid("prism_truncation.items_left_out")
+    return t.ResponseTruncation(
+        items_left_out=count,
+        first_kept_item_id=(
+            _string(value["first_kept_item_id"], "prism_truncation.first_kept_item_id")
+            if "first_kept_item_id" in value
+            else None
+        ),
+    )
+
+
 def _duration(value: object, name: str) -> float | None:
     if value is None:
         return None
@@ -549,6 +566,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         status = _string(response.get("status"), "response.status")
         payload = ResponseEnded(
             settings_revision=_revision(response, "response.prism_settings_revision"),
+            truncation=_response_truncation(response),
             response=ref(response.get("id")),
             status=cast(
                 Literal["completed", "cancelled", "failed", "unknown"],

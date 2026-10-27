@@ -656,3 +656,25 @@ if cut, ok := event.Payload.(rime.ItemTruncated); ok && cut.KeptText != nil {
     fmt.Printf("Retained text for %s: %q\n", cut.ItemID, *cut.KeptText)
 }
 ```
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.Truncation` is an optional
+`*ResponseTruncation` with `ItemsLeftOut` and optional `*string` `FirstKeptItemID`.
+It exposes `response.prism_truncation` through `Recv` and `OnEvent`.
+The count refers to items excluded from this reply's prompt, not turns or items
+deleted from history. Already hidden items do not count. A nil first ID means
+no item from before this turn was retained.
+
+A nil summary means the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+The summary does not change the session's truncation policy.
+
+```go
+if ended, ok := event.Payload.(rime.ResponseEnded); ok && ended.Truncation != nil {
+    fmt.Printf("Items excluded from prompt: %d\n", ended.Truncation.ItemsLeftOut)
+}
+```
+
+Migration: use keyed `ResponseEnded` struct literals. Existing unkeyed literals
+must include the new `Truncation` field, with nil when no summary is available.

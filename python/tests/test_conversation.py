@@ -1166,3 +1166,23 @@ async def test_runner_forwards_truncation_without_retained_response(monkeypatch,
         assert next(e for e in events if isinstance(e, r.ItemTruncated)) == r.ItemTruncated(
             item_id="old-item", content_index=0, audio_end_ms=12, kept_text=kept_text
         )
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [None, {"items_left_out": 12}, {"items_left_out": 12, "first_kept_item_id": "item-kept"}],
+)
+async def test_runner_forwards_response_truncation(monkeypatch, summary):
+    async with run(monkeypatch) as (_, peer, _, _, _, events):
+        peer.emit("response.created", response={"id": "history-reply"})
+        peer.emit(
+            "response.done",
+            response={
+                "id": "history-reply",
+                "status": "completed",
+                **({} if summary is None else {"prism_truncation": summary}),
+            },
+        )
+        await until(lambda: any(isinstance(e, r.ResponseEnded) for e in events))
+        ended = next(e for e in events if isinstance(e, r.ResponseEnded))
+        assert ended.truncation == (None if summary is None else r.ResponseTruncation(**summary))

@@ -369,6 +369,14 @@ pub struct SessionEvent {
     /// Typed event contents.
     pub payload: RealtimeEvent,
 }
+/// History items excluded from a reply's prompt, not deleted from history.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResponseTruncation {
+    /// Number of excluded items, not turns. Already hidden items are not counted.
+    pub items_left_out: u64,
+    /// Oldest retained item; None when no earlier item was retained.
+    pub first_kept_item_id: Option<String>,
+}
 /// Typed Prism event contents. Unknown wire events are ignored.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
@@ -502,6 +510,8 @@ pub enum RealtimeEvent {
     ResponseEnded {
         /// Settings revision the reply began with, if published.
         settings_revision: Option<u64>,
+        /// None when the server reports no exclusions or the information is unavailable.
+        truncation: Option<ResponseTruncation>,
         /// Response reference.
         response: ResponseRef,
         /// Completed, cancelled, failed, or unknown.

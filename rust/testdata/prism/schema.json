@@ -734,5 +734,238 @@
       "prism_kept_text": {}
     },
     "valid": false
+  },
+  {
+    "name": "response_truncation_absent",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_with_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": "item-kept"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_all_prior_items",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 852
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_large_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 4294967295,
+        "first_kept_item_id": "item-kept"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_null",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": null
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_array",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": []
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_string",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": "bad"
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_missing_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {}
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_zero",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 0
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_negative",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": -1
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_fraction",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 1.5
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_bool",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": true
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_string_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": "12"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_null_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": null
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_null_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": null
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_number_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": 3
+      }
+    },
+    "valid": false
   }
 ]

@@ -785,6 +785,9 @@ components:
       type: object
       required: [id, object, status, output, usage]
       properties:
+        prism_truncation:
+          allOf:
+            - $ref: '#/components/schemas/responseTruncation'
         prism_settings_revision:
           type: integer
           minimum: 0
@@ -822,6 +825,17 @@ components:
             type: string
         usage:
           type: 'null'
+
+    responseTruncation:
+      type: object
+      additionalProperties: false
+      required: [items_left_out]
+      properties:
+        items_left_out:
+          type: integer
+          minimum: 1
+        first_kept_item_id:
+          type: string
 
     errorType:
       oneOf:

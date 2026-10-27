@@ -615,3 +615,24 @@ function onEvent(event: SessionEvent) {
 This event can arrive after `response.ended`. It has no response reference and does
 not require the SDK to retain that response. `text.done` still reports generated
 text. Add `item.truncated` to exhaustive switches on `SessionEvent.payload.kind`.
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.truncation` exposes the server's
+`response.prism_truncation` summary. It contains `itemsLeftOut` and nullable
+`firstKeptItemId`. The count refers to conversation items excluded from this
+reply's prompt, not turns or items deleted from history. Already hidden items do
+not count. The first ID is absent when no item from before this turn was retained.
+
+Decoded events have `truncation: null` when the server reports no exclusions or the
+information is unavailable, including older servers or a reply that ended before
+usage was counted. Caller-created events may omit the property. This does not change
+the session's truncation policy. Session events and conversation callbacks expose
+the same immutable summary.
+
+```typescript
+if (event.payload.kind === "response.ended" && event.payload.truncation) {
+  const summary = event.payload.truncation;
+  console.log(summary.itemsLeftOut, summary.firstKeptItemId);
+}
+```

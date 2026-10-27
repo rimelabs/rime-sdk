@@ -123,6 +123,18 @@ for (const item of cases) {
           keptText: item.expected_kept_text,
         });
       }
+      if ("expected_truncation" in item) {
+        const expected = item.expected_truncation;
+        assert.deepEqual(
+          decode(raw, "session-1").payload.truncation,
+          expected === null
+            ? null
+            : {
+                itemsLeftOut: expected.items_left_out,
+                firstKeptItemId: expected.first_kept_item_id ?? null,
+              },
+        );
+      }
     }
   });
   if (item.invalid)

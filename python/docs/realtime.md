@@ -586,3 +586,22 @@ def on_event(event):
 This event can arrive after `ResponseEnded`. It has no response reference and does
 not require the SDK to retain that response. `TextDone` still reports generated
 text. Existing exhaustive event handlers must accept `ItemTruncated`.
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.truncation` exposes the server's
+`response.prism_truncation` summary. It contains `items_left_out` and optional
+`first_kept_item_id`. The count refers to conversation items excluded from this
+reply's prompt, not turns or items deleted from history. Already hidden items do
+not count. The first ID is absent when no item from before this turn was retained.
+
+`truncation` is `None` when the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+This does not change the session's truncation policy. Both session events and
+conversation callbacks expose the summary.
+
+```python
+if isinstance(event.payload, r.ResponseEnded) and event.payload.truncation is not None:
+    summary = event.payload.truncation
+    print(summary.items_left_out, summary.first_kept_item_id)
+```

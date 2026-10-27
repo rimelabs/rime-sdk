@@ -60,3 +60,46 @@ func TestRealtimeTruncation(t *testing.T) {
 		}
 	}
 }
+
+func TestResponseTruncationSurvivesCancellationAcknowledgment(t *testing.T) {
+	for _, summary := range []rtObject{nil, {"items_left_out": 12}, {"items_left_out": 12, "first_kept_item_id": "item-kept"}} {
+		for _, status := range []string{"completed", "cancelled", "failed"} {
+			p := newRealtimePeer(t)
+			_, s := p.setup(t)
+			response := p.turn(s, "reply-1")
+			rtRecv(t, s)
+			rtRecv(t, s)
+			done := make(chan error, 1)
+			go func() { done <- s.Cancel(context.Background(), response) }()
+			q := p.next("response.cancel")
+			body := rtObject{"id": "reply-1", "status": status, "metadata": rtObject{"prism_drain_token": "drain-1"}}
+			if summary != nil {
+				body["prism_truncation"] = summary
+			}
+			p.send(rtObject{"type": "response.done", "event_id": "done-event", "prism_request_event_id": q["event_id"], "response": body})
+			rtWait(t, done)
+			event := rtRecv(t, s)
+			payload, ok := event.Payload.(ResponseEnded)
+			if !ok || payload.Status != status || event.EventID != "done-event" || event.RequestID != q["event_id"] {
+				t.Fatal(event)
+			}
+			if summary == nil {
+				if payload.Truncation != nil {
+					t.Fatal(payload)
+				}
+			} else {
+				if payload.Truncation == nil || payload.Truncation.ItemsLeftOut != 12 {
+					t.Fatal(payload)
+				}
+				first, present := summary["first_kept_item_id"]
+				if present {
+					if payload.Truncation.FirstKeptItemID == nil || *payload.Truncation.FirstKeptItemID != first {
+						t.Fatal(payload)
+					}
+				} else if payload.Truncation.FirstKeptItemID != nil {
+					t.Fatal(payload)
+				}
+			}
+		}
+	}
+}

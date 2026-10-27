@@ -69,3 +69,64 @@ for (const value of [
     }
   });
 }
+
+for (const summary of [
+  null,
+  { items_left_out: 12 },
+  { items_left_out: 12, first_kept_item_id: "item-kept" },
+]) {
+  for (const status of ["completed", "cancelled", "failed"]) {
+    test(
+      `response truncation survives cancel acknowledgment: ${status} ${JSON.stringify(summary)}`,
+      { timeout: 4000 },
+      async (t) => {
+        const peer = await new Peer().start();
+        const client = new Rime({ apiKey: "test" });
+        t.after(async () => {
+          await client.close();
+          await peer.close();
+        });
+        const session = await client.realtime.connect({
+          endpoint: peer.endpoint,
+        });
+        peer.emit("prism.typed_input.ready");
+        const accepted = session.sendText("hello");
+        peer.accepted(await peer.next("response.create"));
+        const response = await accepted;
+        const pending = session.cancel(response);
+        const q = await peer.next("response.cancel");
+        peer.emit("response.done", {
+          event_id: "done-event",
+          prism_request_event_id: q.event_id,
+          response: {
+            id: response.responseId,
+            status,
+            metadata: { prism_drain_token: "drain-1" },
+            ...(summary === null ? {} : { prism_truncation: summary }),
+          },
+        });
+        await pending;
+        const events = session.events;
+        for await (const event of events) {
+          if (event.payload.kind !== "response.ended") continue;
+          assert.deepEqual(
+            event.payload.truncation,
+            summary === null
+              ? null
+              : {
+                  itemsLeftOut: 12,
+                  firstKeptItemId: summary.first_kept_item_id ?? null,
+                },
+          );
+          assert.equal(event.payload.status, status);
+          assert.equal(event.eventId, "done-event");
+          assert.equal(event.requestId, q.event_id);
+          if (summary !== null)
+            assert.ok(Object.isFrozen(event.payload.truncation));
+          return;
+        }
+        assert.fail("missing response completion");
+      },
+    );
+  }
+}

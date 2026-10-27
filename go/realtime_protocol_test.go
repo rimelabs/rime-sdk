@@ -16,11 +16,15 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 	var cases []struct {
-		Name     string          `json:"name"`
-		Event    json.RawMessage `json:"event"`
-		Invalid  bool            `json:"invalid"`
-		Expected string          `json:"expected_kind"`
-		KeptText *string         `json:"expected_kept_text"`
+		Name       string          `json:"name"`
+		Event      json.RawMessage `json:"event"`
+		Invalid    bool            `json:"invalid"`
+		Expected   string          `json:"expected_kind"`
+		KeptText   *string         `json:"expected_kept_text"`
+		Truncation *struct {
+			ItemsLeftOut    uint64  `json:"items_left_out"`
+			FirstKeptItemID *string `json:"first_kept_item_id"`
+		} `json:"expected_truncation"`
 	}
 	if err = json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
@@ -48,6 +52,15 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 				payload, ok := e.payload.(ItemTruncated)
 				if !ok || !reflect.DeepEqual(payload.KeptText, c.KeptText) || payload.ItemID != "retained-item" || payload.ContentIndex != 0 || payload.AudioEndMS != 1200 {
 					t.Fatalf("unexpected truncation: %#v", e.payload)
+				}
+			}
+			if kind == "response.ended" {
+				var want *ResponseTruncation
+				if c.Truncation != nil {
+					want = &ResponseTruncation{ItemsLeftOut: c.Truncation.ItemsLeftOut, FirstKeptItemID: c.Truncation.FirstKeptItemID}
+				}
+				if !reflect.DeepEqual(e.payload.(ResponseEnded).Truncation, want) {
+					t.Fatalf("unexpected response truncation: %#v", e.payload)
 				}
 			}
 		})
