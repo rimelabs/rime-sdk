@@ -1,0 +1,127 @@
+go/realtime_protocol.go
+  s_30fa7d6155dbe0::t_ef4b301a411362 302-307
+typescript/src/realtime/session.ts
+  s_30fa7d6155dbe0::t_ef4b301a411362 986
+rust/src/realtime/types.rs
+  s_30fa7d6155dbe0::t_ef4b301a411362 376-387
+typescript/docs/realtime.md
+  s_30fa7d6155dbe0::t_9d4f9d58343918 590-617
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_30fa7d6155dbe0::t_ef4b301a411362 24,81
+go/realtime_conversation_test.go
+  s_30fa7d6155dbe0::t_8901b0a22d296a 604-606,611-615,621-622
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 159,327
+  s_30fa7d6155dbe0::t_b1017dd478851c 588-603,607-610,616-620,623-624
+  s_30fa7d6155dbe0::t_c5af937ceecbb6 7
+python/tests/test_realtime_protocol.py
+  s_30fa7d6155dbe0::t_a2caa02dda0ed2 36-41
+conformance/prism/README.md
+  s_30fa7d6155dbe0::t_9d4f9d58343918 102-106
+go/realtime_protocol_test.go
+  s_30fa7d6155dbe0::t_a2caa02dda0ed2 23,47-51
+  s_2ed902f4b7cb9e::t_3af0370bbfc99e 52
+typescript/tests/realtime.test.mjs
+  s_30fa7d6155dbe0::t_064621649f8873 387,458
+  s_30fa7d6155dbe0::t_1372cf2db30ae9 388-421,423-457
+  s_30fa7d6155dbe0::t_8901b0a22d296a 422
+rust/src/realtime/tests/protocol.rs
+  s_30fa7d6155dbe0::t_a2caa02dda0ed2 83-84,91-97
+  s_30fa7d6155dbe0::t_8901b0a22d296a 85-90
+go/realtime_session_test.go
+  s_30fa7d6155dbe0::t_1c45e3f59d5d2d 12-65,68
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1449-1450
+conformance/prism/schema.json
+  s_30fa7d6155dbe0::t_9d4f9d58343918 664
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 612-663,665-736
+rust/testdata/prism/schema.json
+  s_30fa7d6155dbe0::t_9d4f9d58343918 664
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 612-663,665-736
+rust/src/realtime/protocol.rs
+  s_30fa7d6155dbe0::t_ef4b301a411362 266-272
+python/src/rimelabs_sdk/realtime/_types.py
+  s_30fa7d6155dbe0::t_ef4b301a411362 440-453,459
+  s_2ed902f4b7cb9e::t_c862e677db7e63 439
+rust/README.md
+  s_30fa7d6155dbe0::t_9d4f9d58343918 624-645
+conformance/prism/protocol.json
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1558-1608,1610-1611,1613-1677
+  s_30fa7d6155dbe0::t_9d4f9d58343918 1609,1612
+typescript/tests/conversation.test.mjs
+  s_30fa7d6155dbe0::t_8901b0a22d296a 1120-1143
+  s_30fa7d6155dbe0::t_b1017dd478851c 1118-1119,1144
+python/tests/test_realtime.py
+  s_30fa7d6155dbe0::t_8901b0a22d296a 443-446
+  s_30fa7d6155dbe0::t_1c45e3f59d5d2d 420,422-424,447,456
+  s_30fa7d6155dbe0::t_78ae62f28f1ae9 421,442,448-455
+go/realtime_types.go
+  s_30fa7d6155dbe0::t_8901b0a22d296a 228,230
+  s_30fa7d6155dbe0::t_ef4b301a411362 225-227,229,231-237
+rust/src/realtime/tests/conversation.rs
+  s_30fa7d6155dbe0::t_8901b0a22d296a 592-595,600-602,604-616,623-627
+  s_30fa7d6155dbe0::t_b1017dd478851c 576-591,596-599,603,617-622,628-629
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 161,475,538
+python/src/rimelabs_sdk/realtime/_session.py
+  s_30fa7d6155dbe0::t_ef4b301a411362 803,811,900
+typescript/src/realtime/protocol.ts
+  s_30fa7d6155dbe0::t_ef4b301a411362 96,191,474
+  s_30fa7d6155dbe0::t_8901b0a22d296a 475-478
+typescript/src/realtime/types.ts
+  s_30fa7d6155dbe0::t_ef4b301a411362 343-352
+  s_30fa7d6155dbe0::t_8901b0a22d296a 357-358
+rust/src/realtime/tests/session.rs
+  s_30fa7d6155dbe0::t_1c45e3f59d5d2d 11-51,53-91
+go/README.md
+  s_30fa7d6155dbe0::t_9d4f9d58343918 637-658
+go/testdata/prism/schema.json
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 612-663,665-736
+  s_30fa7d6155dbe0::t_9d4f9d58343918 664
+typescript/tests/realtime-protocol.test.mjs
+  s_30fa7d6155dbe0::t_a2caa02dda0ed2 112,117-126
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1449-1450
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1449-1450
+go/testdata/prism/protocol.json
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1558-1608,1610-1611,1613-1677
+  s_30fa7d6155dbe0::t_9d4f9d58343918 1609,1612
+python/tests/test_conversation.py
+  s_30fa7d6155dbe0::t_b1017dd478851c 1153-1158,1163-1168
+  s_30fa7d6155dbe0::t_8901b0a22d296a 1159-1162
+typescript/tests/fixtures/realtime.ts
+  s_30fa7d6155dbe0::t_75ea47c30743d7 17,59-65
+go/realtime_interruption_policy_test.go
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 86,228
+rust/testdata/prism/protocol.json
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 1558-1608,1610-1611,1613-1677
+  s_30fa7d6155dbe0::t_9d4f9d58343918 1609,1612
+python/docs/realtime.md
+  s_30fa7d6155dbe0::t_9d4f9d58343918 565-588
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_30fa7d6155dbe0::t_ca66c6d69da01c 196
+  s_30fa7d6155dbe0::t_ef4b301a411362 133,437,440-445
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "be1d85bc1b90830b28e3689dd4216637c8b34ece",
+  "prompts": {},
+  "sessions": {
+    "s_2ed902f4b7cb9e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17990-75da-7f31-bed9-8edddd12f59a",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_30fa7d6155dbe0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17b68-c1f8-72c0-8324-1313fb595754",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
