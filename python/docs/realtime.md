@@ -576,8 +576,11 @@ generated. The event does not promise a later text update. Replies with tool cal
 retain all words, so this field can differ from the words heard during playback.
 
 ```python
+from rimelabs_sdk.realtime import ItemTruncated
+
+
 def on_event(event):
-    if isinstance(event.payload, r.ItemTruncated):
+    if isinstance(event.payload, ItemTruncated):
         cut = event.payload
         if cut.kept_text is not None:
             print(f"Retained text for {cut.item_id}: {cut.kept_text!r}")
@@ -601,7 +604,9 @@ This does not change the session's truncation policy. Both session events and
 conversation callbacks expose the summary.
 
 ```python
-if isinstance(event.payload, r.ResponseEnded) and event.payload.truncation is not None:
+from rimelabs_sdk.realtime import ResponseEnded
+
+if isinstance(event.payload, ResponseEnded) and event.payload.truncation is not None:
     summary = event.payload.truncation
     print(summary.items_left_out, summary.first_kept_item_id)
 ```

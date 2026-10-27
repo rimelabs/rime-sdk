@@ -764,6 +764,22 @@
     "valid": true
   },
   {
+    "name": "response_truncation_empty_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": ""
+      }
+    },
+    "valid": true
+  },
+  {
     "name": "response_truncation_all_prior_items",
     "schema": "responseView",
     "value": {

@@ -1714,6 +1714,28 @@
     }
   },
   {
+    "name": "response_truncation_empty_first",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "object": "realtime.response",
+        "status": "completed",
+        "output": [],
+        "usage": null,
+        "prism_truncation": {
+          "items_left_out": 12,
+          "first_kept_item_id": ""
+        }
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_truncation": {
+      "items_left_out": 12,
+      "first_kept_item_id": ""
+    }
+  },
+  {
     "name": "response_truncation_all_prior_items",
     "event": {
       "type": "response.done",
