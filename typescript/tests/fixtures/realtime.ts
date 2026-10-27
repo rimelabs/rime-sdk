@@ -14,6 +14,7 @@ import {
   type AudioChunk,
   type PlaybackReport,
   type SessionEvent,
+  type ItemTruncated,
   type TurnDetection,
   type TurnDetectionInfo,
 } from "../../dist/index.js";
@@ -55,6 +56,13 @@ void [previousInput, previousEvents];
 
 const onEvent: NonNullable<ConversationOptions["onEvent"]> = (event) => {
   const payload = event.payload;
+  if (payload.kind === "item.truncated") {
+    const cut: ItemTruncated = payload;
+    const text: string | null = cut.keptText;
+    void text;
+    // @ts-expect-error Retained text is read-only.
+    cut.keptText = "changed";
+  }
   if (payload.kind === "error" || payload.kind === "transcript.failed") {
     const retryable: boolean = payload.error.retryable;
     void retryable;

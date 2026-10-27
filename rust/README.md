@@ -621,3 +621,25 @@ session.update(RealtimeUpdateOptions::default().truncation(Truncation::Disabled)
 ```
 
 Migration: existing `SessionInfo` struct literals must add `truncation: None`.
+
+## Retained text after interruption
+
+Available in the next SDK release. `RealtimeEvent::ItemTruncated` appears in the
+session event stream and the conversation runner's `on_event` callback. Playback
+reporting does not wait for event consumption. It carries `item_id`,
+`content_index`, `audio_end_ms`, and `kept_text`.
+
+`kept_text` contains the text retained in server history. `Some("")` means no words
+remain. `None` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this text can differ from the words heard during playback.
+The event can arrive after `ResponseEnded` and does not require a retained response
+reference. `TextDone` still reports generated text.
+
+In your event handler:
+
+```rust,ignore
+if let RealtimeEvent::ItemTruncated { item_id, kept_text: Some(text), .. } = &event.payload {
+    println!("Retained text for {item_id}: {text:?}");
+}
+```

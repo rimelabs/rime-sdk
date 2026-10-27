@@ -340,11 +340,22 @@ export type ResponseEvent =
   | AudioDone
   | ToolCall
   | ResponseEnded;
+/** A playback report was recorded. Retained history text can differ from audible
+ * text: replies with tool calls retain all words. */
+export interface ItemTruncated {
+  readonly kind: "item.truncated";
+  readonly itemId: string;
+  readonly contentIndex: number;
+  readonly audioEndMs: number;
+  /** Null when unavailable, including during generation; empty if no words remain. */
+  readonly keptText: string | null;
+}
 export interface SessionEvent<Fault extends RealtimeFault = RealtimeFault> {
   readonly sessionId: string;
   readonly eventId: string;
   readonly requestId: string | null;
-  readonly payload: InputEvent<Fault> | ResponseEvent | FaultEvent<Fault>;
+  readonly payload:
+    InputEvent<Fault> | ResponseEvent | ItemTruncated | FaultEvent<Fault>;
 }
 export interface PlaybackInterrupted {
   readonly kind: "interrupted";

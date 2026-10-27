@@ -1555,5 +1555,125 @@
       }
     },
     "expected_kind": "session.updated"
+  },
+  {
+    "name": "truncated_kept_text_absent",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200
+    },
+    "expected_kind": "item.truncated",
+    "expected_kept_text": null
+  },
+  {
+    "name": "truncated_kept_text_empty",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": ""
+    },
+    "expected_kind": "item.truncated",
+    "expected_kept_text": ""
+  },
+  {
+    "name": "truncated_kept_text_text",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": "Your payment amount is $125, and"
+    },
+    "expected_kind": "item.truncated",
+    "expected_kept_text": "Your payment amount is $125, and"
+  },
+  {
+    "name": "truncated_kept_text_unicode",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": "Bonjour, \u4e16\u754c \ud83c\udf0d"
+    },
+    "expected_kind": "item.truncated",
+    "expected_kept_text": "Bonjour, \u4e16\u754c \ud83c\udf0d"
+  },
+  {
+    "name": "truncated_kept_text_null",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": null
+    },
+    "invalid": true
+  },
+  {
+    "name": "truncated_kept_text_number",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": 1
+    },
+    "invalid": true
+  },
+  {
+    "name": "truncated_kept_text_boolean",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": false
+    },
+    "invalid": true
+  },
+  {
+    "name": "truncated_kept_text_array",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": []
+    },
+    "invalid": true
+  },
+  {
+    "name": "truncated_kept_text_object",
+    "event": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": {}
+    },
+    "invalid": true
   }
 ]

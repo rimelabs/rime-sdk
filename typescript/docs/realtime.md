@@ -587,3 +587,31 @@ publish it.
 ```text
 await session.update({ truncation: { retentionRatio: 0.9 } });
 ```
+
+## Retained text after interruption
+
+Available in the next SDK release. A `conversation.item.truncated` acknowledgment
+also appears in `session.events` as `ItemTruncated`, with kind `item.truncated`.
+The conversation runner forwards it to `onEvent`. Playback reporting does not
+wait for event consumption.
+
+Use `itemId`, `contentIndex`, and `audioEndMs` to identify the reported audio.
+`keptText` is the text retained in server history. An empty string means no words
+remain. `null` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this field can differ from the words heard during playback.
+
+```typescript
+function onEvent(event: SessionEvent) {
+  if (event.payload.kind === "item.truncated") {
+    const cut = event.payload;
+    if (cut.keptText !== null) {
+      console.log("Retained text", cut.itemId, JSON.stringify(cut.keptText));
+    }
+  }
+}
+```
+
+This event can arrive after `response.ended`. It has no response reference and does
+not require the SDK to retain that response. `text.done` still reports generated
+text. Add `item.truncated` to exhaustive switches on `SessionEvent.payload.kind`.

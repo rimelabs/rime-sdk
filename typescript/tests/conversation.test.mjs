@@ -1115,3 +1115,30 @@ for (const newer of [false, true]) {
     );
   });
 }
+
+for (const keptText of [null, "", "Hello, 世界"]) {
+  test(
+    `runner forwards truncation without retained response: ${JSON.stringify(keptText)}`,
+    { timeout: 4000 },
+    async (t) => {
+      const { peer, events } = await setup(t);
+      peer.emit("conversation.item.truncated", {
+        item_id: "old-item",
+        content_index: 0,
+        audio_end_ms: 12,
+        ...(keptText === null ? {} : { prism_kept_text: keptText }),
+      });
+      await until(() => events.some((e) => e.kind === "item.truncated"));
+      assert.deepEqual(
+        events.find((e) => e.kind === "item.truncated"),
+        {
+          kind: "item.truncated",
+          itemId: "old-item",
+          contentIndex: 0,
+          audioEndMs: 12,
+          keptText,
+        },
+      );
+    },
+  );
+}

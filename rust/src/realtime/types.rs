@@ -373,6 +373,18 @@ pub struct SessionEvent {
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum RealtimeEvent {
+    /// A playback report was recorded, with the text retained in history.
+    ItemTruncated {
+        /// Conversation item identifier. No retained response reference is needed.
+        item_id: String,
+        /// Content part reported by the server.
+        content_index: u64,
+        /// Reported playback time in milliseconds.
+        audio_end_ms: u64,
+        /// None when unavailable, including during generation; empty when no words
+        /// remain. Tool-call replies retain all words, which can differ from audible text.
+        kept_text: Option<String>,
+    },
     /// A typed or proactive turn can be submitted.
     InputReady,
     /// Possible speech; applications can lower playback volume.

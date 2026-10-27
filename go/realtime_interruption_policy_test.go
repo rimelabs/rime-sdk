@@ -83,7 +83,7 @@ func TestRealtimeRunnerRetainsReplyInterruptionPolicy(t *testing.T) {
 			}
 			if scenario.initial {
 				q := p.next("conversation.item.truncate")
-				p.send(rtObject{"type": "conversation.item.truncated", "item_id": q["item_id"], "content_index": 0})
+				p.send(rtObject{"type": "conversation.item.truncated", "item_id": q["item_id"], "audio_end_ms": 12, "content_index": 0})
 			} else if o.writes.Load() != 1 {
 				t.Fatal("protected playback lost audio")
 			}
@@ -225,7 +225,7 @@ func TestRealtimeLatestReplyPolicyControlsPlaybackBatch(t *testing.T) {
 			if latest {
 				for i := 0; i < 2; i++ {
 					q := p.next("conversation.item.truncate")
-					p.send(rtObject{"type": "conversation.item.truncated", "item_id": q["item_id"], "content_index": 0})
+					p.send(rtObject{"type": "conversation.item.truncated", "item_id": q["item_id"], "audio_end_ms": 12, "content_index": 0})
 				}
 			}
 			cancel()

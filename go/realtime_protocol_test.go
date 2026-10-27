@@ -20,6 +20,7 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		Event    json.RawMessage `json:"event"`
 		Invalid  bool            `json:"invalid"`
 		Expected string          `json:"expected_kind"`
+		KeptText *string         `json:"expected_kept_text"`
 	}
 	if err = json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
@@ -42,6 +43,12 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 			}
 			if kind != c.Expected {
 				t.Fatalf("got %s, want %s", kind, c.Expected)
+			}
+			if kind == "item.truncated" {
+				payload, ok := e.payload.(ItemTruncated)
+				if !ok || !reflect.DeepEqual(payload.KeptText, c.KeptText) || payload.ItemID != "retained-item" || payload.ContentIndex != 0 || payload.AudioEndMS != 1200 {
+					t.Fatalf("unexpected truncation: %#v", e.payload)
+				}
 			}
 		})
 	}

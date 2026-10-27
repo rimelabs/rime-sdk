@@ -83,11 +83,6 @@ export interface ItemDeleted {
 export interface AudioCleared {
   kind: "audio.cleared";
 }
-export interface ItemTruncated {
-  kind: "item.truncated";
-  itemId: string;
-  contentIndex: number;
-}
 export interface ResponseEnded extends t.ResponseEnded {
   drainToken: string | null;
 }
@@ -98,7 +93,7 @@ export type Acknowledgment =
   | ItemCreated
   | ToolResultCreated
   | AudioCleared
-  | ItemTruncated
+  | t.ItemTruncated
   | t.ResponseStarted
   | ResponseEnded;
 export type ServerPayload =
@@ -193,7 +188,7 @@ export const requests = {
   ),
   truncate: new Request(
     "conversation.item.truncate",
-    (e): e is ItemTruncated => e.kind === "item.truncated",
+    (e): e is t.ItemTruncated => e.kind === "item.truncated",
   ),
 };
 
@@ -476,6 +471,11 @@ function decodeValue(
         kind: "item.truncated",
         itemId: id(event.item_id, "item_id"),
         contentIndex: integer(event.content_index, "content_index"),
+        audioEndMs: integer(event.audio_end_ms, "audio_end_ms"),
+        keptText:
+          event.prism_kept_text === undefined
+            ? null
+            : string(event.prism_kept_text, "prism_kept_text"),
       };
       break;
     case "prism.typed_input.ready":

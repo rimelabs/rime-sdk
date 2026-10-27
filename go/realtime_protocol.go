@@ -299,6 +299,12 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.kind = "item.truncated"
 		w.target = decoder.id(o["item_id"])
 		w.index = decoder.integer(o["content_index"])
+		var keptText *string
+		if value, present := o["prism_kept_text"]; present {
+			text := decoder.string(value)
+			keptText = &text
+		}
+		w.payload = ItemTruncated{ItemID: w.target, ContentIndex: w.index, AudioEndMS: decoder.integer(o["audio_end_ms"]), KeptText: keptText}
 	case "prism.typed_input.ready":
 		w.kind = "input.ready"
 		w.payload = InputReady{}

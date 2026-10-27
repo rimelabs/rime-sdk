@@ -80,6 +80,21 @@ fn shared_protocol() {
             assert!(result.is_err(), "{}", c["name"])
         } else {
             let event = result.unwrap_or_else(|e| panic!("{}: {e}", c["name"]));
+            if c.get("expected_kept_text").is_some() {
+                let Some(crate::realtime::RealtimeEvent::ItemTruncated {
+                    item_id,
+                    content_index,
+                    audio_end_ms,
+                    kept_text,
+                }) = &event.as_ref().unwrap().payload
+                else {
+                    panic!("missing truncation: {}", c["name"]);
+                };
+                assert_eq!(item_id, c["event"]["item_id"].as_str().unwrap());
+                assert_eq!(*content_index, 0);
+                assert_eq!(*audio_end_ms, 1200);
+                assert_eq!(kept_text.as_deref(), c["expected_kept_text"].as_str());
+            }
             assert_eq!(
                 event.map(|e| e.kind).as_deref().unwrap_or("ignored"),
                 c["expected_kind"].as_str().unwrap(),

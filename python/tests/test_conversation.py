@@ -1150,3 +1150,19 @@ async def test_missing_update_revision_does_not_guess_reply_policy(
         )
         if expected:
             ack_cut(peer, report)
+
+
+@pytest.mark.parametrize("kept_text", [None, "", "Hello, 世界"])
+async def test_runner_forwards_truncation_without_retained_response(monkeypatch, kept_text):
+    async with run(monkeypatch) as (_, peer, _, _, _, events):
+        peer.emit(
+            "conversation.item.truncated",
+            item_id="old-item",
+            content_index=0,
+            audio_end_ms=12,
+            **({"prism_kept_text": kept_text} if kept_text is not None else {}),
+        )
+        await until(lambda: any(isinstance(e, r.ItemTruncated) for e in events))
+        assert next(e for e in events if isinstance(e, r.ItemTruncated)) == r.ItemTruncated(
+            item_id="old-item", content_index=0, audio_end_ms=12, kept_text=kept_text
+        )

@@ -99,3 +99,8 @@ Each of four connections prints the supplied and returned IDs, then closes
 without requesting a reply. Set `PRISM_URL` to check another endpoint.
 To require preservation, also set `RIME_PRISM_REQUIRE_REQUEST_ID=1`. A failure
 then identifies a server or gateway behavior that a local peer cannot test.
+
+The optional `prism_kept_text` field on `conversation.item.truncated` follows
+`rimelabs/rime#3622`. The shared cases distinguish absent, empty, and nonempty
+text and reject non-string values. All four SDKs expose this acknowledgment as a
+public session event, including when no response reference remains.

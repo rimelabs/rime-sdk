@@ -983,7 +983,7 @@ export class RealtimeSession {
             payload.contentIndex === 0
           )
             this.settle(key, payload);
-        return;
+        break;
       case "input.ready":
         this.readyEpoch++;
         this.ready.set();

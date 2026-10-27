@@ -562,3 +562,27 @@ await session.update(truncation=RetentionRatio(0.9))
 ```
 
 Import `RetentionRatio` from `rimelabs_sdk.realtime`.
+
+## Retained text after interruption
+
+Available in the next SDK release. A `conversation.item.truncated` acknowledgment
+also appears in `session.events` as `ItemTruncated`. The conversation runner
+forwards it to `on_event`. Playback reporting does not wait for event consumption.
+
+Use `item_id`, `content_index`, and `audio_end_ms` to identify the reported audio.
+`kept_text` is the text retained in server history. An empty string means no words
+remain. `None` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this field can differ from the words heard during playback.
+
+```python
+def on_event(event):
+    if isinstance(event.payload, r.ItemTruncated):
+        cut = event.payload
+        if cut.kept_text is not None:
+            print(f"Retained text for {cut.item_id}: {cut.kept_text!r}")
+```
+
+This event can arrive after `ResponseEnded`. It has no response reference and does
+not require the SDK to retain that response. `TextDone` still reports generated
+text. Existing exhaustive event handlers must accept `ItemTruncated`.

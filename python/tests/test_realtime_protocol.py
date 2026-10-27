@@ -33,6 +33,12 @@ def test_shared_protocol_decoding(case):
     else:
         result = protocol.decode(raw, "session-1")
         assert (result.payload.kind if result else "ignored") == case["expected_kind"]
+        if "expected_kept_text" in case:
+            assert isinstance(result.payload, r.ItemTruncated)
+            assert result.payload.kept_text == case["expected_kept_text"]
+            assert result.payload.item_id == case["event"]["item_id"]
+            assert result.payload.content_index == case["event"]["content_index"]
+            assert result.payload.audio_end_ms == case["event"]["audio_end_ms"]
 
 
 @pytest.mark.parametrize(

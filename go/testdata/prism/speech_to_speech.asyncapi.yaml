@@ -1446,6 +1446,8 @@ components:
               type: string
             content_index:
               const: 0
+            prism_kept_text:
+              type: string
             audio_end_ms:
               type: integer
               minimum: 0

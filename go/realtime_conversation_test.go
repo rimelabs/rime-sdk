@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -155,7 +156,7 @@ func TestRealtimeRunnerInterruptsAndRejectsLateAudio(t *testing.T) {
 	if q["audio_end_ms"] != float64(12) {
 		t.Fatal(q)
 	}
-	p.send(rtObject{"type": "conversation.item.truncated", "item_id": "i1", "content_index": 0})
+	p.send(rtObject{"type": "conversation.item.truncated", "item_id": "i1", "audio_end_ms": 12, "content_index": 0})
 	p.send(rtObject{"type": "response.audio.delta", "response_id": "r1", "item_id": "i1", "output_index": 0, "content_index": 0, "delta": "AAA="})
 	p.send(rtObject{"type": "response.created", "response": rtObject{"id": "child", "metadata": rtObject{"prism_cause": "tool_continuation", "prism_parent_response_id": "r1"}}})
 	q = p.next("response.cancel")
@@ -323,7 +324,7 @@ func TestRealtimeReceiptWaitOverlapsWriteEndAndInterrupt(t *testing.T) {
 	// pending throughout Write, End, and Interrupt.
 	output.measured <- 12
 	p.next("conversation.item.truncate")
-	p.send(rtObject{"type": "conversation.item.truncated", "item_id": "i1", "content_index": 0})
+	p.send(rtObject{"type": "conversation.item.truncated", "item_id": "i1", "audio_end_ms": 12, "content_index": 0})
 	cancel()
 	select {
 	case err := <-done:
@@ -582,5 +583,42 @@ func TestRealtimeRunnerKeepsPendingFinishedReportOnSpeech(t *testing.T) {
 				t.Fatal("runner did not stop")
 			}
 		})
+	}
+}
+
+func TestRealtimeRunnerForwardsTruncationWithoutRetainedResponse(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	source := &rtControlledSource{stopped: make(chan struct{})}
+	playback := &rtControlledPlayback{opened: make(chan *rtControlledOutput, 4), outputs: map[OutputRef]*rtControlledOutput{}}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	seen := make(chan SessionEvent, 4)
+	done := make(chan error, 1)
+	go func() {
+		done <- (&ConversationRunner{Session: s, Source: source, Playback: playback, OnEvent: func(e SessionEvent) error { seen <- e; return nil }}).Run(ctx)
+	}()
+	empty, text := "", "Hello, 世界"
+	for _, kept := range []*string{nil, &empty, &text} {
+		wire := rtObject{"type": "conversation.item.truncated", "item_id": "old-item", "content_index": 0, "audio_end_ms": 12}
+		if kept != nil {
+			wire["prism_kept_text"] = *kept
+		}
+		p.send(wire)
+		select {
+		case event := <-seen:
+			payload, ok := event.Payload.(ItemTruncated)
+			if !ok || payload.ItemID != "old-item" || payload.ContentIndex != 0 || payload.AudioEndMS != 12 || !reflect.DeepEqual(payload.KeptText, kept) {
+				t.Fatal(event)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("missing truncation callback")
+		}
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("runner did not stop")
 	}
 }

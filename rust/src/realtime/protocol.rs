@@ -263,7 +263,13 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         "conversation.item.truncated" => {
             w.kind = "item.truncated".into();
             w.target = id(&v["item_id"])?;
-            w.index = integer(&v["content_index"])?
+            w.index = integer(&v["content_index"])?;
+            w.payload = Some(ItemTruncated {
+                item_id: w.target.clone(),
+                content_index: w.index,
+                audio_end_ms: integer(&v["audio_end_ms"])?,
+                kept_text: v.get("prism_kept_text").map(string).transpose()?,
+            });
         }
         "prism.typed_input.ready" => {
             w.kind = "input.ready".into();

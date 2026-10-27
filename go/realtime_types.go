@@ -222,6 +222,19 @@ type ResponseEnded struct {
 }
 type FaultEvent struct{ Fault *RealtimeFault }
 
+// ItemTruncated records a playback report and the text retained in history.
+// Replies with tool calls retain all words, which can differ from audible text.
+type ItemTruncated struct {
+	ItemID       string
+	ContentIndex uint64
+	AudioEndMS   uint64
+	// KeptText is nil when unavailable, including during generation, and points
+	// to an empty string when no words remain.
+	KeptText *string
+}
+
+func (ItemTruncated) isRealtimeEvent() {}
+
 func (InputReady) isRealtimeEvent()        {}
 func (SpeechHint) isRealtimeEvent()        {}
 func (SpeechStarted) isRealtimeEvent()     {}

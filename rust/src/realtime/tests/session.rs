@@ -8,59 +8,87 @@ use serde_json::json;
 
 #[tokio::test]
 async fn text_history_and_playback() {
-    let mut p = Peer::new().await;
-    let (c, s) = p.setup().await;
-    let mut events = s.events().unwrap();
-    assert!(s.events().is_err());
-    let response = p.turn(&s, "reply-1").await;
-    assert_eq!(response.session_id(), "session-1");
-    assert!(matches!(
-        event(&mut events).await.payload,
-        RealtimeEvent::InputReady
-    ));
-    assert!(matches!(
-        event(&mut events).await.payload,
-        RealtimeEvent::ResponseStarted { .. }
-    ));
-    let session = s.clone();
-    let task = tokio::spawn(async move { session.add_message("assistant", "history").await });
-    let q = p.next("conversation.item.create").await;
-    p.send(json!({"type":"conversation.item.created","prism_request_event_id":q["event_id"],"item":{"id":"history-1","type":"message"}})).await;
-    assert_eq!(task.await.unwrap().unwrap().item_id(), "history-1");
-    p.send(json!({"type":"response.output_item.added","response_id":"reply-1","output_index":0,"item":{"type":"message","id":"message-1"}})).await;
-    let RealtimeEvent::MessageStarted { output } = event(&mut events).await.payload else {
-        panic!("missing message")
-    };
-    let session = s.clone();
-    let task = tokio::spawn(async move {
-        session
-            .report_playback(PlaybackReport::Interrupted {
-                output,
-                audio_end_ms: 12,
-            })
+    for echo in [false, true] {
+        let mut p = Peer::new().await;
+        let (c, s) = p.setup().await;
+        let mut events = s.events().unwrap();
+        assert!(s.events().is_err());
+        let response = p.turn(&s, "reply-1").await;
+        assert_eq!(response.session_id(), "session-1");
+        assert!(matches!(
+            event(&mut events).await.payload,
+            RealtimeEvent::InputReady
+        ));
+        assert!(matches!(
+            event(&mut events).await.payload,
+            RealtimeEvent::ResponseStarted { .. }
+        ));
+        let session = s.clone();
+        let task = tokio::spawn(async move { session.add_message("assistant", "history").await });
+        let q = p.next("conversation.item.create").await;
+        p.send(json!({"type":"conversation.item.created","prism_request_event_id":q["event_id"],"item":{"id":"history-1","type":"message"}})).await;
+        assert_eq!(task.await.unwrap().unwrap().item_id(), "history-1");
+        p.send(json!({"type":"response.output_item.added","response_id":"reply-1","output_index":0,"item":{"type":"message","id":"message-1"}})).await;
+        let RealtimeEvent::MessageStarted { output } = event(&mut events).await.payload else {
+            panic!("missing message")
+        };
+        let session = s.clone();
+        let task = tokio::spawn(async move {
+            session
+                .report_playback(PlaybackReport::Interrupted {
+                    output,
+                    audio_end_ms: 12,
+                })
+                .await
+        });
+        let q = p.next("conversation.item.truncate").await;
+        assert_eq!(q["audio_end_ms"], 12);
+        let mut wire = json!({"type":"conversation.item.truncated","event_id":"cut-1","item_id":"message-1","audio_end_ms":12,"content_index":0,"prism_kept_text":"Hello"});
+        if echo {
+            wire["prism_request_event_id"] = q["event_id"].clone();
+        }
+        p.send(wire).await;
+        tokio::time::timeout(std::time::Duration::from_secs(3), task)
             .await
-    });
-    let q = p.next("conversation.item.truncate").await;
-    assert_eq!(q["audio_end_ms"], 12);
-    p.send(json!({"type":"conversation.item.truncated","item_id":"message-1","content_index":0}))
-        .await;
-    task.await.unwrap().unwrap();
-    p.ended("reply-1").await;
-    event(&mut events).await;
-    let session = s.clone();
-    let task = tokio::spawn(async move {
-        session
-            .report_playback(PlaybackReport::Finished {
-                response,
-                played_ms: Some(12.0),
-                audible_tail_ms: None,
-            })
-            .await
-    });
-    let q = p.next("prism.playback.drained").await;
-    assert_eq!(q["drain_token"], "token-reply-1");
-    task.await.unwrap().unwrap();
-    c.close().await;
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let cut = event(&mut events).await;
+        assert_eq!(cut.event_id, "cut-1");
+        assert_eq!(
+            cut.request_id.as_deref(),
+            if echo { q["event_id"].as_str() } else { None }
+        );
+        let RealtimeEvent::ItemTruncated {
+            item_id,
+            content_index,
+            audio_end_ms,
+            kept_text,
+        } = cut.payload
+        else {
+            panic!("missing truncation");
+        };
+        assert_eq!(item_id, "message-1");
+        assert_eq!(content_index, 0);
+        assert_eq!(audio_end_ms, 12);
+        assert_eq!(kept_text.as_deref(), Some("Hello"));
+        p.ended("reply-1").await;
+        event(&mut events).await;
+        let session = s.clone();
+        let task = tokio::spawn(async move {
+            session
+                .report_playback(PlaybackReport::Finished {
+                    response,
+                    played_ms: Some(12.0),
+                    audible_tail_ms: None,
+                })
+                .await
+        });
+        let q = p.next("prism.playback.drained").await;
+        assert_eq!(q["drain_token"], "token-reply-1");
+        task.await.unwrap().unwrap();
+        c.close().await;
+    }
 }
 #[tokio::test]
 async fn audio_and_clear() {
