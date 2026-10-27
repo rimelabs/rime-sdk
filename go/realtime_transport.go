@@ -2,8 +2,13 @@ package rime
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 )
@@ -35,14 +40,56 @@ func rtDial(ctx context.Context, address, key, requestID string, transport http.
 		if ctx.Err() != nil {
 			return nil, operationError(context.Cause(ctx), "")
 		}
-		kind := ErrUnavailable
-		if response != nil && (response.StatusCode == 401 || response.StatusCode == 403) {
-			kind = ErrAuthentication
+		if response != nil {
+			return nil, rtHandshakeError(response)
 		}
-		return nil, failure(kind, "realtime handshake failed")
+		return nil, failure(ErrUnavailable, "realtime handshake failed")
 	}
 	c.SetReadLimit(1024 * 1024)
 	return c, nil
+}
+
+func rtHandshakeError(response *http.Response) *Error {
+	kind, reason := ErrUnavailable, "realtime endpoint rejected the connection"
+	switch response.StatusCode {
+	case 401, 403:
+		kind, reason = ErrAuthentication, "realtime endpoint rejected credentials"
+	case 429:
+		kind, reason = ErrResourceLimit, "realtime connection or rate limit reached"
+	case 503:
+		reason = "realtime endpoint is unavailable"
+	}
+	message := fmt.Sprintf("%s (HTTP %d)", reason, response.StatusCode)
+	if response.Body != nil {
+		defer response.Body.Close()
+		// websocket.Dial returns at most 1024 bytes after a bounded body read.
+		body, err := io.ReadAll(io.LimitReader(response.Body, 1024))
+		if err == nil && len(body) < 1024 && utf8.Valid(body) {
+			detail := strings.TrimSpace(string(body))
+			if strings.HasPrefix(detail, "{") || strings.HasPrefix(detail, "[") {
+				var envelope struct {
+					Error struct {
+						Message string `json:"message"`
+					} `json:"error"`
+				}
+				if json.Unmarshal(body, &envelope) == nil {
+					detail = envelope.Error.Message
+				} else {
+					detail = ""
+				}
+			}
+			invalid := strings.ContainsFunc(detail, func(c rune) bool {
+				return c < 32 && c != '\r' && c != '\n' && c != '\t'
+			})
+			if !invalid && !strings.HasPrefix(strings.TrimSpace(detail), "<") {
+				detail = strings.Join(strings.Fields(detail), " ")
+				if detail != "" {
+					message += ": " + detail
+				}
+			}
+		}
+	}
+	return &Error{Kind: kind, Message: message, RequestID: response.Header.Get("x-request-id")}
 }
 func rtReadLoop(ctx context.Context, c *websocket.Conn, out chan<- rtRead) {
 	for {

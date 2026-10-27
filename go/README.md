@@ -336,6 +336,12 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
+If Prism refuses the connection with HTTP 429, `Realtime.Connect` returns
+an error matching `ErrResourceLimit`. HTTP 503 returns `ErrUnavailable`.
+Handshake errors include the HTTP status, the server request ID when supplied,
+and a short server explanation when available. Missing or invalid error bodies
+use a default message. The SDK does not retry the connection automatically.
+
 Prism is available from `v0.1.0-alpha.11`. Request IDs, reply labels, session updates,
 `RealtimeFault.Retryable()`, and `ErrRealtime` are pending the next release.
 Use this checkout for those APIs.

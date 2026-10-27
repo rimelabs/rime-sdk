@@ -2,10 +2,50 @@ import WebSocket from "ws";
 import {
   RimeAuthenticationError,
   RimeError,
+  RimeResourceLimitError,
   RimeStreamError,
   RimeUnavailableError,
 } from "../errors.js";
 import { Deferred } from "./async.js";
+
+function handshakeError(
+  status: number,
+  body: Buffer,
+  requestId: string | null,
+) {
+  let errorType = RimeUnavailableError;
+  let reason = "Realtime endpoint rejected the connection";
+  if ([401, 403].includes(status)) {
+    errorType = RimeAuthenticationError;
+    reason = "Realtime endpoint rejected credentials";
+  } else if (status === 429) {
+    errorType = RimeResourceLimitError;
+    reason = "Realtime connection or rate limit reached";
+  } else if (status === 503) {
+    reason = "Realtime endpoint is unavailable";
+  }
+  let message = `${reason} (HTTP ${status})`;
+  if (body.length > 0 && body.length < 1024) {
+    try {
+      let detail: unknown = new TextDecoder("utf-8", { fatal: true })
+        .decode(body)
+        .trim();
+      if (typeof detail === "string" && /^[{[]/.test(detail))
+        detail = JSON.parse(detail)?.error?.message;
+      if (
+        typeof detail === "string" &&
+        !detail.trimStart().startsWith("<") &&
+        !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(detail)
+      ) {
+        detail = detail.trim().replace(/\s+/gu, " ");
+        if (detail) message += `: ${detail}`;
+      }
+    } catch {
+      // Invalid response bodies do not change the HTTP error category.
+    }
+  }
+  return new errorType(message, requestId);
+}
 
 /** Private transport. The public declarations do not require ws types. */
 export class RealtimeConnection {
@@ -14,6 +54,8 @@ export class RealtimeConnection {
   private readonly ended = new Deferred<void>();
   private closing: Promise<void> | null = null;
   private connected = false;
+  private failed = false;
+  private refusal: (() => void) | undefined;
   readonly ready = this.opened.promise;
   onMessage: (raw: string) => void = () => {};
   onFailure: (error: RimeError) => void = () => {};
@@ -33,20 +75,47 @@ export class RealtimeConnection {
       this.opened.resolve();
     });
     this.socket.on("unexpected-response", (request, response) => {
-      const error = [401, 403].includes(response.statusCode ?? 0)
-        ? new RimeAuthenticationError("Realtime endpoint rejected credentials")
-        : new RimeUnavailableError("Realtime endpoint rejected the connection");
-      this.failure(error);
-      response.destroy();
-      request.destroy();
-      this.socket.terminate();
+      const chunks: Buffer[] = [];
+      let size = 0;
+      let finished = false;
+      const finish = (complete = false) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timer);
+        this.refusal = undefined;
+        const id = response.headers["x-request-id"];
+        this.failure(
+          handshakeError(
+            response.statusCode ?? 0,
+            complete ? Buffer.concat(chunks) : Buffer.alloc(0),
+            typeof id === "string" ? id : null,
+          ),
+        );
+        response.destroy();
+        request.destroy();
+        this.socket.terminate();
+      };
+      const timer = setTimeout(finish, 1000);
+      this.refusal = finish;
+      response.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size >= 1024) finish();
+        else chunks.push(chunk);
+      });
+      response.on("end", () => finish(true));
+      response.on("error", () => finish());
+      response.on("aborted", () => finish());
     });
     this.socket.on("error", () =>
-      this.failure(
-        !this.connected
-          ? new RimeUnavailableError("Realtime handshake failed")
-          : new RimeStreamError("Invalid event or lost realtime connection"),
-      ),
+      this.refusal
+        ? this.refusal()
+        : this.failure(
+            !this.connected
+              ? new RimeUnavailableError("Realtime handshake failed")
+              : new RimeStreamError(
+                  "Invalid event or lost realtime connection",
+                ),
+          ),
     );
     this.socket.on("message", (data, binary) => {
       if (binary) {
@@ -56,6 +125,7 @@ export class RealtimeConnection {
       this.onMessage(data.toString());
     });
     this.socket.on("close", () => {
+      this.refusal?.();
       this.ended.resolve();
       this.failure(
         new RimeStreamError(
@@ -66,6 +136,8 @@ export class RealtimeConnection {
   }
 
   private failure(error: RimeError) {
+    if (this.failed) return;
+    this.failed = true;
     this.opened.reject(error);
     this.onFailure(error);
   }
@@ -83,6 +155,7 @@ export class RealtimeConnection {
   close(): Promise<void> {
     if (!this.closing) {
       this.closing = (async () => {
+        this.refusal?.();
         if (this.socket.readyState === WebSocket.CLOSED) return;
         const timer = setTimeout(() => this.socket.terminate(), 2000);
         try {

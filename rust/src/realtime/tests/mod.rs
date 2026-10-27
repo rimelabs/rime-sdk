@@ -9,5 +9,6 @@ mod schema;
 
 mod updates;
 
+mod handshake;
 mod history;
 mod truncation;

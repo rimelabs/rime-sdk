@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Literal
@@ -13,7 +14,9 @@ from websockets.exceptions import InvalidHandshake, InvalidStatus, InvalidURI
 
 from .._errors import (
     RimeAuthenticationError,
+    RimeError,
     RimeInputError,
+    RimeResourceLimitError,
     RimeTimeoutError,
     RimeUnavailableError,
 )
@@ -29,6 +32,43 @@ if TYPE_CHECKING:
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
 _DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
+
+
+def _handshake_error(error: InvalidStatus) -> RimeError:
+    response = error.response
+    status = response.status_code
+    error_type: type[RimeError] = RimeUnavailableError
+    reason = "Realtime endpoint rejected the connection"
+    if status in (401, 403):
+        error_type = RimeAuthenticationError
+        reason = "Realtime endpoint rejected credentials"
+    elif status == 429:
+        error_type = RimeResourceLimitError
+        reason = "Realtime connection or rate limit reached"
+    elif status == 503:
+        reason = "Realtime endpoint is unavailable"
+    message = f"{reason} (HTTP {status})"
+    # websockets bounds the HTTP body read; open_timeout bounds its duration.
+    body = response.body
+    if body and len(body) < 1024:
+        try:
+            detail = body.decode("utf-8").strip()
+            if detail.startswith(("{", "[")):
+                payload = json.loads(detail)
+                detail = payload.get("error", {}).get("message")
+            if (
+                isinstance(detail, str)
+                and not detail.lstrip().startswith("<")
+                and all(ord(c) >= 32 or c in "\r\n\t" for c in detail)
+            ):
+                detail = " ".join(detail.split())
+                if detail:
+                    message += f": {detail}"
+        except (UnicodeError, ValueError, AttributeError, RecursionError):
+            pass
+    request_ids = response.headers.get_all("x-request-id")
+    request_id = request_ids[0] if len(request_ids) == 1 and request_ids[0] else None
+    return error_type(message, request_id=request_id)
 
 
 class Realtime:
@@ -139,13 +179,7 @@ class Realtime:
                         proxy=None,
                     )
                 except InvalidStatus as error:
-                    if error.response.status_code in (401, 403):
-                        raise RimeAuthenticationError(
-                            "Realtime endpoint rejected credentials"
-                        ) from None
-                    raise RimeUnavailableError(
-                        "Realtime endpoint rejected the connection"
-                    ) from None
+                    raise _handshake_error(error) from None
                 except TimeoutError:
                     raise RimeTimeoutError("Realtime connection timed out") from None
                 except OSError:
