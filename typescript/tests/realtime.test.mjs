@@ -384,50 +384,78 @@ test("clear remains serialized after caller cancellation; refusal releases its s
   await third;
 });
 
-test("playback uses message identity, waits for done, and sends the drain token", async (t) => {
-  const { session, peer, events } = await setup(t);
-  const ref = await turn(session, peer);
-  peer.message();
-  const output = (await payload(events, "message.started")).output;
-  const stop = watch(
-    session.reportPlayback({ kind: "interrupted", output, audioEndMs: 123 }),
-  );
-  const truncate = await peer.next("conversation.item.truncate");
-  assert.equal(truncate.item_id, output.itemId);
-  peer.emit("conversation.item.truncated", {
-    item_id: output.itemId,
-    content_index: 0,
-  });
-  await stop;
-  const finish = watch(
-    session.reportPlayback({
-      kind: "finished",
-      response: ref,
-      playedMs: 123,
-      audibleTailMs: 2,
-    }),
-  );
-  await sleep(20);
-  assert.equal(peer.queue.length, 0);
-  peer.ended();
-  await finish;
-  const drained = await peer.next("prism.playback.drained");
-  assert.deepEqual(drained, {
-    type: "prism.playback.drained",
-    response_id: ref.responseId,
-    drain_token: "drain-1",
-    played_ms: 123,
-    audible_tail_ms: 2,
-  });
-  await assert.rejects(
-    session.reportPlayback({
-      kind: "interrupted",
-      output: { ...output, outputIndex: 1 },
-      audioEndMs: 0,
-    }),
-    RimeInputError,
-  );
-});
+for (const keptText of [null, "", "Your payment amount is $125, and"]) {
+  for (const echoRequestId of [false, true]) {
+    test(
+      `playback acknowledgment exposes retained text: ${JSON.stringify(keptText)}, request echo: ${echoRequestId}`,
+      { timeout: 4000 },
+      async (t) => {
+        const { session, peer, events } = await setup(t);
+        const ref = await turn(session, peer);
+        peer.message();
+        const output = (await payload(events, "message.started")).output;
+        const stop = watch(
+          session.reportPlayback({
+            kind: "interrupted",
+            output,
+            audioEndMs: 123,
+          }),
+        );
+        const truncate = await peer.next("conversation.item.truncate");
+        assert.equal(truncate.item_id, output.itemId);
+        peer.emit("conversation.item.truncated", {
+          item_id: output.itemId,
+          content_index: 0,
+          audio_end_ms: 123,
+          ...(echoRequestId
+            ? { prism_request_event_id: truncate.event_id }
+            : {}),
+          event_id: "cut-1",
+          ...(keptText === null ? {} : { prism_kept_text: keptText }),
+        });
+        await stop;
+        const cut = (await events.next()).value;
+        assert.deepEqual(cut.payload, {
+          kind: "item.truncated",
+          itemId: output.itemId,
+          contentIndex: 0,
+          audioEndMs: 123,
+          keptText,
+        });
+        assert.equal(cut.eventId, "cut-1");
+        assert.equal(cut.requestId, echoRequestId ? truncate.event_id : null);
+        const finish = watch(
+          session.reportPlayback({
+            kind: "finished",
+            response: ref,
+            playedMs: 123,
+            audibleTailMs: 2,
+          }),
+        );
+        await sleep(20);
+        assert.equal(peer.queue.length, 0);
+        peer.ended();
+        await finish;
+        const drained = await peer.next("prism.playback.drained");
+        assert.deepEqual(drained, {
+          type: "prism.playback.drained",
+          response_id: ref.responseId,
+          drain_token: "drain-1",
+          played_ms: 123,
+          audible_tail_ms: 2,
+        });
+        await assert.rejects(
+          session.reportPlayback({
+            kind: "interrupted",
+            output: { ...output, outputIndex: 1 },
+            audioEndMs: 0,
+          }),
+          RimeInputError,
+        );
+      },
+    );
+  }
+}
 
 test("cancel requests share a slot; completion can win the cancellation race", async (t) => {
   const { session, peer, events } = await setup(t);

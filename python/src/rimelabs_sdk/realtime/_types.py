@@ -397,13 +397,30 @@ class ResponseAbandoned:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ResponseTruncation:
+    """History items excluded from this reply's prompt, not deleted from history.
+
+    ``items_left_out`` counts items, not turns, and excludes already hidden items.
+    ``first_kept_item_id`` is None when no earlier item was retained.
+    """
+
+    items_left_out: int
+    first_kept_item_id: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
 class ResponseEnded:
-    """A reply ended. Its settings revision is None when not published."""
+    """A reply ended, with optional settings revision and prompt truncation.
+
+    ``truncation`` is None when no exclusions are reported or the information
+    is unavailable, including on older servers.
+    """
 
     settings_revision: int | None = None
     response: ResponseRef
     status: Literal["completed", "cancelled", "failed", "unknown"]
     reason: str | None = None
+    truncation: ResponseTruncation | None = None
     kind: Literal["response.ended"] = field(default="response.ended", init=False)
 
 
@@ -437,11 +454,26 @@ ResponseEvent: TypeAlias = (
 
 
 @dataclass(frozen=True, kw_only=True)
+class ItemTruncated:
+    """Playback report recorded. Retained history text can differ from audible text.
+
+    ``kept_text`` is None when unavailable, empty when no words remain. Replies
+    with tool calls retain all words. Text can be unavailable during generation.
+    """
+
+    item_id: str
+    content_index: int
+    audio_end_ms: int
+    kept_text: str | None = None
+    kind: Literal["item.truncated"] = field(default="item.truncated", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
 class SessionEvent:
     session_id: str
     event_id: str
     request_id: str | None
-    payload: InputEvent | ResponseEvent | FaultEvent
+    payload: InputEvent | ResponseEvent | ItemTruncated | FaultEvent
 
 
 @dataclass(frozen=True, kw_only=True)

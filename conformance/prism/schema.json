@@ -609,5 +609,379 @@
       }
     },
     "valid": false
+  },
+  {
+    "name": "truncated_kept_text_absent",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200
+    },
+    "valid": true
+  },
+  {
+    "name": "truncated_kept_text_empty",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": ""
+    },
+    "valid": true
+  },
+  {
+    "name": "truncated_kept_text_text",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": "Your payment amount is $125, and"
+    },
+    "valid": true
+  },
+  {
+    "name": "truncated_kept_text_unicode",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": "Bonjour, \u4e16\u754c \ud83c\udf0d"
+    },
+    "valid": true
+  },
+  {
+    "name": "truncated_kept_text_null",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": null
+    },
+    "valid": false
+  },
+  {
+    "name": "truncated_kept_text_number",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": 1
+    },
+    "valid": false
+  },
+  {
+    "name": "truncated_kept_text_boolean",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": false
+    },
+    "valid": false
+  },
+  {
+    "name": "truncated_kept_text_array",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": []
+    },
+    "valid": false
+  },
+  {
+    "name": "truncated_kept_text_object",
+    "schema": "conversationItemTruncatedEvent",
+    "value": {
+      "type": "conversation.item.truncated",
+      "event_id": "truncated-event",
+      "prism_request_event_id": "truncate-request",
+      "item_id": "retained-item",
+      "content_index": 0,
+      "audio_end_ms": 1200,
+      "prism_kept_text": {}
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_absent",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_with_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": "item-kept"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_empty_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": ""
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_all_prior_items",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 852
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_large_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 4294967295,
+        "first_kept_item_id": "item-kept"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "response_truncation_null",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": null
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_array",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": []
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_string",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": "bad"
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_missing_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {}
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_zero",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 0
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_negative",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": -1
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_fraction",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 1.5
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_bool",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": true
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_string_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": "12"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_null_count",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": null
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_null_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": null
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "response_truncation_number_first",
+    "schema": "responseView",
+    "value": {
+      "id": "reply-1",
+      "object": "realtime.response",
+      "status": "completed",
+      "output": [],
+      "usage": null,
+      "prism_truncation": {
+        "items_left_out": 12,
+        "first_kept_item_id": 3
+      }
+    },
+    "valid": false
   }
 ]

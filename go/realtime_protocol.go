@@ -108,6 +108,24 @@ func (decoder *rtDecoder) integer(v any) uint64 {
 	return uint64(x)
 }
 
+func (decoder *rtDecoder) responseTruncation(response rtObject) *ResponseTruncation {
+	v, present := response["prism_truncation"]
+	if !present {
+		return nil
+	}
+	value := decoder.object(v)
+	count := decoder.integer(value["items_left_out"])
+	if count == 0 {
+		decoder.bad("prism_truncation.items_left_out")
+	}
+	var first *string
+	if v, present := value["first_kept_item_id"]; present {
+		text := decoder.string(v)
+		first = &text
+	}
+	return &ResponseTruncation{ItemsLeftOut: count, FirstKeptItemID: first}
+}
+
 // rtLabels keeps the client's own labels in metadata: string values under keys
 // without Prism's prism_ prefix.
 func rtLabels(metadata rtObject) map[string]string {
@@ -299,6 +317,12 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.kind = "item.truncated"
 		w.target = decoder.id(o["item_id"])
 		w.index = decoder.integer(o["content_index"])
+		var keptText *string
+		if value, present := o["prism_kept_text"]; present {
+			text := decoder.string(value)
+			keptText = &text
+		}
+		w.payload = ItemTruncated{ItemID: w.target, ContentIndex: w.index, AudioEndMS: decoder.integer(o["audio_end_ms"]), KeptText: keptText}
 	case "prism.typed_input.ready":
 		w.kind = "input.ready"
 		w.payload = InputReady{}
@@ -377,7 +401,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 				details = decoder.object(d["status_details"])
 			}
 			w.token = decoder.optional(m["prism_drain_token"])
-			w.payload = ResponseEnded{Response: r, Status: rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), Reason: decoder.optional(details["reason"]), SettingsRevision: decoder.revision(d)}
+			w.payload = ResponseEnded{Response: r, Status: rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), Reason: decoder.optional(details["reason"]), SettingsRevision: decoder.revision(d), Truncation: decoder.responseTruncation(d)}
 		}
 	case "response.function_call_arguments.done":
 		w.kind = "tool.call"

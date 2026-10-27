@@ -587,3 +587,52 @@ publish it.
 ```text
 await session.update({ truncation: { retentionRatio: 0.9 } });
 ```
+
+## Retained text after interruption
+
+Available in the next SDK release. A `conversation.item.truncated` acknowledgment
+also appears in `session.events` as `ItemTruncated`, with kind `item.truncated`.
+The conversation runner forwards it to `onEvent`. Playback reporting does not
+wait for event consumption.
+
+Use `itemId`, `contentIndex`, and `audioEndMs` to identify the reported audio.
+`keptText` is the text retained in server history. An empty string means no words
+remain. `null` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this field can differ from the words heard during playback.
+
+```typescript
+function onEvent(event: SessionEvent) {
+  if (event.payload.kind === "item.truncated") {
+    const cut = event.payload;
+    if (cut.keptText !== null) {
+      console.log("Retained text", cut.itemId, JSON.stringify(cut.keptText));
+    }
+  }
+}
+```
+
+This event can arrive after `response.ended`. It has no response reference and does
+not require the SDK to retain that response. `text.done` still reports generated
+text. Add `item.truncated` to exhaustive switches on `SessionEvent.payload.kind`.
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.truncation` exposes the server's
+`response.prism_truncation` summary. It contains `itemsLeftOut` and nullable
+`firstKeptItemId`. The count refers to conversation items excluded from this
+reply's prompt, not turns or items deleted from history. Already hidden items do
+not count. The first ID is absent when no item from before this turn was retained.
+
+Decoded events have `truncation: null` when the server reports no exclusions or the
+information is unavailable, including older servers or a reply that ended before
+usage was counted. Caller-created events may omit the property. This does not change
+the session's truncation policy. Session events and conversation callbacks expose
+the same immutable summary.
+
+```typescript
+if (event.payload.kind === "response.ended" && event.payload.truncation) {
+  const summary = event.payload.truncation;
+  console.log(summary.itemsLeftOut, summary.firstKeptItemId);
+}
+```

@@ -621,3 +621,47 @@ session.update(RealtimeUpdateOptions::default().truncation(Truncation::Disabled)
 ```
 
 Migration: existing `SessionInfo` struct literals must add `truncation: None`.
+
+## Retained text after interruption
+
+Available in the next SDK release. `RealtimeEvent::ItemTruncated` appears in the
+session event stream and the conversation runner's `on_event` callback. Playback
+reporting does not wait for event consumption. It carries `item_id`,
+`content_index`, `audio_end_ms`, and `kept_text`.
+
+`kept_text` contains the text retained in server history. `Some("")` means no words
+remain. `None` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this text can differ from the words heard during playback.
+The event can arrive after `ResponseEnded` and does not require a retained response
+reference. `TextDone` still reports generated text.
+
+In your event handler:
+
+```rust,ignore
+if let RealtimeEvent::ItemTruncated { item_id, kept_text: Some(text), .. } = &event.payload {
+    println!("Retained text for {item_id}: {text:?}");
+}
+```
+
+## History excluded from a reply
+
+Available in the next SDK release. `RealtimeEvent::ResponseEnded` includes
+`truncation: Option<ResponseTruncation>`, with `items_left_out` and optional
+`first_kept_item_id`. It exposes `response.prism_truncation` through session events
+and conversation callbacks. The count refers to items excluded from this reply's
+prompt, not turns or items deleted from history. Already hidden items do not count.
+The first ID is None when no item from before this turn was retained.
+
+A None summary means the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+It does not change the session's truncation policy.
+
+```rust,ignore
+if let RealtimeEvent::ResponseEnded { truncation: Some(summary), .. } = &event.payload {
+    println!("Items excluded from prompt: {}", summary.items_left_out);
+}
+```
+
+Migration: add `truncation: None` to constructed `ResponseEnded` values without a
+summary. Add `truncation` or `..` to patterns that list every variant field.

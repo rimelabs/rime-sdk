@@ -158,7 +158,7 @@ async fn interruption_rejects_late_audio_and_cancels_dependent_reply() {
     .await;
     let q = p.next("conversation.item.truncate").await;
     assert_eq!(q["audio_end_ms"], 12);
-    p.send(json!({"type":"conversation.item.truncated","item_id":"i1","content_index":0}))
+    p.send(json!({"type":"conversation.item.truncated","item_id":"i1","audio_end_ms":12,"content_index":0}))
         .await;
     p.send(json!({"type":"response.audio.delta","response_id":"r1","item_id":"i1","output_index":0,"content_index":0,"delta":"AAA="})).await;
     p.send(json!({"type":"response.created","response":{"id":"child","metadata":{"prism_cause":"tool_continuation","prism_parent_response_id":"r1"}}})).await;
@@ -472,7 +472,7 @@ async fn delayed_playback_uses_each_reply_policy_across_settings_changes() {
         if initial {
             let q = p.next("conversation.item.truncate").await;
             assert_eq!(q["item_id"], "policy-output");
-            p.send(json!({"type":"conversation.item.truncated","item_id":"policy-output","content_index":0})).await;
+            p.send(json!({"type":"conversation.item.truncated","item_id":"policy-output","audio_end_ms":12,"content_index":0})).await;
         } else {
             p.no_request().await;
             output.finish(19.0);
@@ -535,7 +535,7 @@ async fn queued_response_keeps_its_captured_policy_after_history_eviction() {
     assert!(output.done.is_cancelled());
     p.next("conversation.item.truncate").await;
     p.send(
-        json!({"type":"conversation.item.truncated","item_id":"queued-output","content_index":0}),
+        json!({"type":"conversation.item.truncated","item_id":"queued-output","audio_end_ms":12,"content_index":0}),
     )
     .await;
     stop.cancel();
@@ -572,4 +572,96 @@ async fn speech_preserves_measured_playback_with_pending_finished_report() {
         }
     }
     client.close().await;
+}
+
+#[tokio::test]
+async fn runner_forwards_truncation_without_retained_response() {
+    use crate::realtime::RealtimeEvent;
+    let p = Peer::new().await;
+    let (c, s) = p.setup().await;
+    let (opened, _outputs) = mpsc::channel(4);
+    let playback = Playback {
+        opened,
+        outputs: Arc::new(Mutex::new(HashMap::new())),
+        stopped: Arc::new(AtomicBool::new(false)),
+    };
+    let (sent, mut seen) = mpsc::channel(4);
+    let stop = CancellationToken::new();
+    let task = tokio::spawn(
+        ConversationRunner::new(s, Source(Arc::new(AtomicBool::new(false))), playback)
+            .on_event(move |event| {
+                sent.try_send(event.clone()).unwrap();
+                Ok(())
+            })
+            .run(stop.clone()),
+    );
+    for expected in [None, Some(""), Some("Hello, 世界")] {
+        let mut wire = json!({"type":"conversation.item.truncated","item_id":"old-item","content_index":0,"audio_end_ms":12});
+        if let Some(text) = expected {
+            wire["prism_kept_text"] = json!(text);
+        }
+        p.send(wire).await;
+        let event = tokio::time::timeout(Duration::from_secs(3), seen.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let RealtimeEvent::ItemTruncated {
+            item_id,
+            content_index,
+            audio_end_ms,
+            kept_text,
+        } = event.payload
+        else {
+            panic!("missing truncation");
+        };
+        assert_eq!(item_id, "old-item");
+        assert_eq!(content_index, 0);
+        assert_eq!(audio_end_ms, 12);
+        assert_eq!(kept_text.as_deref(), expected);
+    }
+    for (id, summary) in [
+        ("no-summary", None),
+        ("all-prior", Some(json!({"items_left_out":12}))),
+        (
+            "partial-history",
+            Some(json!({"items_left_out":12,"first_kept_item_id":"item-kept"})),
+        ),
+    ] {
+        p.send(json!({"type":"response.created","response":{"id":id}}))
+            .await;
+        let mut body = json!({"id":id,"status":"completed"});
+        if let Some(value) = &summary {
+            body["prism_truncation"] = value.clone();
+        }
+        p.send(json!({"type":"response.done","response":body}))
+            .await;
+        for n in 0..2 {
+            let event = tokio::time::timeout(Duration::from_secs(3), seen.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            if n == 1 {
+                let RealtimeEvent::ResponseEnded { truncation, .. } = event.payload else {
+                    panic!("missing response completion");
+                };
+                if let Some(value) = &summary {
+                    let truncation = truncation.unwrap();
+                    assert_eq!(truncation.items_left_out, 12);
+                    assert_eq!(
+                        truncation.first_kept_item_id.as_deref(),
+                        value["first_kept_item_id"].as_str()
+                    );
+                } else {
+                    assert!(truncation.is_none());
+                }
+            }
+        }
+    }
+    stop.cancel();
+    tokio::time::timeout(Duration::from_secs(3), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap_err();
+    c.close().await;
 }

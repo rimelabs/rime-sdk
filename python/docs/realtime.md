@@ -562,3 +562,51 @@ await session.update(truncation=RetentionRatio(0.9))
 ```
 
 Import `RetentionRatio` from `rimelabs_sdk.realtime`.
+
+## Retained text after interruption
+
+Available in the next SDK release. A `conversation.item.truncated` acknowledgment
+also appears in `session.events` as `ItemTruncated`. The conversation runner
+forwards it to `on_event`. Playback reporting does not wait for event consumption.
+
+Use `item_id`, `content_index`, and `audio_end_ms` to identify the reported audio.
+`kept_text` is the text retained in server history. An empty string means no words
+remain. `None` means unavailable, including older servers and replies still being
+generated. The event does not promise a later text update. Replies with tool calls
+retain all words, so this field can differ from the words heard during playback.
+
+```python
+from rimelabs_sdk.realtime import ItemTruncated
+
+
+def on_event(event):
+    if isinstance(event.payload, ItemTruncated):
+        cut = event.payload
+        if cut.kept_text is not None:
+            print(f"Retained text for {cut.item_id}: {cut.kept_text!r}")
+```
+
+This event can arrive after `ResponseEnded`. It has no response reference and does
+not require the SDK to retain that response. `TextDone` still reports generated
+text. Existing exhaustive event handlers must accept `ItemTruncated`.
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.truncation` exposes the server's
+`response.prism_truncation` summary. It contains `items_left_out` and optional
+`first_kept_item_id`. The count refers to conversation items excluded from this
+reply's prompt, not turns or items deleted from history. Already hidden items do
+not count. The first ID is absent when no item from before this turn was retained.
+
+`truncation` is `None` when the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+This does not change the session's truncation policy. Both session events and
+conversation callbacks expose the summary.
+
+```python
+from rimelabs_sdk.realtime import ResponseEnded
+
+if isinstance(event.payload, ResponseEnded) and event.payload.truncation is not None:
+    summary = event.payload.truncation
+    print(summary.items_left_out, summary.first_kept_item_id)
+```

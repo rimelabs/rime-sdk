@@ -308,10 +308,20 @@ export interface ResponseAbandoned {
   readonly kind: "response.abandoned";
   readonly response: ResponseRef;
 }
+/** History items excluded from this reply's prompt, not deleted from history. */
+export interface ResponseTruncation {
+  /** Number of excluded items, not turns. Already hidden items are not counted. */
+  readonly itemsLeftOut: number;
+  /** Oldest retained item; null when no earlier item was retained. */
+  readonly firstKeptItemId: string | null;
+}
 export interface ResponseEnded {
   /** Settings revision published by the server; null when unavailable.
    * Optional on caller-created values for compatibility. */
   readonly settingsRevision?: number | null;
+  /** Null when the server reports no exclusions or the information is unavailable.
+   * Optional on caller-created values for compatibility. */
+  readonly truncation?: ResponseTruncation | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;
   readonly status: "completed" | "cancelled" | "failed" | "unknown";
@@ -340,11 +350,22 @@ export type ResponseEvent =
   | AudioDone
   | ToolCall
   | ResponseEnded;
+/** A playback report was recorded. Retained history text can differ from audible
+ * text: replies with tool calls retain all words. */
+export interface ItemTruncated {
+  readonly kind: "item.truncated";
+  readonly itemId: string;
+  readonly contentIndex: number;
+  readonly audioEndMs: number;
+  /** Null when unavailable, including during generation; empty if no words remain. */
+  readonly keptText: string | null;
+}
 export interface SessionEvent<Fault extends RealtimeFault = RealtimeFault> {
   readonly sessionId: string;
   readonly eventId: string;
   readonly requestId: string | null;
-  readonly payload: InputEvent<Fault> | ResponseEvent | FaultEvent<Fault>;
+  readonly payload:
+    InputEvent<Fault> | ResponseEvent | ItemTruncated | FaultEvent<Fault>;
 }
 export interface PlaybackInterrupted {
   readonly kind: "interrupted";

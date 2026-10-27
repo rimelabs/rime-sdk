@@ -14,6 +14,9 @@ import {
   type AudioChunk,
   type PlaybackReport,
   type SessionEvent,
+  type ItemTruncated,
+  type ResponseTruncation,
+  type ResponseEnded,
   type TurnDetection,
   type TurnDetectionInfo,
 } from "../../dist/index.js";
@@ -55,6 +58,20 @@ void [previousInput, previousEvents];
 
 const onEvent: NonNullable<ConversationOptions["onEvent"]> = (event) => {
   const payload = event.payload;
+  if (payload.kind === "response.ended" && payload.truncation) {
+    const summary: ResponseTruncation = payload.truncation;
+    const first: string | null = summary.firstKeptItemId;
+    void first;
+    // @ts-expect-error Response truncation is read-only.
+    summary.itemsLeftOut = 1;
+  }
+  if (payload.kind === "item.truncated") {
+    const cut: ItemTruncated = payload;
+    const text: string | null = cut.keptText;
+    void text;
+    // @ts-expect-error Retained text is read-only.
+    cut.keptText = "changed";
+  }
   if (payload.kind === "error" || payload.kind === "transcript.failed") {
     const retryable: boolean = payload.error.retryable;
     void retryable;
@@ -65,6 +82,15 @@ const previousCallback: typeof onEvent = (event: SessionEvent) => {
   void event;
 };
 void [onEvent, previousCallback];
+
+// Existing caller-created response events can omit the optional summary.
+const previousEnded: ResponseEnded = {
+  kind: "response.ended",
+  response: { sessionId: "session-1", responseId: "reply-1" },
+  status: "completed",
+  reason: null,
+};
+void previousEnded;
 
 const tool: ToolDefinition = { name: "lookup", parameters: { type: "object" } };
 const fillers: PrismFiller[] = [

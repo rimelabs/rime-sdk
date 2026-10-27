@@ -214,13 +214,37 @@ type ToolCall struct {
 	ItemID, Name string
 	Arguments    map[string]any
 }
+
+// ResponseTruncation describes history items excluded from a reply's prompt.
+// These items remain in conversation history. Already hidden items are not counted.
+type ResponseTruncation struct {
+	// ItemsLeftOut counts excluded items, not turns.
+	ItemsLeftOut uint64
+	// FirstKeptItemID is nil when no earlier item was retained.
+	FirstKeptItemID *string
+}
 type ResponseEnded struct {
 	// SettingsRevision names the settings this reply began with, if published.
 	SettingsRevision *uint64
 	Response         ResponseRef
 	Status, Reason   string
+	// Truncation is nil when the server reports no exclusions or the information is unavailable.
+	Truncation *ResponseTruncation
 }
 type FaultEvent struct{ Fault *RealtimeFault }
+
+// ItemTruncated records a playback report and the text retained in history.
+// Replies with tool calls retain all words, which can differ from audible text.
+type ItemTruncated struct {
+	ItemID       string
+	ContentIndex uint64
+	AudioEndMS   uint64
+	// KeptText is nil when unavailable, including during generation, and points
+	// to an empty string when no words remain.
+	KeptText *string
+}
+
+func (ItemTruncated) isRealtimeEvent() {}
 
 func (InputReady) isRealtimeEvent()        {}
 func (SpeechHint) isRealtimeEvent()        {}

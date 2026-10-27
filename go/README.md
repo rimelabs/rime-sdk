@@ -634,3 +634,47 @@ policy, or an absent value when an older server does not publish it.
 ```text
 session.Update(ctx, rime.RealtimeUpdateOptions{Truncation: &rime.Truncation{Mode: rime.TruncationDisabled}})
 ```
+
+## Retained text after interruption
+
+Available in the next SDK release. `ItemTruncated` appears in `SessionEvent.Payload`
+through `Recv` and the conversation runner's `OnEvent` callback. Playback reporting
+does not wait for event consumption. It carries `ItemID`, `ContentIndex`,
+`AudioEndMS`, and `KeptText`.
+
+`KeptText` points to the text retained in server history. An empty string means
+no words remain. A nil pointer means unavailable, including older servers and
+replies still being generated. The event does not promise a later text update.
+Replies with tool calls retain all words, so this text can differ from the words
+heard during playback. The event can arrive after `ResponseEnded` and does not
+require a retained response reference. `TextDone` still reports generated text.
+
+In your event handler:
+
+```go
+if cut, ok := event.Payload.(rime.ItemTruncated); ok && cut.KeptText != nil {
+    fmt.Printf("Retained text for %s: %q\n", cut.ItemID, *cut.KeptText)
+}
+```
+
+## History excluded from a reply
+
+Available in the next SDK release. `ResponseEnded.Truncation` is an optional
+`*ResponseTruncation` with `ItemsLeftOut` and optional `*string` `FirstKeptItemID`.
+It exposes `response.prism_truncation` through `Recv` and `OnEvent`.
+The count refers to items excluded from this reply's prompt, not turns or items
+deleted from history. Already hidden items do not count. A nil first ID means
+no item from before this turn was retained.
+
+A nil summary means the server reports no exclusions or the information is
+unavailable, including older servers or a reply that ended before usage was counted.
+The summary does not change the session's truncation policy.
+
+```go
+if ended, ok := event.Payload.(rime.ResponseEnded); ok && ended.Truncation != nil {
+    fmt.Printf("Items excluded from prompt: %d\n", ended.Truncation.ItemsLeftOut)
+}
+```
+
+Migration: use keyed `ResponseEnded` struct literals. Existing unkeyed literals
+must include the new `Truncation` field, with nil when no summary is available.

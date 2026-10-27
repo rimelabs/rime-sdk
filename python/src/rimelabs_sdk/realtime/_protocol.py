@@ -119,13 +119,6 @@ class AudioCleared:
 
 
 @dataclass(frozen=True, kw_only=True)
-class ItemTruncated:
-    item_id: str
-    content_index: int
-    kind: Literal["item.truncated"] = field(default="item.truncated", init=False)
-
-
-@dataclass(frozen=True, kw_only=True)
 class ResponseEnded(t.ResponseEnded):
     drain_token: str | None
 
@@ -137,7 +130,7 @@ Acknowledgment: TypeAlias = (
     | ItemCreated
     | ToolResultCreated
     | AudioCleared
-    | ItemTruncated
+    | t.ItemTruncated
     | t.ResponseStarted
     | ResponseEnded
 )
@@ -200,7 +193,7 @@ CREATE = Request("response.create", t.ResponseStarted)
 TEXT = Request("response.create", t.ResponseStarted, allows_item_created=True)
 CANCEL = Request("response.cancel", ResponseEnded)
 CLEAR = Request("input_audio_buffer.clear", AudioCleared)
-TRUNCATE = Request("conversation.item.truncate", ItemTruncated)
+TRUNCATE = Request("conversation.item.truncate", t.ItemTruncated)
 
 
 def _invalid(name: str) -> NoReturn:
@@ -243,6 +236,23 @@ def _revision(value: dict, name: str) -> int | None:
         _integer(value["prism_settings_revision"], name)
         if "prism_settings_revision" in value
         else None
+    )
+
+
+def _response_truncation(response: dict) -> t.ResponseTruncation | None:
+    if "prism_truncation" not in response:
+        return None
+    value = _object(response["prism_truncation"], "response.prism_truncation")
+    count = _integer(value.get("items_left_out"), "prism_truncation.items_left_out")
+    if count == 0:
+        _invalid("prism_truncation.items_left_out")
+    return t.ResponseTruncation(
+        items_left_out=count,
+        first_kept_item_id=(
+            _string(value["first_kept_item_id"], "prism_truncation.first_kept_item_id")
+            if "first_kept_item_id" in value
+            else None
+        ),
     )
 
 
@@ -441,9 +451,15 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
     elif kind == "input_audio_buffer.cleared":
         payload = AudioCleared()
     elif kind == "conversation.item.truncated":
-        payload = ItemTruncated(
+        payload = t.ItemTruncated(
             item_id=_id(event.get("item_id"), "item_id"),
             content_index=_integer(event.get("content_index"), "content_index"),
+            audio_end_ms=_integer(event.get("audio_end_ms"), "audio_end_ms"),
+            kept_text=(
+                _string(event["prism_kept_text"], "prism_kept_text")
+                if "prism_kept_text" in event
+                else None
+            ),
         )
     elif kind == "prism.typed_input.ready":
         payload = t.InputReady()
@@ -550,6 +566,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         status = _string(response.get("status"), "response.status")
         payload = ResponseEnded(
             settings_revision=_revision(response, "response.prism_settings_revision"),
+            truncation=_response_truncation(response),
             response=ref(response.get("id")),
             status=cast(
                 Literal["completed", "cancelled", "failed", "unknown"],

@@ -73,6 +73,20 @@ fn enumeration(s: String, known: &[&str]) -> String {
 fn revision(v: &Value) -> Result<Option<u64>, Error> {
     v.get("prism_settings_revision").map(integer).transpose()
 }
+fn response_truncation(response: &Value) -> Result<Option<ResponseTruncation>, Error> {
+    let Some(value) = response.get("prism_truncation") else {
+        return Ok(None);
+    };
+    object(value)?;
+    let count = integer(&value["items_left_out"])?;
+    if count == 0 {
+        return Err(invalid("prism_truncation.items_left_out"));
+    }
+    Ok(Some(ResponseTruncation {
+        items_left_out: count,
+        first_kept_item_id: value.get("first_kept_item_id").map(string).transpose()?,
+    }))
+}
 fn view(v: &Value) -> Result<SessionInfo, Error> {
     let o = object(v)?;
     let mut s = SessionInfo {
@@ -263,7 +277,13 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         "conversation.item.truncated" => {
             w.kind = "item.truncated".into();
             w.target = id(&v["item_id"])?;
-            w.index = integer(&v["content_index"])?
+            w.index = integer(&v["content_index"])?;
+            w.payload = Some(ItemTruncated {
+                item_id: w.target.clone(),
+                content_index: w.index,
+                audio_end_ms: integer(&v["audio_end_ms"])?,
+                kept_text: v.get("prism_kept_text").map(string).transpose()?,
+            });
         }
         "prism.typed_input.ready" => {
             w.kind = "input.ready".into();
@@ -381,6 +401,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                 w.token = optional(&m["prism_drain_token"])?;
                 w.payload = Some(ResponseEnded {
                     settings_revision: revision(d)?,
+                    truncation: response_truncation(d)?,
                     response,
                     status: enumeration(
                         string(&d["status"])?,

@@ -1115,3 +1115,62 @@ for (const newer of [false, true]) {
     );
   });
 }
+
+for (const keptText of [null, "", "Hello, 世界"]) {
+  test(
+    `runner forwards truncation without retained response: ${JSON.stringify(keptText)}`,
+    { timeout: 4000 },
+    async (t) => {
+      const { peer, events } = await setup(t);
+      peer.emit("conversation.item.truncated", {
+        item_id: "old-item",
+        content_index: 0,
+        audio_end_ms: 12,
+        ...(keptText === null ? {} : { prism_kept_text: keptText }),
+      });
+      await until(() => events.some((e) => e.kind === "item.truncated"));
+      assert.deepEqual(
+        events.find((e) => e.kind === "item.truncated"),
+        {
+          kind: "item.truncated",
+          itemId: "old-item",
+          contentIndex: 0,
+          audioEndMs: 12,
+          keptText,
+        },
+      );
+    },
+  );
+}
+
+for (const summary of [
+  null,
+  { items_left_out: 12 },
+  { items_left_out: 12, first_kept_item_id: "item-kept" },
+]) {
+  test(
+    `runner forwards response truncation: ${JSON.stringify(summary)}`,
+    { timeout: 4000 },
+    async (t) => {
+      const { peer, events } = await setup(t);
+      peer.emit("response.created", { response: { id: "history-reply" } });
+      peer.emit("response.done", {
+        response: {
+          id: "history-reply",
+          status: "completed",
+          ...(summary === null ? {} : { prism_truncation: summary }),
+        },
+      });
+      await until(() => events.some((e) => e.kind === "response.ended"));
+      assert.deepEqual(
+        events.find((e) => e.kind === "response.ended").truncation,
+        summary === null
+          ? null
+          : {
+              itemsLeftOut: 12,
+              firstKeptItemId: summary.first_kept_item_id ?? null,
+            },
+      );
+    },
+  );
+}

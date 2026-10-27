@@ -800,7 +800,7 @@ class RealtimeSession:
                     self._settle(key, payload)
                     break
             return
-        if isinstance(payload, p.ItemTruncated):
+        if isinstance(payload, t.ItemTruncated):
             for key, pending in self._pending.items():
                 if (
                     pending.request.kind == "conversation.item.truncate"
@@ -808,6 +808,7 @@ class RealtimeSession:
                     and payload.content_index == 0
                 ):
                     self._settle(key, payload)
+            self._publish(payload, event_id=event.event_id, request_id=echo)
             return
         if isinstance(payload, t.InputReady):
             self._ready_epoch += 1
@@ -856,6 +857,7 @@ class RealtimeSession:
                     status=payload.status,
                     reason=payload.reason,
                     settings_revision=payload.settings_revision,
+                    truncation=payload.truncation,
                 ),
                 event_id=event.event_id,
                 request_id=echo,
@@ -896,7 +898,7 @@ class RealtimeSession:
 
     def _publish(
         self,
-        payload: t.InputEvent | t.ResponseEvent | t.FaultEvent,
+        payload: t.InputEvent | t.ResponseEvent | t.ItemTruncated | t.FaultEvent,
         *,
         event_id: str = "",
         request_id: str | None = None,

@@ -9,47 +9,63 @@ import (
 )
 
 func TestRealtimeTextHistoryAndPlayback(t *testing.T) {
-	p := newRealtimePeer(t)
-	_, s := p.setup(t)
-	r := p.turn(s, "reply-1")
-	if r.SessionID() != "session-1" {
-		t.Fatal(r)
+	for name, echo := range map[string]bool{"without_request_echo": false, "with_request_echo": true} {
+		t.Run(name, func(t *testing.T) {
+			p := newRealtimePeer(t)
+			_, s := p.setup(t)
+			r := p.turn(s, "reply-1")
+			if r.SessionID() != "session-1" {
+				t.Fatal(r)
+			}
+			if _, ok := rtRecv(t, s).Payload.(InputReady); !ok {
+				t.Fatal("missing readiness")
+			}
+			if _, ok := rtRecv(t, s).Payload.(ResponseStarted); !ok {
+				t.Fatal("missing acceptance")
+			}
+			done := make(chan error, 1)
+			go func() {
+				item, e := s.AddMessage(context.Background(), "assistant", "history")
+				if e == nil && item.ItemID() != "history-1" {
+					t.Error(item)
+				}
+				done <- e
+			}()
+			q := p.next("conversation.item.create")
+			p.send(rtObject{"type": "conversation.item.created", "prism_request_event_id": q["event_id"], "item": rtObject{"id": "history-1", "type": "message"}})
+			rtWait(t, done)
+			p.send(rtObject{"type": "response.output_item.added", "response_id": "reply-1", "output_index": 0, "item": rtObject{"type": "message", "id": "message-1"}})
+			out := rtRecv(t, s).Payload.(MessageStarted).Output
+			go func() { done <- s.ReportPlayback(context.Background(), PlaybackInterrupted{out, 12}) }()
+			q = p.next("conversation.item.truncate")
+			if q["audio_end_ms"] != float64(12) {
+				t.Fatal(q)
+			}
+			wire := rtObject{"type": "conversation.item.truncated", "event_id": "cut-1", "item_id": "message-1", "audio_end_ms": 12, "content_index": 0, "prism_kept_text": "Hello"}
+			requestID := ""
+			if echo {
+				requestID = q["event_id"].(string)
+				wire["prism_request_event_id"] = requestID
+			}
+			p.send(wire)
+			rtWait(t, done)
+			cut := rtRecv(t, s)
+			kept := "Hello"
+			if !reflect.DeepEqual(cut.Payload, ItemTruncated{ItemID: "message-1", ContentIndex: 0, AudioEndMS: 12, KeptText: &kept}) || cut.EventID != "cut-1" || cut.RequestID != requestID {
+				t.Fatal(cut)
+			}
+			p.ended("reply-1")
+			_ = rtRecv(t, s)
+			go func() { done <- s.ReportPlayback(context.Background(), PlaybackFinished{Response: r}) }()
+			q = p.next("prism.playback.drained")
+			if q["drain_token"] != "token-reply-1" {
+				t.Fatal(q)
+			}
+			rtWait(t, done)
+		})
 	}
-	if _, ok := rtRecv(t, s).Payload.(InputReady); !ok {
-		t.Fatal("missing readiness")
-	}
-	if _, ok := rtRecv(t, s).Payload.(ResponseStarted); !ok {
-		t.Fatal("missing acceptance")
-	}
-	done := make(chan error, 1)
-	go func() {
-		item, e := s.AddMessage(context.Background(), "assistant", "history")
-		if e == nil && item.ItemID() != "history-1" {
-			t.Error(item)
-		}
-		done <- e
-	}()
-	q := p.next("conversation.item.create")
-	p.send(rtObject{"type": "conversation.item.created", "prism_request_event_id": q["event_id"], "item": rtObject{"id": "history-1", "type": "message"}})
-	rtWait(t, done)
-	p.send(rtObject{"type": "response.output_item.added", "response_id": "reply-1", "output_index": 0, "item": rtObject{"type": "message", "id": "message-1"}})
-	out := rtRecv(t, s).Payload.(MessageStarted).Output
-	go func() { done <- s.ReportPlayback(context.Background(), PlaybackInterrupted{out, 12}) }()
-	q = p.next("conversation.item.truncate")
-	if q["audio_end_ms"] != float64(12) {
-		t.Fatal(q)
-	}
-	p.send(rtObject{"type": "conversation.item.truncated", "item_id": "message-1", "content_index": 0})
-	rtWait(t, done)
-	p.ended("reply-1")
-	_ = rtRecv(t, s)
-	go func() { done <- s.ReportPlayback(context.Background(), PlaybackFinished{Response: r}) }()
-	q = p.next("prism.playback.drained")
-	if q["drain_token"] != "token-reply-1" {
-		t.Fatal(q)
-	}
-	rtWait(t, done)
 }
+
 func TestRealtimeAudioAndClear(t *testing.T) {
 	p := newRealtimePeer(t)
 	_, s := p.setup(t)

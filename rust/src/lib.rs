@@ -26,8 +26,8 @@ pub use realtime::{
     AudioChunk, ConversationOutput, ConversationPlayback, ConversationRunner, ConversationSource,
     HistoryItem, HistoryRole, ItemRef, OutputRef, PlaybackReport, PrismFiller, Realtime,
     RealtimeConnectOptions, RealtimeEvent, RealtimeEvents, RealtimeFault, RealtimeSession,
-    RealtimeTimeouts, RealtimeUpdateOptions, ReplyOptions, ResponseRef, SessionEvent, SessionInfo,
-    ToolCallRef, ToolDefinition, Truncation, TurnDetection,
+    RealtimeTimeouts, RealtimeUpdateOptions, ReplyOptions, ResponseRef, ResponseTruncation,
+    SessionEvent, SessionInfo, ToolCallRef, ToolDefinition, Truncation, TurnDetection,
 };
 pub use stream::AudioStream;
 pub use stt::{

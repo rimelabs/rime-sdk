@@ -109,11 +109,33 @@ for (const item of cases) {
     const raw = JSON.stringify(item.event);
     if (item.invalid)
       assert.throws(() => decode(raw, "session-1"), RimeStreamError);
-    else
+    else {
       assert.equal(
         decode(raw, "session-1")?.payload.kind ?? "ignored",
         item.expected_kind,
       );
+      if ("expected_kept_text" in item) {
+        assert.deepEqual(decode(raw, "session-1").payload, {
+          kind: "item.truncated",
+          itemId: item.event.item_id,
+          contentIndex: item.event.content_index,
+          audioEndMs: item.event.audio_end_ms,
+          keptText: item.expected_kept_text,
+        });
+      }
+      if ("expected_truncation" in item) {
+        const expected = item.expected_truncation;
+        assert.deepEqual(
+          decode(raw, "session-1").payload.truncation,
+          expected === null
+            ? null
+            : {
+                itemsLeftOut: expected.items_left_out,
+                firstKeptItemId: expected.first_kept_item_id ?? null,
+              },
+        );
+      }
+    }
   });
   if (item.invalid)
     test(`invalid payload fails pending request and iterator: ${item.name}`, async (t) => {

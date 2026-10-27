@@ -83,11 +83,6 @@ export interface ItemDeleted {
 export interface AudioCleared {
   kind: "audio.cleared";
 }
-export interface ItemTruncated {
-  kind: "item.truncated";
-  itemId: string;
-  contentIndex: number;
-}
 export interface ResponseEnded extends t.ResponseEnded {
   drainToken: string | null;
 }
@@ -98,7 +93,7 @@ export type Acknowledgment =
   | ItemCreated
   | ToolResultCreated
   | AudioCleared
-  | ItemTruncated
+  | t.ItemTruncated
   | t.ResponseStarted
   | ResponseEnded;
 export type ServerPayload =
@@ -193,7 +188,7 @@ export const requests = {
   ),
   truncate: new Request(
     "conversation.item.truncate",
-    (e): e is ItemTruncated => e.kind === "item.truncated",
+    (e): e is t.ItemTruncated => e.kind === "item.truncated",
   ),
 };
 
@@ -227,6 +222,27 @@ function revision(value: ObjectValue): number | null {
   return value.prism_settings_revision === undefined
     ? null
     : integer(value.prism_settings_revision, "prism_settings_revision");
+}
+function responseTruncation(
+  response: ObjectValue,
+): t.ResponseTruncation | null {
+  if (response.prism_truncation === undefined) return null;
+  const value = object(response.prism_truncation, "response.prism_truncation");
+  const count = integer(
+    value.items_left_out,
+    "prism_truncation.items_left_out",
+  );
+  if (count === 0) return invalid("prism_truncation.items_left_out");
+  return Object.freeze({
+    itemsLeftOut: count,
+    firstKeptItemId:
+      value.first_kept_item_id === undefined
+        ? null
+        : string(
+            value.first_kept_item_id,
+            "prism_truncation.first_kept_item_id",
+          ),
+  });
 }
 function duration(value: unknown, field: string): number | null {
   if (value == null) return null;
@@ -476,6 +492,11 @@ function decodeValue(
         kind: "item.truncated",
         itemId: id(event.item_id, "item_id"),
         contentIndex: integer(event.content_index, "content_index"),
+        audioEndMs: integer(event.audio_end_ms, "audio_end_ms"),
+        keptText:
+          event.prism_kept_text === undefined
+            ? null
+            : string(event.prism_kept_text, "prism_kept_text"),
       };
       break;
     case "prism.typed_input.ready":
@@ -609,6 +630,7 @@ function decodeValue(
       payload = {
         kind: "response.ended",
         settingsRevision: revision(response),
+        truncation: responseTruncation(response),
         response: ref(response.id),
         status:
           status === "completed" ||

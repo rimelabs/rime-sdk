@@ -417,7 +417,11 @@ async def test_named_clear_refusal_is_matched(monkeypatch):
         assert caught.value.fault.request_id == request["event_id"]
 
 
-async def test_playback_uses_output_identity_and_waits_for_done(monkeypatch):
+@pytest.mark.parametrize("echo_request_id", [False, True])
+@pytest.mark.parametrize("kept_text", [None, "", "Your payment amount is $125, and"])
+async def test_playback_uses_output_identity_and_waits_for_done(
+    monkeypatch, kept_text, echo_request_id
+):
     async with session(monkeypatch) as (current, peer, _):
         ref = await accepted_turn(current, peer)
         peer.emit(
@@ -435,8 +439,21 @@ async def test_playback_uses_output_identity_and_waits_for_done(monkeypatch):
         )
         request = await peer.next("conversation.item.truncate")
         assert request["content_index"] == 0
-        peer.emit("conversation.item.truncated", item_id="msg", content_index=0, audio_end_ms=123)
-        await truncate
+        peer.emit(
+            "conversation.item.truncated",
+            item_id="msg",
+            content_index=0,
+            audio_end_ms=123,
+            **({"prism_request_event_id": request["event_id"]} if echo_request_id else {}),
+            **({"prism_kept_text": kept_text} if kept_text is not None else {}),
+        )
+        await asyncio.wait_for(truncate, 1)
+        event = await asyncio.wait_for(anext(iterator), 1)
+        assert event.payload == r.ItemTruncated(
+            item_id="msg", content_index=0, audio_end_ms=123, kept_text=kept_text
+        )
+        assert event.event_id == "server-event"
+        assert event.request_id == (request["event_id"] if echo_request_id else None)
         receipt = asyncio.create_task(
             current.report_playback(r.PlaybackFinished(response=ref, played_ms=123))
         )

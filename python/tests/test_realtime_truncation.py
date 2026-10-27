@@ -81,3 +81,46 @@ async def test_invalid_setting_never_sends(monkeypatch, value):
         with pytest.raises(RimeInputError):
             await current.update(truncation=value)
         assert peer.sent.empty()
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [None, {"items_left_out": 12}, {"items_left_out": 12, "first_kept_item_id": "item-kept"}],
+)
+@pytest.mark.parametrize("status", ["completed", "cancelled", "failed"])
+async def test_response_truncation_survives_cancellation_acknowledgment(
+    monkeypatch, summary, status
+):
+    from test_realtime import accepted_turn
+
+    async with session(monkeypatch) as (current, peer, _):
+        response = await accepted_turn(current, peer)
+        pending = asyncio.create_task(current.cancel(response))
+        request = await peer.next("response.cancel")
+        peer.emit(
+            "response.done",
+            event_id="done-event",
+            prism_request_event_id=request["event_id"],
+            response={
+                "id": response.response_id,
+                "status": status,
+                "metadata": {"prism_drain_token": "drain-1"},
+                **({} if summary is None else {"prism_truncation": summary}),
+            },
+        )
+        await asyncio.wait_for(pending, 1)
+        events = current.events
+        try:
+            async for event in events:
+                if isinstance(event.payload, r.ResponseEnded):
+                    assert event.payload.truncation == (
+                        None if summary is None else r.ResponseTruncation(**summary)
+                    )
+                    assert event.payload.status == status
+                    assert event.event_id == "done-event"
+                    assert event.request_id == request["event_id"]
+                    break
+            else:
+                pytest.fail("missing response completion")
+        finally:
+            await events.aclose()
