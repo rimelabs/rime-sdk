@@ -1,0 +1,37 @@
+rust/testdata/prism/schema.json
+  s_30fa7d6155dbe0::t_7e9fdbcf91efcd 767-781
+  s_30fa7d6155dbe0::t_b9dee7a8efb5d0 766
+conformance/prism/protocol.json
+  s_30fa7d6155dbe0::t_eca5733a77b9b2 1717-1737
+  s_30fa7d6155dbe0::t_d399a9ce612ea5 1716
+rust/testdata/prism/protocol.json
+  s_30fa7d6155dbe0::t_7e9fdbcf91efcd 1717-1737
+  s_30fa7d6155dbe0::t_16bb730d2197ff 1716
+python/docs/realtime.md
+  s_30fa7d6155dbe0::t_eca5733a77b9b2 579-581,583,607-609
+go/testdata/prism/protocol.json
+  s_30fa7d6155dbe0::t_7e9fdbcf91efcd 1717-1737
+  s_30fa7d6155dbe0::t_087d8477bb4b43 1716
+go/testdata/prism/schema.json
+  s_30fa7d6155dbe0::t_7e9fdbcf91efcd 767-781
+  s_30fa7d6155dbe0::t_0d2d349b7bc1d9 766
+conformance/prism/schema.json
+  s_30fa7d6155dbe0::t_eca5733a77b9b2 767-781
+  s_30fa7d6155dbe0::t_3cf27c6ed262ab 766
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e6915294c42508959bf45396e45e3ce5ac52d7fe",
+  "prompts": {},
+  "sessions": {
+    "s_30fa7d6155dbe0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17b68-c1f8-72c0-8324-1313fb595754",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
