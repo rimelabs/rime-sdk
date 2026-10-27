@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.12](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.11...rust-v0.1.0-alpha.12) (2026-10-27)
+
+
+### Bug Fixes
+
+* preserve Prism handshake error categories and diagnostics ([#110](https://github.com/rimelabs/rime-sdk/issues/110)) ([75568b2](https://github.com/rimelabs/rime-sdk/commit/75568b278afddd265a0a4f2c26c716ccb6b29514))
+
 ## [0.1.0-alpha.11](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.10...rust-v0.1.0-alpha.11) (2026-10-24)
 
 
