@@ -452,9 +452,10 @@ whose code is `invalid_session`. `SetResponseMetadata` replaces these labels. `R
 `ResponseStarted.InputItemIDs` names the user items a reply answers.
 `ResponseStarted.InstructionItemID` names a saved nudge instruction. Pass it to
 `DeleteItem` to remove the instruction from later history.
-Set `ReplyOptions.Metadata` to label one proactive reply. For a typed reply or
-tool continuation, use `SendTextWithOptions` or `ContinueReplyWithOptions` and
-pass `ReplyRequestOptions{Metadata: map[string]string{"step": "3"}}`.
+Use `RequestReplyWithOptions` to label one proactive reply. For a typed reply
+or tool continuation, use `SendTextWithOptions` or `ContinueReplyWithOptions`.
+Pass `ReplyRequestOptions{Metadata: map[string]string{"step": "3"}}` to the new
+method; `RequestReplyWithOptions` takes the existing `ReplyOptions` first.
 Prism applies request labels over matching session labels. The SDK adds its
 `prism_` fields; caller keys cannot use that prefix. Existing methods keep
 their request shape, and replies to speech use session labels.
@@ -466,6 +467,7 @@ their request shape, and replies to speech use session labels.
 | `SendTextWithOptions` | Send a typed turn with labels for this reply. |
 | `AddMessage` | Add user or assistant history without a reply. |
 | `RequestReply` | Request a proactive reply, with optional instructions or a recorded tool call. |
+| `RequestReplyWithOptions` | Request a proactive reply with labels for this reply. |
 | `SubmitToolResult` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `ContinueReply` | Wait for the latest tool response and all its results, then request continuation. |
 | `ContinueReplyWithOptions` | Continue a tool round with labels for this reply. |

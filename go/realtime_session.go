@@ -366,7 +366,12 @@ func (s *RealtimeSession) AddMessage(ctx context.Context, role, text string) (It
 	return s.CreateItem(ctx, HistoryItem{Type: HistoryMessage, Role: role, Text: text}, "")
 }
 func (s *RealtimeSession) RequestReply(ctx context.Context, o ReplyOptions) (ResponseRef, error) {
-	metadata, err := rtRequestMetadata(o.Metadata, rtObject{"prism_cause": "proactive"})
+	return s.RequestReplyWithOptions(ctx, o, ReplyRequestOptions{})
+}
+
+// RequestReplyWithOptions requests a proactive reply with labels for this reply.
+func (s *RealtimeSession) RequestReplyWithOptions(ctx context.Context, o ReplyOptions, options ReplyRequestOptions) (ResponseRef, error) {
+	metadata, err := rtRequestMetadata(options.Metadata, rtObject{"prism_cause": "proactive"})
 	if err != nil {
 		return ResponseRef{}, err
 	}

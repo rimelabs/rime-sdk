@@ -68,12 +68,11 @@ type RealtimeConnectOptions struct {
 type ReplyOptions struct {
 	Instruction string
 	ToolCall    *ToolCallRef
-	// Metadata labels this reply. Keys shared with session labels take precedence.
-	Metadata map[string]string
 }
 
-// ReplyRequestOptions adds labels to a typed turn or tool continuation.
+// ReplyRequestOptions adds labels to one typed, proactive, or continued reply.
 type ReplyRequestOptions struct {
+	// Metadata labels this reply. Keys shared with session labels take precedence.
 	Metadata map[string]string
 }
 

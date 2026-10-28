@@ -94,7 +94,7 @@ func TestRealtimeNudgeInstructionAndUsage(t *testing.T) {
 	result := make(chan ResponseRef, 1)
 	done := make(chan error, 1)
 	go func() {
-		ref, err := s.RequestReply(context.Background(), ReplyOptions{Instruction: "Check in."})
+		ref, err := s.RequestReply(context.Background(), ReplyOptions{"Check in.", nil})
 		result <- ref
 		done <- err
 	}()
@@ -136,7 +136,10 @@ func TestRealtimeRequestMetadata(t *testing.T) {
 				}()
 			} else {
 				cause = "proactive"
-				go func() { _, err := s.RequestReply(context.Background(), ReplyOptions{Metadata: labels}); done <- err }()
+				go func() {
+					_, err := s.RequestReplyWithOptions(context.Background(), ReplyOptions{}, ReplyRequestOptions{Metadata: labels})
+					done <- err
+				}()
 			}
 			q := p.next("response.create")
 			metadata := q["response"].(map[string]any)["metadata"]
@@ -153,7 +156,7 @@ func TestRealtimeRequestMetadata(t *testing.T) {
 func TestRealtimeReservedRequestMetadataIsRejected(t *testing.T) {
 	p := newRealtimePeer(t)
 	_, s := p.setup(t)
-	_, err := s.RequestReply(context.Background(), ReplyOptions{Metadata: map[string]string{"prism_cause": "user_text"}})
+	_, err := s.RequestReplyWithOptions(context.Background(), ReplyOptions{}, ReplyRequestOptions{Metadata: map[string]string{"prism_cause": "user_text"}})
 	if !errors.Is(err, ErrInput) {
 		t.Fatal(err)
 	}
