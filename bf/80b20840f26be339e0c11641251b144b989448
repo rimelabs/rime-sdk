@@ -1,0 +1,30 @@
+python/tests/test_realtime_protocol.py
+  s_a3a25f6fe5abcf::t_cac19b960807e5 144
+  s_a3a25f6fe5abcf::t_a3db06d79ddf26 143,145-152
+go/README.md
+  s_a3a25f6fe5abcf::t_a3db06d79ddf26 460-461,700
+conformance/prism/protocol.json
+  s_a3a25f6fe5abcf::t_a3db06d79ddf26 52-61,105-109
+rust/src/realtime/dispatch.rs
+  s_a3a25f6fe5abcf::t_a3db06d79ddf26 330-339
+go/testdata/prism/protocol.json
+  s_a3a25f6fe5abcf::t_2ba84ba9a6ec85 52-61,105-109
+rust/testdata/prism/protocol.json
+  s_a3a25f6fe5abcf::t_1b3248a20977fc 52-61,105-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf80b20840f26be339e0c11641251b144b989448",
+  "prompts": {},
+  "sessions": {
+    "s_a3a25f6fe5abcf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18075-1b34-7b43-b012-11921fa4f140",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
