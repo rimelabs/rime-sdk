@@ -100,6 +100,39 @@ fn shared_protocol() {
                     );
                 }
             }
+            if let Some(expected) = c.get("expected_usage") {
+                let usage = &event.as_ref().unwrap().usage;
+                if expected.is_null() {
+                    assert!(usage.is_none());
+                } else {
+                    let usage = usage.as_ref().unwrap();
+                    assert_eq!(
+                        usage.input_tokens,
+                        expected["input_tokens"].as_u64().unwrap()
+                    );
+                    assert_eq!(
+                        usage.output_tokens,
+                        expected["output_tokens"].as_u64().unwrap()
+                    );
+                    assert_eq!(
+                        usage.total_tokens,
+                        expected["total_tokens"].as_u64().unwrap()
+                    );
+                    assert_eq!(
+                        usage.context_window,
+                        expected["context_window"].as_u64().unwrap()
+                    );
+                }
+            }
+            if let Some(expected) = c.get("expected_instruction_item_id") {
+                assert_eq!(
+                    event.as_ref().unwrap().instruction_item_id.as_deref(),
+                    expected.as_str()
+                );
+            }
+            if let Some(expected) = c.get("expected_idle_timeout_s") {
+                assert_eq!(event.as_ref().unwrap().idle_timeout_s, expected.as_f64());
+            }
             if c.get("expected_kept_text").is_some() {
                 let Some(crate::realtime::RealtimeEvent::ItemTruncated {
                     item_id,

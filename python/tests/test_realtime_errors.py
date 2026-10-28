@@ -16,6 +16,19 @@ OVERFLOW = (
 )
 
 
+async def test_idle_timeout_fails_pending_work_and_event_reader(monkeypatch):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
+        pending = asyncio.create_task(current.add_message("user", "history"))
+        await peer.next("conversation.item.create")
+        peer.emit("session.idle_timeout", reason="idle_timeout", idle_timeout_s=300)
+        with pytest.raises(r.RealtimeIdleTimeout) as operation:
+            await pending
+        assert operation.value.idle_timeout_s == 300
+        with pytest.raises(r.RealtimeIdleTimeout) as events:
+            await anext(current.events)
+        assert events.value.idle_timeout_s == 300
+
+
 def test_retry_cases_cover_the_schema_codes():
     codes = {entry["const"] for entry in _CONTRACT["components"]["schemas"]["errorCode"]["oneOf"]}
     tested = {case["code"] for case in CASES}

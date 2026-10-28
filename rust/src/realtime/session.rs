@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Prism protocol behavior adapted from the existing SDKs; see NOTICE-PRISM.
 use super::{
-    client::text,
+    client::{request_metadata, text},
     protocol::{self, Wire},
     transport::{Transport, Write},
     types::*,
@@ -473,9 +473,24 @@ impl RealtimeSession {
     }
     /// Request a response to a typed user turn after admission.
     pub async fn send_text(&self, value: impl Into<String>) -> Result<ResponseRef, Error> {
+        self.send_text_with_options(value, ReplyRequestOptions::default())
+            .await
+    }
+    /// Request a typed reply with labels for this request.
+    pub async fn send_text_with_options(
+        &self,
+        value: impl Into<String>,
+        options: ReplyRequestOptions,
+    ) -> Result<ResponseRef, Error> {
         let value = value.into();
         text(&value, 4000)?;
-        let a=self.invoke(Command::new(Kind::Text,json!({"response":{"prism_input_text":value,"metadata":{"prism_cause":"user_text"}}}))).await?;
+        let metadata = request_metadata(&options.metadata, &[("prism_cause", "user_text")])?;
+        let a = self
+            .invoke(Command::new(
+                Kind::Text,
+                json!({"response":{"prism_input_text":value,"metadata":metadata}}),
+            ))
+            .await?;
         a.response
             .ok_or_else(|| Error::new(ErrorKind::Stream, "missing accepted response"))
     }
@@ -557,7 +572,8 @@ impl RealtimeSession {
     }
     /// Request a proactive reply, optionally about a recorded tool result.
     pub async fn request_reply(&self, options: ReplyOptions) -> Result<ResponseRef, Error> {
-        let mut body = json!({"response":{"metadata":{"prism_cause":"proactive"}}});
+        let metadata = request_metadata(&options.metadata, &[("prism_cause", "proactive")])?;
+        let mut body = json!({"response":{"metadata":metadata}});
         if let Some(s) = options.instruction {
             text(&s, 4000)?;
             body["response"]["prism_instruction"] = json!(s)
@@ -574,10 +590,23 @@ impl RealtimeSession {
     }
     /// Continue the latest completed tool round once all tool results are recorded.
     pub async fn continue_reply(&self, parent: &ResponseRef) -> Result<ResponseRef, Error> {
-        let mut c = Command::new(
-            Kind::Continue,
-            json!({"response":{"metadata":{"prism_cause":"tool_continuation","prism_parent_response_id":parent.response_id}}}),
-        );
+        self.continue_reply_with_options(parent, ReplyRequestOptions::default())
+            .await
+    }
+    /// Continue a tool round with labels for this reply.
+    pub async fn continue_reply_with_options(
+        &self,
+        parent: &ResponseRef,
+        options: ReplyRequestOptions,
+    ) -> Result<ResponseRef, Error> {
+        let metadata = request_metadata(
+            &options.metadata,
+            &[
+                ("prism_cause", "tool_continuation"),
+                ("prism_parent_response_id", &parent.response_id),
+            ],
+        )?;
+        let mut c = Command::new(Kind::Continue, json!({"response":{"metadata":metadata}}));
         c.reference = Some(parent.clone());
         self.invoke(c)
             .await?

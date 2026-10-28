@@ -294,6 +294,12 @@ instruction, tool call, and signal in one object. `update` returns
 `getHistory` returns `Promise<readonly HistoryItem[]>`. The other methods return
 `Promise<void>`.
 
+Pass `metadata: { step: "3" }` in the options for `sendText`, `requestReply`, or
+`continueReply` to label only that reply. Request labels replace matching
+session labels in Prism's response. The SDK adds the required `prism_` fields;
+caller keys cannot use that prefix. Omitting `metadata` keeps the existing
+request shape. Replies to speech use the session labels.
+
 `sendText` and `addMessage` require nonblank text of at most 4,000 Unicode
 characters. `addMessage` accepts `"user"` and `"assistant"` roles. `createItem`
 also accepts `"system"` messages and allows blank message text, with the same
@@ -397,12 +403,12 @@ are exported from `@rimelabs/sdk`.
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
 | `transcript.failed` | `itemId`, `error` |
-| `response.started` | `response`, `cause`, nullable `parent` and `inputItemId`, `inputItemIds` (the user items it answers), `metadata` (your own keys) |
+| `response.started` | `response`, `cause`, nullable `parent`, `inputItemId`, and `instructionItemId`, `inputItemIds` (the user items it answers), `metadata` (your own keys) |
 | `message.started` | `output` |
 | `text.delta`, `text.done` | `output` and `delta` or `text` |
 | `audio.delta`, `audio.done` | `output`; a delta also has `audio.data` and a complete `audio.format` |
 | `tool.call` | `call`, `itemId`, `name`, parsed `arguments` |
-| `response.ended` | `response`, `status`, nullable `reason` |
+| `response.ended` | `response`, `status`, nullable `reason` and `usage` |
 | `response.abandoned` | `response`; the SDK requests cancellation after the requesting caller aborted. |
 | `error` | `error`, a `RealtimeFault` |
 
@@ -459,6 +465,10 @@ run until stopped or the connection fails.
 the session remains usable. An unknown request outcome closes the connection and
 is never replayed. The SDK retries typed-turn admission only after named refusals
 that confirm the request made no change.
+
+`RealtimeIdleTimeout` means Prism closed an idle session. Its `idleTimeoutS`
+is the limit reported by Prism. Pending methods and the event iterator reject
+with this error. Reconnect to start a new conversation.
 
 Protocol faults appear as `error` events and can also reject an affected method
 with `RimeRealtimeError`. Its `.fault` has `code`, `message`, `scope`, nullable
@@ -615,6 +625,14 @@ function onEvent(event: SessionEvent) {
 This event can arrive after `response.ended`. It has no response reference and does
 not require the SDK to retain that response. `text.done` still reports generated
 text. Add `item.truncated` to exhaustive switches on `SessionEvent.payload.kind`.
+
+## Response usage and saved nudge instructions
+
+`ResponseEnded.usage` contains `inputTokens`, `outputTokens`, `totalTokens`,
+and `contextWindow` when Prism counted the reply's tokens. It is `null` when
+the count is unavailable. For a nudge with an instruction,
+`ResponseStarted.instructionItemId` names the saved instruction. Pass that ID
+to `deleteItem` to remove it from later history.
 
 ## History excluded from a reply
 

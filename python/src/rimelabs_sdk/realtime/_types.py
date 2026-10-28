@@ -14,6 +14,14 @@ class RealtimeAdmissionTimeout(RimeTimeoutError):
     """Readiness expired with no request outstanding. The session remains usable."""
 
 
+class RealtimeIdleTimeout(RimeTimeoutError):
+    """Prism closed an idle conversation."""
+
+    def __init__(self, idle_timeout_s: float):
+        self.idle_timeout_s = idle_timeout_s
+        super().__init__(f"Realtime session idle for {idle_timeout_s:g} seconds")
+
+
 JsonValue: TypeAlias = None | bool | int | float | str | list["JsonValue"] | dict[str, "JsonValue"]
 JsonObject: TypeAlias = dict[str, JsonValue]
 # Your labels for replies, keys to strings, such as {"step": "3"}. Prism takes at most 16,
@@ -334,6 +342,7 @@ class ResponseStarted:
     cause: Literal["speech", "text", "proactive", "tools", "unknown"]
     parent: ResponseRef | None = None
     input_item_id: str | None = None
+    instruction_item_id: str | None = None
     # The session's labels when the reply began. Prism's prism_ keys are left out.
     metadata: Labels = field(default_factory=dict)
     # The user items the reply answers: a spoken reply's committed turns, or a typed
@@ -409,6 +418,14 @@ class ResponseTruncation:
 
 
 @dataclass(frozen=True, kw_only=True)
+class ResponseUsage:
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    context_window: int
+
+
+@dataclass(frozen=True, kw_only=True)
 class ResponseEnded:
     """A reply ended, with optional settings revision and prompt truncation.
 
@@ -421,6 +438,7 @@ class ResponseEnded:
     status: Literal["completed", "cancelled", "failed", "unknown"]
     reason: str | None = None
     truncation: ResponseTruncation | None = None
+    usage: ResponseUsage | None = None
     kind: Literal["response.ended"] = field(default="response.ended", init=False)
 
 

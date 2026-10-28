@@ -259,17 +259,23 @@ Each method is async. Arguments without a default are required.
 | Method | Use it to | Result |
 | --- | --- | --- |
 | `update(*, instructions=None, tools=None, voice=None, interrupt_on_speech=None)` | Change supplied settings without reconnecting. | `SessionInfo` after acknowledgment |
-| `send_text(text)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
+| `send_text(text, *, metadata=None)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
 | `send_audio(chunk)` | Send microphone audio. | `None` |
-| `request_reply(*, instruction=None, tool_call=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
+| `request_reply(*, instruction=None, tool_call=None, metadata=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
 | `add_message(role, text)` | Add user or assistant history without requesting a reply. | `ItemRef` after acknowledgment |
 | `submit_tool_result(call, output)` | Record a tool result without requesting a reply. | `None` after acknowledgment |
-| `continue_reply(parent)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
+| `continue_reply(parent, *, metadata=None)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
 | `cancel(response)` | Request that generation stop. | `None` when the response is terminal |
 | `clear_audio()` | Clear buffered input and reset audio conversion. | `None` after acknowledgment |
 | `set_response_metadata(metadata)` | Replace the labels for later replies. | `None` once Prism confirms |
 | `report_playback(report)` | Report interrupted or finished playback. | `None` |
 | `close()` | Close the session and release its resources. | `None`; safe to repeat |
+
+Pass `metadata={"step": "3"}` to one of the three reply requests to label only
+that reply. Request labels replace matching session labels in Prism's response.
+The SDK adds the required `prism_` fields; caller keys cannot use that prefix.
+Omitting `metadata` keeps the existing request shape. Replies to speech use
+the session labels because they have no client request.
 
 Text passed to `send_text`, `add_message`, or `request_reply(instruction=...)`
 must be nonblank and at most 4,000 characters. History roles are `"user"` and
@@ -379,12 +385,12 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |
 | `TranscriptFailed` | `item_id`, `error` |
-| `ResponseStarted` | `response`, `cause`; optional `parent` and `input_item_id`; `input_item_ids` (the user items it answers); `metadata` (your own keys) |
+| `ResponseStarted` | `response`, `cause`; optional `parent`, `input_item_id`, and `instruction_item_id`; `input_item_ids` (the user items it answers); `metadata` (your own keys) |
 | `MessageStarted` | `output` |
 | `TextDelta`, `TextDone` | `output` and `delta` or `text` |
 | `AudioDelta`, `AudioDone` | `output`; `AudioDelta` also has `audio` |
 | `ToolCall` | `call`, `item_id`, `name`, `arguments` |
-| `ResponseEnded` | `response`, `status`; optional `reason` |
+| `ResponseEnded` | `response`, `status`; optional `reason` and `usage` |
 | `ResponseAbandoned` | `response`; the SDK is cancelling a response accepted after its caller was cancelled. |
 | `FaultEvent` | `error`, a `RealtimeFault` |
 
@@ -447,6 +453,10 @@ run. Voice conversations run until stopped or the connection fails. Set an appli
 the session remains usable. An unknown request outcome closes the connection and
 is never replayed. Named refusals that made no change can allow a retry; the SDK
 handles typed-turn readiness retries within `ready_s`.
+
+`RealtimeIdleTimeout` means Prism closed an idle session. Its `idle_timeout_s`
+is the limit reported by Prism. Pending operations and the event iterator raise
+this error; reconnect to start a new conversation.
 
 Protocol faults appear as `FaultEvent` and can also raise `RimeRealtimeError` on
 the affected request. Its `.fault` contains `code`, `message`, `scope`, and any
@@ -589,6 +599,14 @@ def on_event(event):
 This event can arrive after `ResponseEnded`. It has no response reference and does
 not require the SDK to retain that response. `TextDone` still reports generated
 text. Existing exhaustive event handlers must accept `ItemTruncated`.
+
+## Response usage and saved nudge instructions
+
+`ResponseEnded.usage` contains `input_tokens`, `output_tokens`, `total_tokens`,
+and `context_window` when Prism counted the reply's tokens. It is `None` when
+the count is unavailable. For a nudge with an instruction,
+`ResponseStarted.instruction_item_id` names the saved instruction. Pass that ID
+to `delete_item` to remove it from later history.
 
 ## History excluded from a reply
 

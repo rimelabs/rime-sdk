@@ -314,7 +314,31 @@ impl Worker {
                 }
                 _ => {}
             }
-            self.publish(p.clone(), e.event_id.clone(), e.request_id.clone())?
+            if let RealtimeEvent::ResponseEnded { response, .. } = p {
+                if let Some(usage) = &e.usage {
+                    self.publish(
+                        RealtimeEvent::ResponseUsageRecorded {
+                            response: response.clone(),
+                            usage: usage.clone(),
+                        },
+                        String::new(),
+                        e.request_id.clone(),
+                    )?;
+                }
+            }
+            self.publish(p.clone(), e.event_id.clone(), e.request_id.clone())?;
+            if let RealtimeEvent::ResponseStarted { response, .. } = p {
+                if let Some(item_id) = &e.instruction_item_id {
+                    self.publish(
+                        RealtimeEvent::ResponseInstructionSaved {
+                            response: response.clone(),
+                            item_id: item_id.clone(),
+                        },
+                        String::new(),
+                        e.request_id.clone(),
+                    )?;
+                }
+            }
         }
         // Only uncorrelated controls can match several waiters; they are serialized.
         if let Some(&i) = matched.first() {

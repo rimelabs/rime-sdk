@@ -17,6 +17,20 @@ pub(super) fn text(value: &str, limit: usize) -> Result<(), Error> {
         Ok(())
     }
 }
+pub(super) fn request_metadata(labels: &Labels, reserved: &[(&str, &str)]) -> Result<Value, Error> {
+    if labels.keys().any(|key| key.starts_with("prism_")) {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "request metadata keys cannot start with prism_",
+        ));
+    }
+    let mut metadata = json!(labels);
+    let object = metadata.as_object_mut().expect("labels form an object");
+    for (key, value) in reserved {
+        object.insert((*key).to_owned(), json!(value));
+    }
+    Ok(metadata)
+}
 fn tool_settings(definitions: &[ToolDefinition]) -> Result<Vec<Value>, Error> {
     let mut tools = vec![];
     let mut names = std::collections::HashSet::new();

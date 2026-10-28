@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import Ajv from "ajv";
 import { parse } from "yaml";
-import { Rime, RimeStreamError } from "../dist/index.js";
+import {
+  Rime,
+  RimeInputError,
+  RimeStreamError,
+  RealtimeIdleTimeout,
+} from "../dist/index.js";
 import { decode } from "../dist/realtime/protocol.js";
 import { Peer } from "./realtime-peer.mjs";
 
@@ -68,6 +73,95 @@ async function toolCall(session, peer) {
     if (payload.kind === "tool.call") return { parent, call: payload.call };
   throw new Error("No tool call");
 }
+test("nudge instruction and token usage reach public events", async (t) => {
+  const { session, peer } = await setup(t);
+  peer.emit("prism.typed_input.ready");
+  const pending = session.requestReply({ instruction: "Check in." });
+  const request = await peer.next("response.create");
+  peer.accepted(request, "reply-1", {
+    prism_instruction_item_id: "item-instruction",
+  });
+  const response = await pending;
+  const events = session.events;
+  let started;
+  do {
+    started = (await events.next()).value.payload;
+  } while (started.kind !== "response.started");
+  assert.deepEqual(started.response, response);
+  assert.equal(started.instructionItemId, "item-instruction");
+  peer.emit("response.done", {
+    response: {
+      id: response.responseId,
+      status: "completed",
+      usage: {
+        input_tokens: 10,
+        output_tokens: 3,
+        total_tokens: 13,
+        context_window: 65536,
+      },
+    },
+  });
+  assert.deepEqual((await events.next()).value.payload.usage, {
+    inputTokens: 10,
+    outputTokens: 3,
+    totalTokens: 13,
+    contextWindow: 65536,
+  });
+  const deleting = session.deleteItem(started.instructionItemId);
+  const deletion = await peer.next("conversation.item.delete");
+  assert.equal(deletion.item_id, "item-instruction");
+  peer.emit("conversation.item.deleted", {
+    prism_request_event_id: deletion.event_id,
+    item_id: "item-instruction",
+  });
+  await deleting;
+});
+for (const kind of ["text", "nudge"]) {
+  test(`${kind} request labels apply to one reply`, async (t) => {
+    const { session, peer } = await setup(t);
+    peer.emit("prism.typed_input.ready");
+    const metadata = { step: "one" };
+    const pending =
+      kind === "text"
+        ? session.sendText("hello", { metadata })
+        : session.requestReply({ metadata });
+    const request = await peer.next("response.create");
+    assert.deepEqual(request.response.metadata, {
+      step: "one",
+      prism_cause: kind === "text" ? "user_text" : "proactive",
+    });
+    assert.deepEqual(metadata, { step: "one" });
+    peer.accepted(request);
+    await pending;
+  });
+}
+test("reserved request labels fail before a write", async (t) => {
+  const { session, peer } = await setup(t);
+  await assert.rejects(
+    session.requestReply({ metadata: { prism_cause: "user_text" } }),
+    RimeInputError,
+  );
+  assert.equal(peer.queue.length, 0);
+});
+test("idle timeout ends pending work and event reading with its duration", async (t) => {
+  const { session, peer } = await setup(t);
+  const pending = session.addMessage("user", "history");
+  await peer.next("conversation.item.create");
+  peer.emit("session.idle_timeout", {
+    reason: "idle_timeout",
+    idle_timeout_s: 300,
+  });
+  await assert.rejects(
+    pending,
+    (error) =>
+      error instanceof RealtimeIdleTimeout && error.idleTimeoutS === 300,
+  );
+  await assert.rejects(
+    session.events.next(),
+    (error) =>
+      error instanceof RealtimeIdleTimeout && error.idleTimeoutS === 300,
+  );
+});
 test("a started reply shows the client's own metadata", () => {
   const started = (metadata) =>
     decode(
@@ -135,6 +229,30 @@ for (const item of cases) {
               },
         );
       }
+      if ("expected_usage" in item) {
+        const usage = item.expected_usage;
+        assert.deepEqual(
+          decode(raw, "session-1").payload.usage,
+          usage === null
+            ? null
+            : {
+                inputTokens: usage.input_tokens,
+                outputTokens: usage.output_tokens,
+                totalTokens: usage.total_tokens,
+                contextWindow: usage.context_window,
+              },
+        );
+      }
+      if ("expected_instruction_item_id" in item)
+        assert.equal(
+          decode(raw, "session-1").payload.instructionItemId,
+          item.expected_instruction_item_id,
+        );
+      if ("expected_idle_timeout_s" in item)
+        assert.equal(
+          decode(raw, "session-1").payload.idleTimeoutS,
+          item.expected_idle_timeout_s,
+        );
     }
   });
   if (item.invalid)
@@ -215,8 +333,16 @@ test("tool result acknowledgment without item ID permits continuation", async (t
   });
   await result;
   peer.ended();
-  const continuation = watch(session.continueReply(parent));
-  peer.accepted(await peer.next("response.create"), "reply-2");
+  const continuation = watch(
+    session.continueReply(parent, { metadata: { step: "tool" } }),
+  );
+  const continuationRequest = await peer.next("response.create");
+  assert.deepEqual(continuationRequest.response.metadata, {
+    step: "tool",
+    prism_cause: "tool_continuation",
+    prism_parent_response_id: parent.responseId,
+  });
+  peer.accepted(continuationRequest, "reply-2");
   assert.equal((await continuation).responseId, "reply-2");
 });
 

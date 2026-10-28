@@ -16,12 +16,15 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		t.Fatal(err)
 	}
 	var cases []struct {
-		Name       string          `json:"name"`
-		Event      json.RawMessage `json:"event"`
-		Invalid    bool            `json:"invalid"`
-		Expected   string          `json:"expected_kind"`
-		KeptText   *string         `json:"expected_kept_text"`
-		Truncation *struct {
+		Name              string          `json:"name"`
+		Event             json.RawMessage `json:"event"`
+		Invalid           bool            `json:"invalid"`
+		Expected          string          `json:"expected_kind"`
+		Usage             json.RawMessage `json:"expected_usage"`
+		InstructionItemID *string         `json:"expected_instruction_item_id"`
+		IdleTimeoutS      *float64        `json:"expected_idle_timeout_s"`
+		KeptText          *string         `json:"expected_kept_text"`
+		Truncation        *struct {
 			ItemsLeftOut    uint64  `json:"items_left_out"`
 			FirstKeptItemID *string `json:"first_kept_item_id"`
 		} `json:"expected_truncation"`
@@ -62,8 +65,126 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 				if !reflect.DeepEqual(e.payload.(ResponseEnded).Truncation, want) {
 					t.Fatalf("unexpected response truncation: %#v", e.payload)
 				}
+				if c.Usage != nil {
+					var expected *ResponseUsage
+					if err := json.Unmarshal(c.Usage, &expected); err != nil {
+						t.Fatal(err)
+					}
+					if !reflect.DeepEqual(e.payload.(ResponseEnded).Usage, expected) {
+						t.Fatalf("unexpected response usage: %#v", e.payload)
+					}
+				}
+			}
+			if c.InstructionItemID != nil {
+				if e.payload.(ResponseStarted).InstructionItemID != *c.InstructionItemID {
+					t.Fatalf("unexpected instruction ID: %#v", e.payload)
+				}
+			}
+			if c.IdleTimeoutS != nil && e.idleTimeoutS != *c.IdleTimeoutS {
+				t.Fatalf("unexpected idle timeout: %#v", e)
 			}
 		})
+	}
+}
+
+func TestRealtimeNudgeInstructionAndUsage(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	p.send(rtObject{"type": "prism.typed_input.ready"})
+	result := make(chan ResponseRef, 1)
+	done := make(chan error, 1)
+	go func() {
+		ref, err := s.RequestReply(context.Background(), ReplyOptions{"Check in.", nil})
+		result <- ref
+		done <- err
+	}()
+	q := p.next("response.create")
+	p.send(rtObject{"type": "response.created", "prism_request_event_id": q["event_id"], "response": rtObject{"id": "reply-1", "metadata": rtObject{"prism_cause": "proactive", "prism_instruction_item_id": "item-instruction"}}})
+	rtWait(t, done)
+	rtRecv(t, s)
+	started := rtRecv(t, s).Payload.(ResponseStarted)
+	if started.Response != <-result || started.InstructionItemID != "item-instruction" {
+		t.Fatal(started)
+	}
+	p.send(rtObject{"type": "response.done", "response": rtObject{"id": "reply-1", "status": "completed", "usage": rtObject{"input_tokens": 10, "output_tokens": 3, "total_tokens": 13, "context_window": 65536}}})
+	ended := rtRecv(t, s).Payload.(ResponseEnded)
+	if !reflect.DeepEqual(ended.Usage, &ResponseUsage{InputTokens: 10, OutputTokens: 3, TotalTokens: 13, ContextWindow: 65536}) {
+		t.Fatal(ended)
+	}
+	go func() { done <- s.DeleteItem(context.Background(), started.InstructionItemID) }()
+	q = p.next("conversation.item.delete")
+	if q["item_id"] != "item-instruction" {
+		t.Fatal(q)
+	}
+	p.send(rtObject{"type": "conversation.item.deleted", "prism_request_event_id": q["event_id"], "item_id": "item-instruction"})
+	rtWait(t, done)
+}
+
+func TestRealtimeRequestMetadata(t *testing.T) {
+	for _, kind := range []string{"text", "nudge"} {
+		t.Run(kind, func(t *testing.T) {
+			p := newRealtimePeer(t)
+			_, s := p.setup(t)
+			p.send(rtObject{"type": "prism.typed_input.ready"})
+			labels := map[string]string{"step": "one"}
+			done := make(chan error, 1)
+			cause := "user_text"
+			if kind == "text" {
+				go func() {
+					_, err := s.SendTextWithOptions(context.Background(), "hello", ReplyRequestOptions{Metadata: labels})
+					done <- err
+				}()
+			} else {
+				cause = "proactive"
+				go func() {
+					_, err := s.RequestReplyWithOptions(context.Background(), ReplyOptions{}, ReplyRequestOptions{Metadata: labels})
+					done <- err
+				}()
+			}
+			q := p.next("response.create")
+			metadata := q["response"].(map[string]any)["metadata"]
+			want := map[string]any{"step": "one", "prism_cause": cause}
+			if !reflect.DeepEqual(metadata, want) || labels["step"] != "one" {
+				t.Fatal(q, labels)
+			}
+			p.accept(q, "reply-1")
+			rtWait(t, done)
+		})
+	}
+}
+
+func TestRealtimeReservedRequestMetadataIsRejected(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	_, err := s.RequestReplyWithOptions(context.Background(), ReplyOptions{}, ReplyRequestOptions{Metadata: map[string]string{"prism_cause": "user_text"}})
+	if !errors.Is(err, ErrInput) {
+		t.Fatal(err)
+	}
+	select {
+	case q := <-p.requests:
+		t.Fatal(q)
+	default:
+	}
+}
+
+func TestRealtimeIdleTimeoutIsTerminal(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	done := make(chan error, 1)
+	go func() {
+		_, err := s.AddMessage(context.Background(), "user", "history")
+		done <- err
+	}()
+	p.next("conversation.item.create")
+	p.send(rtObject{"type": "session.idle_timeout", "reason": "idle_timeout", "idle_timeout_s": 300})
+	err := <-done
+	var idle *RealtimeIdleTimeout
+	if !errors.Is(err, ErrTimeout) || !errors.As(err, &idle) || idle.IdleTimeoutS != 300 {
+		t.Fatal(err)
+	}
+	_, err = s.Recv(context.Background())
+	if !errors.As(err, &idle) || idle.IdleTimeoutS != 300 {
+		t.Fatal(err)
 	}
 }
 

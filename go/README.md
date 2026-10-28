@@ -450,15 +450,28 @@ strings, keys up to 64 characters and values up to 512, no key starting with
 `prism_`. Prism refuses labels that break these rules with a `*RealtimeFault`
 whose code is `invalid_session`. `SetResponseMetadata` replaces these labels. `ResponseStarted.Metadata` carries them, and
 `ResponseStarted.InputItemIDs` names the user items a reply answers.
+`ResponseStarted.InstructionItemID` names a saved nudge instruction. Pass it to
+`DeleteItem` to remove the instruction from later history.
+Use `RequestReplyWithOptions` to label one proactive reply. For a typed reply
+or tool continuation, use `SendTextWithOptions` or `ContinueReplyWithOptions`.
+Pass `ReplyRequestOptions{Metadata: map[string]string{"step": "3"}}` to the new
+method; `RequestReplyWithOptions` takes the existing `ReplyOptions` first.
+Prism applies request labels over matching session labels. The SDK adds its
+`prism_` fields; caller keys cannot use that prefix. Such keys return local
+`ErrInput` before submission. Existing methods keep
+their request shape, and replies to speech use session labels.
 
 | Session method | Behavior |
 | --- | --- |
 | `Update` | Apply supplied settings and return acknowledged `SessionInfo`. |
 | `SendText` | Wait for admission, add a typed turn, and return its response reference. |
+| `SendTextWithOptions` | Send a typed turn with labels for this reply. |
 | `AddMessage` | Add user or assistant history without a reply. |
 | `RequestReply` | Request a proactive reply, with optional instructions or a recorded tool call. |
+| `RequestReplyWithOptions` | Request a proactive reply with labels for this reply. |
 | `SubmitToolResult` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `ContinueReply` | Wait for the latest tool response and all its results, then request continuation. |
+| `ContinueReplyWithOptions` | Continue a tool round with labels for this reply. |
 | `Cancel` | Cancel a retained response. |
 | `SetResponseMetadata` | Replace the labels for later replies once Prism confirms. |
 | `SendAudio` / `ClearAudio` | Convert input PCM or clear the input buffer. |
@@ -657,6 +670,13 @@ if cut, ok := event.Payload.(rime.ItemTruncated); ok && cut.KeptText != nil {
 }
 ```
 
+## Response usage and idle sessions
+
+`ResponseEnded.Usage` holds input, output, and total token counts and the
+context window when Prism counted the reply. It is nil when no count is
+available. An idle session ends with `ErrTimeout`; use `errors.As` with
+`*RealtimeIdleTimeout` to read `IdleTimeoutS`.
+
 ## History excluded from a reply
 
 Available in the next SDK release. `ResponseEnded.Truncation` is an optional
@@ -677,4 +697,4 @@ if ended, ok := event.Payload.(rime.ResponseEnded); ok && ended.Truncation != ni
 ```
 
 Migration: use keyed `ResponseEnded` struct literals. Existing unkeyed literals
-must include the new `Truncation` field, with nil when no summary is available.
+must include both `Truncation` and `Usage`, with nil for each when unavailable.

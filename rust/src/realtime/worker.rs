@@ -81,6 +81,11 @@ impl Worker {
                                 command.admission_deadline = command.deadline;
                                 self.pending.push(command);
                             }
+                        } else if event.kind == "session.idle_timeout" {
+                            let idle = RealtimeIdleTimeout {
+                                idle_timeout_s: event.idle_timeout_s.expect("validated idle timeout"),
+                            };
+                            return Err(Error::new(ErrorKind::Timeout, idle.to_string()).caused_by(idle));
                         } else {
                             self.dispatch(event)?;
                         }

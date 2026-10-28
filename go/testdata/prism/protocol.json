@@ -1,5 +1,113 @@
 [
   {
+    "name": "response token usage",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "usage": {
+          "input_tokens": 4210,
+          "output_tokens": 37,
+          "total_tokens": 4247,
+          "context_window": 65536
+        }
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_usage": {
+      "input_tokens": 4210,
+      "output_tokens": 37,
+      "total_tokens": 4247,
+      "context_window": 65536
+    }
+  },
+  {
+    "name": "uncounted response usage",
+    "event": {
+      "type": "response.done",
+      "response": {"id": "reply-1", "status": "cancelled", "usage": null}
+    },
+    "expected_kind": "response.ended",
+    "expected_usage": null
+  },
+  {
+    "name": "response usage requires all counts",
+    "event": {
+      "type": "response.done",
+      "response": {"id": "reply-1", "status": "completed", "usage": {"input_tokens": 1}}
+    },
+    "invalid": true
+  },
+  {
+    "name": "response usage rejects fractional counts",
+    "event": {
+      "type": "response.done",
+      "response": {"id": "reply-1", "status": "completed", "usage": {
+        "input_tokens": 1.5, "output_tokens": 1, "total_tokens": 2, "context_window": 10
+      }}
+    },
+    "invalid": true
+  },
+  {
+    "name": "response usage rejects negative counts",
+    "event": {
+      "type": "response.done",
+      "response": {"id": "reply-1", "status": "completed", "usage": {
+        "input_tokens": -1, "output_tokens": 1, "total_tokens": 0, "context_window": 10
+      }}
+    },
+    "invalid": true
+  },
+  {
+    "name": "saved nudge instruction",
+    "event": {
+      "type": "response.created",
+      "response": {"id": "reply-1", "metadata": {
+        "prism_cause": "proactive", "prism_instruction_item_id": "item-3"
+      }}
+    },
+    "expected_kind": "response.started",
+    "expected_instruction_item_id": "item-3"
+  },
+  {
+    "name": "invalid saved nudge instruction ID",
+    "event": {
+      "type": "response.created",
+      "response": {"id": "reply-1", "metadata": {"prism_instruction_item_id": 3}}
+    },
+    "invalid": true
+  },
+  {
+    "name": "empty saved nudge instruction ID",
+    "event": {
+      "type": "response.created",
+      "response": {"id": "reply-1", "metadata": {"prism_instruction_item_id": ""}}
+    },
+    "invalid": true
+  },
+  {
+    "name": "session idle timeout",
+    "event": {"type": "session.idle_timeout", "reason": "idle_timeout", "idle_timeout_s": 300},
+    "expected_kind": "session.idle_timeout",
+    "expected_idle_timeout_s": 300
+  },
+  {
+    "name": "session idle timeout rejects bad reason",
+    "event": {"type": "session.idle_timeout", "reason": "other", "idle_timeout_s": 300},
+    "invalid": true
+  },
+  {
+    "name": "session idle timeout requires duration",
+    "event": {"type": "session.idle_timeout", "reason": "idle_timeout"},
+    "invalid": true
+  },
+  {
+    "name": "session idle timeout rejects values below one second",
+    "event": {"type": "session.idle_timeout", "reason": "idle_timeout", "idle_timeout_s": 0.5},
+    "invalid": true
+  },
+  {
     "name": "typed input readiness",
     "event": {
       "type": "prism.typed_input.ready",

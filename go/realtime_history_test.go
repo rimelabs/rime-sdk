@@ -84,8 +84,14 @@ func TestRealtimeHistoryResultCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.send(rtObject{"type": "conversation.item.created", "prism_request_event_id": q["event_id"], "item": rtObject{"type": "function_call_output", "id": "result", "call_id": "call-1"}})
-	go func() { _, err := s.ContinueReply(context.Background(), parent); done <- err }()
+	go func() {
+		_, err := s.ContinueReplyWithOptions(context.Background(), parent, ReplyRequestOptions{Metadata: map[string]string{"step": "tool"}})
+		done <- err
+	}()
 	q = p.next("response.create")
+	if !reflect.DeepEqual(q["response"].(map[string]any)["metadata"], map[string]any{"step": "tool", "prism_cause": "tool_continuation", "prism_parent_response_id": parent.ResponseID()}) {
+		t.Fatal(q)
+	}
 	p.accept(q, "reply-2")
 	rtWait(t, done)
 }

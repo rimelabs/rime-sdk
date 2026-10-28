@@ -53,6 +53,14 @@ def response_metadata(value: object) -> t.Labels:
     return dict(value)
 
 
+def request_metadata(value: t.Labels | None, reserved: dict[str, str]) -> dict[str, str]:
+    """Copy one reply's labels and add protocol fields owned by the SDK."""
+    labels = {} if value is None else response_metadata(value)
+    if any(key.startswith("prism_") for key in labels):
+        raise RimeInputError("request metadata keys cannot start with prism_")
+    return {**labels, **reserved}
+
+
 class SessionPatch(TypedDict, total=False):
     truncation: t.JsonValue
     voice: str
@@ -119,6 +127,12 @@ class AudioCleared:
 
 
 @dataclass(frozen=True, kw_only=True)
+class SessionIdleTimeout:
+    idle_timeout_s: float
+    kind: Literal["session.idle_timeout"] = field(default="session.idle_timeout", init=False)
+
+
+@dataclass(frozen=True, kw_only=True)
 class ResponseEnded(t.ResponseEnded):
     drain_token: str | None
 
@@ -145,6 +159,7 @@ ServerPayload: TypeAlias = (
     | t.AudioDone
     | t.ToolCall
     | t.FaultEvent
+    | SessionIdleTimeout
 )
 
 
@@ -223,6 +238,10 @@ def _optional_string(value: object, name: str) -> str | None:
     return None if value is None else _string(value, name)
 
 
+def _optional_id(value: object, name: str) -> str | None:
+    return None if value is None else _id(value, name)
+
+
 def _integer(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _invalid(name)
@@ -253,6 +272,19 @@ def _response_truncation(response: dict) -> t.ResponseTruncation | None:
             if "first_kept_item_id" in value
             else None
         ),
+    )
+
+
+def _response_usage(response: dict[str, object]) -> t.ResponseUsage | None:
+    value = response.get("usage")
+    if value is None:
+        return None
+    usage = _object(value, "response.usage")
+    return t.ResponseUsage(
+        input_tokens=_integer(usage.get("input_tokens"), "response.usage.input_tokens"),
+        output_tokens=_integer(usage.get("output_tokens"), "response.usage.output_tokens"),
+        total_tokens=_integer(usage.get("total_tokens"), "response.usage.total_tokens"),
+        context_window=_integer(usage.get("context_window"), "response.usage.context_window"),
     )
 
 
@@ -450,6 +482,19 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         payload = ItemDeleted(item_id=_id(event.get("item_id"), "item_id"))
     elif kind == "input_audio_buffer.cleared":
         payload = AudioCleared()
+    elif kind == "session.idle_timeout":
+        if event.get("reason") != "idle_timeout":
+            _invalid("reason")
+        timeout = event.get("idle_timeout_s")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
+            _invalid("idle_timeout_s")
+        try:
+            idle_timeout_s = float(timeout)
+        except OverflowError:
+            _invalid("idle_timeout_s")
+        if not math.isfinite(idle_timeout_s) or idle_timeout_s < 1:
+            _invalid("idle_timeout_s")
+        payload = SessionIdleTimeout(idle_timeout_s=idle_timeout_s)
     elif kind == "conversation.item.truncated":
         payload = t.ItemTruncated(
             item_id=_id(event.get("item_id"), "item_id"),
@@ -548,6 +593,9 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
             ),
             parent=ref(parent) if parent is not None else None,
             input_item_id=input_item_id,
+            instruction_item_id=_optional_id(
+                metadata.get("prism_instruction_item_id"), "prism_instruction_item_id"
+            ),
             metadata=_client_metadata(metadata),
             input_item_ids=tuple(_id(value, "prism_input_item_ids") for value in input_item_ids),
         )
@@ -567,6 +615,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         payload = ResponseEnded(
             settings_revision=_revision(response, "response.prism_settings_revision"),
             truncation=_response_truncation(response),
+            usage=_response_usage(response),
             response=ref(response.get("id")),
             status=cast(
                 Literal["completed", "cancelled", "failed", "unknown"],

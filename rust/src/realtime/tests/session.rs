@@ -120,6 +120,7 @@ async fn audio_and_clear() {
 }
 #[tokio::test]
 async fn cancelled_tool_wait_keeps_acknowledgment_and_continuation() {
+    use crate::realtime::{Labels, ReplyRequestOptions};
     let mut p = Peer::new().await;
     let (c, s) = p.setup().await;
     let mut events = s.events().unwrap();
@@ -139,9 +140,26 @@ async fn cancelled_tool_wait_keeps_acknowledgment_and_continuation() {
     task.abort();
     let _ = task.await;
     let session = s.clone();
-    let continuation = tokio::spawn(async move { session.continue_reply(&parent).await });
+    let continuation = tokio::spawn(async move {
+        session
+            .continue_reply_with_options(
+                &parent,
+                ReplyRequestOptions::default()
+                    .metadata(Labels::from([("step".into(), "tool".into())])),
+            )
+            .await
+    });
     p.send(json!({"type":"conversation.item.created","prism_request_event_id":q["event_id"],"item":{"type":"function_call_output","call_id":"call-1"}})).await;
     let q = p.next("response.create").await;
+    assert_eq!(q["response"]["metadata"]["step"], "tool");
+    assert_eq!(
+        q["response"]["metadata"]["prism_cause"],
+        "tool_continuation"
+    );
+    assert_eq!(
+        q["response"]["metadata"]["prism_parent_response_id"],
+        "reply-1"
+    );
     p.accept(&q, "reply-2").await;
     continuation.await.unwrap().unwrap();
     s.submit_tool_result(&call, "result").await.unwrap();

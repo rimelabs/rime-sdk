@@ -339,10 +339,19 @@ func (s *RealtimeSession) Update(ctx context.Context, options RealtimeUpdateOpti
 
 // SendText waits for admission and requests a reply to a typed user turn.
 func (s *RealtimeSession) SendText(ctx context.Context, text string) (ResponseRef, error) {
+	return s.SendTextWithOptions(ctx, text, ReplyRequestOptions{})
+}
+
+// SendTextWithOptions requests a typed reply with labels for this request.
+func (s *RealtimeSession) SendTextWithOptions(ctx context.Context, text string, options ReplyRequestOptions) (ResponseRef, error) {
 	if e := rtText(text, 4000); e != nil {
 		return ResponseRef{}, e
 	}
-	r, e := s.invoke(ctx, &rtCommand{kind: "text", body: rtObject{"response": rtObject{"prism_input_text": text, "metadata": rtObject{"prism_cause": "user_text"}}}})
+	metadata, err := rtRequestMetadata(options.Metadata, rtObject{"prism_cause": "user_text"})
+	if err != nil {
+		return ResponseRef{}, err
+	}
+	r, e := s.invoke(ctx, &rtCommand{kind: "text", body: rtObject{"response": rtObject{"prism_input_text": text, "metadata": metadata}}})
 	return r.ref, e
 }
 
@@ -357,7 +366,16 @@ func (s *RealtimeSession) AddMessage(ctx context.Context, role, text string) (It
 	return s.CreateItem(ctx, HistoryItem{Type: HistoryMessage, Role: role, Text: text}, "")
 }
 func (s *RealtimeSession) RequestReply(ctx context.Context, o ReplyOptions) (ResponseRef, error) {
-	b := rtObject{"metadata": rtObject{"prism_cause": "proactive"}}
+	return s.RequestReplyWithOptions(ctx, o, ReplyRequestOptions{})
+}
+
+// RequestReplyWithOptions requests a proactive reply with labels for this reply.
+func (s *RealtimeSession) RequestReplyWithOptions(ctx context.Context, o ReplyOptions, options ReplyRequestOptions) (ResponseRef, error) {
+	metadata, err := rtRequestMetadata(options.Metadata, rtObject{"prism_cause": "proactive"})
+	if err != nil {
+		return ResponseRef{}, err
+	}
+	b := rtObject{"metadata": metadata}
 	if o.Instruction != "" {
 		if e := rtText(o.Instruction, 4000); e != nil {
 			return ResponseRef{}, e
@@ -373,7 +391,16 @@ func (s *RealtimeSession) RequestReply(ctx context.Context, o ReplyOptions) (Res
 	return r.ref, e
 }
 func (s *RealtimeSession) ContinueReply(ctx context.Context, parent ResponseRef) (ResponseRef, error) {
-	r, e := s.invoke(ctx, &rtCommand{kind: "continue", ref: parent, body: rtObject{"response": rtObject{"metadata": rtObject{"prism_cause": "tool_continuation", "prism_parent_response_id": parent.responseID}}}})
+	return s.ContinueReplyWithOptions(ctx, parent, ReplyRequestOptions{})
+}
+
+// ContinueReplyWithOptions requests a tool continuation with labels for this reply.
+func (s *RealtimeSession) ContinueReplyWithOptions(ctx context.Context, parent ResponseRef, options ReplyRequestOptions) (ResponseRef, error) {
+	metadata, err := rtRequestMetadata(options.Metadata, rtObject{"prism_cause": "tool_continuation", "prism_parent_response_id": parent.responseID})
+	if err != nil {
+		return ResponseRef{}, err
+	}
+	r, e := s.invoke(ctx, &rtCommand{kind: "continue", ref: parent, body: rtObject{"response": rtObject{"metadata": metadata}}})
 	return r.ref, e
 }
 func (s *RealtimeSession) SubmitToolResult(ctx context.Context, call ToolCallRef, output string) error {
@@ -944,6 +971,10 @@ func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
 	e.info = info
 }
 func (w *rtWorker) dispatch(e *rtWire) error {
+	if e.kind == "session.idle_timeout" {
+		timeout := &RealtimeIdleTimeout{IdleTimeoutS: e.idleTimeoutS}
+		return &Error{Kind: ErrTimeout, Message: timeout.Error(), Cause: timeout}
+	}
 	var matched []*rtCommand
 	for _, c := range w.pending {
 		if c.finished || !c.submitted {
