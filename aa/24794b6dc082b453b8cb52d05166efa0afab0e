@@ -1,0 +1,40 @@
+rust/src/realtime/tests/errors.rs
+  s_a3a25f6fe5abcf::t_f821129872a54d 25,31-35,45-49,62-68
+  s_a3a25f6fe5abcf::t_51165cb13e2fa0 30,36-39,50,52
+rust/README.md
+  s_a3a25f6fe5abcf::t_fed1ab486e9d51 442-443,661-663
+  s_a3a25f6fe5abcf::t_fa8f81eb66408f 444,665
+  s_a3a25f6fe5abcf::t_f821129872a54d 660
+rust/src/realtime/tests/protocol.rs
+  s_a3a25f6fe5abcf::t_51165cb13e2fa0 104,128
+  s_a3a25f6fe5abcf::t_3cdc216e5e67b1 129-131
+rust/src/realtime/protocol.rs
+  s_a3a25f6fe5abcf::t_4e78efc419f698 17-18,242-243,417-421,438
+rust/src/realtime/dispatch.rs
+  s_a3a25f6fe5abcf::t_f821129872a54d 317-328
+  s_a3a25f6fe5abcf::t_939c19b684b7b8 329
+  s_a3a25f6fe5abcf::t_a06ff4c6cc1f19 330-344
+rust/tests/realtime_pattern_compat.rs
+  s_a3a25f6fe5abcf::t_4ab11de6990477 3-34
+  s_a3a25f6fe5abcf::t_f25c8f9062e88d 1-2
+rust/src/realtime/types.rs
+  s_a3a25f6fe5abcf::t_4e78efc419f698 508-514,575-581
+rust/src/lib.rs
+  s_a3a25f6fe5abcf::t_9978e41a8c04ab 28-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aa24794b6dc082b453b8cb52d05166efa0afab0e",
+  "prompts": {},
+  "sessions": {
+    "s_a3a25f6fe5abcf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18075-1b34-7b43-b012-11921fa4f140",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
