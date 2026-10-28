@@ -50,6 +50,16 @@
     "invalid": true
   },
   {
+    "name": "response usage rejects negative counts",
+    "event": {
+      "type": "response.done",
+      "response": {"id": "reply-1", "status": "completed", "usage": {
+        "input_tokens": -1, "output_tokens": 1, "total_tokens": 0, "context_window": 10
+      }}
+    },
+    "invalid": true
+  },
+  {
     "name": "saved nudge instruction",
     "event": {
       "type": "response.created",
@@ -90,6 +100,11 @@
   {
     "name": "session idle timeout requires duration",
     "event": {"type": "session.idle_timeout", "reason": "idle_timeout"},
+    "invalid": true
+  },
+  {
+    "name": "session idle timeout rejects values below one second",
+    "event": {"type": "session.idle_timeout", "reason": "idle_timeout", "idle_timeout_s": 0.5},
     "invalid": true
   },
   {

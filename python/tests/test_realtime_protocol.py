@@ -140,6 +140,16 @@ async def test_request_metadata_labels_only_one_reply(monkeypatch, kind):
         peer.accepted(request)
         await pending
         assert "prism_response_metadata" not in peer.settings
+        peer.ended()
+        peer.emit("prism.typed_input.ready")
+        if kind == "text":
+            next_pending = asyncio.create_task(current.send_text("again"))
+        else:
+            next_pending = asyncio.create_task(current.request_reply())
+        next_request = await peer.next("response.create")
+        assert next_request["response"]["metadata"] == {"prism_cause": cause}
+        peer.accepted(next_request, response_id="reply-2")
+        await next_pending
 
 
 async def test_reserved_request_metadata_is_rejected_before_write(monkeypatch):

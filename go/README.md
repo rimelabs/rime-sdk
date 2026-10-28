@@ -457,7 +457,8 @@ or tool continuation, use `SendTextWithOptions` or `ContinueReplyWithOptions`.
 Pass `ReplyRequestOptions{Metadata: map[string]string{"step": "3"}}` to the new
 method; `RequestReplyWithOptions` takes the existing `ReplyOptions` first.
 Prism applies request labels over matching session labels. The SDK adds its
-`prism_` fields; caller keys cannot use that prefix. Existing methods keep
+`prism_` fields; caller keys cannot use that prefix. Such keys return local
+`ErrInput` before submission. Existing methods keep
 their request shape, and replies to speech use session labels.
 
 | Session method | Behavior |
@@ -696,4 +697,4 @@ if ended, ok := event.Payload.(rime.ResponseEnded); ok && ended.Truncation != ni
 ```
 
 Migration: use keyed `ResponseEnded` struct literals. Existing unkeyed literals
-must include the new `Truncation` field, with nil when no summary is available.
+must include both `Truncation` and `Usage`, with nil for each when unavailable.

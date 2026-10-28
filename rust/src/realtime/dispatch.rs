@@ -327,20 +327,17 @@ impl Worker {
                 }
             }
             self.publish(p.clone(), e.event_id.clone(), e.request_id.clone())?;
-            match p {
-                RealtimeEvent::ResponseStarted { response, .. } => {
-                    if let Some(item_id) = &e.instruction_item_id {
-                        self.publish(
-                            RealtimeEvent::ResponseInstructionSaved {
-                                response: response.clone(),
-                                item_id: item_id.clone(),
-                            },
-                            String::new(),
-                            e.request_id.clone(),
-                        )?;
-                    }
+            if let RealtimeEvent::ResponseStarted { response, .. } = p {
+                if let Some(item_id) = &e.instruction_item_id {
+                    self.publish(
+                        RealtimeEvent::ResponseInstructionSaved {
+                            response: response.clone(),
+                            item_id: item_id.clone(),
+                        },
+                        String::new(),
+                        e.request_id.clone(),
+                    )?;
                 }
-                _ => {}
             }
         }
         // Only uncorrelated controls can match several waiters; they are serialized.
