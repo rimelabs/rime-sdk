@@ -1,0 +1,28 @@
+go/realtime_types.go
+  s_a3a25f6fe5abcf::t_bd9e6afa8e9309 73,75
+go/README.md
+  s_a3a25f6fe5abcf::t_bd9e6afa8e9309 455-456,470
+  s_a3a25f6fe5abcf::t_3e116f28381e5f 457-458
+go/realtime_protocol_test.go
+  s_a3a25f6fe5abcf::t_3f22cec5e9880b 97
+  s_a3a25f6fe5abcf::t_bd9e6afa8e9309 139
+  s_a3a25f6fe5abcf::t_36ee67a7e004c8 140-142,159
+go/realtime_session.go
+  s_a3a25f6fe5abcf::t_bd9e6afa8e9309 369-374
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "91efb506905726afd61feca6ba2bf43fc85bf4ba",
+  "prompts": {},
+  "sessions": {
+    "s_a3a25f6fe5abcf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18075-1b34-7b43-b012-11921fa4f140",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
