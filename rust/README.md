@@ -441,15 +441,23 @@ realtime fault whose code is `invalid_session`. `set_response_metadata` replaces
 carries them, and its `input_item_ids` names the user items a reply answers.
 `ResponseStarted.instruction_item_id` names a saved nudge instruction. Pass it
 to `delete_item` to remove the instruction from later history.
+Use `ReplyOptions::metadata(labels)` to label one proactive reply. For a typed
+reply or tool continuation, use `send_text_with_options` or
+`continue_reply_with_options` with `ReplyRequestOptions::default().metadata(labels)`.
+Prism applies request labels over matching session labels. The SDK adds its
+`prism_` fields; caller keys cannot use that prefix. Existing methods keep
+their request shape, and replies to speech use session labels.
 
 | Session method | Behavior |
 | --- | --- |
 | `update` | Apply supplied settings and return acknowledged `SessionInfo`. |
 | `send_text` | Wait for admission, add a typed turn, and return its response reference. |
+| `send_text_with_options` | Send a typed turn with labels for this reply. |
 | `add_message` | Add user or assistant history without a reply. |
 | `request_reply` | Request a proactive reply, with optional instructions or a recorded tool call. |
 | `submit_tool_result` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `continue_reply` | Wait for the latest tool response and all its results, then request continuation. |
+| `continue_reply_with_options` | Continue a tool round with labels for this reply. |
 | `cancel` | Cancel a retained response. |
 | `set_response_metadata` | Replace the labels for later replies once Prism confirms. |
 | `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |

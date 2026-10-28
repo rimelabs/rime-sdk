@@ -35,6 +35,16 @@ export function responseMetadata(value: unknown): t.Labels {
     throw new RimeInputError("responseMetadata must map keys to strings");
   return Object.freeze({ ...(value as t.Labels) });
 }
+/** Copy caller labels before combining them with the SDK's protocol fields. */
+export function requestMetadata(
+  value: t.Labels | null | undefined,
+  reserved: Record<string, string>,
+): Record<string, string> {
+  const labels = value == null ? {} : responseMetadata(value);
+  if (Object.keys(labels).some((key) => key.startsWith("prism_")))
+    throw new RimeInputError("request metadata keys cannot start with prism_");
+  return { ...labels, ...reserved };
+}
 export interface SessionPatch {
   truncation?: SessionSettings["truncation"];
   voice?: string;

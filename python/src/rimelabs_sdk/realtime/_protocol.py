@@ -53,6 +53,14 @@ def response_metadata(value: object) -> t.Labels:
     return dict(value)
 
 
+def request_metadata(value: t.Labels | None, reserved: dict[str, str]) -> dict[str, str]:
+    """Copy one reply's labels and add protocol fields owned by the SDK."""
+    labels = {} if value is None else response_metadata(value)
+    if any(key.startswith("prism_") for key in labels):
+        raise RimeInputError("request metadata keys cannot start with prism_")
+    return {**labels, **reserved}
+
+
 class SessionPatch(TypedDict, total=False):
     truncation: t.JsonValue
     voice: str

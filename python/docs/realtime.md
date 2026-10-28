@@ -259,17 +259,23 @@ Each method is async. Arguments without a default are required.
 | Method | Use it to | Result |
 | --- | --- | --- |
 | `update(*, instructions=None, tools=None, voice=None, interrupt_on_speech=None)` | Change supplied settings without reconnecting. | `SessionInfo` after acknowledgment |
-| `send_text(text)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
+| `send_text(text, *, metadata=None)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
 | `send_audio(chunk)` | Send microphone audio. | `None` |
-| `request_reply(*, instruction=None, tool_call=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
+| `request_reply(*, instruction=None, tool_call=None, metadata=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
 | `add_message(role, text)` | Add user or assistant history without requesting a reply. | `ItemRef` after acknowledgment |
 | `submit_tool_result(call, output)` | Record a tool result without requesting a reply. | `None` after acknowledgment |
-| `continue_reply(parent)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
+| `continue_reply(parent, *, metadata=None)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
 | `cancel(response)` | Request that generation stop. | `None` when the response is terminal |
 | `clear_audio()` | Clear buffered input and reset audio conversion. | `None` after acknowledgment |
 | `set_response_metadata(metadata)` | Replace the labels for later replies. | `None` once Prism confirms |
 | `report_playback(report)` | Report interrupted or finished playback. | `None` |
 | `close()` | Close the session and release its resources. | `None`; safe to repeat |
+
+Pass `metadata={"step": "3"}` to one of the three reply requests to label only
+that reply. Request labels replace matching session labels in Prism's response.
+The SDK adds the required `prism_` fields; caller keys cannot use that prefix.
+Omitting `metadata` keeps the existing request shape. Replies to speech use
+the session labels because they have no client request.
 
 Text passed to `send_text`, `add_message`, or `request_reply(instruction=...)`
 must be nonblank and at most 4,000 characters. History roles are `"user"` and

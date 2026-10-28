@@ -120,6 +120,50 @@ func TestRealtimeNudgeInstructionAndUsage(t *testing.T) {
 	rtWait(t, done)
 }
 
+func TestRealtimeRequestMetadata(t *testing.T) {
+	for _, kind := range []string{"text", "nudge"} {
+		t.Run(kind, func(t *testing.T) {
+			p := newRealtimePeer(t)
+			_, s := p.setup(t)
+			p.send(rtObject{"type": "prism.typed_input.ready"})
+			labels := map[string]string{"step": "one"}
+			done := make(chan error, 1)
+			cause := "user_text"
+			if kind == "text" {
+				go func() {
+					_, err := s.SendTextWithOptions(context.Background(), "hello", ReplyRequestOptions{Metadata: labels})
+					done <- err
+				}()
+			} else {
+				cause = "proactive"
+				go func() { _, err := s.RequestReply(context.Background(), ReplyOptions{Metadata: labels}); done <- err }()
+			}
+			q := p.next("response.create")
+			metadata := q["response"].(map[string]any)["metadata"]
+			want := map[string]any{"step": "one", "prism_cause": cause}
+			if !reflect.DeepEqual(metadata, want) || labels["step"] != "one" {
+				t.Fatal(q, labels)
+			}
+			p.accept(q, "reply-1")
+			rtWait(t, done)
+		})
+	}
+}
+
+func TestRealtimeReservedRequestMetadataIsRejected(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	_, err := s.RequestReply(context.Background(), ReplyOptions{Metadata: map[string]string{"prism_cause": "user_text"}})
+	if !errors.Is(err, ErrInput) {
+		t.Fatal(err)
+	}
+	select {
+	case q := <-p.requests:
+		t.Fatal(q)
+	default:
+	}
+}
+
 func TestRealtimeIdleTimeoutIsTerminal(t *testing.T) {
 	p := newRealtimePeer(t)
 	_, s := p.setup(t)

@@ -193,6 +193,7 @@ impl RealtimeUpdateOptions {
 pub struct ReplyOptions {
     pub(crate) instruction: Option<String>,
     pub(crate) tool_call: Option<ToolCallRef>,
+    pub(crate) metadata: Labels,
 }
 impl ReplyOptions {
     /// Set instructions for this reply.
@@ -203,6 +204,23 @@ impl ReplyOptions {
     /// Request a report about an already recorded tool result.
     pub fn tool_call(mut self, value: ToolCallRef) -> Self {
         self.tool_call = Some(value);
+        self
+    }
+    /// Label only this reply; request labels override matching session labels.
+    pub fn metadata(mut self, value: Labels) -> Self {
+        self.metadata = value;
+        self
+    }
+}
+/// Options for a typed reply or tool continuation.
+#[derive(Clone, Debug, Default)]
+pub struct ReplyRequestOptions {
+    pub(crate) metadata: Labels,
+}
+impl ReplyRequestOptions {
+    /// Label only this reply; request labels override matching session labels.
+    pub fn metadata(mut self, value: Labels) -> Self {
+        self.metadata = value;
         self
     }
 }

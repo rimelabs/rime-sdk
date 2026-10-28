@@ -408,17 +408,27 @@ class RealtimeSession:
         assert event.info is not None
         return event.info
 
-    async def send_text(self, text: str) -> t.ResponseRef:
+    async def send_text(self, text: str, *, metadata: t.Labels | None = None) -> t.ResponseRef:
         """Start a typed user turn. Wait for readiness and return at response creation."""
         self._text(text)
         return await self._create(
-            {"prism_input_text": text, "metadata": {"prism_cause": "user_text"}}, p.TEXT
+            {
+                "prism_input_text": text,
+                "metadata": p.request_metadata(metadata, {"prism_cause": "user_text"}),
+            },
+            p.TEXT,
         )
 
     async def request_reply(
-        self, *, instruction: str | None = None, tool_call: t.ToolCallRef | None = None
+        self,
+        *,
+        instruction: str | None = None,
+        tool_call: t.ToolCallRef | None = None,
+        metadata: t.Labels | None = None,
     ) -> t.ResponseRef:
-        body: dict[str, object] = {"metadata": {"prism_cause": "proactive"}}
+        body: dict[str, object] = {
+            "metadata": p.request_metadata(metadata, {"prism_cause": "proactive"})
+        }
         if instruction is not None:
             self._text(instruction)
             body["prism_instruction"] = instruction
@@ -508,8 +518,17 @@ class RealtimeSession:
             response.calls[call.call_id] = digest
             response.changed.set()
 
-    async def continue_reply(self, parent: t.ResponseRef) -> t.ResponseRef:
+    async def continue_reply(
+        self, parent: t.ResponseRef, *, metadata: t.Labels | None = None
+    ) -> t.ResponseRef:
         response = self._response(parent)
+        request_metadata = p.request_metadata(
+            metadata,
+            {
+                "prism_cause": "tool_continuation",
+                "prism_parent_response_id": parent.response_id,
+            },
+        )
         try:
             async with asyncio.timeout(self._timeouts.ready_s):
                 while True:
@@ -533,14 +552,7 @@ class RealtimeSession:
         return (
             await self._request(
                 p.CREATE,
-                {
-                    "response": {
-                        "metadata": {
-                            "prism_cause": "tool_continuation",
-                            "prism_parent_response_id": parent.response_id,
-                        }
-                    }
-                },
+                {"response": {"metadata": request_metadata}},
                 continuation=response,
             )
         ).response

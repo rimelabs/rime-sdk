@@ -294,6 +294,12 @@ instruction, tool call, and signal in one object. `update` returns
 `getHistory` returns `Promise<readonly HistoryItem[]>`. The other methods return
 `Promise<void>`.
 
+Pass `metadata: { step: "3" }` in the options for `sendText`, `requestReply`, or
+`continueReply` to label only that reply. Request labels replace matching
+session labels in Prism's response. The SDK adds the required `prism_` fields;
+caller keys cannot use that prefix. Omitting `metadata` keeps the existing
+request shape. Replies to speech use the session labels.
+
 `sendText` and `addMessage` require nonblank text of at most 4,000 Unicode
 characters. `addMessage` accepts `"user"` and `"assistant"` roles. `createItem`
 also accepts `"system"` messages and allows blank message text, with the same

@@ -8,7 +8,7 @@ import pytest
 from jsonschema import Draft7Validator
 from test_realtime import _CONTRACT, _VALIDATORS, accepted_turn, session
 
-from rimelabs_sdk import RimeStreamError
+from rimelabs_sdk import RimeInputError, RimeStreamError
 from rimelabs_sdk import realtime as r
 from rimelabs_sdk.realtime import _protocol as protocol
 
@@ -123,6 +123,32 @@ async def test_nudge_instruction_and_usage_reach_public_events(monkeypatch):
         await deleting
 
 
+@pytest.mark.parametrize("kind", ["text", "nudge"])
+async def test_request_metadata_labels_only_one_reply(monkeypatch, kind):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
+        peer.emit("prism.typed_input.ready")
+        labels = {"step": "one"}
+        if kind == "text":
+            pending = asyncio.create_task(current.send_text("hello", metadata=labels))
+            cause = "user_text"
+        else:
+            pending = asyncio.create_task(current.request_reply(metadata=labels))
+            cause = "proactive"
+        request = await peer.next("response.create")
+        assert request["response"]["metadata"] == {"step": "one", "prism_cause": cause}
+        assert labels == {"step": "one"}
+        peer.accepted(request)
+        await pending
+        assert "prism_response_metadata" not in peer.settings
+
+
+async def test_reserved_request_metadata_is_rejected_before_write(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        with pytest.raises(RimeInputError, match="prism_"):
+            await current.request_reply(metadata={"prism_cause": "user_text"})
+        assert peer.sent.empty()
+
+
 @pytest.mark.parametrize(
     ("operation", "acknowledgment"),
     [
@@ -222,8 +248,16 @@ async def test_tool_result_acknowledgment_needs_no_item_id(monkeypatch):
         peer.incoming.put_nowait(json.dumps(acknowledgment))
         await pending
         peer.ended()
-        continuation = asyncio.create_task(current.continue_reply(parent))
-        peer.accepted(await peer.next("response.create"), "reply-2")
+        continuation = asyncio.create_task(
+            current.continue_reply(parent, metadata={"step": "tool"})
+        )
+        request = await peer.next("response.create")
+        assert request["response"]["metadata"] == {
+            "step": "tool",
+            "prism_cause": "tool_continuation",
+            "prism_parent_response_id": parent.response_id,
+        }
+        peer.accepted(request, "reply-2")
         assert (await continuation).response_id == "reply-2"
 
 

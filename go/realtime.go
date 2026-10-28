@@ -179,6 +179,22 @@ func rtLabelsValid(labels map[string]string) error {
 	}
 	return nil
 }
+func rtRequestMetadata(labels map[string]string, reserved rtObject) (rtObject, error) {
+	if err := rtLabelsValid(labels); err != nil {
+		return nil, err
+	}
+	metadata := rtObject{}
+	for key, value := range labels {
+		if strings.HasPrefix(key, "prism_") {
+			return nil, failure(ErrInput, "request metadata keys cannot start with prism_")
+		}
+		metadata[key] = value
+	}
+	for key, value := range reserved {
+		metadata[key] = value
+	}
+	return metadata, nil
+}
 func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, error) {
 	t := o.Timeouts
 	for _, p := range []*time.Duration{&t.Connect, &t.Ready, &t.Request} {

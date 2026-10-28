@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import Ajv from "ajv";
 import { parse } from "yaml";
-import { Rime, RimeStreamError, RealtimeIdleTimeout } from "../dist/index.js";
+import {
+  Rime,
+  RimeInputError,
+  RimeStreamError,
+  RealtimeIdleTimeout,
+} from "../dist/index.js";
 import { decode } from "../dist/realtime/protocol.js";
 import { Peer } from "./realtime-peer.mjs";
 
@@ -110,6 +115,33 @@ test("nudge instruction and token usage reach public events", async (t) => {
     item_id: "item-instruction",
   });
   await deleting;
+});
+for (const kind of ["text", "nudge"]) {
+  test(`${kind} request labels apply to one reply`, async (t) => {
+    const { session, peer } = await setup(t);
+    peer.emit("prism.typed_input.ready");
+    const metadata = { step: "one" };
+    const pending =
+      kind === "text"
+        ? session.sendText("hello", { metadata })
+        : session.requestReply({ metadata });
+    const request = await peer.next("response.create");
+    assert.deepEqual(request.response.metadata, {
+      step: "one",
+      prism_cause: kind === "text" ? "user_text" : "proactive",
+    });
+    assert.deepEqual(metadata, { step: "one" });
+    peer.accepted(request);
+    await pending;
+  });
+}
+test("reserved request labels fail before a write", async (t) => {
+  const { session, peer } = await setup(t);
+  await assert.rejects(
+    session.requestReply({ metadata: { prism_cause: "user_text" } }),
+    RimeInputError,
+  );
+  assert.equal(peer.queue.length, 0);
 });
 test("idle timeout ends pending work and event reading with its duration", async (t) => {
   const { session, peer } = await setup(t);
@@ -301,8 +333,16 @@ test("tool result acknowledgment without item ID permits continuation", async (t
   });
   await result;
   peer.ended();
-  const continuation = watch(session.continueReply(parent));
-  peer.accepted(await peer.next("response.create"), "reply-2");
+  const continuation = watch(
+    session.continueReply(parent, { metadata: { step: "tool" } }),
+  );
+  const continuationRequest = await peer.next("response.create");
+  assert.deepEqual(continuationRequest.response.metadata, {
+    step: "tool",
+    prism_cause: "tool_continuation",
+    prism_parent_response_id: parent.responseId,
+  });
+  peer.accepted(continuationRequest, "reply-2");
   assert.equal((await continuation).responseId, "reply-2");
 });
 

@@ -488,12 +488,18 @@ export class RealtimeSession {
   }
   async sendText(
     value: string,
-    options: t.RealtimeOperationOptions = {},
+    options: t.ReplyRequestOptions = {},
   ): Promise<t.ResponseRef> {
     text(value);
+    const metadata = p.requestMetadata(options.metadata, {
+      prism_cause: "user_text",
+    });
     return this.operation(options, (signal) =>
       this.create(
-        { prism_input_text: value, metadata: { prism_cause: "user_text" } },
+        {
+          prism_input_text: value,
+          metadata,
+        },
         signal,
         p.requests.text,
       ),
@@ -501,7 +507,9 @@ export class RealtimeSession {
   }
   async requestReply(options: t.ReplyOptions = {}): Promise<t.ResponseRef> {
     const body: Record<string, unknown> = {
-      metadata: { prism_cause: "proactive" },
+      metadata: p.requestMetadata(options.metadata, {
+        prism_cause: "proactive",
+      }),
     };
     if (options.instruction != null) {
       text(options.instruction);
@@ -641,9 +649,13 @@ export class RealtimeSession {
   }
   async continueReply(
     parent: t.ResponseRef,
-    options: t.RealtimeOperationOptions = {},
+    options: t.ReplyRequestOptions = {},
   ): Promise<t.ResponseRef> {
     const ref = { ...parent };
+    const metadata = p.requestMetadata(options.metadata, {
+      prism_cause: "tool_continuation",
+      prism_parent_response_id: ref.responseId,
+    });
     const state = this.response(ref);
     return this.operation(options, async (signal) => {
       const ready = scope(
@@ -680,10 +692,7 @@ export class RealtimeSession {
           p.requests.create,
           {
             response: {
-              metadata: {
-                prism_cause: "tool_continuation",
-                prism_parent_response_id: ref.responseId,
-              },
+              metadata,
             },
           },
           signal,

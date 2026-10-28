@@ -94,7 +94,11 @@ export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
   readonly voice?: string;
   readonly interruptOnSpeech?: boolean;
 }
-export interface ReplyOptions extends RealtimeOperationOptions {
+export interface ReplyRequestOptions extends RealtimeOperationOptions {
+  /** Labels for this reply. Request labels override matching session labels. */
+  readonly metadata?: Labels | null;
+}
+export interface ReplyOptions extends ReplyRequestOptions {
   readonly instruction?: string | null;
   readonly toolCall?: ToolCallRef | null;
 }
