@@ -1,6 +1,9 @@
 package rime
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // RealtimeTimeouts are independent of TTS. Zero selects 10s, 30s, and 10s.
 type RealtimeTimeouts struct{ Connect, Ready, Request time.Duration }
@@ -140,6 +143,13 @@ type RealtimeFault struct {
 	CallIDs                                                                       []string
 }
 
+// RealtimeIdleTimeout reports the server's idle limit when it closes a conversation.
+type RealtimeIdleTimeout struct{ IdleTimeoutS float64 }
+
+func (e *RealtimeIdleTimeout) Error() string {
+	return fmt.Sprintf("realtime session idle for %g seconds", e.IdleTimeoutS)
+}
+
 func (f *RealtimeFault) Error() string { return f.Code + ": " + f.Message }
 
 // Retryable reports whether the same request, unchanged, may succeed on another
@@ -189,6 +199,8 @@ type ResponseStarted struct {
 	Cause            string
 	Parent           *ResponseRef
 	InputItemID      string
+	// InstructionItemID names a saved nudge instruction that DeleteItem can remove.
+	InstructionItemID string
 	// Metadata holds the session's labels when the reply began.
 	Metadata map[string]string
 	// InputItemIDs names the user items the reply answers; empty when Prism names none.
@@ -223,6 +235,14 @@ type ResponseTruncation struct {
 	// FirstKeptItemID is nil when no earlier item was retained.
 	FirstKeptItemID *string
 }
+
+// ResponseUsage contains the model tokens counted for a reply.
+type ResponseUsage struct {
+	InputTokens   uint64 `json:"input_tokens"`
+	OutputTokens  uint64 `json:"output_tokens"`
+	TotalTokens   uint64 `json:"total_tokens"`
+	ContextWindow uint64 `json:"context_window"`
+}
 type ResponseEnded struct {
 	// SettingsRevision names the settings this reply began with, if published.
 	SettingsRevision *uint64
@@ -230,6 +250,8 @@ type ResponseEnded struct {
 	Status, Reason   string
 	// Truncation is nil when the server reports no exclusions or the information is unavailable.
 	Truncation *ResponseTruncation
+	// Usage is nil when Prism did not count tokens.
+	Usage *ResponseUsage
 }
 type FaultEvent struct{ Fault *RealtimeFault }
 

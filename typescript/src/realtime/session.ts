@@ -903,6 +903,9 @@ export class RealtimeSession {
         );
     }
     switch (payload.kind) {
+      case "session.idle_timeout":
+        this.fail(new t.RealtimeIdleTimeout(payload.idleTimeoutS));
+        return;
       case "session.created":
         if (this.sessionId === null) {
           this.sessionId = payload.session.id;

@@ -697,6 +697,9 @@ class RealtimeSession:
 
     def _dispatch(self, event: p.ServerEvent) -> None:
         payload, echo = event.payload, event.request_id
+        if isinstance(payload, p.SessionIdleTimeout):
+            self._fail(t.RealtimeIdleTimeout(payload.idle_timeout_s))
+            return
         # Reject mismatched echoed acknowledgments before changing session state.
         if isinstance(
             payload,
@@ -858,6 +861,7 @@ class RealtimeSession:
                     reason=payload.reason,
                     settings_revision=payload.settings_revision,
                     truncation=payload.truncation,
+                    usage=payload.usage,
                 ),
                 event_id=event.event_id,
                 request_id=echo,

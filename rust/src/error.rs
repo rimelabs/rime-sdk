@@ -89,6 +89,11 @@ impl Error {
         self.source.as_ref()?.downcast_ref()
     }
 
+    /// Prism's idle limit when the session ended for inactivity.
+    pub fn realtime_idle_timeout(&self) -> Option<&crate::realtime::RealtimeIdleTimeout> {
+        self.source.as_ref()?.downcast_ref()
+    }
+
     /// The category of this failure.
     pub fn kind(&self) -> ErrorKind {
         self.kind

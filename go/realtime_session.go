@@ -944,6 +944,10 @@ func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
 	e.info = info
 }
 func (w *rtWorker) dispatch(e *rtWire) error {
+	if e.kind == "session.idle_timeout" {
+		timeout := &RealtimeIdleTimeout{IdleTimeoutS: e.idleTimeoutS}
+		return &Error{Kind: ErrTimeout, Message: timeout.Error(), Cause: timeout}
+	}
 	var matched []*rtCommand
 	for _, c := range w.pending {
 		if c.finished || !c.submitted {

@@ -17,7 +17,8 @@ recognize the former `prsm` names.
 - `schema.json` checks whether values match the current protocol schema,
   including rejection of requests with the former prefix.
 - `protocol.json` checks all four SDK decoders, including malformed messages,
-  unknown events, extra fields, and unknown enum values.
+  unknown events, extra fields, unknown enum values, response usage, saved nudge
+  instruction IDs, and idle timeouts.
 - `error-retry.json` checks retry classification for every code in the schema
   fixture and unknown codes. The classification and `context_length_exceeded`
   follow `rimelabs/rime#3356` at commit `61ddc5429`. Only `capacity_exceeded`,

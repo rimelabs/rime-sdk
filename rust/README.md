@@ -439,6 +439,8 @@ the SDK request that caused it instead. `response_metadata` labels every reply, 
 no key starting with `prism_`. Prism refuses labels that break these rules with a
 realtime fault whose code is `invalid_session`. `set_response_metadata` replaces these labels. `ResponseStarted`'s `metadata`
 carries them, and its `input_item_ids` names the user items a reply answers.
+`ResponseStarted.instruction_item_id` names a saved nudge instruction. Pass it
+to `delete_item` to remove the instruction from later history.
 
 | Session method | Behavior |
 | --- | --- |
@@ -643,6 +645,13 @@ if let RealtimeEvent::ItemTruncated { item_id, kept_text: Some(text), .. } = &ev
     println!("Retained text for {item_id}: {text:?}");
 }
 ```
+
+## Response usage and idle sessions
+
+`RealtimeEvent::ResponseEnded.usage` holds input, output, and total token
+counts and the context window when Prism counted the reply. It is `None` when
+no count is available. An idle session ends with `ErrorKind::Timeout`;
+`Error::realtime_idle_timeout()` returns the server's idle limit in seconds.
 
 ## History excluded from a reply
 

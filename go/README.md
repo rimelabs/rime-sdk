@@ -450,6 +450,8 @@ strings, keys up to 64 characters and values up to 512, no key starting with
 `prism_`. Prism refuses labels that break these rules with a `*RealtimeFault`
 whose code is `invalid_session`. `SetResponseMetadata` replaces these labels. `ResponseStarted.Metadata` carries them, and
 `ResponseStarted.InputItemIDs` names the user items a reply answers.
+`ResponseStarted.InstructionItemID` names a saved nudge instruction. Pass it to
+`DeleteItem` to remove the instruction from later history.
 
 | Session method | Behavior |
 | --- | --- |
@@ -656,6 +658,13 @@ if cut, ok := event.Payload.(rime.ItemTruncated); ok && cut.KeptText != nil {
     fmt.Printf("Retained text for %s: %q\n", cut.ItemID, *cut.KeptText)
 }
 ```
+
+## Response usage and idle sessions
+
+`ResponseEnded.Usage` holds input, output, and total token counts and the
+context window when Prism counted the reply. It is nil when no count is
+available. An idle session ends with `ErrTimeout`; use `errors.As` with
+`*RealtimeIdleTimeout` to read `IdleTimeoutS`.
 
 ## History excluded from a reply
 

@@ -38,12 +38,30 @@ def test_shared_protocol_decoding(case):
             assert result.payload.truncation == (
                 None if expected is None else r.ResponseTruncation(**expected)
             )
+        if "expected_usage" in case:
+            expected = case["expected_usage"]
+            assert isinstance(result.payload, r.ResponseEnded)
+            assert result.payload.usage == (
+                None if expected is None else r.ResponseUsage(**expected)
+            )
+        if "expected_instruction_item_id" in case:
+            assert isinstance(result.payload, r.ResponseStarted)
+            assert result.payload.instruction_item_id == case["expected_instruction_item_id"]
+        if "expected_idle_timeout_s" in case:
+            assert isinstance(result.payload, protocol.SessionIdleTimeout)
+            assert result.payload.idle_timeout_s == case["expected_idle_timeout_s"]
         if "expected_kept_text" in case:
             assert isinstance(result.payload, r.ItemTruncated)
             assert result.payload.kept_text == case["expected_kept_text"]
             assert result.payload.item_id == case["event"]["item_id"]
             assert result.payload.content_index == case["event"]["content_index"]
             assert result.payload.audio_end_ms == case["event"]["audio_end_ms"]
+
+
+def test_large_idle_timeout_is_a_protocol_error():
+    event = {"type": "session.idle_timeout", "reason": "idle_timeout", "idle_timeout_s": 10**400}
+    with pytest.raises(RimeStreamError):
+        protocol.decode(json.dumps(event), "session-1")
 
 
 @pytest.mark.parametrize(
@@ -60,6 +78,49 @@ async def test_invalid_payload_fails_pending_request_and_event_consumer(monkeypa
         with pytest.raises(RimeStreamError):
             await anext(current.events)
         assert peer.sent.empty()
+
+
+async def test_nudge_instruction_and_usage_reach_public_events(monkeypatch):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
+        peer.emit("prism.typed_input.ready")
+        pending = asyncio.create_task(current.request_reply(instruction="Check in."))
+        request = await peer.next("response.create")
+        peer.accepted(request, prism_instruction_item_id="item-instruction")
+        response = await pending
+        events = current.events
+        while True:
+            started = (await anext(events)).payload
+            if isinstance(started, r.ResponseStarted):
+                break
+        assert started.response == response
+        assert started.instruction_item_id == "item-instruction"
+        peer.emit(
+            "response.done",
+            response={
+                "id": response.response_id,
+                "status": "completed",
+                "usage": {
+                    "input_tokens": 10,
+                    "output_tokens": 3,
+                    "total_tokens": 13,
+                    "context_window": 65536,
+                },
+            },
+        )
+        ended = (await anext(events)).payload
+        assert isinstance(ended, r.ResponseEnded)
+        assert ended.usage == r.ResponseUsage(
+            input_tokens=10, output_tokens=3, total_tokens=13, context_window=65536
+        )
+        deleting = asyncio.create_task(current.delete_item(started.instruction_item_id))
+        request = await peer.next("conversation.item.delete")
+        assert request["item_id"] == "item-instruction"
+        peer.emit(
+            "conversation.item.deleted",
+            prism_request_event_id=request["event_id"],
+            item_id="item-instruction",
+        )
+        await deleting
 
 
 @pytest.mark.parametrize(

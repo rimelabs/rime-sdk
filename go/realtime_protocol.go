@@ -59,6 +59,7 @@ type rtWire struct {
 	interruptKnown                          bool
 	kind, eventID, requestID, target, token string
 	index                                   uint64
+	idleTimeoutS                            float64
 	info                                    SessionInfo
 	payload                                 RealtimeEvent
 }
@@ -313,6 +314,16 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.target = decoder.id(o["item_id"])
 	case "input_audio_buffer.cleared":
 		w.kind = "audio.cleared"
+	case "session.idle_timeout":
+		if decoder.string(o["reason"]) != "idle_timeout" {
+			decoder.bad("reason")
+		}
+		timeout, ok := o["idle_timeout_s"].(float64)
+		if !ok || math.IsNaN(timeout) || math.IsInf(timeout, 0) || timeout < 1 {
+			decoder.bad("idle_timeout_s")
+		}
+		w.kind = "session.idle_timeout"
+		w.idleTimeoutS = timeout
 	case "conversation.item.truncated":
 		w.kind = "item.truncated"
 		w.target = decoder.id(o["item_id"])
@@ -393,7 +404,11 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 			} else if input != "" {
 				inputs = append(inputs, input)
 			}
-			w.payload = ResponseStarted{Response: r, Cause: cause, Parent: parent, InputItemID: input, Metadata: rtLabels(m), InputItemIDs: inputs, SettingsRevision: decoder.revision(d)}
+			instruction := ""
+			if m["prism_instruction_item_id"] != nil {
+				instruction = decoder.id(m["prism_instruction_item_id"])
+			}
+			w.payload = ResponseStarted{Response: r, Cause: cause, Parent: parent, InputItemID: input, InstructionItemID: instruction, Metadata: rtLabels(m), InputItemIDs: inputs, SettingsRevision: decoder.revision(d)}
 		} else {
 			w.kind = "response.ended"
 			details := rtObject{}
@@ -401,7 +416,17 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 				details = decoder.object(d["status_details"])
 			}
 			w.token = decoder.optional(m["prism_drain_token"])
-			w.payload = ResponseEnded{Response: r, Status: rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), Reason: decoder.optional(details["reason"]), SettingsRevision: decoder.revision(d), Truncation: decoder.responseTruncation(d)}
+			var usage *ResponseUsage
+			if value := d["usage"]; value != nil {
+				counts := decoder.object(value)
+				usage = &ResponseUsage{
+					InputTokens:   decoder.integer(counts["input_tokens"]),
+					OutputTokens:  decoder.integer(counts["output_tokens"]),
+					TotalTokens:   decoder.integer(counts["total_tokens"]),
+					ContextWindow: decoder.integer(counts["context_window"]),
+				}
+			}
+			w.payload = ResponseEnded{Response: r, Status: rtEnum(decoder.string(d["status"]), "completed", "cancelled", "failed"), Reason: decoder.optional(details["reason"]), SettingsRevision: decoder.revision(d), Truncation: decoder.responseTruncation(d), Usage: usage}
 		}
 	case "response.function_call_arguments.done":
 		w.kind = "tool.call"

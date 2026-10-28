@@ -83,6 +83,10 @@ export interface ItemDeleted {
 export interface AudioCleared {
   kind: "audio.cleared";
 }
+export interface SessionIdleTimeout {
+  kind: "session.idle_timeout";
+  idleTimeoutS: number;
+}
 export interface ResponseEnded extends t.ResponseEnded {
   drainToken: string | null;
 }
@@ -106,7 +110,8 @@ export type ServerPayload =
   | t.AudioDelta
   | t.AudioDone
   | t.ToolCall
-  | t.FaultEvent<t.NormalizedRealtimeFault>;
+  | t.FaultEvent<t.NormalizedRealtimeFault>
+  | SessionIdleTimeout;
 export interface ServerEvent {
   eventId: string;
   requestId: string | null;
@@ -213,6 +218,9 @@ function id(value: unknown, field: string): string {
 function optionalString(value: unknown, field: string): string | null {
   return value == null ? null : string(value, field);
 }
+function optionalId(value: unknown, field: string): string | null {
+  return value == null ? null : id(value, field);
+}
 function integer(value: unknown, field: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
     return invalid(field);
@@ -242,6 +250,19 @@ function responseTruncation(
             value.first_kept_item_id,
             "prism_truncation.first_kept_item_id",
           ),
+  });
+}
+function responseUsage(response: ObjectValue): t.ResponseUsage | null {
+  if (response.usage == null) return null;
+  const usage = object(response.usage, "response.usage");
+  return Object.freeze({
+    inputTokens: integer(usage.input_tokens, "response.usage.input_tokens"),
+    outputTokens: integer(usage.output_tokens, "response.usage.output_tokens"),
+    totalTokens: integer(usage.total_tokens, "response.usage.total_tokens"),
+    contextWindow: integer(
+      usage.context_window,
+      "response.usage.context_window",
+    ),
   });
 }
 function duration(value: unknown, field: string): number | null {
@@ -484,6 +505,13 @@ function decodeValue(
     case "conversation.item.deleted":
       payload = { kind: "item.deleted", itemId: id(event.item_id, "item_id") };
       break;
+    case "session.idle_timeout": {
+      if (event.reason !== "idle_timeout") return invalid("reason");
+      const timeout = duration(event.idle_timeout_s, "idle_timeout_s");
+      if (timeout === null || timeout < 1) return invalid("idle_timeout_s");
+      payload = { kind: "session.idle_timeout", idleTimeoutS: timeout };
+      break;
+    }
     case "input_audio_buffer.cleared":
       payload = { kind: "audio.cleared" };
       break;
@@ -609,6 +637,10 @@ function decodeValue(
                   : "unknown",
         parent: parent === null ? null : ref(parent),
         inputItemId,
+        instructionItemId: optionalId(
+          metadata.prism_instruction_item_id,
+          "prism_instruction_item_id",
+        ),
         metadata: clientMetadata(metadata),
         inputItemIds: Object.freeze(
           inputItemIds.map((value) => id(value, "prism_input_item_ids")),
@@ -631,6 +663,7 @@ function decodeValue(
         kind: "response.ended",
         settingsRevision: revision(response),
         truncation: responseTruncation(response),
+        usage: responseUsage(response),
         response: ref(response.id),
         status:
           status === "completed" ||

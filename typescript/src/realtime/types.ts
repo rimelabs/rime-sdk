@@ -193,6 +193,12 @@ export interface NormalizedRealtimeFault extends RealtimeFault {
   readonly retryable: boolean;
 }
 export class RealtimeAdmissionTimeout extends RimeTimeoutError {}
+/** Prism closed the conversation after this many idle seconds. */
+export class RealtimeIdleTimeout extends RimeTimeoutError {
+  constructor(readonly idleTimeoutS: number) {
+    super(`Realtime session idle for ${idleTimeoutS} seconds`);
+  }
+}
 export class RimeRealtimeError extends RimeError {
   readonly fault: NormalizedRealtimeFault;
   constructor(fault: RealtimeFault) {
@@ -264,6 +270,8 @@ export interface ResponseStarted {
   readonly cause: "speech" | "text" | "proactive" | "tools" | "unknown";
   readonly parent: ResponseRef | null;
   readonly inputItemId: string | null;
+  /** Saved nudge instruction; pass this ID to deleteItem to remove it. */
+  readonly instructionItemId?: string | null;
   /** The session's labels when the reply began. Prism's `prism_` keys are
    * left out. */
   readonly metadata: Labels;
@@ -315,6 +323,12 @@ export interface ResponseTruncation {
   /** Oldest retained item; null when no earlier item was retained. */
   readonly firstKeptItemId: string | null;
 }
+export interface ResponseUsage {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly totalTokens: number;
+  readonly contextWindow: number;
+}
 export interface ResponseEnded {
   /** Settings revision published by the server; null when unavailable.
    * Optional on caller-created values for compatibility. */
@@ -322,6 +336,8 @@ export interface ResponseEnded {
   /** Null when the server reports no exclusions or the information is unavailable.
    * Optional on caller-created values for compatibility. */
   readonly truncation?: ResponseTruncation | null;
+  /** Null when Prism did not count tokens. */
+  readonly usage?: ResponseUsage | null;
   readonly kind: "response.ended";
   readonly response: ResponseRef;
   readonly status: "completed" | "cancelled" | "failed" | "unknown";

@@ -13,6 +13,7 @@ pub(super) struct Wire {
     pub target: String,
     pub index: u64,
     pub token: Option<String>,
+    pub idle_timeout_s: Option<f64>,
     pub info: Option<SessionInfo>,
     pub payload: Option<RealtimeEvent>,
 }
@@ -85,6 +86,18 @@ fn response_truncation(response: &Value) -> Result<Option<ResponseTruncation>, E
     Ok(Some(ResponseTruncation {
         items_left_out: count,
         first_kept_item_id: value.get("first_kept_item_id").map(string).transpose()?,
+    }))
+}
+fn response_usage(response: &Value) -> Result<Option<ResponseUsage>, Error> {
+    let Some(value) = response.get("usage").filter(|value| !value.is_null()) else {
+        return Ok(None);
+    };
+    object(value)?;
+    Ok(Some(ResponseUsage {
+        input_tokens: integer(&value["input_tokens"])?,
+        output_tokens: integer(&value["output_tokens"])?,
+        total_tokens: integer(&value["total_tokens"])?,
+        context_window: integer(&value["context_window"])?,
     }))
 }
 fn view(v: &Value) -> Result<SessionInfo, Error> {
@@ -223,6 +236,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         target: String::new(),
         index: 0,
         token: None,
+        idle_timeout_s: None,
         info: None,
         payload: None,
     };
@@ -243,6 +257,19 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
             w.interrupt_known = v["session"]
                 .get("prism_effective_interrupt_response")
                 .is_some()
+        }
+        "session.idle_timeout" => {
+            if string(&v["reason"])? != "idle_timeout" {
+                return Err(invalid("reason"));
+            }
+            let timeout = v["idle_timeout_s"]
+                .as_f64()
+                .ok_or_else(|| invalid("idle_timeout_s"))?;
+            if !timeout.is_finite() || timeout < 1.0 {
+                return Err(invalid("idle_timeout_s"));
+            }
+            w.kind = "session.idle_timeout".into();
+            w.idle_timeout_s = Some(timeout);
         }
         "conversation.item.created" => {
             w.created_id = optional(&v["item"]["id"])?;
@@ -389,6 +416,11 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                     cause,
                     parent,
                     input_item_id,
+                    instruction_item_id: if m["prism_instruction_item_id"].is_null() {
+                        None
+                    } else {
+                        Some(id(&m["prism_instruction_item_id"])?)
+                    },
                     metadata: labels(m),
                     input_item_ids,
                 });
@@ -402,6 +434,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                 w.payload = Some(ResponseEnded {
                     settings_revision: revision(d)?,
                     truncation: response_truncation(d)?,
+                    usage: response_usage(d)?,
                     response,
                     status: enumeration(
                         string(&d["status"])?,
