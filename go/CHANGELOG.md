@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.16](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.15...go/v0.1.0-alpha.16) (2026-10-28)
+
+
+### Features
+
+* expose Prism reply labels and response data ([#114](https://github.com/rimelabs/rime-sdk/issues/114)) ([4a303a1](https://github.com/rimelabs/rime-sdk/commit/4a303a1b545019dea389f30d0c696e8f7e6cc6b1))
+
 ## [0.1.0-alpha.15](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.14...go/v0.1.0-alpha.15) (2026-10-27)
 
 

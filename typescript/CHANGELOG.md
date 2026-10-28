@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.25](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.24...typescript-v0.1.0-alpha.25) (2026-10-28)
+
+
+### Features
+
+* expose Prism reply labels and response data ([#114](https://github.com/rimelabs/rime-sdk/issues/114)) ([4a303a1](https://github.com/rimelabs/rime-sdk/commit/4a303a1b545019dea389f30d0c696e8f7e6cc6b1))
+
 ## [0.1.0-alpha.24](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.23...typescript-v0.1.0-alpha.24) (2026-10-27)
 
 
