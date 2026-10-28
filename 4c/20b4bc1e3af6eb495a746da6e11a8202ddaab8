@@ -1,0 +1,71 @@
+go/realtime_session.go
+  s_a3a25f6fe5abcf::t_58440cedf16492 342-346,350-354,369-373,389-398
+rust/README.md
+  s_a3a25f6fe5abcf::t_65fdd4ba157e31 444-449,455,460
+go/realtime.go
+  s_a3a25f6fe5abcf::t_58440cedf16492 182-197
+python/tests/test_realtime_protocol.py
+  s_a3a25f6fe5abcf::t_ce9e40c60c9a68 11,126-151,251-260
+go/realtime_protocol_test.go
+  s_a3a25f6fe5abcf::t_c2e9e3098a44c6 123-163,165-166
+  s_a3a25f6fe5abcf::t_f3237138d5b783 164
+rust/src/realtime/session.rs
+  s_a3a25f6fe5abcf::t_dd3862729d5fd7 4,476-484,487-493,575-576,593-606
+  s_a3a25f6fe5abcf::t_40f251b97f3073 607-609
+typescript/src/realtime/session.ts
+  s_a3a25f6fe5abcf::t_15ba052e8f2fcf 491,500-502,510-512,652
+  s_a3a25f6fe5abcf::t_392553e6566548 494-496,499
+  s_a3a25f6fe5abcf::t_e34d751f62e4b4 655-658,695
+rust/src/realtime/tests/session.rs
+  s_a3a25f6fe5abcf::t_0445ebd68acb7a 123,143-151,154-155,162
+  s_a3a25f6fe5abcf::t_d545bc908a728d 156
+  s_a3a25f6fe5abcf::t_71f8eb0757df6c 157-161
+typescript/src/realtime/protocol.ts
+  s_a3a25f6fe5abcf::t_15ba052e8f2fcf 38-47
+rust/src/realtime/types.rs
+  s_a3a25f6fe5abcf::t_dd3862729d5fd7 196,209-225
+typescript/src/realtime/types.ts
+  s_a3a25f6fe5abcf::t_15ba052e8f2fcf 97-101
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_a3a25f6fe5abcf::t_c059bd8b5cc337 56-63
+python/src/rimelabs_sdk/realtime/_session.py
+  s_a3a25f6fe5abcf::t_28dd3cae83adb3 555
+  s_a3a25f6fe5abcf::t_c059bd8b5cc337 411,415-419,423-427,429-431,521-523,525-531
+go/realtime_history_test.go
+  s_a3a25f6fe5abcf::t_c2e9e3098a44c6 87-90
+  s_a3a25f6fe5abcf::t_2ceecea6fe28be 92-94
+go/realtime_types.go
+  s_a3a25f6fe5abcf::t_58440cedf16492 71-77
+rust/src/realtime/tests/errors.rs
+  s_a3a25f6fe5abcf::t_0445ebd68acb7a 2,59-102,106,108,110-111
+  s_a3a25f6fe5abcf::t_45fdac1cabe2af 103-105,107,109,112
+python/docs/realtime.md
+  s_a3a25f6fe5abcf::t_65fdd4ba157e31 262,264,267,274-278
+  s_a3a25f6fe5abcf::t_aadcc6516b4694 279
+typescript/docs/realtime.md
+  s_a3a25f6fe5abcf::t_65fdd4ba157e31 297-301
+  s_a3a25f6fe5abcf::t_71558c6f53e4dc 302
+typescript/tests/realtime-protocol.test.mjs
+  s_a3a25f6fe5abcf::t_e2985d8c6cede2 339-340,345
+  s_a3a25f6fe5abcf::t_abe37dfec2abc0 6-11,119-145,336-338,341-344
+go/README.md
+  s_a3a25f6fe5abcf::t_65fdd4ba157e31 455-460,466,471
+rust/src/realtime/client.rs
+  s_a3a25f6fe5abcf::t_dd3862729d5fd7 20-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4c20b4bc1e3af6eb495a746da6e11a8202ddaab8",
+  "prompts": {},
+  "sessions": {
+    "s_a3a25f6fe5abcf": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18075-1b34-7b43-b012-11921fa4f140",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
