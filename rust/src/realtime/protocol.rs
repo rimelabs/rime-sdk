@@ -14,6 +14,8 @@ pub(super) struct Wire {
     pub index: u64,
     pub token: Option<String>,
     pub idle_timeout_s: Option<f64>,
+    pub instruction_item_id: Option<String>,
+    pub usage: Option<ResponseUsage>,
     pub info: Option<SessionInfo>,
     pub payload: Option<RealtimeEvent>,
 }
@@ -237,6 +239,8 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         index: 0,
         token: None,
         idle_timeout_s: None,
+        instruction_item_id: None,
+        usage: None,
         info: None,
         payload: None,
     };
@@ -410,17 +414,17 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                     Value::Array(a) => a.iter().map(id).collect::<Result<_, _>>()?,
                     _ => return Err(invalid("prism_input_item_ids")),
                 };
+                w.instruction_item_id = if m["prism_instruction_item_id"].is_null() {
+                    None
+                } else {
+                    Some(id(&m["prism_instruction_item_id"])?)
+                };
                 w.payload = Some(ResponseStarted {
                     settings_revision: revision(d)?,
                     response,
                     cause,
                     parent,
                     input_item_id,
-                    instruction_item_id: if m["prism_instruction_item_id"].is_null() {
-                        None
-                    } else {
-                        Some(id(&m["prism_instruction_item_id"])?)
-                    },
                     metadata: labels(m),
                     input_item_ids,
                 });
@@ -431,10 +435,10 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                     object(details)?;
                 }
                 w.token = optional(&m["prism_drain_token"])?;
+                w.usage = response_usage(d)?;
                 w.payload = Some(ResponseEnded {
                     settings_revision: revision(d)?,
                     truncation: response_truncation(d)?,
-                    usage: response_usage(d)?,
                     response,
                     status: enumeration(
                         string(&d["status"])?,

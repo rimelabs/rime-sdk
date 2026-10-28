@@ -22,22 +22,34 @@ async fn nudge_instruction_and_usage_reach_public_events() {
     let response = task.await.unwrap().unwrap();
     event(&mut events).await;
     let RealtimeEvent::ResponseStarted {
-        instruction_item_id,
-        ..
+        response: started, ..
     } = event(&mut events).await.payload
     else {
         panic!("missing response start");
     };
-    assert_eq!(instruction_item_id.as_deref(), Some("item-instruction"));
+    assert_eq!(started, response);
+    let RealtimeEvent::ResponseInstructionSaved {
+        response: named,
+        item_id,
+    } = event(&mut events).await.payload
+    else {
+        panic!("missing saved instruction");
+    };
+    assert_eq!(named, response);
+    assert_eq!(item_id, "item-instruction");
     peer.send(
         json!({"type":"response.done","response":{"id":response.response_id(),"status":"completed",
         "usage":{"input_tokens":10,"output_tokens":3,"total_tokens":13,"context_window":65536}}}),
     )
     .await;
-    let RealtimeEvent::ResponseEnded { usage, .. } = event(&mut events).await.payload else {
-        panic!("missing response end");
+    let RealtimeEvent::ResponseUsageRecorded {
+        response: counted,
+        usage,
+    } = event(&mut events).await.payload
+    else {
+        panic!("missing response usage");
     };
-    let usage = usage.unwrap();
+    assert_eq!(counted, response);
     assert_eq!(
         (
             usage.input_tokens,
@@ -47,6 +59,13 @@ async fn nudge_instruction_and_usage_reach_public_events() {
         ),
         (10, 3, 13, 65536)
     );
+    let RealtimeEvent::ResponseEnded {
+        response: ended, ..
+    } = event(&mut events).await.payload
+    else {
+        panic!("missing response end");
+    };
+    assert_eq!(ended, response);
     let handle = session.clone();
     let task = tokio::spawn(async move { handle.delete_item("item-instruction").await });
     let request = peer.next("conversation.item.delete").await;

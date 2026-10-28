@@ -25,9 +25,10 @@ pub use lexicon::PronunciationEntry;
 pub use realtime::{
     AudioChunk, ConversationOutput, ConversationPlayback, ConversationRunner, ConversationSource,
     HistoryItem, HistoryRole, ItemRef, OutputRef, PlaybackReport, PrismFiller, Realtime,
-    RealtimeConnectOptions, RealtimeEvent, RealtimeEvents, RealtimeFault, RealtimeSession,
-    RealtimeTimeouts, RealtimeUpdateOptions, ReplyOptions, ResponseRef, ResponseTruncation,
-    SessionEvent, SessionInfo, ToolCallRef, ToolDefinition, Truncation, TurnDetection,
+    RealtimeConnectOptions, RealtimeEvent, RealtimeEvents, RealtimeFault, RealtimeIdleTimeout,
+    RealtimeSession, RealtimeTimeouts, RealtimeUpdateOptions, ReplyOptions, ReplyRequestOptions,
+    ResponseRef, ResponseTruncation, ResponseUsage, SessionEvent, SessionInfo, ToolCallRef,
+    ToolDefinition, Truncation, TurnDetection,
 };
 pub use stream::AudioStream;
 pub use stt::{

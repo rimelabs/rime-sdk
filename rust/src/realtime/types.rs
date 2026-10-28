@@ -500,12 +500,17 @@ pub enum RealtimeEvent {
         parent: Option<ResponseRef>,
         /// Typed input history item.
         input_item_id: Option<String>,
-        /// Saved nudge instruction, removable with delete_item.
-        instruction_item_id: Option<String>,
         /// The session's labels when the reply began.
         metadata: Labels,
         /// The user items the reply answers; empty when Prism names none.
         input_item_ids: Vec<String>,
+    },
+    /// A nudge instruction was saved for later replies.
+    ResponseInstructionSaved {
+        /// Response that used the instruction.
+        response: ResponseRef,
+        /// Saved item, removable with delete_item after the response ends.
+        item_id: String,
     },
     /// A caller cancelled a submitted reply request.
     ResponseAbandoned {
@@ -560,14 +565,19 @@ pub enum RealtimeEvent {
         settings_revision: Option<u64>,
         /// None when the server reports no exclusions or the information is unavailable.
         truncation: Option<ResponseTruncation>,
-        /// None when Prism did not count tokens.
-        usage: Option<ResponseUsage>,
         /// Response reference.
         response: ResponseRef,
         /// Completed, cancelled, failed, or unknown.
         status: String,
         /// Optional reason.
         reason: Option<String>,
+    },
+    /// Prism counted model tokens for a completed reply.
+    ResponseUsageRecorded {
+        /// Response whose tokens were counted.
+        response: ResponseRef,
+        /// Input, output, and total tokens with the context window.
+        usage: ResponseUsage,
     },
     /// A nonterminal service error.
     Fault(RealtimeFault),

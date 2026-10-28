@@ -101,11 +101,7 @@ fn shared_protocol() {
                 }
             }
             if let Some(expected) = c.get("expected_usage") {
-                let Some(crate::realtime::RealtimeEvent::ResponseEnded { usage, .. }) =
-                    &event.as_ref().unwrap().payload
-                else {
-                    panic!("missing response end");
-                };
+                let usage = &event.as_ref().unwrap().usage;
                 if expected.is_null() {
                     assert!(usage.is_none());
                 } else {
@@ -129,14 +125,10 @@ fn shared_protocol() {
                 }
             }
             if let Some(expected) = c.get("expected_instruction_item_id") {
-                let Some(crate::realtime::RealtimeEvent::ResponseStarted {
-                    instruction_item_id,
-                    ..
-                }) = &event.as_ref().unwrap().payload
-                else {
-                    panic!("missing response start");
-                };
-                assert_eq!(instruction_item_id.as_deref(), expected.as_str());
+                assert_eq!(
+                    event.as_ref().unwrap().instruction_item_id.as_deref(),
+                    expected.as_str()
+                );
             }
             if let Some(expected) = c.get("expected_idle_timeout_s") {
                 assert_eq!(event.as_ref().unwrap().idle_timeout_s, expected.as_f64());
