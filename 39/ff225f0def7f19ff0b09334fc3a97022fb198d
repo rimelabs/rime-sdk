@@ -1,0 +1,80 @@
+go/realtime_handshake_test.go
+  s_7ecf00e2b83aec::t_b9a4bb1e30cde4 146,154,170
+  s_7ecf00e2b83aec::t_5fb4b3d396e174 7,80-88,103-108,117-118,121-135,137-141,147-153,158-169,171-175
+  s_7ecf00e2b83aec::t_c3e8f4e739ccf4 102,109-116,119-120,136,142-145,155-157,176-178
+  s_7ecf00e2b83aec::t_9964259902c051 179-181
+python/tests/test_realtime_handshake.py
+  s_7ecf00e2b83aec::t_ae1ea4cd2711b9 116-126,145-154
+  s_7ecf00e2b83aec::t_a58f037c60b0eb 4,130,138,160-161,169-176
+  s_7ecf00e2b83aec::t_2aec08e3fe18b0 157,164-167
+  s_7ecf00e2b83aec::t_7ba1c4cbb3af5f 78-80,89-115,127-129,131-137,139-144,155-156,158-159,162-163,168
+  s_7ecf00e2b83aec::t_286757a09ffe7b 177-178
+rust/README.md
+  s_7ecf00e2b83aec::t_fff95dd631c506 313-322
+rust/src/realtime/tests/handshake.rs
+  s_7ecf00e2b83aec::t_4684c8e4aa18a8 116-118,130-132,135,145-149,153-174,180-185,194-195,202,210-211
+  s_7ecf00e2b83aec::t_62fbefbbf196e2 133-134,136-144,175-178,187-193,196-201,204-209
+  s_7ecf00e2b83aec::t_b9a4bb1e30cde4 179,186,203
+  s_7ecf00e2b83aec::t_868f8ea3b3482f 150-152
+  s_7ecf00e2b83aec::t_db5df99e6d2029 212-216
+typescript/src/errors.ts
+  s_7ecf00e2b83aec::t_13297b106b9939 1-10,13-15,19,24-26
+python/src/rimelabs_sdk/realtime/_client.py
+  s_7ecf00e2b83aec::t_550ec7270cb968 7-8,11,40-56,91-96
+python/src/rimelabs_sdk/realtime/_session.py
+  s_7ecf00e2b83aec::t_550ec7270cb968 210-212,214-216,706-707,709,717-718,720-722
+  s_7ecf00e2b83aec::t_cd9a5525fcbaa9 213,708,719
+  s_7ecf00e2b83aec::t_fff95dd631c506 45-48
+go/errors.go
+  s_7ecf00e2b83aec::t_5fb4b3d396e174 81
+  s_7ecf00e2b83aec::t_13297b106b9939 8,47-80,82-85
+  s_7ecf00e2b83aec::t_528fb9f50b970c 86
+go/realtime_transport.go
+  s_7ecf00e2b83aec::t_13297b106b9939 9,93-98,102-105,109-111,115-126,138,188
+  s_7ecf00e2b83aec::t_5fb4b3d396e174 99-101,106-108,112-114
+typescript/src/realtime/transport.ts
+  s_7ecf00e2b83aec::t_13297b106b9939 11-23,28,109,145,151-152
+  s_7ecf00e2b83aec::t_7c1a8fecc337d9 61-64
+rust/Cargo.toml
+  s_7ecf00e2b83aec::t_13297b106b9939 17
+rust/src/error.rs
+  s_7ecf00e2b83aec::t_13297b106b9939 1,36-38,75-77,86-102,107-110,112
+  s_7ecf00e2b83aec::t_62fbefbbf196e2 103-106
+  s_7ecf00e2b83aec::t_a0142aa993c8d7 111,113
+python/src/rimelabs_sdk/_errors.py
+  s_7ecf00e2b83aec::t_550ec7270cb968 1,5-21,24-26
+python/docs/realtime.md
+  s_7ecf00e2b83aec::t_fff95dd631c506 439-454
+typescript/docs/realtime.md
+  s_7ecf00e2b83aec::t_fff95dd631c506 455-468
+rust/src/realtime/transport.rs
+  s_7ecf00e2b83aec::t_13297b106b9939 8,75,95,99-102,106,171
+  s_7ecf00e2b83aec::t_62fbefbbf196e2 76-92,96-98,103-105,172-174,177
+  s_7ecf00e2b83aec::t_fff95dd631c506 175
+  s_7ecf00e2b83aec::t_230ac2c70c7187 93-94,176,178-181
+go/README.md
+  s_7ecf00e2b83aec::t_fff95dd631c506 339-349
+typescript/tests/realtime-handshake.test.mjs
+  s_7ecf00e2b83aec::t_c3e8f4e739ccf4 5,11,83-85,99,110,138-139,141,146,153,163-164,169,174,186-187
+  s_7ecf00e2b83aec::t_2aec08e3fe18b0 165,168
+  s_7ecf00e2b83aec::t_7c1a8fecc337d9 100-109,111-137,140,142-145,147-152,154-162,166-167,170-173,175-185
+  s_7ecf00e2b83aec::t_06d9b9d762dbd5 188-190
+rust/Cargo.lock
+  s_7ecf00e2b83aec::t_d9c92c1283b4a6 1291
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "39ff225f0def7f19ff0b09334fc3a97022fb198d",
+  "prompts": {},
+  "sessions": {
+    "s_7ecf00e2b83aec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18b06-8cd5-7f03-a3c2-e024667d74d4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
