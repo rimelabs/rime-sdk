@@ -1,0 +1,22 @@
+typescript/tests/realtime-handshake.test.mjs
+  s_7ecf00e2b83aec::t_64c74829098752 219
+  s_7ecf00e2b83aec::t_dcb73e8e1045cf 222
+python/tests/test_realtime_handshake.py
+  s_7ecf00e2b83aec::t_64c74829098752 192,194
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8666106a3d81332390459a92e912c7f0fa6cf2c8",
+  "prompts": {},
+  "sessions": {
+    "s_7ecf00e2b83aec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18b06-8cd5-7f03-a3c2-e024667d74d4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
