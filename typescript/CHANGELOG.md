@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.26](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.25...typescript-v0.1.0-alpha.26) (2026-10-30)
+
+
+### Features
+
+* expose realtime connection diagnostics across SDKs ([#116](https://github.com/rimelabs/rime-sdk/issues/116)) ([da50cf4](https://github.com/rimelabs/rime-sdk/commit/da50cf41b0ca4631c0c71e48ef31cd207ab5e713))
+
 ## [0.1.0-alpha.25](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.24...typescript-v0.1.0-alpha.25) (2026-10-28)
 
 
