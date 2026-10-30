@@ -1,0 +1,43 @@
+go/realtime_handshake_test.go
+  s_7ecf00e2b83aec::t_4764ca5aa313fc 83-85,116,149-181,212-216
+go/errors.go
+  s_7ecf00e2b83aec::t_4764ca5aa313fc 85-93
+go/README.md
+  s_7ecf00e2b83aec::t_4764ca5aa313fc 344
+  s_7ecf00e2b83aec::t_3002dd1ef15250 345-346
+typescript/src/realtime/transport.ts
+  s_7ecf00e2b83aec::t_482e4808474536 15-23,35-43,64-73
+  s_7ecf00e2b83aec::t_be61416203a687 26
+  s_7ecf00e2b83aec::t_b2516b61033382 11-14,24-25,27-34,44-50,60-63,74-85
+  s_7ecf00e2b83aec::t_10940082905b01 51-59
+  s_7ecf00e2b83aec::t_80f4800789fe62 93-95
+python/tests/test_realtime_handshake.py
+  s_7ecf00e2b83aec::t_be4d78e6c60a80 189-227,231-236
+  s_7ecf00e2b83aec::t_63724973481bf3 112-114
+  s_7ecf00e2b83aec::t_d347d6d38adf04 154-162,228-230
+  s_7ecf00e2b83aec::t_2881cd289145dc 102-111,142-143,151-153,163-171
+python/src/rimelabs_sdk/realtime/_client.py
+  s_7ecf00e2b83aec::t_63724973481bf3 81-83
+  s_7ecf00e2b83aec::t_27b11c7567aa28 8,12,40-53,64-69,71-80,84
+go/realtime_transport.go
+  s_7ecf00e2b83aec::t_4764ca5aa313fc 115-119
+typescript/tests/realtime-handshake.test.mjs
+  s_7ecf00e2b83aec::t_f7b7581d673a79 110-120,151,209-211,222,228,260
+  s_7ecf00e2b83aec::t_482e4808474536 152-208,212-221,223-227,229-257
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fc884e10c376521896100d41680c049db8b7486b",
+  "prompts": {},
+  "sessions": {
+    "s_7ecf00e2b83aec": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18b06-8cd5-7f03-a3c2-e024667d74d4",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
