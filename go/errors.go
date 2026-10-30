@@ -82,7 +82,15 @@ type connectionError struct {
 	retryAfter *time.Duration
 }
 
-func (e *connectionError) Error() string { return "realtime connection diagnostics" }
+func (e *connectionError) Error() string {
+	if e.statusCode != nil {
+		return fmt.Sprintf("realtime connection refused (HTTP %d)", *e.statusCode)
+	}
+	if e.closeCode != nil {
+		return fmt.Sprintf("realtime connection closed (WebSocket close %d)", *e.closeCode)
+	}
+	return "realtime connection diagnostics"
+}
 
 func failure(kind ErrorKind, message string) *Error { return &Error{Kind: kind, Message: message} }
 

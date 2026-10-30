@@ -112,7 +112,11 @@ func rtRetryAfter(values []string) *time.Duration {
 		if err != nil {
 			return nil
 		}
-		delay = max(0, time.Until(date))
+		now := time.Now()
+		if date.After(now.Add(time.Duration(1<<63 - 1))) {
+			return nil
+		}
+		delay = max(0, date.Sub(now))
 	}
 	return &delay
 }

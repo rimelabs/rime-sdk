@@ -8,6 +8,81 @@ import {
 } from "../errors.js";
 import { Deferred } from "./async.js";
 
+const months = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ");
+const dayName = "(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)";
+const monthName = `(?:${months.join("|")})`;
+const clock = "([0-9]{2}):([0-9]{2}):([0-9]{2})";
+const imfDate = new RegExp(
+  `^${dayName}, ([0-9]{2}) (${monthName}) ([0-9]{4}) ${clock} GMT$`,
+);
+const rfc850Date = new RegExp(
+  `^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), ([0-9]{2})-(${monthName})-([0-9]{2}) ${clock} GMT$`,
+);
+const asctimeDate = new RegExp(
+  `^${dayName} (${monthName}) ([0-9]{2}| [0-9]) ${clock} ([0-9]{4})$`,
+);
+
+function httpDate(value: string, now: number): number | null {
+  let parts: string[] | null = imfDate.exec(value);
+  let shortYear = false;
+  if (!parts) {
+    parts = rfc850Date.exec(value);
+    shortYear = parts !== null;
+  }
+  if (!parts) {
+    const legacy = asctimeDate.exec(value);
+    if (!legacy) return null;
+    parts = [
+      legacy[0],
+      legacy[2],
+      legacy[1],
+      legacy[6],
+      legacy[3],
+      legacy[4],
+      legacy[5],
+    ];
+  }
+  const day = Number(parts[1]);
+  const month = months.indexOf(parts[2]);
+  let year = Number(parts[3]);
+  const hour = Number(parts[4]);
+  const minute = Number(parts[5]);
+  const second = Number(parts[6]);
+  if (shortYear) {
+    const current = new Date(now);
+    const limit = [
+      current.getUTCFullYear() + 50,
+      current.getUTCMonth(),
+      current.getUTCDate(),
+      current.getUTCHours(),
+      current.getUTCMinutes(),
+      current.getUTCSeconds(),
+    ];
+    year += Math.floor(limit[0] / 100) * 100;
+    const candidate = [year, month, day, hour, minute, second];
+    const difference = candidate.findIndex(
+      (part, index) => part !== limit[index],
+    );
+    if (difference !== -1 && candidate[difference] > limit[difference])
+      year -= 100;
+  }
+  // Use setters so years 0000–0099 aren't silently changed to 1900–1999.
+  const date = new Date(0);
+  date.setUTCFullYear(year, month, day);
+  date.setUTCHours(hour, minute, second, 0);
+  if (
+    year < 1 ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute ||
+    date.getUTCSeconds() !== second
+  )
+    return null;
+  return date.getTime();
+}
+
 function retryAfter(values: string[] | undefined): number | null {
   if (values?.length !== 1 || values[0].length > 256) return null;
   const value = values[0].trim();
@@ -15,10 +90,9 @@ function retryAfter(values: string[] | undefined): number | null {
     const seconds = Number(value);
     return Number.isFinite(seconds) ? seconds : null;
   }
-  // HTTP dates start with a weekday; do not interpret arbitrary numeric strings as dates.
-  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(value)) return null;
-  const date = Date.parse(value);
-  return Number.isFinite(date) ? Math.max(0, (date - Date.now()) / 1000) : null;
+  const now = Date.now();
+  const date = httpDate(value, now);
+  return date === null ? null : Math.max(0, (date - now) / 1000);
 }
 
 function handshakeError(

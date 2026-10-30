@@ -80,6 +80,9 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 				if code, ok := sdkError.StatusCode(); !ok || code != tc.status {
 					t.Fatalf("status=%d present=%v", code, ok)
 				}
+				if cause := errors.Unwrap(sdkError); cause == nil || !strings.Contains(cause.Error(), fmt.Sprintf("HTTP %d", tc.status)) {
+					t.Fatalf("missing HTTP status in cause: %v", cause)
+				}
 				if _, ok := sdkError.CloseCode(); ok {
 					t.Fatal("HTTP refusal has a close code")
 				}
@@ -110,6 +113,7 @@ func TestRealtimeConnectionRetryAfter(t *testing.T) {
 		{[]string{"nan"}, 0, false}, {[]string{"inf"}, 0, false},
 		{[]string{"bad date"}, 0, false}, {[]string{strings.Repeat("9", 400)}, 0, false},
 		{[]string{"1", "2"}, 0, false}, {[]string{"Wed, 21 Oct 2015 07:28:00 GMT"}, 0, true},
+		{[]string{"Fri, 31 Dec 9999 23:59:59 GMT"}, 0, false},
 	}
 	for i, tc := range cases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
@@ -142,6 +146,39 @@ func TestRealtimeConnectionRetryAfter(t *testing.T) {
 	}
 }
 
+func TestRealtimeRetryAfterDateDurationRange(t *testing.T) {
+	const maxDelay = time.Duration(1<<63 - 1)
+	for _, offset := range []time.Duration{-time.Minute, time.Minute} {
+		t.Run(offset.String(), func(t *testing.T) {
+			date := time.Now().UTC().Add(maxDelay).Add(offset)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Retry-After", date.Format(http.TimeFormat))
+				w.WriteHeader(503)
+			}))
+			defer server.Close()
+			client, err := NewClient(Config{APIKey: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, err = client.Realtime.Connect(ctx, RealtimeConnectOptions{Endpoint: "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/realtime"})
+			var sdkError *Error
+			if !errors.As(err, &sdkError) {
+				t.Fatalf("error=%v", err)
+			}
+			delay, ok := sdkError.RetryAfter()
+			if ok != (offset < 0) {
+				t.Fatalf("date=%v delay=%v present=%v", date, delay, ok)
+			}
+			if ok && (delay < maxDelay-2*time.Minute || delay > maxDelay-time.Minute) {
+				t.Fatalf("representable date was lost or clamped: %v", delay)
+			}
+		})
+	}
+}
+
 func TestRealtimeConnectionCloseCode(t *testing.T) {
 	for _, code := range []int{1000, 1001, 1008, 1013, 0} {
 		t.Run(fmt.Sprint(code), func(t *testing.T) {
@@ -171,6 +208,11 @@ func TestRealtimeConnectionCloseCode(t *testing.T) {
 			}
 			if got, ok := sdkError.CloseCode(); ok != (code != 0) || got != code {
 				t.Fatalf("close=%d present=%v", got, ok)
+			}
+			if code != 0 {
+				if cause := errors.Unwrap(sdkError); cause == nil || !strings.Contains(cause.Error(), fmt.Sprintf("WebSocket close %d", code)) {
+					t.Fatalf("missing close code in cause: %v", cause)
+				}
 			}
 			if _, ok := sdkError.StatusCode(); ok {
 				t.Fatal("close has HTTP status")

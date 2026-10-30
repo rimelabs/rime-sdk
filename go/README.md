@@ -341,8 +341,9 @@ methods return `(int, bool)`: the refused HTTP upgrade status or received
 WebSocket close code, and whether it is available. `RetryAfter()` returns
 `(time.Duration, bool)` for the server's requested delay. Zero with `true` is a
 valid delay. An absent close code, absent or invalid timing header, or timing
-that does not fit `time.Duration` returns `false`. Duplicate `Retry-After`
-headers are ignored; HTTP dates use the client clock and past dates become zero.
+that does not fit `time.Duration` returns `false`, for both delay-seconds and
+HTTP-date values. Duplicate `Retry-After` headers are ignored; HTTP dates use
+the client clock and past dates become zero.
 These methods require a release with structured connection diagnostics.
 Error categories are unchanged and the SDK does not automatically retry startup.
 The metadata does not make replay of an accepted request safe.
