@@ -929,9 +929,12 @@ class RealtimeSession:
             self._ready.clear()
             self._settle(echo, payload)
         elif isinstance(payload, p.ResponseEnded):
-            state = self._responses[payload.response.response_id]
-            if state.done.is_set():
+            ended_state = self._responses.get(payload.response.response_id)
+            # Pruning can remove a response as soon as it finishes. A late
+            # terminal event for an expired response has no state to update.
+            if ended_state is None or ended_state.done.is_set():
                 return
+            state = ended_state
             state.token = payload.drain_token
             state.done.set()
             state.changed.set()

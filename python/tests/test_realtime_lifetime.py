@@ -253,6 +253,38 @@ async def test_public_holds_keep_playback_after_ordinary_cache_expiry(monkeypatc
             current.hold_response(old)
 
 
+async def test_duplicate_end_after_active_response_becomes_expired(monkeypatch):
+    from contextlib import aclosing
+
+    from rimelabs_sdk import realtime as r
+
+    async with session(monkeypatch) as (current, peer, _):
+        peer.emit("response.created", response={"id": "long-running"})
+        async with aclosing(current.events) as events:
+            started = await anext(events)
+            assert isinstance(started.payload, r.ResponseStarted)
+            old = started.payload.response
+        for number in range(128):
+            await _observed_response(current, peer, number)
+        peer.ended(old.response_id)
+        async with aclosing(current.events) as events:
+            ended = await anext(events)
+            assert isinstance(ended.payload, r.ResponseEnded)
+            assert ended.payload.response == old
+        with pytest.raises(RimeInputError, match="expired"):
+            current.hold_response(old)
+        peer.ended(old.response_id)
+        # The duplicate must not fail the stream or produce a second completion.
+        peer.emit("prism.typed_input.ready")
+        async with aclosing(current.events) as events:
+            ready = await anext(events)
+            assert isinstance(ready.payload, r.InputReady)
+        reply = asyncio.create_task(current.request_reply())
+        request = await peer.next("response.create")
+        peer.accepted(request, "still-usable")
+        assert (await reply).response_id == "still-usable"
+
+
 async def test_pending_tool_owner_survives_then_can_report_once(monkeypatch):
     async with session(monkeypatch) as (current, peer, _):
         parent, call = await _observed_response(current, peer, 0, tool=True)
