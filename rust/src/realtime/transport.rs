@@ -5,7 +5,7 @@ use std::{
         atomic::{AtomicU8, Ordering},
         Arc,
     },
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 use tokio::sync::mpsc;
 use tokio_tungstenite::{
@@ -72,12 +72,38 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
             }
         }
     }
-    Error::new(kind, message).with_request_id(
-        response
-            .headers()
-            .get("x-request-id")
-            .and_then(|v| v.to_str().ok()),
-    )
+    let mut values = response.headers().get_all("retry-after").iter();
+    let retry_after = values
+        .next()
+        .and_then(|v| v.to_str().ok())
+        .and_then(retry_after);
+    let retry_after = if values.next().is_none() {
+        retry_after
+    } else {
+        None
+    };
+    Error::new(kind, message)
+        .with_connection_diagnostics(Some(status), None, retry_after)
+        .with_request_id(
+            response
+                .headers()
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok()),
+        )
+}
+
+fn retry_after(value: &str) -> Option<Duration> {
+    if value.len() > 256 {
+        return None;
+    }
+    let value = value.trim();
+    if !value.is_empty() && value.bytes().all(|c| c.is_ascii_digit()) {
+        value.parse::<u64>().ok().map(Duration::from_secs)
+    } else {
+        httpdate::parse_http_date(value)
+            .ok()
+            .map(|date| date.duration_since(SystemTime::now()).unwrap_or_default())
+    }
 }
 
 pub(super) struct Write {
@@ -142,6 +168,17 @@ impl Transport {
                 let result = match next {
                     Some(Ok(Message::Text(s))) => Ok(s.to_string()),
                     Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
+                    Some(Ok(Message::Close(frame))) => Err(Error::new(
+                        ErrorKind::Stream,
+                        "realtime connection closed; reconnect is not automatic",
+                    )
+                    .with_connection_diagnostics(
+                        None,
+                        frame
+                            .map(|f| u16::from(f.code))
+                            .filter(|code| !matches!(code, 1005 | 1006)),
+                        None,
+                    )),
                     _ => Err(Error::new(
                         ErrorKind::Stream,
                         "invalid event or lost realtime connection",

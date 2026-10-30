@@ -1,4 +1,4 @@
-use std::{borrow::Cow, error::Error as StdError, fmt, sync::Arc};
+use std::{borrow::Cow, error::Error as StdError, fmt, sync::Arc, time::Duration};
 
 /// Stable categories for application error handling.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +33,9 @@ pub struct Error {
     message: Cow<'static, str>,
     request_id: Option<String>,
     source: Option<Arc<dyn StdError + Send + Sync>>,
+    status_code: Option<u16>,
+    close_code: Option<u16>,
+    retry_after: Option<Duration>,
 }
 
 #[derive(Debug)]
@@ -69,11 +72,42 @@ impl Error {
             message: message.into(),
             request_id: None,
             source: None,
+            status_code: None,
+            close_code: None,
+            retry_after: None,
         }
     }
 
     pub(crate) fn caused_by(mut self, source: impl StdError + Send + Sync + 'static) -> Self {
         self.source = Some(Arc::new(source));
+        self
+    }
+
+    /// Refused realtime HTTP upgrade status, such as 503. None means unavailable.
+    pub fn status_code(&self) -> Option<u16> {
+        self.status_code
+    }
+
+    /// Received WebSocket close code, such as 1013. None means unavailable.
+    pub fn close_code(&self) -> Option<u16> {
+        self.close_code
+    }
+
+    /// Server-requested delay, including zero. None means absent or invalid.
+    /// This does not initiate retries or make replay of accepted requests safe.
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.retry_after
+    }
+
+    pub(crate) fn with_connection_diagnostics(
+        mut self,
+        status: Option<u16>,
+        close: Option<u16>,
+        retry_after: Option<Duration>,
+    ) -> Self {
+        self.status_code = status;
+        self.close_code = close;
+        self.retry_after = retry_after;
         self
     }
 

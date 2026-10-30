@@ -8,10 +8,24 @@ import {
 } from "../errors.js";
 import { Deferred } from "./async.js";
 
+function retryAfter(values: string[] | undefined): number | null {
+  if (values?.length !== 1 || values[0].length > 256) return null;
+  const value = values[0].trim();
+  if (/^[0-9]+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isFinite(seconds) ? seconds : null;
+  }
+  // HTTP dates start with a weekday; do not interpret arbitrary numeric strings as dates.
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(value)) return null;
+  const date = Date.parse(value);
+  return Number.isFinite(date) ? Math.max(0, (date - Date.now()) / 1000) : null;
+}
+
 function handshakeError(
   status: number,
   body: Buffer,
   requestId: string | null,
+  retryAfterSeconds: number | null,
 ) {
   let errorType = RimeUnavailableError;
   let reason = "Realtime endpoint rejected the connection";
@@ -44,7 +58,10 @@ function handshakeError(
       // Invalid response bodies do not change the HTTP error category.
     }
   }
-  return new errorType(message, requestId);
+  return new errorType(message, requestId, {
+    statusCode: status,
+    retryAfterSeconds,
+  });
 }
 
 /** Private transport. The public declarations do not require ws types. */
@@ -89,6 +106,7 @@ export class RealtimeConnection {
             response.statusCode ?? 0,
             complete ? Buffer.concat(chunks) : Buffer.alloc(0),
             typeof id === "string" ? id : null,
+            retryAfter(response.headersDistinct["retry-after"]),
           ),
         );
         response.destroy();
@@ -124,12 +142,14 @@ export class RealtimeConnection {
       }
       this.onMessage(data.toString());
     });
-    this.socket.on("close", () => {
+    this.socket.on("close", (code) => {
       this.refusal?.();
       this.ended.resolve();
       this.failure(
         new RimeStreamError(
           "Realtime connection closed; reconnect is not automatic",
+          null,
+          { closeCode: code === 1005 || code === 1006 ? null : code },
         ),
       );
     });

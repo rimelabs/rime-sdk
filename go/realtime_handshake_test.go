@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/coder/websocket"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -76,6 +77,15 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 				} else if strings.Contains(sdkError.Message, ": ") {
 					t.Fatal(sdkError.Message)
 				}
+				if code, ok := sdkError.StatusCode(); !ok || code != tc.status {
+					t.Fatalf("status=%d present=%v", code, ok)
+				}
+				if _, ok := sdkError.CloseCode(); ok {
+					t.Fatal("HTTP refusal has a close code")
+				}
+				if _, ok := sdkError.RetryAfter(); ok {
+					t.Fatal("missing header has retry timing")
+				}
 				select {
 				case <-released:
 				case <-ctx.Done():
@@ -84,6 +94,86 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 			}
 			if attempts.Load() != 2 {
 				t.Fatalf("unexpected attempts: %d", attempts.Load())
+			}
+		})
+	}
+}
+
+func TestRealtimeConnectionRetryAfter(t *testing.T) {
+	cases := []struct {
+		values   []string
+		expected time.Duration
+		present  bool
+	}{
+		{[]string{"3"}, 3 * time.Second, true}, {[]string{"0"}, 0, true},
+		{[]string{"-1"}, 0, false}, {[]string{"1.5"}, 0, false},
+		{[]string{"nan"}, 0, false}, {[]string{"inf"}, 0, false},
+		{[]string{"bad date"}, 0, false}, {[]string{strings.Repeat("9", 400)}, 0, false},
+		{[]string{"1", "2"}, 0, false}, {[]string{"Wed, 21 Oct 2015 07:28:00 GMT"}, 0, true},
+	}
+	for i, tc := range cases {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header()["Retry-After"] = tc.values
+				w.WriteHeader(503)
+			}))
+			defer server.Close()
+			client, err := NewClient(Config{APIKey: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, err = client.Realtime.Connect(ctx, RealtimeConnectOptions{Endpoint: "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/realtime"})
+			var sdkError *Error
+			if !errors.As(err, &sdkError) {
+				t.Fatalf("error=%v", err)
+			}
+			if delay, ok := sdkError.RetryAfter(); delay != tc.expected || ok != tc.present {
+				t.Fatalf("delay=%v present=%v", delay, ok)
+			}
+		})
+	}
+	date := time.Now().Add(30 * time.Second).UTC().Format(http.TimeFormat)
+	delay := rtRetryAfter([]string{date})
+	if delay == nil || *delay < 28*time.Second || *delay > 30*time.Second {
+		t.Fatalf("date delay=%v", delay)
+	}
+}
+
+func TestRealtimeConnectionCloseCode(t *testing.T) {
+	for _, code := range []int{1000, 1001, 1008, 1013, 0} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := websocket.Accept(w, r, nil)
+				if err != nil {
+					return
+				}
+				defer conn.CloseNow()
+				if code == 0 {
+					return
+				}
+				conn.Close(websocket.StatusCode(code), "")
+			}))
+			defer server.Close()
+			client, err := NewClient(Config{APIKey: "test"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, err = client.Realtime.Connect(ctx, RealtimeConnectOptions{Endpoint: "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/realtime"})
+			var sdkError *Error
+			if !errors.As(err, &sdkError) {
+				t.Fatalf("error=%v", err)
+			}
+			if got, ok := sdkError.CloseCode(); ok != (code != 0) || got != code {
+				t.Fatalf("close=%d present=%v", got, ok)
+			}
+			if _, ok := sdkError.StatusCode(); ok {
+				t.Fatal("close has HTTP status")
 			}
 		})
 	}

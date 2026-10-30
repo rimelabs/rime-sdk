@@ -310,6 +310,16 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
+`Error::status_code()` returns the refused HTTP upgrade status as `Option<u16>`.
+`Error::close_code()` returns a received WebSocket close code as `Option<u16>`.
+`Error::retry_after()` returns the server's requested delay as `Option<Duration>`.
+Missing values are `None`; `Some(Duration::ZERO)` is a valid delay. An absent
+close frame or empty close frame has no close code. Invalid, duplicate, or
+unrepresentable `Retry-After` values are ignored. HTTP dates use the client clock,
+with past dates becoming zero. These methods require a release with structured
+connection diagnostics. Error categories are unchanged. The SDK does not retry
+startup automatically, and this metadata does not make request replay safe.
+
 If Prism refuses the connection with HTTP 429, `realtime().connect()` returns
 `ErrorKind::ResourceLimit`. HTTP 503 returns `ErrorKind::Unavailable`.
 Handshake errors include the HTTP status, the server request ID when supplied,

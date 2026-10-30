@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createServer } from "node:http";
 import test from "node:test";
+import { WebSocketServer } from "ws";
 import {
   Rime,
   RimeAuthenticationError,
   RimeResourceLimitError,
   RimeUnavailableError,
+  RimeStreamError,
 } from "../dist/index.js";
 
 const cases = [
@@ -78,6 +80,9 @@ for (const [index, [status, body, errorType, detail]] of cases.entries()) {
             assert.ok(error instanceof errorType);
             assert.ok(error.message.includes(`HTTP ${status}`));
             assert.equal(error.requestId, "server-request");
+            assert.equal(error.statusCode, status);
+            assert.equal(error.closeCode, null);
+            assert.equal(error.retryAfterSeconds, null);
             if (detail) assert.ok(error.message.includes(detail));
             else assert.ok(!error.message.includes(": "));
             return true;
@@ -89,6 +94,98 @@ for (const [index, [status, body, errorType, detail]] of cases.entries()) {
       assert.equal(attempts, 2);
     },
   );
+}
+
+for (const [header, expected] of [
+  ["3", 3],
+  ["0", 0],
+  ["-1", null],
+  ["1.5", null],
+  ["nan", null],
+  ["inf", null],
+  ["bad date", null],
+  ["9".repeat(400), null],
+  [["1", "2"], null],
+  ["Wed, 21 Oct 2015 07:28:00 GMT", 0],
+]) {
+  test(
+    `Retry-After ${JSON.stringify(header).slice(0, 60)}`,
+    { timeout: 5000 },
+    async (t) => {
+      const server = createServer((_req, res) => {
+        res.writeHead(503, { "Retry-After": header });
+        res.end("busy");
+      });
+      server.listen(0, "127.0.0.1");
+      await once(server, "listening");
+      const client = new Rime({ apiKey: "test" });
+      t.after(async () => {
+        await client.close();
+        await new Promise((resolve) => server.close(resolve));
+      });
+      await assert.rejects(
+        client.realtime.connect({
+          endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
+        }),
+        (error) => {
+          assert.equal(error.statusCode, 503);
+          assert.equal(error.retryAfterSeconds, expected);
+          return true;
+        },
+      );
+    },
+  );
+}
+
+test("Retry-After HTTP date", { timeout: 5000 }, async (t) => {
+  const server = createServer((_req, res) => {
+    res.writeHead(503, {
+      "Retry-After": new Date(Date.now() + 30000).toUTCString(),
+    });
+    res.end();
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const client = new Rime({ apiKey: "test" });
+  t.after(async () => {
+    await client.close();
+    await new Promise((resolve) => server.close(resolve));
+  });
+  await assert.rejects(
+    client.realtime.connect({
+      endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
+    }),
+    (error) => {
+      assert.ok(error.retryAfterSeconds > 28 && error.retryAfterSeconds <= 30);
+      return true;
+    },
+  );
+});
+
+for (const code of [1000, 1001, 1008, 1013, null]) {
+  test(`close before initialization ${code}`, { timeout: 5000 }, async (t) => {
+    const server = new WebSocketServer({ port: 0, host: "127.0.0.1" });
+    server.on("connection", (socket) =>
+      code === null ? socket.terminate() : socket.close(code),
+    );
+    await once(server, "listening");
+    const client = new Rime({ apiKey: "test" });
+    t.after(async () => {
+      await client.close();
+      await new Promise((resolve) => server.close(resolve));
+    });
+    await assert.rejects(
+      client.realtime.connect({
+        endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
+      }),
+      (error) => {
+        assert.ok(error instanceof RimeStreamError);
+        assert.equal(error.closeCode, code);
+        assert.equal(error.statusCode, null);
+        return true;
+      },
+    );
+  });
 }
 
 test(

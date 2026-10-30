@@ -436,6 +436,22 @@ The voice examples report actual playback.
 
 ## Timeouts and failures
 
+Connection errors expose optional structured diagnostics on `RimeError`:
+`status_code` is the refused HTTP upgrade status, `close_code` is a received
+WebSocket close code, and `retry_after_s` is the server's requested delay in
+seconds. For example, a busy endpoint can return `status_code=503` and
+`retry_after_s=2.0`. `request_id` retains the server's request ID on an HTTP
+refusal. Missing values are `None`; zero seconds is a valid delay. Invalid or
+duplicate `Retry-After` headers are ignored. HTTP-date values become a delay
+relative to the client clock, with past dates becoming zero.
+
+HTTP refusals retain their existing error category. A WebSocket closure raises
+`RimeStreamError`; a connection that never upgraded has no close code. An absent
+close frame or a frame without a status also has no close code. Do not parse the
+message to decide whether to retry. These fields require an SDK release that
+includes structured connection diagnostics. The SDK does not retry connection
+startup automatically, and these fields do not make an accepted request safe to replay.
+
 Configure connection deadlines with `RealtimeTimeouts`. All fields are
 optional and must be finite positive seconds.
 

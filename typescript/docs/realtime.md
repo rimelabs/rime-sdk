@@ -452,6 +452,20 @@ The voice examples report actual playback.
 
 ## Timeouts and failures
 
+`RimeError` exposes `statusCode` for a refused HTTP upgrade, `closeCode` for a
+received WebSocket close code, and `retryAfterSeconds` for the server's requested
+delay. For example, a busy endpoint can return `statusCode=503` and
+`retryAfterSeconds=2`. Missing values are `null`; zero is a valid delay. The
+existing `requestId` retains the server's request ID on an HTTP refusal.
+Invalid or duplicate `Retry-After` headers are ignored. HTTP dates become a delay
+relative to the client clock, with past dates becoming zero.
+
+Error categories stay the same. A WebSocket closure uses `RimeStreamError`;
+no received close code means `closeCode=null`, including a lost connection or
+an empty close frame. These fields require a release with structured connection
+diagnostics. The SDK does not retry startup automatically. These fields do not
+make replay of an accepted request safe.
+
 Configure positive, finite seconds through `timeouts`. `connectS` bounds the
 WebSocket handshake and initial session event. `readyS` bounds turn admission,
 tool readiness, and waiting for generation to end before a playback report.

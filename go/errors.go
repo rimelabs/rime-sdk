@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,6 +43,46 @@ type Error struct {
 func (e *Error) Error() string        { return fmt.Sprintf("rime: %s: %s", e.Kind, e.Message) }
 func (e *Error) Unwrap() error        { return e.Cause }
 func (e *Error) Is(target error) bool { return target == e.Kind }
+
+// StatusCode returns the refused realtime HTTP upgrade status, such as 503.
+// The second result is false when no HTTP refusal was received.
+func (e *Error) StatusCode() (int, bool) {
+	var details *connectionError
+	if errors.As(e.Cause, &details) && details.statusCode != nil {
+		return *details.statusCode, true
+	}
+	return 0, false
+}
+
+// CloseCode returns a received WebSocket close code, such as 1013.
+// The second result is false when no close code was received.
+func (e *Error) CloseCode() (int, bool) {
+	var details *connectionError
+	if errors.As(e.Cause, &details) && details.closeCode != nil {
+		return *details.closeCode, true
+	}
+	return 0, false
+}
+
+// RetryAfter returns the server-requested delay. Zero with true is valid.
+// False means that Retry-After was absent, invalid, duplicated, or too large.
+// This value does not cause retries or make replay of accepted requests safe.
+func (e *Error) RetryAfter() (time.Duration, bool) {
+	var details *connectionError
+	if errors.As(e.Cause, &details) && details.retryAfter != nil {
+		return *details.retryAfter, true
+	}
+	return 0, false
+}
+
+// Connection metadata stays in the error chain to preserve Error's public struct layout.
+type connectionError struct {
+	statusCode *int
+	closeCode  *int
+	retryAfter *time.Duration
+}
+
+func (e *connectionError) Error() string { return "realtime connection diagnostics" }
 
 func failure(kind ErrorKind, message string) *Error { return &Error{Kind: kind, Message: message} }
 

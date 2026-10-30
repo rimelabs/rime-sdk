@@ -42,6 +42,10 @@ _LIMIT = 128
 _close_errors: WeakSet[RimeError] = WeakSet()
 
 
+def _received_close_code(code: int | None) -> int | None:
+    return None if code in (1005, 1006) else code
+
+
 def _response_interrupts_speech(session: RealtimeSession, response: t.ResponseRef) -> bool:
     """Read the policy captured before the response entered the event queue."""
     if isinstance(session, RealtimeSession):
@@ -203,8 +207,13 @@ class RealtimeSession:
             error = RimeTimeoutError("Realtime write timed out; outcome unknown")
             self._fail(error)
             raise error from None
-        except (OSError, ConnectionError, ConnectionClosed):
-            failure = RimeStreamError("Realtime write failed; outcome unknown")
+        except (OSError, ConnectionError, ConnectionClosed) as error:
+            failure = RimeStreamError(
+                "Realtime write failed; outcome unknown",
+                close_code=_received_close_code(error.rcvd.code)
+                if isinstance(error, ConnectionClosed) and error.rcvd is not None
+                else None,
+            )
             self._fail(failure)
             raise failure from None
 
@@ -694,7 +703,10 @@ class RealtimeSession:
                     self._dispatch(event)
             if not self._closed:
                 self._fail(
-                    RimeStreamError("Realtime connection closed; reconnect is not automatic")
+                    RimeStreamError(
+                        "Realtime connection closed; reconnect is not automatic",
+                        close_code=_received_close_code(getattr(self._socket, "close_code", None)),
+                    )
                 )
         except asyncio.CancelledError:
             raise
@@ -702,7 +714,12 @@ class RealtimeSession:
             self._fail(
                 error
                 if isinstance(error, RimeError)
-                else RimeStreamError("Invalid event or lost realtime connection")
+                else RimeStreamError(
+                    "Invalid event or lost realtime connection",
+                    close_code=_received_close_code(error.rcvd.code)
+                    if isinstance(error, ConnectionClosed) and error.rcvd is not None
+                    else None,
+                )
             )
         finally:
             await self._socket.close()

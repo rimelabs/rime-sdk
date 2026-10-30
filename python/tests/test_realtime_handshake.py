@@ -1,6 +1,7 @@
 """HTTP refusals through the public realtime connection interface."""
 
 import asyncio
+from datetime import UTC
 
 import pytest
 
@@ -74,12 +75,105 @@ async def test_http_refusal_preserves_category_and_diagnostics(status, body, err
                 error = caught.value
                 assert f"HTTP {status}" in str(error)
                 assert error.request_id == "server-request"
+                assert error.status_code == status
+                assert error.close_code is None
+                assert error.retry_after_s is None
                 if detail:
                     assert detail in str(error)
                 else:
                     assert ": " not in str(error)
                 assert await asyncio.wait_for(closed.get(), 2) is None
         assert attempts == 2
+
+
+@pytest.mark.parametrize(
+    "headers,expected",
+    [
+        ([("Retry-After", "3")], 3.0),
+        ([("Retry-After", "0")], 0.0),
+        ([("Retry-After", "-1")], None),
+        ([("Retry-After", "1.5")], None),
+        ([("Retry-After", "nan")], None),
+        ([("Retry-After", "inf")], None),
+        ([("Retry-After", "bad date")], None),
+        ([("Retry-After", "9" * 400)], None),
+        ([("Retry-After", "1"), ("Retry-After", "2")], None),
+        ([("Retry-After", "Wed, 21 Oct 2015 07:28:00 GMT")], 0.0),
+    ],
+)
+async def test_http_refusal_exposes_retry_after(headers, expected):
+    from websockets.asyncio.server import serve
+
+    async def refuse(connection, request):
+        response = connection.respond(503, "busy")
+        for name, value in headers:
+            response.headers[name] = value
+        return response
+
+    async def unexpected(socket):
+        pytest.fail("refused connection upgraded")
+
+    async with (
+        serve(unexpected, "127.0.0.1", 0, process_request=refuse) as server,
+        Rime(api_key="test") as client,
+    ):
+        with pytest.raises(RimeUnavailableError) as caught:
+            async with client.realtime.connect(
+                endpoint=f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/v1/realtime"
+            ):
+                pytest.fail("refused connection accepted")
+        assert caught.value.status_code == 503
+        assert caught.value.retry_after_s == expected
+
+
+async def test_http_refusal_retry_after_date():
+    from datetime import datetime, timedelta
+    from email.utils import format_datetime
+
+    from websockets.asyncio.server import serve
+
+    async def refuse(connection, request):
+        response = connection.respond(503, "busy")
+        response.headers["Retry-After"] = format_datetime(
+            datetime.now(UTC) + timedelta(seconds=30), usegmt=True
+        )
+        return response
+
+    async def unexpected(socket):
+        pytest.fail("refused connection upgraded")
+
+    async with (
+        serve(unexpected, "127.0.0.1", 0, process_request=refuse) as server,
+        Rime(api_key="test") as client,
+    ):
+        with pytest.raises(RimeUnavailableError) as caught:
+            async with client.realtime.connect(
+                endpoint=f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/v1/realtime"
+            ):
+                pytest.fail("refused connection accepted")
+        assert 28 < caught.value.retry_after_s <= 30
+
+
+@pytest.mark.parametrize("code", [1000, 1001, 1008, 1013, None])
+async def test_close_before_initialization_preserves_received_code(code):
+    from websockets.asyncio.server import serve
+
+    from rimelabs_sdk import RimeStreamError
+
+    async def close(socket):
+        if code is None:
+            socket.transport.abort()
+        else:
+            await socket.close(code=code)
+
+    async with serve(close, "127.0.0.1", 0) as server, Rime(api_key="test") as client:
+        with pytest.raises(RimeStreamError) as caught:
+            async with client.realtime.connect(
+                endpoint=f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}/v1/realtime"
+            ):
+                pytest.fail("closed session initialized")
+        assert caught.value.close_code == code
+        assert caught.value.status_code is None
 
 
 @pytest.mark.parametrize(

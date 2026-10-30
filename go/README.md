@@ -336,6 +336,17 @@ Prism adaptations retain Apache-2.0 attribution in `NOTICE-PRISM` and `LICENSE-P
 
 ## Prism realtime
 
+Use `errors.As` to inspect `*rime.Error`. Its `StatusCode()` and `CloseCode()`
+methods return `(int, bool)`: the refused HTTP upgrade status or received
+WebSocket close code, and whether it is available. `RetryAfter()` returns
+`(time.Duration, bool)` for the server's requested delay. Zero with `true` is a
+valid delay. An absent close code, absent or invalid timing header, or timing
+that does not fit `time.Duration` returns `false`. Duplicate `Retry-After`
+headers are ignored; HTTP dates use the client clock and past dates become zero.
+These methods require a release with structured connection diagnostics.
+Error categories are unchanged and the SDK does not automatically retry startup.
+The metadata does not make replay of an accepted request safe.
+
 If Prism refuses the connection with HTTP 429, `Realtime.Connect` returns
 an error matching `ErrResourceLimit`. HTTP 503 returns `ErrUnavailable`.
 Handshake errors include the HTTP status, the server request ID when supplied,

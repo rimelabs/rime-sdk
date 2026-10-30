@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
@@ -32,6 +35,23 @@ if TYPE_CHECKING:
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
 _DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
+
+
+def _retry_after(values: list[str]) -> float | None:
+    if len(values) != 1 or len(values[0]) > 256:
+        return None
+    value = values[0].strip()
+    try:
+        if value.isascii() and value.isdecimal():
+            seconds = float(value)
+        else:
+            date = parsedate_to_datetime(value)
+            if date.tzinfo is None:
+                return None
+            seconds = max(0.0, date.timestamp() - time.time())
+        return seconds if math.isfinite(seconds) else None
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 def _handshake_error(error: InvalidStatus) -> RimeError:
@@ -68,7 +88,12 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
             pass
     request_ids = response.headers.get_all("x-request-id")
     request_id = request_ids[0] if len(request_ids) == 1 and request_ids[0] else None
-    return error_type(message, request_id=request_id)
+    return error_type(
+        message,
+        request_id=request_id,
+        status_code=status,
+        retry_after_s=_retry_after(response.headers.get_all("retry-after")),
+    )
 
 
 class Realtime:
