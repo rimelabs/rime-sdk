@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -89,7 +90,44 @@ func rtHandshakeError(response *http.Response) *Error {
 			}
 		}
 	}
-	return &Error{Kind: kind, Message: message, RequestID: response.Header.Get("x-request-id")}
+	return &Error{Kind: kind, Message: message, RequestID: response.Header.Get("x-request-id"), Cause: &connectionError{
+		statusCode: &response.StatusCode, retryAfter: rtRetryAfter(response.Header.Values("Retry-After")),
+	}}
+}
+
+func rtRetryAfter(values []string) *time.Duration {
+	if len(values) != 1 || len(values[0]) > 256 {
+		return nil
+	}
+	value := strings.TrimSpace(values[0])
+	var delay time.Duration
+	if value != "" && !strings.ContainsFunc(value, func(c rune) bool { return c < '0' || c > '9' }) {
+		seconds, err := strconv.ParseUint(value, 10, 64)
+		if err != nil || seconds > uint64((1<<63-1)/time.Second) {
+			return nil
+		}
+		delay = time.Duration(seconds) * time.Second
+	} else {
+		date, err := http.ParseTime(value)
+		if err != nil {
+			return nil
+		}
+		now := time.Now()
+		if date.After(now.Add(time.Duration(1<<63 - 1))) {
+			return nil
+		}
+		delay = max(0, date.Sub(now))
+	}
+	return &delay
+}
+
+func rtStreamError(message string, cause error) *Error {
+	err := failure(ErrStream, message)
+	code := int(websocket.CloseStatus(cause))
+	if code >= 1000 && code != 1005 && code != 1006 {
+		err.Cause = &connectionError{closeCode: &code}
+	}
+	return err
 }
 func rtReadLoop(ctx context.Context, c *websocket.Conn, out chan<- rtRead) {
 	for {
@@ -101,7 +139,7 @@ func rtReadLoop(ctx context.Context, c *websocket.Conn, out chan<- rtRead) {
 			if ctx.Err() != nil {
 				e = operationError(context.Cause(ctx), "")
 			} else {
-				e = failure(ErrStream, "invalid event or lost realtime connection")
+				e = rtStreamError("invalid event or lost realtime connection", e)
 			}
 		}
 		select {
@@ -151,7 +189,7 @@ func rtWriteFrames(ctx context.Context, job rtWrite, budget time.Duration, write
 	}
 	for _, frame := range job.frames {
 		if err := write(writeCtx, frame); err != nil {
-			result.err = failure(ErrStream, "realtime write failed; outcome unknown")
+			result.err = rtStreamError("realtime write failed; outcome unknown", err)
 			break
 		}
 		if job.audio && job.caller.Err() != nil {

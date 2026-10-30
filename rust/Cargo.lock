@@ -1288,6 +1288,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hex",
+ "httpdate",
  "jsonschema",
  "rimelabs-api",
  "serde_json",

@@ -113,6 +113,9 @@ async fn check(
             let error = client.realtime().connect(RealtimeConnectOptions::default().endpoint(&endpoint)).await.err().expect("connection must fail");
             assert_eq!(error.kind(), kind);
             assert_eq!(error.request_id(), Some("server-request"));
+            assert_eq!(error.status_code(), Some(status));
+            assert_eq!(error.close_code(), None);
+            assert_eq!(error.retry_after(), None);
             assert!(error.message().contains(&format!("HTTP {status}")));
             if let Some(detail) = detail {
                 assert!(error.message().contains(detail), "{}", error.message());
@@ -123,4 +126,91 @@ async fn check(
         client.close().await;
         server.await.unwrap();
     }).await.unwrap();
+}
+
+#[tokio::test]
+async fn retry_after_is_optional_and_bounded() {
+    let future_date =
+        httpdate::fmt_http_date(std::time::SystemTime::now() + Duration::from_secs(30));
+    for (value, expected) in [
+        ("3", Some(3)),
+        ("0", Some(0)),
+        ("-1", None),
+        ("1.5", None),
+        ("nan", None),
+        ("inf", None),
+        ("bad date", None),
+        ("1\r\nRetry-After: 2", None),
+        ("Wed, 21 Oct 2015 07:28:00 GMT", Some(0)),
+        (future_date.as_str(), Some(30)),
+    ] {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
+            let value = if expected == Some(30) {
+                httpdate::fmt_http_date(std::time::SystemTime::now() + Duration::from_secs(30))
+            } else { value.to_owned() };
+            let response = format!("HTTP/1.1 503 Refused\r\nContent-Length: 0\r\nRetry-After: {value}\r\nConnection: close\r\n\r\n");
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut buffer = vec![];
+                while !buffer.ends_with(b"\r\n\r\n") {buffer.push(socket.read_u8().await.unwrap());}
+                socket.write_all(response.as_bytes()).await.unwrap();
+            });
+            let client = Client::builder().api_key("test").build().unwrap();
+            let error = client.realtime().connect(RealtimeConnectOptions::default().endpoint(endpoint)).await.err().unwrap();
+            assert_eq!(error.status_code(), Some(503));
+            if expected == Some(30) {
+                let delay = error.retry_after().unwrap();
+                assert!(delay > Duration::from_secs(28) && delay <= Duration::from_secs(30));
+            } else {assert_eq!(error.retry_after(), expected.map(Duration::from_secs));}
+            client.close().await; server.await.unwrap();
+        }).await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn received_close_code_survives_initialization_failure() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::{
+        accept_async,
+        tungstenite::{protocol::CloseFrame, Message},
+    };
+    for code in [1000u16, 1001, 1008, 1013, 0] {
+        tokio::time::timeout(Duration::from_secs(3), async {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut websocket = accept_async(socket).await.unwrap();
+                if code == 0 {
+                    return;
+                }
+                websocket
+                    .send(Message::Close(Some(CloseFrame {
+                        code: code.into(),
+                        reason: "".into(),
+                    })))
+                    .await
+                    .unwrap();
+            });
+            let client = Client::builder().api_key("test").build().unwrap();
+            let error = client
+                .realtime()
+                .connect(RealtimeConnectOptions::default().endpoint(endpoint))
+                .await
+                .err()
+                .unwrap();
+            assert_eq!(error.kind(), ErrorKind::Stream);
+            assert_eq!(
+                error.close_code(),
+                if code == 0 { None } else { Some(code) }
+            );
+            assert_eq!(error.status_code(), None);
+            client.close().await;
+            server.await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
 }

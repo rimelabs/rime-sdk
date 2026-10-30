@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
+import re
+import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING, Literal
 from urllib.parse import urlsplit
 
@@ -32,6 +37,54 @@ if TYPE_CHECKING:
 
 _DEFAULT_TIMEOUTS = RealtimeTimeouts()
 _DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime"
+_HTTP_DATE_PATTERNS = (
+    re.compile(
+        r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), [0-9]{2} [A-Z][a-z]{2} [0-9]{4} "
+        r"[0-9]{2}:[0-9]{2}:[0-9]{2} GMT"
+    ),
+    re.compile(
+        r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), "
+        r"[0-9]{2}-[A-Z][a-z]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT"
+    ),
+    re.compile(
+        r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} (?:[0-9]{2}| [0-9]) "
+        r"[0-9]{2}:[0-9]{2}:[0-9]{2} [0-9]{4}"
+    ),
+)
+
+
+def _retry_after(values: list[str]) -> float | None:
+    if len(values) != 1 or len(values[0]) > 256:
+        return None
+    value = values[0].strip()
+    try:
+        if value.isascii() and value.isdecimal():
+            seconds = float(value)
+        else:
+            # Email date parsing alone accepts non-HTTP forms and timezone offsets.
+            form = next(
+                (i for i, pattern in enumerate(_HTTP_DATE_PATTERNS) if pattern.fullmatch(value)),
+                None,
+            )
+            if form is None:
+                return None
+            date = parsedate_to_datetime(value).replace(tzinfo=UTC)
+            now = time.time()
+            if form == 1:
+                # RFC 850 years more than 50 years ahead denote the previous century.
+                current = datetime.fromtimestamp(now, UTC)
+                cutoff = (current.year + 50, *current.timetuple()[1:6])
+                year = cutoff[0] // 100 * 100 + int(value.split(" ")[1][-2:])
+                if (year, *date.timetuple()[1:6]) > cutoff:
+                    year -= 100
+                date = date.replace(year=year)
+            else:
+                # The email parser also applies its year pivot to four-digit years.
+                date = date.replace(year=int(value[12:16] if form == 0 else value[-4:]))
+            seconds = max(0.0, date.timestamp() - now)
+        return seconds if math.isfinite(seconds) else None
+    except (ValueError, TypeError, OverflowError):
+        return None
 
 
 def _handshake_error(error: InvalidStatus) -> RimeError:
@@ -68,7 +121,12 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
             pass
     request_ids = response.headers.get_all("x-request-id")
     request_id = request_ids[0] if len(request_ids) == 1 and request_ids[0] else None
-    return error_type(message, request_id=request_id)
+    return error_type(
+        message,
+        request_id=request_id,
+        status_code=status,
+        retry_after_s=_retry_after(response.headers.get_all("retry-after")),
+    )
 
 
 class Realtime:
