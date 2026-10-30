@@ -1,0 +1,41 @@
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_abe32fc5b8c5b7::t_1584105fae991c 104
+  s_abe32fc5b8c5b7::t_9fdd32096f7a61 10
+python/src/rimelabs_sdk/realtime/_session.py
+  s_abe32fc5b8c5b7::t_af754d82f60ac8 18,20,76,92-98,100-111,115-117,211-212,217-238,243-246,928,938,973,1035-1038
+  s_abe32fc5b8c5b7::t_dc0a50cb16967d 918-919,967-971
+  s_abe32fc5b8c5b7::t_1584105fae991c 213-216,239-242
+  s_abe32fc5b8c5b7::t_14f97717f54599 878
+  s_03edeeb9b0e0a4::t_2c16ed1d6b1c43 99
+python/tests/test_realtime_lifetime.py
+  s_abe32fc5b8c5b7::t_1584105fae991c 213-268
+  s_abe32fc5b8c5b7::t_dea27bcdd9856f 282-283,323-333,339
+  s_abe32fc5b8c5b7::t_5485de58eb0497 287,304,307-322,334,336-338
+  s_03edeeb9b0e0a4::t_a63038abad1ff2 205-212,269-281,284-286,288-303,305-306,335
+python/README.md
+  s_abe32fc5b8c5b7::t_36e397e5e5c8a5 320-339
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a3e0e471df11b3adbd5885e35c14b935873ec182",
+  "prompts": {},
+  "sessions": {
+    "s_03edeeb9b0e0a4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18611-83f3-7261-8960-f0e7d135b2ae",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_abe32fc5b8c5b7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a18e47-da9e-7462-8cb0-76bb81b95c6b",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
