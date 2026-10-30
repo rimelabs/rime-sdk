@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.27](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.26...python-v0.1.0-alpha.27) (2026-10-30)
+
+
+### Bug Fixes
+
+* **realtime:** retain response references for pending tools and playback ([d4f1c35](https://github.com/rimelabs/rime-sdk/commit/d4f1c3537a3fc62c7f8a71bac4aef8ebb93b02e0))
+
 ## [0.1.0-alpha.26](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.25...python-v0.1.0-alpha.26) (2026-10-30)
 
 
