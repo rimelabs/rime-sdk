@@ -216,9 +216,10 @@ for (const [now, header, expected] of [
   ],
   [
     "2026-01-01T00:00:00Z",
-    "Thursday, 01-Jan-76 00:00:00 GMT",
+    "Wednesday, 01-Jan-76 00:00:00 GMT",
     "2076-01-01T00:00:00Z",
   ],
+  // Beyond the cutoff this means January 1, 1976, which was a Thursday.
   ["2026-01-01T00:00:00Z", "Thursday, 01-Jan-76 00:00:01 GMT", null],
   [
     "2090-01-01T00:00:00Z",

@@ -189,9 +189,9 @@ async def test_http_refusal_retry_after_date(date_format):
 @pytest.mark.parametrize(
     "now,header,expected_date",
     [
-        ("2026-01-01", "Wednesday, 01-Jan-75 00:00:00 GMT", "2075-01-01"),
+        ("2026-01-01", "Tuesday, 01-Jan-75 00:00:00 GMT", "2075-01-01"),
         ("2026-01-01", "Wednesday, 01-Jan-76 00:00:00 GMT", "2076-01-01"),
-        ("2026-01-01", "Wednesday, 02-Jan-76 00:00:00 GMT", "1976-01-02"),
+        ("2026-01-01", "Friday, 02-Jan-76 00:00:00 GMT", "1976-01-02"),
         ("2090-01-01", "Friday, 01-Jan-00 00:00:00 GMT", "2100-01-01"),
         ("2090-01-01", "Tuesday, 29-Feb-00 00:00:00 GMT", None),
     ],
