@@ -7,7 +7,7 @@ from ._conversation import (
     ConversationSource,
     run_conversation,
 )
-from ._session import RealtimeSession
+from ._session import RealtimeSession, ResponseHold
 from ._types import (
     AudioChunk,
     AudioDelta,
@@ -101,6 +101,7 @@ __all__ = [
     "ResponseAbandoned",
     "ResponseEnded",
     "ResponseEvent",
+    "ResponseHold",
     "ResponseRef",
     "ResponseStarted",
     "ResponseTruncation",

@@ -15,8 +15,9 @@ import os
 import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Self, TypeVar
 from weakref import WeakKeyDictionary, WeakSet
 
 from websockets.exceptions import ConnectionClosed
@@ -72,6 +73,7 @@ class _Response:
     token: str | None = None
     continued: bool = False
     abandoned: bool = False
+    holds: int = 0
     cancel_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -87,11 +89,32 @@ class _Pending:
     expected_item_id: str | None = None
 
 
+class ResponseHold(AbstractContextManager["ResponseHold"]):
+    """A local response lease. Release is idempotent and sends no messages."""
+
+    def __init__(self, session: RealtimeSession, state: _Response):
+        self._session: RealtimeSession | None = session
+        self._state = state
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.release()
+
+    def release(self) -> None:
+        session, self._session = self._session, None
+        if session is not None and self._state.holds:
+            self._state.holds -= 1
+            session._prune_responses()
+
+
 class RealtimeSession:
     """One conversation. Consume ``events`` concurrently with session operations.
 
-    The session retains the last 128 responses, without retaining audio. References
-    to older responses expire. A slow event consumer closes the session rather
+    The session retains 128 ordinary responses and up to 128 protected responses,
+    without retaining audio. Active generations, unresolved tools, and local holds
+    protect their response. Other older references expire. A slow consumer closes the session rather
     than dropping audio or blocking control messages.
     """
 
@@ -184,6 +207,42 @@ class RealtimeSession:
         if isinstance(ref, t.ToolCallRef) and ref.call_id not in response.calls:
             raise RimeInputError("Unknown tool call reference")
         return response
+
+    @staticmethod
+    def _protected(state: _Response) -> bool:
+        return (
+            not state.done.is_set()
+            or bool(state.holds)
+            or any(result is None for result in state.calls.values())
+        )
+
+    def _prune_responses(self) -> None:
+        protected = sum(self._protected(state) for state in self._responses.values())
+        if protected > _LIMIT:
+            raise RimeResourceLimitError("Too many protected realtime responses")
+        ordinary = len(self._responses) - protected
+        for key, state in list(self._responses.items()):
+            if ordinary <= _LIMIT:
+                break
+            if not self._protected(state):
+                del self._responses[key]
+                self._response_interruptions.pop(state.ref, None)
+                ordinary -= 1
+
+    def hold_response(self, ref: t.ResponseRef | t.ToolCallRef) -> ResponseHold:
+        """Protect a reference until release, context exit, or session close.
+
+        Multiple holds share a count. Acquiring a hold at the protected limit
+        raises without evicting another owner or sending a protocol message.
+        """
+        state = self._response(ref)
+        if (
+            not self._protected(state)
+            and sum(self._protected(item) for item in self._responses.values()) >= _LIMIT
+        ):
+            raise RimeResourceLimitError("Too many protected realtime responses")
+        state.holds += 1
+        return ResponseHold(self, state)
 
     async def _send(
         self,
@@ -816,6 +875,7 @@ class RealtimeSession:
                     ):
                         response.calls[payload.call_id] = pending.tool_output_digest
                         response.changed.set()
+                self._prune_responses()
             self._settle(echo, payload)
             return
         if isinstance(payload, p.ItemCreated):
@@ -855,6 +915,8 @@ class RealtimeSession:
             ref = payload.response
             if ref.response_id in self._responses:
                 raise RimeStreamError("Duplicate response.created")
+            if sum(self._protected(state) for state in self._responses.values()) >= _LIMIT:
+                raise RimeResourceLimitError("Too many protected realtime responses")
             self._response_interruptions[ref] = self._interruption_policies.resolve(
                 payload.settings_revision
             )
@@ -863,20 +925,20 @@ class RealtimeSession:
                 state.changed.set()
             self._latest = ref.response_id
             self._ready_epoch += 1
-            while len(self._responses) > _LIMIT:
-                oldest = next(iter(self._responses.values()))
-                if not oldest.done.is_set():
-                    raise RimeResourceLimitError("Too many retained active responses")
-                self._responses.popitem(last=False)
+            self._prune_responses()
             self._ready.clear()
             self._settle(echo, payload)
         elif isinstance(payload, p.ResponseEnded):
-            state = self._responses[payload.response.response_id]
-            if state.done.is_set():
+            ended_state = self._responses.get(payload.response.response_id)
+            # Pruning can remove a response as soon as it finishes. A late
+            # terminal event for an expired response has no state to update.
+            if ended_state is None or ended_state.done.is_set():
                 return
+            state = ended_state
             state.token = payload.drain_token
             state.done.set()
             state.changed.set()
+            self._prune_responses()
             for key, pending in self._pending.items():
                 if (
                     pending.request.kind == "response.cancel"
@@ -905,7 +967,13 @@ class RealtimeSession:
                 raise RimeStreamError("Tool call ID reused by another response")
             if len(state.calls) >= 128:
                 raise RimeResourceLimitError("Too many tool calls in one response")
+            if (
+                not self._protected(state)
+                and sum(self._protected(item) for item in self._responses.values()) >= _LIMIT
+            ):
+                raise RimeResourceLimitError("Too many protected realtime responses")
             state.calls[call_id] = None
+            self._prune_responses()
         elif isinstance(payload, t.MessageStarted):
             state = self._responses[payload.output.response.response_id]
             if len(state.outputs) >= 128:
@@ -967,6 +1035,10 @@ class RealtimeSession:
         try:
             await self._socket.close()
         finally:
+            for state in self._responses.values():
+                state.holds = 0
+            self._responses.clear()
+            self._response_interruptions.clear()
             self._reader.cancel()
             await asyncio.gather(self._reader, return_exceptions=True)
             tasks = list(self._tasks)

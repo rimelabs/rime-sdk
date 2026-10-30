@@ -317,3 +317,23 @@ For Prism, include `session.info.request_id`.
 SDK code uses the [MIT license](LICENSE). The Prism protocol module uses
 [Apache 2.0](LICENSE-PRISM); see its [notices](NOTICE-PRISM).
 License texts and notices are included in the distribution.
+
+### Realtime response lifetime
+
+A session retains up to 128 ordinary recent responses and 128 protected responses.
+Active generation and unresolved tool calls protect their owner automatically.
+Use a local hold for delayed playback or for the time between result submission
+and the continuation decision:
+
+```python
+with session.hold_response(response) as hold:
+    await session.report_playback(r.PlaybackFinished(response=response, played_ms=0))
+    hold.release()  # Optional early release; repeated release is safe.
+```
+
+The hold sends no messages and retains no audio. Multiple holds share a count.
+Session close releases all holds. Old ordinary references expire. If 128 protected
+responses already exist, a new protected owner raises `RimeResourceLimitError`;
+it never evicts a pending tool owner. A new response received above that bound
+ends the session through its normal resource-limit failure path. Acquiring a local
+hold above the bound raises without changing the connection.
