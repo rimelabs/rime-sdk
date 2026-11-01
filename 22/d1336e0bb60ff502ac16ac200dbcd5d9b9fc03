@@ -1,0 +1,28 @@
+typescript/src/realtime/session.ts
+  s_e2ebdd4570c888::t_640b0c8fe5da9d 263-264
+  s_e2ebdd4570c888::t_e01ce2b2e20089 108,257,261,265-270,274-275,1203-1211
+  s_e2ebdd4570c888::t_9dc433c9b6b981 1212
+typescript/docs/realtime.md
+  s_e2ebdd4570c888::t_165f8b68a222e9 444-445
+typescript/tests/realtime-hold-cleanup.test.mjs
+  s_e2ebdd4570c888::t_640b0c8fe5da9d 34-37,40-44,60-105
+  s_e2ebdd4570c888::t_c66864ffc0de36 1-33,38-39,45-59
+python/tests/test_realtime_lifetime.py
+  s_e2ebdd4570c888::t_c66864ffc0de36 334
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22d1336e0bb60ff502ac16ac200dbcd5d9b9fc03",
+  "prompts": {},
+  "sessions": {
+    "s_e2ebdd4570c888": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1990f-27a3-7cd2-93f8-b77fc1c6b8db",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
