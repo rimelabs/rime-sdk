@@ -81,6 +81,73 @@ func TestRealtimeResponseHoldsLifetime(t *testing.T) {
 	s.Close()
 	b.Release()
 }
+
+func TestRealtimeCompletionHistory(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var first ResponseRef
+	for i := 0; i < 256; i++ {
+		ref, _ := rtObserved(t, p, s, fmt.Sprint(i), false)
+		if i == 0 {
+			first = ref
+		}
+	}
+	if _, err := s.HoldResponse(ctx, first); !errors.Is(err, ErrInput) {
+		t.Fatalf("completion history retained response metadata: %v", err)
+	}
+	// All 128 evicted IDs still suppress duplicates; retained completions do too.
+	for _, id := range []string{"0", "127", "255"} {
+		p.ended(id)
+	}
+	p.send(rtObject{"type": "prism.typed_input.ready"})
+	if _, ok := rtRecv(t, s).Payload.(InputReady); !ok {
+		t.Fatal("duplicate completion was published")
+	}
+	rtObserved(t, p, s, "256", false)
+	for _, id := range []string{"1", "128"} {
+		p.ended(id)
+	}
+	p.send(rtObject{"type": "prism.typed_input.ready"})
+	if _, ok := rtRecv(t, s).Payload.(InputReady); !ok {
+		t.Fatal("recently evicted completion was published")
+	}
+	rtNoWrites(t, p)
+	// The duplicate above did not refresh ID 0: the 129th eviction removes it.
+	p.ended("0")
+	if _, err := s.Recv(ctx); !errors.Is(err, ErrStream) {
+		t.Fatalf("completion outside history: %v", err)
+	}
+}
+
+func TestRealtimeUnknownCompletionFails(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	p.ended("never-started")
+	if _, err := s.Recv(ctx); !errors.Is(err, ErrStream) {
+		t.Fatalf("unknown completion: %v", err)
+	}
+	rtNoWrites(t, p)
+}
+
+func TestRealtimeEvictedResponseIDCannotBeReused(t *testing.T) {
+	p := newRealtimePeer(t)
+	_, s := p.setup(t)
+	for i := 0; i < 129; i++ {
+		rtObserved(t, p, s, fmt.Sprint(i), false)
+	}
+	p.send(rtObject{"type": "response.created", "response": rtObject{"id": "0"}})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := s.Recv(ctx); !errors.Is(err, ErrStream) {
+		t.Fatalf("reused evicted response ID: %v", err)
+	}
+	rtNoWrites(t, p)
+}
+
 func TestRealtimeUnresolvedToolLifetime(t *testing.T) {
 	p := newRealtimePeer(t)
 	_, s := p.setup(t)

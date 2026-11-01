@@ -586,6 +586,12 @@ last protection makes the response eligible for eviction. A hold does not make a
 superseded tool continuation valid. The conversation runner holds delayed playback
 references until reporting ends; its queue limits and playback order still apply.
 
+The session also remembers the last 128 evicted completed response IDs, without
+response metadata or audio. Duplicate completion events for retained responses or
+those IDs are ignored and do not refresh that history. A completion for any other
+ID fails the session with `ErrStream`, including a duplicate whose ID has left
+the history. Remembering an ID does not make its expired reference usable.
+
 A local hold or operation that needs a new protected slot fails with `ErrResourceLimit`
 when all 128 slots are in use. The session stays usable. Incoming work that exceeds
 the protected limit fails the session with `ErrResourceLimit`. It never evicts a protected

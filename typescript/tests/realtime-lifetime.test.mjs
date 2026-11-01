@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Rime, RimeInputError, RimeResourceLimitError } from "../dist/index.js";
+import {
+  Rime,
+  RimeInputError,
+  RimeResourceLimitError,
+  RimeStreamError,
+} from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 
 async function setup(t) {
@@ -33,6 +38,66 @@ async function observed(peer, events, id, tool = false) {
 async function age(peer, events, prefix = "later") {
   for (let i = 0; i < 140; i++) await observed(peer, events, `${prefix}-${i}`);
 }
+
+test(
+  "a completion for a never-started response fails the session",
+  { timeout: 3000 },
+  async (t) => {
+    const { peer, session, events } = await setup(t);
+    peer.ended("never-started");
+    await assert.rejects(events.next(), RimeStreamError);
+    assert.throws(
+      () =>
+        session.holdResponse({
+          sessionId: "session-1",
+          responseId: "never-started",
+        }),
+      RimeStreamError,
+    );
+    assert.equal(peer.requests.length, 1, "invalid completion sends no writes");
+  },
+);
+
+test(
+  "duplicate completions use the last 128 evicted IDs without extending their history",
+  { timeout: 3000 },
+  async (t) => {
+    const { peer, session, events } = await setup(t);
+    const { response } = await observed(peer, events, "oldest");
+    for (let i = 0; i < 255; i++) await observed(peer, events, `later-${i}`);
+    assert.throws(() => session.holdResponse(response), RimeInputError);
+    peer.ended("oldest");
+    peer.ended("oldest");
+    peer.ended("later-254");
+    peer.emit("prism.typed_input.ready");
+    await payload(events, "input.ready");
+    assert.equal(
+      peer.requests.length,
+      1,
+      "duplicate completions send no writes",
+    );
+    await observed(peer, events, "overflow");
+    peer.ended("later-0");
+    peer.emit("prism.typed_input.ready");
+    await payload(events, "input.ready");
+    peer.ended("oldest");
+    await assert.rejects(events.next(), RimeStreamError);
+    assert.equal(peer.requests.length, 1, "expired completion sends no writes");
+  },
+);
+
+test(
+  "response creation cannot reuse a recently evicted ID",
+  { timeout: 3000 },
+  async (t) => {
+    const { peer, events } = await setup(t);
+    await observed(peer, events, "evicted");
+    await age(peer, events);
+    peer.emit("response.created", { response: { id: "evicted" } });
+    await assert.rejects(events.next(), RimeStreamError);
+    assert.equal(peer.requests.length, 1, "duplicate creation sends no writes");
+  },
+);
 
 test("ordinary expiry, delayed playback, nested holds and duplicate terminal events", async (t) => {
   const { peer, session, events } = await setup(t);

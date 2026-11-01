@@ -11,6 +11,7 @@ import (
 	"io"
 	"maps"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +20,7 @@ import (
 var errRealtimeClosed = errors.New("realtime session closed")
 
 const rtInterruptionPolicyLimit = 128
+const rtEvictedResponseLimit = 128
 
 type rtInterruptionPolicy struct {
 	revision  uint64
@@ -130,6 +132,7 @@ type rtWorker struct {
 	pending           []*rtCommand
 	responses         map[string]*rtResponse
 	order             []string
+	evicted           []string
 	ready             bool
 	latest, sessionID string
 	converter         *pcmInput
@@ -1060,7 +1063,7 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		e.payload = p
 		w.epoch++
 		id := p.Response.responseID
-		if w.responses[id] != nil {
+		if w.responses[id] != nil || slices.Contains(w.evicted, id) {
 			return failure(ErrStream, "duplicate response.created")
 		}
 		if w.protectedCount() >= 128 {
@@ -1072,7 +1075,13 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		w.ready = false
 	case ResponseEnded:
 		r := w.responses[p.Response.responseID]
-		if r == nil || r.done {
+		if r == nil {
+			if slices.Contains(w.evicted, p.Response.responseID) {
+				return nil
+			}
+			return failure(ErrStream, "event refers to unknown response")
+		}
+		if r.done {
 			return nil
 		}
 		r.done = true
@@ -1251,6 +1260,12 @@ func (w *rtWorker) pruneResponses() error {
 		r.holds = holds
 		if ordinary > 128 && !w.protected(r) {
 			delete(w.responses, id)
+			if len(w.evicted) == rtEvictedResponseLimit {
+				copy(w.evicted, w.evicted[1:])
+				w.evicted[len(w.evicted)-1] = id
+			} else {
+				w.evicted = append(w.evicted, id)
+			}
 			ordinary--
 		} else {
 			kept = append(kept, id)

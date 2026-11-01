@@ -165,7 +165,7 @@ impl Worker {
                         .resolve(*settings_revision, self.interrupt)?;
                     self.epoch += 1;
                     let id = &response.response_id;
-                    if self.responses.contains_key(id) {
+                    if self.responses.contains_key(id) || self.evicted_responses.contains(id) {
                         return Err(failure("duplicate response.created"));
                     }
                     if self.protected_count() >= 128 {
@@ -197,7 +197,11 @@ impl Worker {
                 }
                 ResponseEnded { response, .. } => {
                     let Some(r) = self.responses.get_mut(&response.response_id) else {
-                        return Ok(());
+                        return if self.evicted_responses.contains(&response.response_id) {
+                            Ok(())
+                        } else {
+                            Err(failure("event refers to an unknown response"))
+                        };
                     };
                     if r.done {
                         return Ok(());

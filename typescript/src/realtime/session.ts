@@ -105,6 +105,7 @@ export class RealtimeSession {
   private readonly toolLock = new Mutex();
   private readonly pending = new Map<string, Pending>();
   private readonly responses = new Map<string, ResponseState>();
+  private readonly evictedResponses = new Set<string>();
   private readonly interruptionPolicies = new InterruptionPolicies();
   private latest: string | null = null;
   private readonly tasks = new Set<Promise<unknown>>();
@@ -239,6 +240,11 @@ export class RealtimeSession {
       if (ordinary <= LIMIT) break;
       if (!this.protected(state)) {
         this.responses.delete(id);
+        this.evictedResponses.add(id);
+        if (this.evictedResponses.size > LIMIT)
+          this.evictedResponses.delete(
+            this.evictedResponses.values().next().value!,
+          );
         responseInterruptions.delete(state.ref);
         ordinary--;
       }
@@ -1062,7 +1068,10 @@ export class RealtimeSession {
         break;
       case "response.started": {
         const ref = payload.response;
-        if (this.responses.has(ref.responseId))
+        if (
+          this.responses.has(ref.responseId) ||
+          this.evictedResponses.has(ref.responseId)
+        )
           throw new RimeStreamError("Duplicate response.created");
         this.admitProtection();
         responseInterruptions.set(
@@ -1080,7 +1089,11 @@ export class RealtimeSession {
       }
       case "response.ended": {
         const state = this.responses.get(payload.response.responseId);
-        if (!state || state.done.isSet) return;
+        if (!state) {
+          if (this.evictedResponses.has(payload.response.responseId)) return;
+          throw new RimeStreamError("Event refers to an unknown response");
+        }
+        if (state.done.isSet) return;
         state.token = payload.drainToken;
         state.done.set();
         state.changed.set();
@@ -1185,6 +1198,7 @@ export class RealtimeSession {
         for (const state of this.responses.values())
           responseInterruptions.delete(state.ref);
         this.responses.clear();
+        this.evictedResponses.clear();
       })();
     }
     await this.closing;

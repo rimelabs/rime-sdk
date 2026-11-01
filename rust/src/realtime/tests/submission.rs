@@ -25,6 +25,7 @@ fn worker() -> (
             pending: vec![],
             responses: HashMap::new(),
             order: VecDeque::new(),
+            evicted_responses: VecDeque::new(),
             ready: true,
             latest: String::new(),
             id: "session-1".into(),

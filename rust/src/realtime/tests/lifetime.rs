@@ -208,3 +208,70 @@ async fn active_generation_protects_after_hold_release() {
     p.no_request().await;
     client.close().await;
 }
+
+#[tokio::test]
+async fn completion_for_a_never_started_response_fails_the_session() {
+    let mut p = Peer::new().await;
+    let (client, s) = p.setup().await;
+    let mut events = s.events().unwrap();
+    p.ended("never-started").await;
+    let error = tokio::time::timeout(std::time::Duration::from_secs(3), events.next())
+        .await
+        .expect("unknown completion must fail the session")
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Stream);
+    p.closed_without_request().await;
+    client.close().await;
+}
+
+#[tokio::test]
+async fn evicted_completion_history_retains_128_ids_without_refreshing_duplicates() {
+    let mut p = Peer::new().await;
+    let (client, s) = p.setup().await;
+    let mut events = s.events().unwrap();
+    let (first, _) = observed(&p, &mut events, "first", false).await;
+    for i in 0..255 {
+        observed(&p, &mut events, &format!("later-{i}"), false).await;
+    }
+    assert_eq!(
+        s.hold_response(&first).await.err().unwrap().kind(),
+        ErrorKind::Input
+    );
+    // All 128 ordinary slots and all 128 evicted-ID slots are occupied.
+    p.ended("first").await;
+    p.ended("later-126").await;
+    p.ended("later-254").await;
+    p.send(json!({"type":"prism.typed_input.ready"})).await;
+    assert!(matches!(
+        event(&mut events).await.payload,
+        RealtimeEvent::InputReady
+    ));
+    p.no_request().await;
+    observed(&p, &mut events, "overflow", false).await;
+    // The duplicate did not refresh the oldest evicted ID.
+    p.ended("first").await;
+    let error = tokio::time::timeout(std::time::Duration::from_secs(3), events.next())
+        .await
+        .expect("completion outside the ID history must fail the session")
+        .unwrap()
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Stream);
+    p.closed_without_request().await;
+    client.close().await;
+}
+
+#[tokio::test]
+async fn response_creation_cannot_reuse_a_recently_evicted_id() {
+    let mut p = Peer::new().await;
+    let (client, s) = p.setup().await;
+    let mut events = s.events().unwrap();
+    observed(&p, &mut events, "first", false).await;
+    age(&p, &mut events, "later").await;
+    p.send(json!({"type":"response.created","response":{"id":"first"}}))
+        .await;
+    let error = events.next().await.unwrap().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Stream);
+    p.closed_without_request().await;
+    client.close().await;
+}

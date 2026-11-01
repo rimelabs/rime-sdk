@@ -6,7 +6,7 @@ import grpc
 import pytest
 from test_realtime import Peer, completed_tool_round, session
 
-from rimelabs_sdk import Rime, RimeInputError
+from rimelabs_sdk import Rime, RimeInputError, RimeStreamError
 from rimelabs_sdk.realtime import _client, _session
 
 
@@ -283,6 +283,56 @@ async def test_duplicate_end_after_active_response_becomes_expired(monkeypatch):
         request = await peer.next("response.create")
         peer.accepted(request, "still-usable")
         assert (await reply).response_id == "still-usable"
+
+
+async def test_completion_for_never_started_response_fails_session(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        peer.ended("never-started")
+        with pytest.raises(RimeStreamError, match="unknown response"):
+            await asyncio.wait_for(anext(current.events), 1)
+        with pytest.raises(RimeStreamError, match="unknown response"):
+            await current.request_reply()
+        assert peer.sent.empty()
+
+
+async def test_completion_history_remembers_only_last_128_evicted_ids(monkeypatch):
+    from contextlib import aclosing
+
+    from rimelabs_sdk import realtime as r
+
+    async with session(monkeypatch) as (current, peer, _):
+        first, _ = await _observed_response(current, peer, 0)
+        for number in range(1, 256):
+            await _observed_response(current, peer, number)
+        with pytest.raises(RimeInputError, match="expired"):
+            current.hold_response(first)
+        # IDs 0 through 127 are remembered; 128 through 255 retain full state.
+        for number in (0, 127, 255, 0):
+            peer.ended(f"retained-{number}")
+        peer.emit("prism.typed_input.ready")
+        async with aclosing(current.events) as events:
+            assert isinstance((await anext(events)).payload, r.InputReady)
+        assert peer.sent.empty()
+        await _observed_response(current, peer, 256)
+        # Ignoring duplicates does not refresh their position in the history.
+        peer.ended("retained-1")
+        peer.emit("prism.typed_input.ready")
+        async with aclosing(current.events) as events:
+            assert isinstance((await anext(events)).payload, r.InputReady)
+        peer.ended("retained-0")
+        with pytest.raises(RimeStreamError, match="unknown response"):
+            await asyncio.wait_for(anext(current.events), 1)
+        assert peer.sent.empty()
+
+
+async def test_response_creation_cannot_reuse_remembered_completed_id(monkeypatch):
+    async with session(monkeypatch) as (current, peer, _):
+        for number in range(129):
+            await _observed_response(current, peer, number)
+        peer.emit("response.created", response={"id": "retained-0"})
+        with pytest.raises(RimeStreamError, match="Duplicate response.created"):
+            await anext(current.events)
+        assert peer.sent.empty()
 
 
 async def test_pending_tool_owner_survives_then_can_report_once(monkeypatch):

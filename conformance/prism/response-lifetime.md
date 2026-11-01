@@ -10,6 +10,14 @@ protect a response. Go and Rust also protect pending SDK operations. Multiple
 holds share one protected slot. Eviction selects the oldest ordinary response and
 skips protected responses. Holds retain no audio and send no protocol messages.
 
+The session also remembers the last 128 evicted completed response IDs, in
+eviction order. This history contains IDs only, not response metadata or audio.
+A terminal event completes an active response once. Duplicate terminal events
+are ignored for retained completed responses and IDs in this history. Duplicates
+do not refresh the history. Any other terminal response ID fails the session
+with a stream/protocol error, including a previously completed ID that has left
+the history. A new response cannot reuse a retained or remembered ID.
+
 | Scenario | Required behavior |
 | --- | --- |
 | Ordinary reference followed by 140 completed responses | The reference expires, even if an older response is protected. |
@@ -23,7 +31,10 @@ skips protected responses. Holds retain no audio and send no protocol messages.
 | Invalid, expired, or cross-session reference | Hold acquisition fails with an input error. |
 | Cancellation after acquisition but before handle delivery | No hold leaks. Accepted wire operations are not replayed. |
 | Full command queue or session closure | Release does not block. Rust holds do not extend the last session handle's lifetime. |
-| Duplicate terminal event, including an expired reference | No second completion and no session failure. |
+| Duplicate terminal event for retained state or one of the last 128 evicted completed IDs | No second completion, no protocol writes, and no session failure. |
+| Completion for a never-started ID or an ID older than the 128-entry eviction history | Explicit stream/protocol failure. |
+| Duplicate events at the history limit | The oldest remembered ID remains valid until another response is evicted; duplicates do not extend its lifetime. |
+| New response reuses a retained or remembered ID | Explicit stream/protocol failure. |
 
 Executable coverage:
 

@@ -428,6 +428,14 @@ ordinary response when the ordinary limit is exceeded. It can evict a later
 ordinary response while an older response is protected. Current output uses
 `contentIndex: 0`.
 
+The session also remembers the last 128 evicted completed response IDs, without
+response metadata or audio. Duplicate completion events for retained responses
+or those remembered IDs are ignored and do not extend the history. A completion
+for any other ID fails the session with `RimeStreamError`, including a duplicate
+whose ID has expired from this history. Remembered IDs do not make expired
+references usable. Reusing a retained or remembered ID in `response.created`
+also fails the session. Closing the session clears this history.
+
 Use `session.holdResponse(responseOrToolCall)` when work must use a reference after
 its automatic protection ends. The returned `ResponseHold` has `release()`.
 Multiple holds share one protected slot. Release is idempotent and safe after

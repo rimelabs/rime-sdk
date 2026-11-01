@@ -240,6 +240,10 @@ impl Worker {
             r.holds.retain(|hold| hold.strong_count() > 0);
             if ordinary > 128 && !self.protected(&self.responses[&id]) {
                 self.responses.remove(&id);
+                self.evicted_responses.push_back(id);
+                if self.evicted_responses.len() > 128 {
+                    self.evicted_responses.pop_front();
+                }
                 ordinary -= 1;
             } else {
                 kept.push_back(id);
