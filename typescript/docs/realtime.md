@@ -441,6 +441,8 @@ its automatic protection ends. The returned `ResponseHold` has `release()`.
 Multiple holds share one protected slot. Release is idempotent and safe after
 session closure. Holds retain metadata, not audio, and send no protocol messages.
 Always release in `finally`; garbage collection does not release a hold.
+Closing the session detaches outstanding holds. Keeping a released hold or a hold
+after close does not retain the session or its response metadata.
 
 ```typescript
 const hold = session.holdResponse(call);

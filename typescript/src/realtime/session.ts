@@ -105,6 +105,7 @@ export class RealtimeSession {
   private readonly toolLock = new Mutex();
   private readonly pending = new Map<string, Pending>();
   private readonly responses = new Map<string, ResponseState>();
+  private readonly responseHolds = new Set<ResponseHold>();
   private readonly evictedResponses = new Set<string>();
   private readonly interruptionPolicies = new InterruptionPolicies();
   private latest: string | null = null;
@@ -253,19 +254,25 @@ export class RealtimeSession {
   /** Retain metadata until release or session close. Use try/finally for release.
    * Nested holds share a protected slot. Local refusal leaves the session usable. */
   holdResponse(ref: t.ResponseRef | t.ToolCallRef): ResponseHold {
-    const state = this.response(ref);
+    let state: ResponseState | undefined = this.response(ref);
     this.admitProtection(state);
     state.holds++;
     let owner: RealtimeSession | undefined = this;
-    return {
+    const hold: ResponseHold = {
       release() {
-        if (owner) {
-          state.holds--;
-          owner.pruneResponses();
-          owner = undefined;
+        const session = owner,
+          response = state;
+        owner = undefined;
+        state = undefined;
+        if (session && response) {
+          session.responseHolds.delete(hold);
+          response.holds--;
+          session.pruneResponses();
         }
       },
     };
+    this.responseHolds.add(hold);
+    return hold;
   }
   private track<T>(task: Promise<T>): Promise<T> {
     this.tasks.add(task);
@@ -1193,12 +1200,16 @@ export class RealtimeSession {
           this.fail(error);
           this.failure = null;
         }
-        await this.socket.close();
-        await Promise.allSettled([...this.tasks]);
-        for (const state of this.responses.values())
-          responseInterruptions.delete(state.ref);
-        this.responses.clear();
-        this.evictedResponses.clear();
+        try {
+          await this.socket.close();
+          await Promise.allSettled([...this.tasks]);
+        } finally {
+          for (const state of this.responses.values())
+            responseInterruptions.delete(state.ref);
+          this.responses.clear();
+          this.evictedResponses.clear();
+          for (const hold of this.responseHolds) hold.release();
+        }
       })();
     }
     await this.closing;

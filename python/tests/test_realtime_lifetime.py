@@ -331,7 +331,7 @@ async def test_response_creation_cannot_reuse_remembered_completed_id(monkeypatc
             await _observed_response(current, peer, number)
         peer.emit("response.created", response={"id": "retained-0"})
         with pytest.raises(RimeStreamError, match="Duplicate response.created"):
-            await anext(current.events)
+            await asyncio.wait_for(anext(current.events), 1)
         assert peer.sent.empty()
 
 
