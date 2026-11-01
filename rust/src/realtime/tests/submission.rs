@@ -25,6 +25,7 @@ fn worker() -> (
             pending: vec![],
             responses: HashMap::new(),
             order: VecDeque::new(),
+            evicted_responses: VecDeque::new(),
             ready: true,
             latest: String::new(),
             id: "session-1".into(),
@@ -257,6 +258,13 @@ async fn runner_speech_preserves_queued_drain_and_active_write() {
             &mut worker,
             json!({"type":"response.done","response":{"id":"r1","status":"completed","metadata":{"prism_drain_token":"drain-r1"}}}),
         );
+        let mut hold = tokio::time::timeout(Duration::from_secs(1), worker.commands.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(hold.kind == Kind::Hold);
+        let answer = worker.acquire_hold(&hold, &Arc::new(Notify::new()));
+        hold.finish(answer);
         let command = tokio::time::timeout(Duration::from_secs(1), worker.commands.recv())
             .await
             .unwrap()
@@ -383,4 +391,130 @@ async fn dropping_event_stream_releases_queued_and_failed_publish_policies() {
         ErrorKind::ResourceLimit
     );
     assert!(worker.response_policies.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn hold_cancelled_delivery_full_queue_and_shutdown() {
+    for cancelled in [false, true] {
+        let (mut worker, _, _, receiver) = worker();
+        let (commands, command_receiver) = mpsc::channel(128);
+        worker.commands = command_receiver;
+        let wake = Arc::new(Notify::new());
+        let terminal = Arc::new(Mutex::new(None));
+        let session = RealtimeSession {
+            lease: Arc::new(Lease(CancellationToken::new())),
+            commands,
+            events: Arc::new(Mutex::new(Some(RealtimeEvents {
+                receiver,
+                response_policies: worker.response_policies.clone(),
+                previous_response: None,
+                terminal: terminal.clone(),
+                ended: false,
+            }))),
+            info: Arc::new(Mutex::new(None)),
+            response_policies: worker.response_policies.clone(),
+            budgets: RealtimeTimeouts::default(),
+            done: CancellationToken::new(),
+            wake: wake.clone(),
+            terminal,
+        };
+        dispatch(
+            &mut worker,
+            json!({"type":"response.created","response":{"id":"held"}}),
+        );
+        dispatch(
+            &mut worker,
+            json!({"type":"response.done","response":{"id":"held","status":"completed"}}),
+        );
+        let reference = worker.responses["held"].reference.clone();
+        let mut future = Box::pin(session.hold_response(&reference));
+        assert!(futures_util::poll!(future.as_mut()).is_pending());
+        let mut command = worker.commands.recv().await.unwrap();
+        let answer = worker.acquire_hold(&command, &wake).unwrap();
+        if cancelled {
+            // Acquisition succeeded but the oneshot receiver is dropped before delivery.
+            drop(future);
+            command.finish(Ok(answer));
+        } else {
+            command.finish(Ok(answer));
+            let hold = future.await.unwrap();
+            for _ in 0..128 {
+                session
+                    .commands
+                    .try_send(Command::new(Kind::Clear, json!({})))
+                    .ok()
+                    .unwrap();
+            }
+            assert_eq!(
+                session
+                    .hold_response(&reference)
+                    .await
+                    .err()
+                    .unwrap()
+                    .kind(),
+                ErrorKind::ResourceLimit
+            );
+            drop(hold); // Must not require space in the bounded command queue.
+        }
+        worker.prune_responses().unwrap();
+        assert_eq!(worker.protected_count(), 0);
+        assert!(worker.responses["held"].holds.is_empty());
+        // A hold released after worker teardown must also be harmless.
+        let mut command = Command::new(Kind::Hold, json!({}));
+        command.reference = Some(reference);
+        let answer = worker.acquire_hold(&command, &wake).unwrap();
+        drop(worker);
+        drop(session);
+        drop(answer);
+    }
+}
+
+#[tokio::test]
+async fn pending_operation_keeps_response_after_last_hold() {
+    let (mut worker, writes, mut jobs, mut events) = worker();
+    dispatch(
+        &mut worker,
+        json!({"type":"response.created","response":{"id":"held"}}),
+    );
+    dispatch(
+        &mut worker,
+        json!({"type":"response.done","response":{"id":"held","status":"completed","metadata":{"prism_drain_token":"drain"}}}),
+    );
+    let reference = worker.responses["held"].reference.clone();
+    let mut hold = Command::new(Kind::Hold, json!({}));
+    hold.reference = Some(reference.clone());
+    let answer = worker
+        .acquire_hold(&hold, &Arc::new(Notify::new()))
+        .unwrap();
+    let mut command = Command::new(Kind::Drain, json!({"response_id":"held"}));
+    command.reference = Some(reference.clone());
+    command.deadline = Instant::now() + Duration::from_secs(1);
+    worker.admit_command(&command).unwrap();
+    worker.pending.push(command);
+    drop(answer);
+    for i in 0..140 {
+        while events.try_recv().is_ok() {}
+        let id = format!("later-{i}");
+        dispatch(
+            &mut worker,
+            json!({"type":"response.created","response":{"id":id}}),
+        );
+        dispatch(
+            &mut worker,
+            json!({"type":"response.done","response":{"id":id,"status":"completed"}}),
+        );
+    }
+    assert!(worker.response(&reference).is_ok());
+    worker.advance(&writes).unwrap();
+    let job = jobs.recv().await.unwrap();
+    assert_eq!(job.frames.len(), 1);
+    let (mut sink, mut sent, release) = gate();
+    release.cancel();
+    worker
+        .written(write_frames(&mut sink, job, Duration::from_secs(1)).await)
+        .unwrap();
+    assert!(sent.try_recv().is_ok());
+    worker.advance(&writes).unwrap();
+    assert!(worker.response(&reference).is_err());
+    assert!(jobs.try_recv().is_err(), "accepted report replayed");
 }

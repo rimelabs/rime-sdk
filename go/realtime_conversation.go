@@ -62,6 +62,7 @@ type rtPlayOutput struct {
 	played                float64
 }
 type rtPlayReply struct {
+	hold                          *ResponseHold
 	interruptOnSpeech             bool
 	ref                           ResponseRef
 	outputs                       []*rtPlayOutput
@@ -198,6 +199,11 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 		}
 	})
 	replies := []*rtPlayReply{}
+	defer func() {
+		for _, reply := range replies {
+			reply.hold.Release()
+		}
+	}()
 	parents := map[string]string{}
 	blocked := map[string]bool{}
 	history := []string{}
@@ -323,6 +329,7 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 		case id := <-reported:
 			for i, reply := range replies {
 				if reply.ref.responseID == id {
+					reply.hold.Release()
 					replies = append(replies[:i], replies[i+1:]...)
 					break
 				}
@@ -370,7 +377,11 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					interruptOnSpeech = *p.interruptOnSpeech
 				}
 				interrupted := wasInterrupted(id)
-				replies = append(replies, &rtPlayReply{ref: p.Response, interrupted: interrupted, interruptOnSpeech: interruptOnSpeech})
+				hold, err := r.Session.HoldResponse(running, p.Response)
+				if err != nil {
+					return err
+				}
+				replies = append(replies, &rtPlayReply{hold: hold, ref: p.Response, interrupted: interrupted, interruptOnSpeech: interruptOnSpeech})
 				if interrupted {
 					blocked[id] = true
 					if e := start(func() error { return r.Session.Cancel(running, p.Response) }); e != nil {

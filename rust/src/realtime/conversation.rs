@@ -101,6 +101,7 @@ struct Output<O> {
     cut: bool,
 }
 struct Reply<O> {
+    hold: Option<super::ResponseHold>,
     interrupt_on_speech: bool,
     reference: ResponseRef,
     outputs: Vec<Output<O>>,
@@ -288,6 +289,7 @@ impl<O: ConversationOutput> PlaybackState<O> {
                     })?
                 }
                 self.replies.push(Reply {
+                    hold: None,
                     interrupt_on_speech: session.response_interrupt_on_speech(response)?,
                     reference: response.clone(),
                     outputs: vec![],
@@ -500,7 +502,16 @@ impl<S: ConversationSource, P: ConversationPlayback> ConversationRunner<S, P> {
                     },
                     event=events.next()=>{
                         let Some(event)=event else{return Ok(())};let event=event?;
+                        let hold = if let RealtimeEvent::ResponseStarted { response, .. } = &event.payload {
+                            Some(tokio::select! {
+                                _ = stop.cancelled() => return Err(Error::cancelled()),
+                                result = self.session.hold_response(response) => result?,
+                            })
+                        } else { None };
                         state.event(&event, &mut self.playback, &self.session, &tasks, &receipts)?;
+                        if let Some(hold) = hold {
+                            state.replies.last_mut().expect("started reply").hold = Some(hold);
+                        }
                         if let Some(callback)=&mut self.on_event{callback(&event)?}
                     }
                 }
@@ -595,6 +606,7 @@ pub(super) fn assert_measured_playback_is_not_interrupted<P: ConversationPlaybac
             content_index: 0,
         };
         state.replies.push(Reply {
+            hold: None,
             reference: response,
             interrupt_on_speech: true,
             outputs: vec![Output {

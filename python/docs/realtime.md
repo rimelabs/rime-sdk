@@ -403,8 +403,21 @@ References come from the SDK. Pass them back to identify the object you mean:
 | `ToolCallRef` | `session_id`, `response_id`, `call_id` |
 | `OutputRef` | `response`, `item_id`, `output_index`, `content_index` |
 
-Every reference belongs to one session. The SDK retains the last 128 responses,
-so older references expire. Current output uses `content_index=0`.
+Every reference belongs to one session. The SDK retains up to 128 ordinary
+responses and 128 protected responses. Active generation, unresolved tool results,
+and explicit holds protect response metadata. Eviction removes the oldest
+ordinary response and expires its reference. Current output uses `content_index=0`.
+
+Use `with session.hold_response(ref):` for work that needs the reference after
+automatic protection ends, or call `release()` on the returned hold in `finally`.
+Holds retain no audio and send no protocol messages.
+
+The session also remembers the last 128 evicted completed response IDs, without
+their metadata or audio. Duplicate terminal events for retained completed
+responses or these remembered IDs are ignored without refreshing the history.
+Any other terminal response ID fails the session with `RimeStreamError`, including
+an older completed ID that has left this history. A new response cannot reuse a
+retained or remembered ID. Remembering an ID does not restore its expired reference.
 
 Unknown response causes, terminal statuses, and error scopes become `"unknown"`.
 An absent response cause means speech. Unknown event kinds and additional fields

@@ -421,8 +421,45 @@ References come from the SDK. Pass them back to identify the object you mean.
 | `ToolCallRef` | `sessionId`, `responseId`, `callId` |
 | `OutputRef` | `response`, `itemId`, `outputIndex`, `contentIndex` |
 
-Every reference belongs to one session. Only the last 128 responses are retained;
-older references expire. Current output uses `contentIndex: 0`.
+Every reference belongs to one session. The session retains up to 128 ordinary
+responses and 128 protected responses. Active generation, unresolved tool results,
+and explicit holds protect response metadata. The session evicts the oldest
+ordinary response when the ordinary limit is exceeded. It can evict a later
+ordinary response while an older response is protected. Current output uses
+`contentIndex: 0`.
+
+The session also remembers the last 128 evicted completed response IDs, without
+response metadata or audio. Duplicate completion events for retained responses
+or those remembered IDs are ignored and do not extend the history. A completion
+for any other ID fails the session with `RimeStreamError`, including a duplicate
+whose ID has expired from this history. Remembered IDs do not make expired
+references usable. Reusing a retained or remembered ID in `response.created`
+also fails the session. Closing the session clears this history.
+
+Use `session.holdResponse(responseOrToolCall)` when work must use a reference after
+its automatic protection ends. The returned `ResponseHold` has `release()`.
+Multiple holds share one protected slot. Release is idempotent and safe after
+session closure. Holds retain metadata, not audio, and send no protocol messages.
+Always release in `finally`; garbage collection does not release a hold.
+Closing the session detaches outstanding holds. Keeping a released hold or a hold
+after close does not retain the session or its response metadata.
+
+```typescript
+const hold = session.holdResponse(call);
+try {
+  await session.submitToolResult(call, "done");
+  await session.requestReply({ toolCall: call });
+} finally {
+  hold.release();
+}
+```
+
+Hold refusal at the protected limit throws `RimeResourceLimitError` and leaves the
+session usable. Incoming work that exceeds that limit fails the session with the
+same error. It does not evict a protected owner. Invalid, expired, and cross-session
+references throw `RimeInputError`. A hold does not make a superseded tool
+continuation valid. The conversation runner holds each response until its playback
+reports finish or the runner stops. Its queue limits and playback order still apply.
 
 Unknown event kinds and extra fields are ignored. Unknown response causes,
 terminal statuses, and error scopes become `"unknown"`. An absent response cause

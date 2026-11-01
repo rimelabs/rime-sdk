@@ -469,6 +469,7 @@ their request shape, and replies to speech use session labels.
 | `submit_tool_result` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `continue_reply` | Wait for the latest tool response and all its results, then request continuation. |
 | `continue_reply_with_options` | Continue a tool round with labels for this reply. |
+| `hold_response` | Hold response metadata until the guard is dropped. |
 | `cancel` | Cancel a retained response. |
 | `set_response_metadata` | Replace the labels for later replies once Prism confirms. |
 | `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |
@@ -502,8 +503,49 @@ precedence over queued events and remain available from later session operations
 The event stream yields the terminal error once, then ends. Normal closure drains
 the remaining queued events and ends without an error.
 
-There are at most 128 pending requests, 128 retained responses, 128 tools or
-outputs per response, and 256 queued events. Incoming messages are limited to
+Use `hold_response(&response).await` when delayed work needs response metadata.
+Keep the returned `ResponseHold` guard until work is complete. `Drop` releases it.
+Dropping a guard is safe after closure and does not keep the last session handle alive.
+Holds send no protocol messages and retain no audio. Multiple holds on one response
+share one protected slot. Release does not wait for space in the command queue.
+
+```rust,no_run
+use rimelabs_sdk::realtime::{RealtimeSession, ReplyOptions, ToolCallRef};
+
+async fn submit_and_report(
+    session: &RealtimeSession,
+    call: ToolCallRef,
+) -> Result<(), rimelabs_sdk::Error> {
+    let hold = session.hold_response(call.response()).await?;
+    session.submit_tool_result(&call, "done").await?;
+    session.request_reply(ReplyOptions::default().tool_call(call)).await?;
+    drop(hold);
+    Ok(())
+}
+```
+
+Active generation, unresolved tool results, holds, and pending SDK operations
+protect their response. When the ordinary limit is exceeded, the session evicts
+the oldest ordinary response, even if an older response is protected. Ending the
+last protection makes the response eligible for eviction. A hold does not make a
+superseded tool continuation valid. The conversation runner holds delayed playback
+references until reporting ends; its queue limits and playback order still apply.
+
+The session also keeps the last 128 evicted completed response IDs, without
+response metadata or audio. Duplicate completions for these IDs or retained
+completed responses are ignored. Duplicates do not extend the ID history.
+A completion with no retained response or remembered ID fails the session with
+`ErrorKind::Stream`, including an ID that has expired from this history.
+Remembering an evicted ID does not restore its reference. A new response cannot
+reuse an ID still in this history.
+
+A local hold or operation that needs a new protected slot fails with `ErrorKind::ResourceLimit`
+when all 128 slots are in use. The session stays usable. Incoming work that exceeds
+the protected limit fails the session with `ErrorKind::ResourceLimit`. It never evicts a protected
+owner. Cancelled hold acquisition releases an undelivered hold.
+
+There are at most 128 pending requests, 128 ordinary responses, 128 protected
+responses, 128 tools or outputs per response, and 256 queued events. Incoming messages are limited to
 1 MiB. An expired reference fails with `ErrorKind::Input`. A full event queue
 fails with `ErrorKind::ResourceLimit`; consume events during requests. Known
 malformed events fail the session. Unknown events and fields are ignored;

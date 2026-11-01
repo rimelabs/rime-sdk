@@ -58,7 +58,12 @@ impl Worker {
                 _ = tokio::time::sleep_until(deadline) => {},
                 command = self.commands.recv() => {
                     if let Some(mut command) = command {
-                        if self.pending.len() >= 128 {
+                        if command.kind == Kind::Hold {
+                            let result = self.acquire_hold(&command, &wake);
+                            command.finish(result);
+                        } else if let Err(error) = self.admit_command(&command) {
+                            command.finish(Err(error));
+                        } else if self.pending.len() >= 128 {
                             command.finish(Err(Error::new(ErrorKind::ResourceLimit, "too many pending operations")));
                         } else {
                             self.pending.push(command);
@@ -156,6 +161,96 @@ impl Worker {
                     "realtime event consumer is too slow",
                 )
             })
+    }
+    fn protected(&self, r: &Response) -> bool {
+        !r.done
+            || r.holds.iter().any(|hold| hold.strong_count() > 0)
+            || r.calls.values().any(Option::is_none)
+            || self.pending.iter().any(|c| {
+                (!c.finished
+                    && (c.reference.as_ref() == Some(&r.reference)
+                        || c.call
+                            .as_ref()
+                            .is_some_and(|call| call.response == r.reference)))
+                    || (c.accepted.as_ref() == Some(&r.reference)
+                        && c.status.load(Ordering::Acquire) != 1)
+            })
+    }
+    pub(super) fn protected_count(&self) -> usize {
+        self.responses
+            .values()
+            .filter(|r| self.protected(r))
+            .count()
+    }
+    pub(super) fn admit_protection(&self, r: &Response) -> Result<(), Error> {
+        if !self.protected(r) && self.protected_count() >= 128 {
+            return Err(Error::new(
+                ErrorKind::ResourceLimit,
+                "too many protected realtime responses",
+            ));
+        }
+        Ok(())
+    }
+    fn admit_command(&self, c: &Command) -> Result<(), Error> {
+        if let Some(reference) = c
+            .reference
+            .as_ref()
+            .or(c.call.as_ref().map(|call| &call.response))
+        {
+            if let Ok(r) = self.response(reference) {
+                self.admit_protection(r)?;
+            }
+        }
+        Ok(())
+    }
+    fn acquire_hold(&mut self, c: &Command, wake: &Arc<Notify>) -> Result<Answer, Error> {
+        self.prune_responses()?;
+        if c.abandoned() {
+            return Err(Error::cancelled());
+        }
+        let reference = c.reference.as_ref().expect("hold reference");
+        let r = self.response(reference)?;
+        self.admit_protection(r)?;
+        let owner = Arc::new(());
+        self.responses
+            .get_mut(&reference.response_id)
+            .expect("hold response")
+            .holds
+            .push(Arc::downgrade(&owner));
+        Ok(Answer {
+            hold: Some(ResponseHold {
+                owner: Some(owner),
+                wake: wake.clone(),
+            }),
+            ..Answer::default()
+        })
+    }
+    pub(super) fn prune_responses(&mut self) -> Result<(), Error> {
+        let protected = self.protected_count();
+        if protected > 128 {
+            return Err(Error::new(
+                ErrorKind::ResourceLimit,
+                "too many protected realtime responses",
+            ));
+        }
+        let mut ordinary = self.responses.len() - protected;
+        let mut kept = VecDeque::new();
+        while let Some(id) = self.order.pop_front() {
+            let r = self.responses.get_mut(&id).expect("response order");
+            r.holds.retain(|hold| hold.strong_count() > 0);
+            if ordinary > 128 && !self.protected(&self.responses[&id]) {
+                self.responses.remove(&id);
+                self.evicted_responses.push_back(id);
+                if self.evicted_responses.len() > 128 {
+                    self.evicted_responses.pop_front();
+                }
+                ordinary -= 1;
+            } else {
+                kept.push_back(id);
+            }
+        }
+        self.order = kept;
+        Ok(())
     }
     pub(super) fn response(&self, r: &ResponseRef) -> Result<&Response, Error> {
         if r.session_id != self.id {
@@ -287,7 +382,7 @@ impl Worker {
             self.pending.insert(i, c);
             i += 1;
         }
-        Ok(())
+        self.prune_responses()
     }
     fn prepare(&mut self, c: &mut Command) -> Result<bool, Error> {
         if self.pending.iter().any(|p| {
@@ -304,6 +399,7 @@ impl Worker {
             return Ok(true);
         }
         let wire = match c.kind {
+            Kind::Hold => unreachable!("holds are admitted without a wire command"),
             Kind::Text | Kind::Reply => {
                 if let Some(call) = &c.call {
                     let r = self.response(&call.response)?;

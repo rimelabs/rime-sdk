@@ -484,6 +484,7 @@ their request shape, and replies to speech use session labels.
 | `SubmitToolResult` | Record an application result. The same result can be submitted again; a changed result fails. |
 | `ContinueReply` | Wait for the latest tool response and all its results, then request continuation. |
 | `ContinueReplyWithOptions` | Continue a tool round with labels for this reply. |
+| `HoldResponse` | Hold response metadata until `Release`. |
 | `Cancel` | Cancel a retained response. |
 | `SetResponseMetadata` | Replace the labels for later replies once Prism confirms. |
 | `SendAudio` / `ClearAudio` | Convert input PCM or clear the input buffer. |
@@ -559,8 +560,45 @@ text and filler instructions contain at most 500 Unicode scalar values. Input au
 contains complete PCM16 frames and at most 192000 bytes per chunk. Input supports
 mono or stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and
 receives mono 24 kHz PCM. A clear or input-format change resets conversion.
-There are at most 128 pending requests, 128 retained responses, 128 tools or
-outputs per response, and 256 queued events. Incoming messages are limited to
+Use `HoldResponse(ctx, response)` when delayed work needs response metadata.
+Call `Release()` on the returned `*ResponseHold`, normally with `defer`.
+Release is idempotent and safe after session closure.
+Holds send no protocol messages and retain no audio. Multiple holds on one response
+share one protected slot. Release does not wait for space in the command queue.
+
+```go
+hold, err := session.HoldResponse(ctx, call.ResponseRef)
+if err != nil {
+    return err
+}
+defer hold.Release()
+if err := session.SubmitToolResult(ctx, call, "done"); err != nil {
+    return err
+}
+_, err = session.RequestReply(ctx, rime.ReplyOptions{ToolCall: &call})
+return err
+```
+
+Active generation, unresolved tool results, holds, and pending SDK operations
+protect their response. When the ordinary limit is exceeded, the session evicts
+the oldest ordinary response, even if an older response is protected. Ending the
+last protection makes the response eligible for eviction. A hold does not make a
+superseded tool continuation valid. The conversation runner holds delayed playback
+references until reporting ends; its queue limits and playback order still apply.
+
+The session also remembers the last 128 evicted completed response IDs, without
+response metadata or audio. Duplicate completion events for retained responses or
+those IDs are ignored and do not refresh that history. A completion for any other
+ID fails the session with `ErrStream`, including a duplicate whose ID has left
+the history. Remembering an ID does not make its expired reference usable.
+
+A local hold or operation that needs a new protected slot fails with `ErrResourceLimit`
+when all 128 slots are in use. The session stays usable. Incoming work that exceeds
+the protected limit fails the session with `ErrResourceLimit`. It never evicts a protected
+owner. Cancelled hold acquisition releases an undelivered hold.
+
+There are at most 128 pending requests, 128 ordinary responses, 128 protected
+responses, 128 tools or outputs per response, and 256 queued events. Incoming messages are limited to
 1 MiB. Expired references fail with `ErrInput`; a full event queue fails with
 `ErrResourceLimit`. Known malformed events fail the session. Unknown events and
 fields are ignored; unknown enum values become `unknown`.

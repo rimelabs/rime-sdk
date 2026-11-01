@@ -20,7 +20,7 @@ use std::{
     pin::Pin,
     sync::{
         atomic::{AtomicU8, Ordering},
-        Arc, Mutex,
+        Arc, Mutex, Weak,
     },
     task::{Context, Poll},
 };
@@ -112,7 +112,23 @@ impl InterruptPolicies {
     }
 }
 
+/// A local metadata hold. Drop releases it without sending protocol messages.
+/// Holds do not keep the session's last-handle lease alive.
+#[must_use = "keep the guard until all operations using the response are complete"]
+pub struct ResponseHold {
+    owner: Option<Arc<()>>,
+    wake: Arc<Notify>,
+}
+impl Drop for ResponseHold {
+    fn drop(&mut self) {
+        self.owner.take();
+        self.wake.notify_one();
+    }
+}
+
 /// A cloneable Prism session handle. Dropping the last handle requests cleanup.
+/// Retains 128 ordinary and 128 protected responses without audio. Active
+/// generations, unresolved tools, holds and pending operations protect metadata.
 #[derive(Clone)]
 pub struct RealtimeSession {
     lease: Arc<Lease>,
@@ -182,6 +198,7 @@ impl Drop for RealtimeEvents {
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Kind {
+    Hold,
     Text,
     Reply,
     History,
@@ -226,6 +243,7 @@ struct Command {
 }
 #[derive(Default)]
 struct Answer {
+    hold: Option<ResponseHold>,
     history: Vec<super::HistoryItem>,
     info: Option<SessionInfo>,
     response: Option<ResponseRef>,
@@ -271,6 +289,7 @@ impl Command {
     }
 }
 struct Response {
+    holds: Vec<Weak<()>>,
     reference: ResponseRef,
     done: bool,
     continued: bool,
@@ -286,6 +305,7 @@ struct Worker {
     pending: Vec<Command>,
     responses: HashMap<String, Response>,
     order: VecDeque<String>,
+    evicted_responses: VecDeque<String>,
     ready: bool,
     latest: String,
     id: String,
@@ -332,6 +352,7 @@ pub(super) async fn connect(
             pending: vec![],
             responses: HashMap::new(),
             order: VecDeque::new(),
+            evicted_responses: VecDeque::new(),
             ready: false,
             latest: String::new(),
             id: String::new(),
@@ -392,6 +413,17 @@ pub(super) async fn connect(
     })
 }
 impl RealtimeSession {
+    /// Protect response metadata until the returned guard is dropped or the
+    /// session closes. Nested holds share one slot. Local refusal is nonfatal.
+    pub async fn hold_response(&self, reference: &ResponseRef) -> Result<ResponseHold, Error> {
+        let mut command = Command::new(Kind::Hold, json!({}));
+        command.reference = Some(reference.clone());
+        self.invoke(command)
+            .await?
+            .hold
+            .ok_or_else(|| failure("missing response hold"))
+    }
+
     /// An owned snapshot of the current acknowledged server settings.
     pub fn info(&self) -> SessionInfo {
         self.info

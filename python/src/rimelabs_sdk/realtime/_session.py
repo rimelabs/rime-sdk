@@ -139,6 +139,7 @@ class RealtimeSession:
         self._tool_lock = asyncio.Lock()
         self._pending: dict[str, _Pending] = {}
         self._responses: OrderedDict[str, _Response] = OrderedDict()
+        self._completed_response_ids: OrderedDict[str, None] = OrderedDict()
         self._interruption_policies = InterruptionPolicies()
         self._response_interruptions: WeakKeyDictionary[t.ResponseRef, bool] = WeakKeyDictionary()
         self._latest: str | None = None
@@ -227,6 +228,9 @@ class RealtimeSession:
             if not self._protected(state):
                 del self._responses[key]
                 self._response_interruptions.pop(state.ref, None)
+                self._completed_response_ids[key] = None
+                if len(self._completed_response_ids) > _LIMIT:
+                    self._completed_response_ids.popitem(last=False)
                 ordinary -= 1
 
     def hold_response(self, ref: t.ResponseRef | t.ToolCallRef) -> ResponseHold:
@@ -913,7 +917,10 @@ class RealtimeSession:
             self._latest = None
         elif isinstance(payload, t.ResponseStarted):
             ref = payload.response
-            if ref.response_id in self._responses:
+            if (
+                ref.response_id in self._responses
+                or ref.response_id in self._completed_response_ids
+            ):
                 raise RimeStreamError("Duplicate response.created")
             if sum(self._protected(state) for state in self._responses.values()) >= _LIMIT:
                 raise RimeResourceLimitError("Too many protected realtime responses")
@@ -930,9 +937,11 @@ class RealtimeSession:
             self._settle(echo, payload)
         elif isinstance(payload, p.ResponseEnded):
             ended_state = self._responses.get(payload.response.response_id)
-            # Pruning can remove a response as soon as it finishes. A late
-            # terminal event for an expired response has no state to update.
-            if ended_state is None or ended_state.done.is_set():
+            if ended_state is None:
+                if payload.response.response_id in self._completed_response_ids:
+                    return
+                raise RimeStreamError("Event refers to an unknown response")
+            if ended_state.done.is_set():
                 return
             state = ended_state
             state.token = payload.drain_token
@@ -1038,6 +1047,7 @@ class RealtimeSession:
             for state in self._responses.values():
                 state.holds = 0
             self._responses.clear()
+            self._completed_response_ids.clear()
             self._response_interruptions.clear()
             self._reader.cancel()
             await asyncio.gather(self._reader, return_exceptions=True)

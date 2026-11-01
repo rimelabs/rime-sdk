@@ -165,27 +165,14 @@ impl Worker {
                         .resolve(*settings_revision, self.interrupt)?;
                     self.epoch += 1;
                     let id = &response.response_id;
-                    if self.responses.contains_key(id) {
+                    if self.responses.contains_key(id) || self.evicted_responses.contains(id) {
                         return Err(failure("duplicate response.created"));
                     }
-                    if self.order.len() >= 128 {
-                        let old = self.order.front().expect("response order");
-                        if !self.responses[old].done
-                            || self.pending.iter().any(|c| {
-                                !c.finished
-                                    && (c.reference.as_ref().is_some_and(|r| &r.response_id == old)
-                                        || c.call
-                                            .as_ref()
-                                            .is_some_and(|r| &r.response.response_id == old))
-                            })
-                        {
-                            return Err(Error::new(
-                                ErrorKind::ResourceLimit,
-                                "too many retained active responses",
-                            ));
-                        }
-                        self.responses.remove(old);
-                        self.order.pop_front();
+                    if self.protected_count() >= 128 {
+                        return Err(Error::new(
+                            ErrorKind::ResourceLimit,
+                            "too many protected realtime responses",
+                        ));
                     }
                     self.order.push_back(id.clone());
                     self.response_policies
@@ -195,6 +182,7 @@ impl Worker {
                     self.responses.insert(
                         id.clone(),
                         Response {
+                            holds: vec![],
                             reference: response.clone(),
                             done: false,
                             continued: false,
@@ -208,10 +196,13 @@ impl Worker {
                     self.ready = false;
                 }
                 ResponseEnded { response, .. } => {
-                    let r = self
-                        .responses
-                        .get_mut(&response.response_id)
-                        .ok_or_else(|| failure("unknown response"))?;
+                    let Some(r) = self.responses.get_mut(&response.response_id) else {
+                        return if self.evicted_responses.contains(&response.response_id) {
+                            Ok(())
+                        } else {
+                            Err(failure("event refers to an unknown response"))
+                        };
+                    };
                     if r.done {
                         return Ok(());
                     }
@@ -233,6 +224,7 @@ impl Worker {
                     {
                         return Err(failure("tool call ID reused"));
                     }
+                    self.admit_protection(r)?;
                     let r = self
                         .responses
                         .get_mut(&call.response.response_id)
@@ -351,6 +343,6 @@ impl Worker {
                 self.pending[i].ack = Some(e)
             }
         }
-        Ok(())
+        self.prune_responses()
     }
 }
