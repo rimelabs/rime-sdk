@@ -1,0 +1,79 @@
+typescript/tests/realtime-lifetime.test.mjs
+  s_e2ebdd4570c888::t_48528c79eaa6f0 23,30,38,45,64,67,70,72,102-103,133-147
+  s_e2ebdd4570c888::t_850098af244b0b 1-22,24-29,31-37,39-44,46-63,65-66,68-69,71,73-101,104-132
+rust/src/realtime/tests/mod.rs
+  s_e2ebdd4570c888::t_abd91d7ada31b7 15-16
+conformance/prism/response-lifetime.md
+  s_e2ebdd4570c888::t_b3aa1315c9f7ac 1-38
+rust/src/realtime/worker.rs
+  s_e2ebdd4570c888::t_6429809e09006c 179,185,228
+  s_e2ebdd4570c888::t_555d5a199913f8 61-66,165-178,180-184,186-206,208-227,229-250,381,398
+  s_e2ebdd4570c888::t_b4eb284453b08d 207
+typescript/docs/realtime.md
+  s_e2ebdd4570c888::t_b3aa1315c9f7ac 424-452
+go/realtime_conversation.go
+  s_e2ebdd4570c888::t_62f749c3b4b1e8 65,202-206,332,380-384
+rust/src/realtime/tests/submission.rs
+  s_e2ebdd4570c888::t_e5405d4659462e 394-519
+  s_e2ebdd4570c888::t_0bf821927b07f2 260-266
+rust/src/realtime/dispatch.rs
+  s_e2ebdd4570c888::t_555d5a199913f8 171-175,185,199-201,223,342
+rust/src/realtime/mod.rs
+  s_e2ebdd4570c888::t_555d5a199913f8 18
+go/realtime_lifetime_test.go
+  s_e2ebdd4570c888::t_b4eb284453b08d 137
+  s_e2ebdd4570c888::t_ba52c4523d9e05 157-218,227,247,251,254-255,265,274,276
+  s_e2ebdd4570c888::t_e5405d4659462e 219-226,228-246,248-250,252-253,256-264,266-273,275
+  s_e2ebdd4570c888::t_48528c79eaa6f0 277-292
+  s_e2ebdd4570c888::t_e9f60824e39b85 1-3,9-11,25-26,31-32,39-40,47-48,83-84,116-117,156
+  s_e2ebdd4570c888::t_0bf821927b07f2 4-8,12-24,27-30,33-38,41-46,49-82,85-115,118-136,138-155
+conformance/prism/README.md
+  s_e2ebdd4570c888::t_b3aa1315c9f7ac 114-119
+go/realtime_conversation_test.go
+  s_e2ebdd4570c888::t_0bf821927b07f2 532-536,553-557
+typescript/tests/conversation.test.mjs
+  s_e2ebdd4570c888::t_0bf821927b07f2 116
+  s_e2ebdd4570c888::t_409217e54c2041 117-118
+typescript/src/realtime/conversation.ts
+  s_e2ebdd4570c888::t_e28d2ead0757ab 9,66,204,212,293,397
+rust/README.md
+  s_e2ebdd4570c888::t_e879f487132bd9 512-524
+  s_e2ebdd4570c888::t_b3aa1315c9f7ac 472,506-511,525-540
+rust/src/realtime/tests/updates.rs
+  s_e2ebdd4570c888::t_e5405d4659462e 296-299
+  s_e2ebdd4570c888::t_0bf821927b07f2 249,276-277,291
+rust/src/realtime/conversation.rs
+  s_e2ebdd4570c888::t_555d5a199913f8 104,292,505-510,512-514,609
+typescript/src/index.ts
+  s_e2ebdd4570c888::t_e28d2ead0757ab 17
+go/README.md
+  s_e2ebdd4570c888::t_b3aa1315c9f7ac 487,563-595
+rust/src/realtime/tests/lifetime.rs
+  s_e2ebdd4570c888::t_48528c79eaa6f0 1-210
+rust/src/realtime/session.rs
+  s_e2ebdd4570c888::t_555d5a199913f8 23,115-128,130-131,201,246,292,414-424
+go/realtime_session.go
+  s_e2ebdd4570c888::t_62f749c3b4b1e8 34-36,53-84,93,118,603,605-607,786,1066-1067,1075,1096-1098,1175-1218,1223-1232,1234-1260,1266-1268
+  s_e2ebdd4570c888::t_b4eb284453b08d 604,1219-1222,1233
+typescript/src/realtime/session.ts
+  s_e2ebdd4570c888::t_0072921c4f7af6 1187
+  s_e2ebdd4570c888::t_e28d2ead0757ab 63,80-87,221,227-228,231-253,263,1026,1067,1077,1082-1083,1087,1111,1113
+  s_e2ebdd4570c888::t_d46fba646ae38c 222-226,229-230,254-262
+  s_e2ebdd4570c888::t_b4eb284453b08d 210-211,1185-1186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d4bafacaf9dbed04d795976609a5572ab2277d36",
+  "prompts": {},
+  "sessions": {
+    "s_e2ebdd4570c888": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1990f-27a3-7cd2-93f8-b77fc1c6b8db",
+        "model": "gpt-6-astra"
+      },
+      "human_author": null
+    }
+  }
+}
