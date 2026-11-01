@@ -1,0 +1,19 @@
+typescript/examples/tests/tools.test.mjs
+  s_e2ebdd4570c888::t_b9a1ff2d2387e8 112-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ea2358ddb7155454fb45f6758e7ce25fca49a8aa",
+  "prompts": {},
+  "sessions": {
+    "s_e2ebdd4570c888": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1990f-27a3-7cd2-93f8-b77fc1c6b8db",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
