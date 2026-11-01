@@ -15,7 +15,7 @@ pub use client::Realtime;
 pub use conversation::{
     ConversationOutput, ConversationPlayback, ConversationRunner, ConversationSource,
 };
-pub use session::{RealtimeEvents, RealtimeSession};
+pub use session::{RealtimeEvents, RealtimeSession, ResponseHold};
 pub use types::*;
 #[cfg(test)]
 mod tests;

@@ -31,8 +31,9 @@ func realtimeClosedError() error {
 }
 
 // RealtimeSession owns one Prism connection. Consume Recv concurrently with requests.
-// Close waits for the worker and both socket operations. References expire after
-// 128 later responses. Overflow fails explicitly; no writes are replayed.
+// Close waits for the worker and both socket operations. The session retains 128
+// ordinary and 128 protected responses without audio. Active generation, unresolved
+// tools, holds and pending operations protect metadata. Overflow fails explicitly.
 type RealtimeSession struct {
 	normalClose          atomic.Bool
 	op                   *operation
@@ -49,6 +50,38 @@ type RealtimeSession struct {
 	lastSettingsRevision *uint64
 	terminal             error
 }
+
+// ResponseHold retains response metadata. Call Release when the owner is done.
+// Multiple holds share one protected slot. A hold sends no protocol messages.
+// Do not copy a ResponseHold; use the returned pointer.
+type ResponseHold struct {
+	released atomic.Bool
+	wake     chan struct{}
+}
+
+// Release is idempotent, safe after close, and never waits for command queue space.
+func (h *ResponseHold) Release() {
+	if h == nil || h.released.Swap(true) {
+		return
+	}
+	select {
+	case h.wake <- struct{}{}:
+	default:
+	}
+}
+
+// HoldResponse protects metadata until Release or session close. Local capacity
+// refusal leaves the session usable. Use defer hold.Release() after success.
+func (s *RealtimeSession) HoldResponse(ctx context.Context, ref ResponseRef) (*ResponseHold, error) {
+	hold := &ResponseHold{wake: s.wake}
+	_, err := s.invoke(ctx, &rtCommand{kind: "hold", ref: ref, hold: hold})
+	if err != nil {
+		hold.Release()
+		return nil, err
+	}
+	return hold, nil
+}
+
 type rtResult struct {
 	history []HistoryItem
 	info    SessionInfo
@@ -57,6 +90,7 @@ type rtResult struct {
 	err     error
 }
 type rtCommand struct {
+	hold                          *ResponseHold
 	epoch                         uint64
 	finished                      bool
 	delivered                     atomic.Bool
@@ -81,6 +115,7 @@ type rtCommand struct {
 	digest                        [32]byte
 }
 type rtResponse struct {
+	holds                      []*ResponseHold
 	ref                        ResponseRef
 	done, continued, abandoned bool
 	token                      string
@@ -565,7 +600,11 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 		case <-tick.C:
 		case <-s.wake:
 		case c := <-s.commands:
-			if len(w.pending) >= 128 {
+			if c.kind == "hold" {
+				w.finish(c, rtResult{err: w.acquireHold(c)})
+			} else if err := w.admitCommand(c); err != nil {
+				w.finish(c, rtResult{err: err})
+			} else if len(w.pending) >= 128 {
 				w.finish(c, rtResult{err: failure(ErrResourceLimit, "too many pending realtime operations")})
 			} else {
 				w.pending = append(w.pending, c)
@@ -744,7 +783,7 @@ func (w *rtWorker) advance(writes chan<- rtWrite) error {
 		default:
 		}
 	}
-	return nil
+	return w.pruneResponses()
 }
 func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 	// Serialize uncorrelated controls and tool results without blocking the worker.
@@ -1024,13 +1063,8 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		if w.responses[id] != nil {
 			return failure(ErrStream, "duplicate response.created")
 		}
-		if len(w.order) >= 128 {
-			old := w.responses[w.order[0]]
-			if !old.done || w.referencesPending(old.ref) {
-				return failure(ErrResourceLimit, "too many retained active responses")
-			}
-			delete(w.responses, w.order[0])
-			w.order = w.order[1:]
+		if w.protectedCount() >= 128 {
+			return failure(ErrResourceLimit, "too many protected realtime responses")
 		}
 		w.order = append(w.order, id)
 		w.responses[id] = &rtResponse{ref: p.Response, calls: map[string]*[32]byte{}, outputs: map[OutputRef]bool{}}
@@ -1038,10 +1072,7 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		w.ready = false
 	case ResponseEnded:
 		r := w.responses[p.Response.responseID]
-		if r == nil {
-			return failure(ErrStream, "event refers to unknown response")
-		}
-		if r.done {
+		if r == nil || r.done {
 			return nil
 		}
 		r.done = true
@@ -1061,6 +1092,9 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		}
 		if len(r.calls) >= 128 {
 			return failure(ErrResourceLimit, "too many tool calls")
+		}
+		if err := w.admitProtection(r); err != nil {
+			return err
 		}
 		r.calls[p.Call.callID] = nil
 	case MessageStarted:
@@ -1138,11 +1172,100 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 			}
 		}
 	}
+	return w.pruneResponses()
+}
+
+func (w *rtWorker) protected(r *rtResponse) bool {
+	if !r.done || w.referencesPending(r.ref) {
+		return true
+	}
+	for _, hold := range r.holds {
+		if !hold.released.Load() {
+			return true
+		}
+	}
+	for _, result := range r.calls {
+		if result == nil {
+			return true
+		}
+	}
+	return false
+}
+func (w *rtWorker) protectedCount() int {
+	count := 0
+	for _, r := range w.responses {
+		if w.protected(r) {
+			count++
+		}
+	}
+	return count
+}
+func (w *rtWorker) admitProtection(r *rtResponse) error {
+	if !w.protected(r) && w.protectedCount() >= 128 {
+		return failure(ErrResourceLimit, "too many protected realtime responses")
+	}
+	return nil
+}
+func (w *rtWorker) admitCommand(c *rtCommand) error {
+	ref := c.ref
+	if c.call.callID != "" {
+		ref = c.call.ResponseRef
+	}
+	if r := w.responses[ref.responseID]; r != nil && r.ref == ref {
+		return w.admitProtection(r)
+	}
+	return nil
+}
+func (w *rtWorker) acquireHold(c *rtCommand) error {
+	if err := w.pruneResponses(); err != nil {
+		return err
+	}
+	r, err := w.response(c.ref)
+	if c.ctx.Err() != nil {
+		err = operationError(context.Cause(c.ctx), "")
+	}
+	if err == nil {
+		err = w.admitProtection(r)
+	}
+	if err == nil && !c.hold.released.Load() {
+		r.holds = append(r.holds, c.hold)
+	}
+	return err
+}
+func (w *rtWorker) pruneResponses() error {
+	protected := w.protectedCount()
+	if protected > 128 {
+		return failure(ErrResourceLimit, "too many protected realtime responses")
+	}
+	ordinary := len(w.responses) - protected
+	kept := w.order[:0]
+	for _, id := range w.order {
+		r := w.responses[id]
+		holds := r.holds[:0]
+		for _, hold := range r.holds {
+			if !hold.released.Load() {
+				holds = append(holds, hold)
+			}
+		}
+		clear(r.holds[len(holds):])
+		r.holds = holds
+		if ordinary > 128 && !w.protected(r) {
+			delete(w.responses, id)
+			ordinary--
+		} else {
+			kept = append(kept, id)
+		}
+	}
+	clear(w.order[len(kept):])
+	w.order = kept
 	return nil
 }
 
 func (w *rtWorker) referencesPending(ref ResponseRef) bool {
 	for _, c := range w.pending {
+		if c.accepted != nil && *c.accepted == ref && !c.delivered.Load() {
+			return true
+		}
 		if !c.finished && (c.ref == ref || c.call.ResponseRef == ref) {
 			return true
 		}

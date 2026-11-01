@@ -113,6 +113,9 @@ for (const trigger of ["speech", "abandoned"]) {
         consumed = deferred(),
         closed = deferred();
       const session = {
+        holdResponse() {
+          return { release() {} };
+        },
         info: { interruptOnSpeech: true },
         async close() {
           closed.resolve();

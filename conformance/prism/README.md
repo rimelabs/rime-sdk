@@ -111,3 +111,9 @@ The optional `response.prism_truncation` summary on `response.done` follows
 `first_kept_item_id` names the oldest retained item. Decoders preserve absence,
 reject malformed known fields, and accept unknown fields for forward compatibility.
 This reports prompt exclusions and does not remove stored conversation history.
+
+## Response lifetime
+
+The [response lifetime contract](response-lifetime.md) records the common
+ownership rules and links to executable language tests. It does not change the
+Prism wire schema.

@@ -60,6 +60,7 @@ class ResponseState {
   token: string | null = null;
   continued = false;
   abandoned = false;
+  holds = 0;
   constructor(readonly ref: t.ResponseRef) {}
 }
 function outputKey(output: t.OutputRef) {
@@ -76,7 +77,14 @@ function text(value: string) {
     );
 }
 
-/** One conversation. Consume events concurrently with session operations. */
+/** A local metadata hold. Call release() in finally; no wire messages are sent. */
+export interface ResponseHold {
+  release(): void;
+}
+
+/** One conversation. Retains 128 ordinary and 128 protected responses, without
+ * audio. Active generation, unresolved tools and explicit holds protect metadata.
+ * Consume events concurrently with session operations. */
 export class RealtimeSession {
   private readonly created = new Deferred<p.SessionView>();
   private sessionId: string | null = null;
@@ -199,6 +207,8 @@ export class RealtimeSession {
   }
   private response(ref: t.ResponseRef | t.ToolCallRef): ResponseState {
     this.check();
+    if (!ref || typeof ref !== "object" || typeof ref.responseId !== "string")
+      throw new RimeInputError("Invalid response reference");
     if (ref.sessionId !== this.info.sessionId)
       throw new RimeInputError("Reference belongs to another session");
     const state = this.responses.get(ref.responseId);
@@ -207,6 +217,49 @@ export class RealtimeSession {
     if ("callId" in ref && !state.calls.has(ref.callId))
       throw new RimeInputError("Unknown tool call reference");
     return state;
+  }
+  private protected(state: ResponseState): boolean {
+    return (
+      !state.done.isSet ||
+      state.holds > 0 ||
+      [...state.calls.values()].some((result) => result === null)
+    );
+  }
+  private protectedCount(): number {
+    return [...this.responses.values()].filter((state) => this.protected(state))
+      .length;
+  }
+  private admitProtection(state?: ResponseState): void {
+    if ((!state || !this.protected(state)) && this.protectedCount() >= LIMIT)
+      throw new RimeResourceLimitError("Too many protected realtime responses");
+  }
+  private pruneResponses(): void {
+    let ordinary = this.responses.size - this.protectedCount();
+    for (const [id, state] of this.responses) {
+      if (ordinary <= LIMIT) break;
+      if (!this.protected(state)) {
+        this.responses.delete(id);
+        responseInterruptions.delete(state.ref);
+        ordinary--;
+      }
+    }
+  }
+  /** Retain metadata until release or session close. Use try/finally for release.
+   * Nested holds share a protected slot. Local refusal leaves the session usable. */
+  holdResponse(ref: t.ResponseRef | t.ToolCallRef): ResponseHold {
+    const state = this.response(ref);
+    this.admitProtection(state);
+    state.holds++;
+    let owner: RealtimeSession | undefined = this;
+    return {
+      release() {
+        if (owner) {
+          state.holds--;
+          owner.pruneResponses();
+          owner = undefined;
+        }
+      },
+    };
   }
   private track<T>(task: Promise<T>): Promise<T> {
     this.tasks.add(task);
@@ -970,6 +1023,7 @@ export class RealtimeSession {
               response.changed.set();
             }
           }
+        this.pruneResponses();
         this.settle(echo, payload);
         return;
       }
@@ -1010,6 +1064,7 @@ export class RealtimeSession {
         const ref = payload.response;
         if (this.responses.has(ref.responseId))
           throw new RimeStreamError("Duplicate response.created");
+        this.admitProtection();
         responseInterruptions.set(
           ref,
           this.interruptionPolicies.resolve(payload.settingsRevision),
@@ -1019,23 +1074,17 @@ export class RealtimeSession {
         this.latest = ref.responseId;
         this.readyEpoch++;
         this.ready.clear();
-        while (this.responses.size > LIMIT) {
-          const oldest = this.responses.values().next().value!;
-          if (!oldest.done.isSet)
-            throw new RimeResourceLimitError(
-              "Too many retained active responses",
-            );
-          this.responses.delete(oldest.ref.responseId);
-        }
+        this.pruneResponses();
         this.settle(echo, payload);
         break;
       }
       case "response.ended": {
-        const state = this.wireResponse(payload.response.responseId);
-        if (state.done.isSet) return;
+        const state = this.responses.get(payload.response.responseId);
+        if (!state || state.done.isSet) return;
         state.token = payload.drainToken;
         state.done.set();
         state.changed.set();
+        this.pruneResponses();
         for (const [key, pending] of this.pending)
           if (
             pending.request.kind === "response.cancel" &&
@@ -1059,7 +1108,9 @@ export class RealtimeSession {
           throw new RimeResourceLimitError(
             "Too many tool calls in one response",
           );
+        this.admitProtection(state);
         state.calls.set(callId, null);
+        this.pruneResponses();
         break;
       }
       case "message.started": {
@@ -1131,6 +1182,9 @@ export class RealtimeSession {
         }
         await this.socket.close();
         await Promise.allSettled([...this.tasks]);
+        for (const state of this.responses.values())
+          responseInterruptions.delete(state.ref);
+        this.responses.clear();
       })();
     }
     await this.closing;

@@ -246,7 +246,7 @@ async fn unchanged_policies_remain_available_and_evicted_changes_fail_explicitly
 }
 
 #[tokio::test]
-async fn delivered_response_policy_outlives_response_retention_until_next_poll() {
+async fn delivered_response_policy_and_active_response_have_separate_lifetimes() {
     use futures_util::StreamExt;
     let mut p = Peer::with_initial_interruption(true).await;
     let (client, session) = p.setup().await;
@@ -273,11 +273,8 @@ async fn delivered_response_policy_outlives_response_retention_until_next_poll()
     let q = p.next("session.update").await;
     p.send(json!({"type":"session.updated","prism_request_event_id":q["event_id"],"session":{"id":"session-1","voice":"test","prism_effective_interrupt_response":true,"prism_settings_revision":2}})).await;
     barrier.await.unwrap().unwrap();
-    assert_eq!(
-        session.cancel(&first).await.unwrap_err().kind(),
-        crate::ErrorKind::Input,
-        "the worker should have evicted the completed first response"
-    );
+    // The last active generation uses a protected slot, leaving 128 ordinary responses.
+    session.cancel(&first).await.unwrap();
     assert!(session.response_interrupt_on_speech(&first).unwrap());
     let mut refs = vec![first.clone()];
     for _ in 0..256 {
@@ -291,10 +288,15 @@ async fn delivered_response_policy_outlives_response_retention_until_next_poll()
     let last = refs.last().unwrap();
     assert!(session.response_interrupt_on_speech(last).unwrap());
     p.ended(last.response_id()).await;
+    // Completion creates a 129th ordinary response and expires the oldest.
     assert!(matches!(
         events.next().await.unwrap().unwrap().payload,
         RealtimeEvent::ResponseEnded { .. }
     ));
+    assert_eq!(
+        session.cancel(&first).await.unwrap_err().kind(),
+        crate::ErrorKind::Input
+    );
     for reference in refs {
         assert!(
             session.response_interrupt_on_speech(&reference).is_err(),

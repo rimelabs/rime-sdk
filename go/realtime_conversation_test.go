@@ -529,6 +529,11 @@ func TestRealtimeRunnerKeepsPendingFinishedReportOnSpeech(t *testing.T) {
 			first := ResponseRef{"s", "first"}
 			out := OutputRef{response: first, itemID: "first"}
 			session.events <- SessionEvent{Payload: ResponseStarted{Response: first}}
+			hold := <-session.commands
+			if hold.kind != "hold" {
+				t.Fatal(hold.kind)
+			}
+			hold.result <- rtResult{}
 			session.events <- SessionEvent{Payload: MessageStarted{Output: out}}
 			output := rtOutput(t, playback)
 			session.events <- SessionEvent{Payload: ResponseEnded{Response: first, Status: "completed"}}
@@ -545,6 +550,11 @@ func TestRealtimeRunnerKeepsPendingFinishedReportOnSpeech(t *testing.T) {
 			if newer {
 				second := ResponseRef{"s", "second"}
 				session.events <- SessionEvent{Payload: ResponseStarted{Response: second}}
+				hold := <-session.commands
+				if hold.kind != "hold" {
+					t.Fatal(hold.kind)
+				}
+				hold.result <- rtResult{}
 				session.events <- SessionEvent{Payload: MessageStarted{Output: OutputRef{response: second, itemID: "second"}}}
 				rtOutput(t, playback)
 			}

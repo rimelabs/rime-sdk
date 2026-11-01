@@ -6,7 +6,7 @@ import {
   RimeTimeoutError,
 } from "../errors.js";
 import { Deferred } from "./async.js";
-import type { RealtimeSession } from "./session.js";
+import type { RealtimeSession, ResponseHold } from "./session.js";
 import { isSessionCloseError, responseInterruptsSpeech } from "./session.js";
 import { RimeRealtimeError } from "./types.js";
 import type {
@@ -63,6 +63,7 @@ interface Output {
   report?: Promise<void>;
 }
 interface Reply {
+  hold: ResponseHold;
   ref: ResponseRef;
   interruptOnSpeech: boolean;
   outputs: Map<string, Output>;
@@ -200,6 +201,7 @@ export async function runConversation(
         }
         finishing.signal.throwIfAborted();
         replies.delete(reply.ref.responseId);
+        reply.hold.release();
       } finally {
         running.removeEventListener("abort", cancel);
       }
@@ -207,7 +209,7 @@ export async function runConversation(
   }
   function wasInterrupted(responseId: string): boolean {
     let current: string | undefined = responseId;
-    // The session retains at most 128 response references.
+    // Interruption ancestry has its own bounded history.
     for (let count = 0; current !== undefined && count < 128; count++) {
       if (interrupted.has(current)) return true;
       current = parents.get(current);
@@ -288,6 +290,7 @@ export async function runConversation(
           const blocked = wasInterrupted(id);
           if (blocked) interrupted.add(id);
           replies.set(id, {
+            hold: session.holdResponse(payload.response),
             ref: payload.response,
             interruptOnSpeech: responseInterruptsSpeech(
               session,
@@ -391,6 +394,7 @@ export async function runConversation(
       cleanupError ??= error;
     }
     await Promise.allSettled(tasks);
+    for (const reply of replies.values()) reply.hold.release();
     signal?.removeEventListener("abort", abort);
     if (!original) {
       if (failed) throw failureReason;
