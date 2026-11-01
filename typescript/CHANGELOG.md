@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.27](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.26...typescript-v0.1.0-alpha.27) (2026-11-01)
+
+
+### Features
+
+* add realtime response holds across SDKs ([#121](https://github.com/rimelabs/rime-sdk/issues/121)) ([4729933](https://github.com/rimelabs/rime-sdk/commit/4729933648e7c55eaff83556577d0b52046afa6f))
+
 ## [0.1.0-alpha.26](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.25...typescript-v0.1.0-alpha.26) (2026-10-30)
 
 

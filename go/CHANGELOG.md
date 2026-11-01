@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.18](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.17...go/v0.1.0-alpha.18) (2026-11-01)
+
+
+### Features
+
+* add realtime response holds across SDKs ([#121](https://github.com/rimelabs/rime-sdk/issues/121)) ([4729933](https://github.com/rimelabs/rime-sdk/commit/4729933648e7c55eaff83556577d0b52046afa6f))
+
 ## [0.1.0-alpha.17](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.16...go/v0.1.0-alpha.17) (2026-10-30)
 
 
