@@ -109,6 +109,9 @@ for (const scenario of ["completed", "superseded", "refused"]) {
       nextPlayed = resolve;
     });
     const session = {
+      holdResponse() {
+        return { release() {} };
+      },
       info: { interruptOnSpeech: true },
       events: (async function* () {
         while (!ended) {
