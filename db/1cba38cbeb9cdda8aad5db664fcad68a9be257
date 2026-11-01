@@ -1,0 +1,58 @@
+python/src/rimelabs_sdk/realtime/_session.py
+  s_e2ebdd4570c888::t_f5dbe6c573389e 142,231-233,921-922,940-944,1050
+  s_e2ebdd4570c888::t_40fed5596d4bd9 920,923
+rust/src/realtime/tests/submission.rs
+  s_e2ebdd4570c888::t_34f05c8a975af9 28
+rust/README.md
+  s_e2ebdd4570c888::t_34f05c8a975af9 534-536,541
+  s_e2ebdd4570c888::t_edf9cdc5415303 537-540
+go/README.md
+  s_e2ebdd4570c888::t_d6ee4d8a9fcda3 589-594
+python/tests/test_realtime_lifetime.py
+  s_e2ebdd4570c888::t_f3609c8e3e3c48 9,288-291,293-323,325-335
+  s_e2ebdd4570c888::t_01ce65dc3052a1 292,324
+  s_e2ebdd4570c888::t_b5af2721f19fa3 336-337
+typescript/tests/realtime-lifetime.test.mjs
+  s_e2ebdd4570c888::t_4cdef7b0cc7400 42-59,61-87,89-100
+  s_e2ebdd4570c888::t_cd3dfe25ac438f 3-8,60,88
+  s_e2ebdd4570c888::t_b2dc677e47f81d 101
+conformance/prism/response-lifetime.md
+  s_e2ebdd4570c888::t_00f4f672ece3cd 13-20,34-37
+rust/src/realtime/tests/lifetime.rs
+  s_e2ebdd4570c888::t_46f0314fff220a 254-258
+  s_e2ebdd4570c888::t_97f17df02b4bce 211-217,223-253,259-277
+  s_e2ebdd4570c888::t_cd32968ba6097a 218-222
+typescript/docs/realtime.md
+  s_e2ebdd4570c888::t_40c0ece63c88b6 431-438
+go/realtime_session.go
+  s_e2ebdd4570c888::t_d6ee4d8a9fcda3 14,23,135,1066,1078-1084,1263-1268
+python/docs/realtime.md
+  s_e2ebdd4570c888::t_9c90cf1ab89d06 406-420
+typescript/src/realtime/session.ts
+  s_e2ebdd4570c888::t_a3a935c87070de 245-247
+  s_e2ebdd4570c888::t_31829399cdd812 108,243-244,1071-1074,1092-1096,1201
+rust/src/realtime/session.rs
+  s_e2ebdd4570c888::t_34f05c8a975af9 308,355
+rust/src/realtime/dispatch.rs
+  s_e2ebdd4570c888::t_34f05c8a975af9 168,200-204
+rust/src/realtime/worker.rs
+  s_e2ebdd4570c888::t_34f05c8a975af9 243-246
+go/realtime_lifetime_test.go
+  s_e2ebdd4570c888::t_d2ff38836bf1a0 84-150
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "db1cba38cbeb9cdda8aad5db664fcad68a9be257",
+  "prompts": {},
+  "sessions": {
+    "s_e2ebdd4570c888": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1990f-27a3-7cd2-93f8-b77fc1c6b8db",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
