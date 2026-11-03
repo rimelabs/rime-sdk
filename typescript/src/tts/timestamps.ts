@@ -2,7 +2,9 @@ import type { SynthesisResponseTrailer, Timestamps } from "@rimelabs/api";
 import type { Duration } from "@bufbuild/protobuf/wkt";
 import { RimeStreamError } from "../errors.js";
 
-/** A spoken, normalized word with start/end seconds from synthesis start. */
+/** A spoken word with offsets in seconds in the delivered audio.
+ * Coda v2 returns request words; Mist v3 returns normalized words.
+ */
 export interface WordTimestamp {
   readonly text: string;
   readonly start: number;

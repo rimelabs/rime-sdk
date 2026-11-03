@@ -131,7 +131,7 @@ and `PronunciationEntry` from `rimelabs_sdk` when using those options.
 | `audio_format` | Output encoding: `AudioFormat.PCM`, `.WAV`, `.MP3`, `.PCM_24000`, or `.MULAW_8000`. | No | Raw PCM16 at 24 kHz (`PCM_24000`). |
 | `sample_rate` | Requested output rate in Hz: `8000`, `16000`, or `24000`. | No | `24000`; `8000` for `MULAW_8000`. |
 | `time_scale_factor` | Duration multiplier from `0.4` to `2.5`; below `1` speeds speech up, above `1` slows it down. | No | Omitted; normal duration (`1`). |
-| `timestamps` | `True` requests word timings; supported only with Mist v3. | No | `False` |
+| `timestamps` | `True` requests word timings; supported by Coda v2 and Mist v3. | No | `False` |
 | `custom_lexicon` | Sequence of `PronunciationEntry(spelling, pronunciation)` values for Coda; pronunciations use space-separated X-SAMPA. | No | Empty sequence. |
 | `timeout` | Override the overall timeout with positive numeric seconds or `datetime.timedelta`, or `None` to disable it. | No | Inherits the client timeout. |
 
@@ -195,6 +195,15 @@ text and start/end seconds. Nonzero alignment status does not fail the audio.
 The buffer helper returns only bytes, so use an audio stream to access timings.
 Custom lexicons apply to the whole request; the service validates pronunciations
 and model/language support.
+
+Coda v2 returns the original request words, such as `22` or `LiveKit`.
+Mist v3 returns normalized spoken words, such as `twenty` and `two`.
+Times refer to the delivered audio and include the requested speed factor.
+A word the service does not speak can have no span; zero-length spans can occur.
+Timestamp support and limits depend on the deployment. Coda v2 currently aligns
+German, English, Spanish, French, Italian, and Portuguese, with an audio limit
+of 180 seconds. An unsupported language, an exceeded alignment limit, or a
+missing aligner returns a nonzero timestamp status while audio remains available.
 
 ## STT
 

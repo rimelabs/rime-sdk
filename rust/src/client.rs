@@ -59,8 +59,8 @@ pub struct SynthesisOptions {
 }
 
 impl SynthesisOptions {
-    /// Request Mist v3 word timings, available after successful audio consumption.
-    /// Disabled by default. Coda requests with this enabled fail locally.
+    /// Request word timings, available after successful audio consumption.
+    /// Disabled by default. Supported by Coda v2 and Mist v3 deployments.
     pub fn timestamps(mut self, enabled: bool) -> Self {
         self.timestamps = enabled;
         self

@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Client, PronunciationEntry, TimestampStatus, WordTimestamp};
+use crate::{Client, Model, PronunciationEntry, TimestampStatus, WordTimestamp};
 use rimelabs_api::{
     self as protocol,
     text_to_speech_server::{TextToSpeech, TextToSpeechServer},
@@ -463,178 +463,179 @@ fn empty_service_explanations_keep_the_generic_fallback() {
 
 #[tokio::test]
 async fn timestamps_preserve_audio_offsets_and_return_independent_results() {
-    for mode in MODES {
-        for format in FORMATS {
-            let harness = Harness::new(
-                Model::MistV3,
-                Script {
-                    after_gate: vec![trailer(Some(words()))],
-                    ..Default::default()
-                },
-            )
-            .await;
-            let mut audio = start(
-                &harness,
-                mode,
-                SynthesisOptions::default()
-                    .timestamps(true)
-                    .audio_format(format),
-            );
-            let bytes = drain(&mut audio).await.unwrap();
-            assert_eq!(
-                bytes,
-                Converter::new(format)
-                    .process(&[1, 0].repeat(2400), true)
-                    .unwrap()
-            );
-            assert!(
-                harness.service.requests.lock().unwrap()[0]
-                    .timestamps
-                    .unwrap()
-                    .enable
-            );
-            let mut result = audio.timestamps().unwrap();
-            assert_eq!(result, expected_words());
-            result.spans[0].text = "changed".into();
-            result.status.message = "changed".into();
-            audio.close().await;
-            harness.client.close().await;
-            assert_eq!(audio.timestamps().unwrap(), expected_words());
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
+            for format in FORMATS {
+                let harness = Harness::new(
+                    model,
+                    Script {
+                        after_gate: vec![trailer(Some(words()))],
+                        ..Default::default()
+                    },
+                )
+                .await;
+                let mut audio = start(
+                    &harness,
+                    mode,
+                    SynthesisOptions::default()
+                        .timestamps(true)
+                        .audio_format(format),
+                );
+                let bytes = drain(&mut audio).await.unwrap();
+                assert_eq!(
+                    bytes,
+                    Converter::new(format)
+                        .process(&[1, 0].repeat(2400), true)
+                        .unwrap()
+                );
+                assert!(
+                    harness.service.requests.lock().unwrap()[0]
+                        .timestamps
+                        .unwrap()
+                        .enable
+                );
+                let mut result = audio.timestamps().unwrap();
+                assert_eq!(result, expected_words());
+                result.spans[0].text = "changed".into();
+                result.status.message = "changed".into();
+                audio.close().await;
+                harness.client.close().await;
+                assert_eq!(audio.timestamps().unwrap(), expected_words());
+            }
         }
     }
 }
 
 #[tokio::test]
 async fn timestamps_never_consume_audio_or_wait_for_the_trailer() {
-    for mode in MODES {
-        let harness = Harness::new(
-            Model::MistV3,
-            Script {
-                gated: true,
-                after_gate: vec![trailer(Some(words()))],
-                ..Default::default()
-            },
-        )
-        .await;
-        let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
-        assert_eq!(next(&mut audio).await.unwrap().unwrap().len(), 4800);
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
-        harness.service.released.notify_one();
-        finished(&audio).await;
-        // Even a received trailer and successful RPC require consuming the audio EOF.
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
-        assert!(next(&mut audio).await.is_none());
-        assert_eq!(audio.timestamps().unwrap(), expected_words());
-    }
-}
-
-#[tokio::test]
-async fn alignment_failures_and_empty_success_do_not_fail_audio() {
-    for mode in MODES {
-        for code in [0, 1, 3, 4, 8, 12, 14] {
-            let value = protocol::Timestamps {
-                status: Some(protocol::google::rpc::Status {
-                    code,
-                    message: "alignment explanation".into(),
-                    ..Default::default()
-                }),
-                spans: vec![],
-            };
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
             let harness = Harness::new(
-                Model::MistV3,
+                model,
                 Script {
-                    after_gate: vec![trailer(Some(value))],
+                    gated: true,
+                    after_gate: vec![trailer(Some(words()))],
                     ..Default::default()
                 },
             )
             .await;
             let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
-            assert_eq!(drain(&mut audio).await.unwrap().len(), 4800);
-            let result = audio.timestamps().unwrap();
-            assert_eq!(result.status.code, code);
-            assert_eq!(result.status.message, "alignment explanation");
-            assert!(result.spans.is_empty());
+            assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
+            assert_eq!(next(&mut audio).await.unwrap().unwrap().len(), 4800);
+            assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
+            harness.service.released.notify_one();
+            finished(&audio).await;
+            // Even a received trailer and successful RPC require consuming the audio EOF.
+            assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
+            assert!(next(&mut audio).await.is_none());
+            assert_eq!(audio.timestamps().unwrap(), expected_words());
+        }
+    }
+}
+
+#[tokio::test]
+async fn alignment_failures_and_empty_success_do_not_fail_audio() {
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
+            for code in [0, 1, 3, 4, 8, 12, 13, 14] {
+                let value = protocol::Timestamps {
+                    status: Some(protocol::google::rpc::Status {
+                        code,
+                        message: "alignment explanation".into(),
+                        ..Default::default()
+                    }),
+                    spans: vec![],
+                };
+                let harness = Harness::new(
+                    model,
+                    Script {
+                        after_gate: vec![trailer(Some(value))],
+                        ..Default::default()
+                    },
+                )
+                .await;
+                let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
+                assert_eq!(drain(&mut audio).await.unwrap().len(), 4800);
+                let result = audio.timestamps().unwrap();
+                assert_eq!(result.status.code, code);
+                assert_eq!(result.status.message, "alignment explanation");
+                assert!(result.spans.is_empty());
+            }
         }
     }
 }
 
 #[tokio::test]
 async fn malformed_timestamps_fail_only_the_accessor() {
-    let mut cases = vec![
-        ("missing", vec![]),
-        ("empty trailer", vec![trailer(None)]),
-        (
-            "duplicate",
-            vec![trailer(Some(words())), trailer(Some(words()))],
-        ),
-        (
-            "audio after trailer",
-            vec![trailer(Some(words())), audio_frame(vec![0, 0])],
-        ),
-        (
-            "empty audio after trailer",
-            vec![trailer(Some(words())), audio_frame(vec![])],
-        ),
-    ];
-    for name in [
-        "missing status",
-        "failed with spans",
-        "missing start",
-        "missing end",
-        "negative seconds",
-        "negative nanos",
-        "too many seconds",
-        "too many nanos",
-        "blank word",
-        "reversed",
-    ] {
-        let mut value = words();
-        match name {
-            "missing status" => value.status = None,
-            "failed with spans" => value.status.as_mut().unwrap().code = 14,
-            "missing start" => value.spans[0].start = None,
-            "missing end" => value.spans[0].end = None,
-            "negative seconds" => value.spans[0].start.as_mut().unwrap().seconds = -1,
-            "negative nanos" => value.spans[0].start.as_mut().unwrap().nanos = -1,
-            "too many seconds" => value.spans[0].end.as_mut().unwrap().seconds = 315_576_000_001,
-            "too many nanos" => value.spans[0].end.as_mut().unwrap().nanos = 1_000_000_000,
-            "blank word" => value.spans[0].text = " \t\n".into(),
-            "reversed" => value.spans[0].start.as_mut().unwrap().seconds = 2,
-            _ => unreachable!(),
+    for model in [Model::Coda, Model::MistV3] {
+        let mut cases = vec![
+            ("missing", vec![]),
+            ("empty trailer", vec![trailer(None)]),
+            (
+                "duplicate",
+                vec![trailer(Some(words())), trailer(Some(words()))],
+            ),
+            (
+                "audio after trailer",
+                vec![trailer(Some(words())), audio_frame(vec![0, 0])],
+            ),
+            (
+                "empty audio after trailer",
+                vec![trailer(Some(words())), audio_frame(vec![])],
+            ),
+        ];
+        for name in [
+            "missing status",
+            "failed with spans",
+            "missing start",
+            "missing end",
+            "negative seconds",
+            "negative nanos",
+            "too many seconds",
+            "too many nanos",
+            "blank word",
+            "reversed",
+        ] {
+            let mut value = words();
+            match name {
+                "missing status" => value.status = None,
+                "failed with spans" => value.status.as_mut().unwrap().code = 14,
+                "missing start" => value.spans[0].start = None,
+                "missing end" => value.spans[0].end = None,
+                "negative seconds" => value.spans[0].start.as_mut().unwrap().seconds = -1,
+                "negative nanos" => value.spans[0].start.as_mut().unwrap().nanos = -1,
+                "too many seconds" => {
+                    value.spans[0].end.as_mut().unwrap().seconds = 315_576_000_001
+                }
+                "too many nanos" => value.spans[0].end.as_mut().unwrap().nanos = 1_000_000_000,
+                "blank word" => value.spans[0].text = " \t\n".into(),
+                "reversed" => value.spans[0].start.as_mut().unwrap().seconds = 2,
+                _ => unreachable!(),
+            }
+            cases.push((name, vec![trailer(Some(value))]));
         }
-        cases.push((name, vec![trailer(Some(value))]));
-    }
-    for mode in MODES {
-        for (name, frames) in &cases {
-            let harness = Harness::new(
-                Model::MistV3,
-                Script {
-                    after_gate: frames.clone(),
-                    ..Default::default()
-                },
-            )
-            .await;
-            let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
-            assert!(drain(&mut audio).await.unwrap().len() >= 4800, "{name}");
-            let error = audio.timestamps().unwrap_err();
-            assert_eq!(error.kind(), ErrorKind::Stream, "{name}");
-            assert_eq!(error.request_id(), Some("feature-request"), "{name}");
+        for mode in MODES {
+            for (name, frames) in &cases {
+                let harness = Harness::new(
+                    model,
+                    Script {
+                        after_gate: frames.clone(),
+                        ..Default::default()
+                    },
+                )
+                .await;
+                let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
+                assert!(drain(&mut audio).await.unwrap().len() >= 4800, "{name}");
+                let error = audio.timestamps().unwrap_err();
+                assert_eq!(error.kind(), ErrorKind::Stream, "{name}");
+                assert_eq!(error.request_id(), Some("feature-request"), "{name}");
+            }
         }
     }
 }
 
 #[tokio::test]
-async fn timestamp_opt_in_and_model_validation_are_local() {
-    let harness = Harness::new(Model::Coda, Script::default()).await;
-    let error = harness
-        .client
-        .tts()
-        .synthesize("Hello.", SynthesisOptions::default().timestamps(true))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::Input);
-    assert!(error.request_id().is_none());
-    assert!(harness.service.requests.lock().unwrap().is_empty());
+async fn timestamps_require_opt_in() {
     for model in [Model::Coda, Model::MistV3] {
         let harness = Harness::new(
             model,
@@ -655,71 +656,76 @@ async fn timestamp_opt_in_and_model_validation_are_local() {
 
 #[tokio::test]
 async fn rpc_failure_overrides_a_successful_timestamp_trailer_without_replay() {
-    for mode in MODES {
-        let harness = Harness::new(
-            Model::MistV3,
-            Script {
-                gated: true,
-                after_gate: vec![trailer(Some(words()))],
-                final_error: Some(Status::unavailable("disconnected after audio")),
-                ..Default::default()
-            },
-        )
-        .await;
-        let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
-        next(&mut audio).await.unwrap().unwrap();
-        harness.service.released.notify_one();
-        let error = drain(&mut audio).await.unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::Unavailable);
-        assert_eq!(error.message(), "disconnected after audio");
-        assert_eq!(error.request_id(), Some("feature-request"));
-        assert_eq!(
-            audio.timestamps().unwrap_err().kind(),
-            ErrorKind::Unavailable
-        );
-        audio.close().await;
-        assert_eq!(
-            audio.timestamps().unwrap_err().kind(),
-            ErrorKind::Unavailable
-        );
-        assert_eq!(harness.service.requests.lock().unwrap().len(), 1);
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
+            let harness = Harness::new(
+                model,
+                Script {
+                    gated: true,
+                    after_gate: vec![trailer(Some(words()))],
+                    final_error: Some(Status::unavailable("disconnected after audio")),
+                    ..Default::default()
+                },
+            )
+            .await;
+            let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
+            next(&mut audio).await.unwrap().unwrap();
+            harness.service.released.notify_one();
+            let error = drain(&mut audio).await.unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::Unavailable);
+            assert_eq!(error.message(), "disconnected after audio");
+            assert_eq!(error.request_id(), Some("feature-request"));
+            assert_eq!(
+                audio.timestamps().unwrap_err().kind(),
+                ErrorKind::Unavailable
+            );
+            audio.close().await;
+            assert_eq!(
+                audio.timestamps().unwrap_err().kind(),
+                ErrorKind::Unavailable
+            );
+            assert_eq!(harness.service.requests.lock().unwrap().len(), 1);
+        }
     }
 }
 
 #[tokio::test]
 async fn cancellation_before_consumption_cannot_publish_successful_timestamps() {
-    for mode in MODES {
-        for buffered in [false, true] {
-            for cancel in ["stream", "close", "client"] {
-                let harness = Harness::new(
-                    Model::MistV3,
-                    Script {
-                        gated: !buffered,
-                        after_gate: vec![trailer(Some(words()))],
-                        ..Default::default()
-                    },
-                )
-                .await;
-                let mut audio = start(&harness, mode, SynthesisOptions::default().timestamps(true));
-                if buffered {
-                    finished(&audio).await;
-                } else {
-                    next(&mut audio).await.unwrap().unwrap();
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
+            for buffered in [false, true] {
+                for cancel in ["stream", "close", "client"] {
+                    let harness = Harness::new(
+                        model,
+                        Script {
+                            gated: !buffered,
+                            after_gate: vec![trailer(Some(words()))],
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+                    let mut audio =
+                        start(&harness, mode, SynthesisOptions::default().timestamps(true));
+                    if buffered {
+                        finished(&audio).await;
+                    } else {
+                        next(&mut audio).await.unwrap().unwrap();
+                    }
+                    match cancel {
+                        "stream" => audio.cancel(),
+                        "close" => audio.close().await,
+                        "client" => harness.client.close().await,
+                        _ => unreachable!(),
+                    }
+                    assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Cancelled);
+                    if cancel != "close" {
+                        assert_eq!(
+                            drain(&mut audio).await.unwrap_err().kind(),
+                            ErrorKind::Cancelled
+                        );
+                    }
+                    assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Cancelled);
                 }
-                match cancel {
-                    "stream" => audio.cancel(),
-                    "close" => audio.close().await,
-                    "client" => harness.client.close().await,
-                    _ => unreachable!(),
-                }
-                assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Cancelled);
-                if cancel != "close" {
-                    assert_eq!(
-                        drain(&mut audio).await.unwrap_err().kind(),
-                        ErrorKind::Cancelled
-                    );
-                }
-                assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Cancelled);
             }
         }
     }
@@ -727,69 +733,73 @@ async fn cancellation_before_consumption_cannot_publish_successful_timestamps() 
 
 #[tokio::test]
 async fn overall_deadline_remains_active_until_audio_is_consumed() {
-    for mode in MODES {
+    for model in [Model::Coda, Model::MistV3] {
+        for mode in MODES {
+            let harness = Harness::new(
+                model,
+                Script {
+                    after_gate: vec![trailer(Some(words()))],
+                    ..Default::default()
+                },
+            )
+            .await;
+            let mut audio = start(
+                &harness,
+                mode,
+                SynthesisOptions::default()
+                    .timestamps(true)
+                    .timeout(Some(Duration::from_secs(2))),
+            );
+            finished(&audio).await;
+            assert!(audio.outcome.borrow().as_ref().unwrap().is_ok());
+            // The RPC and its timer are gone, but unread audio is still subject to
+            // the overall deadline. Move time only after all network work settles.
+            tokio::time::pause();
+            tokio::time::advance(Duration::from_secs(3)).await;
+            assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
+            assert_eq!(
+                drain(&mut audio).await.unwrap_err().kind(),
+                ErrorKind::Timeout
+            );
+            audio.close().await;
+            assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
+            tokio::time::resume();
+        }
+    }
+}
+
+#[tokio::test]
+async fn source_failure_is_returned_by_both_audio_and_timestamps() {
+    for model in [Model::Coda, Model::MistV3] {
         let harness = Harness::new(
-            Model::MistV3,
+            model,
             Script {
                 after_gate: vec![trailer(Some(words()))],
                 ..Default::default()
             },
         )
         .await;
-        let mut audio = start(
-            &harness,
-            mode,
-            SynthesisOptions::default()
-                .timestamps(true)
-                .timeout(Some(Duration::from_secs(2))),
-        );
-        finished(&audio).await;
-        assert!(audio.outcome.borrow().as_ref().unwrap().is_ok());
-        // The RPC and its timer are gone, but unread audio is still subject to
-        // the overall deadline. Move time only after all network work settles.
-        tokio::time::pause();
-        tokio::time::advance(Duration::from_secs(3)).await;
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
+        let mut audio = harness
+            .client
+            .tts()
+            .stream(
+                futures_util::stream::iter([
+                    Ok("Hello. ".to_owned()),
+                    Err(Error::input(std::io::Error::other("source failed"))),
+                ]),
+                SynthesisOptions::default().timestamps(true),
+            )
+            .unwrap();
         assert_eq!(
             drain(&mut audio).await.unwrap_err().kind(),
-            ErrorKind::Timeout
+            ErrorKind::Input
         );
-        audio.close().await;
-        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Timeout);
-        tokio::time::resume();
+        assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
+        assert_eq!(
+            audio.timestamps().unwrap_err().message(),
+            "input source failed"
+        );
     }
-}
-
-#[tokio::test]
-async fn source_failure_is_returned_by_both_audio_and_timestamps() {
-    let harness = Harness::new(
-        Model::MistV3,
-        Script {
-            after_gate: vec![trailer(Some(words()))],
-            ..Default::default()
-        },
-    )
-    .await;
-    let mut audio = harness
-        .client
-        .tts()
-        .stream(
-            futures_util::stream::iter([
-                Ok("Hello. ".to_owned()),
-                Err(Error::input(std::io::Error::other("source failed"))),
-            ]),
-            SynthesisOptions::default().timestamps(true),
-        )
-        .unwrap();
-    assert_eq!(
-        drain(&mut audio).await.unwrap_err().kind(),
-        ErrorKind::Input
-    );
-    assert_eq!(audio.timestamps().unwrap_err().kind(), ErrorKind::Input);
-    assert_eq!(
-        audio.timestamps().unwrap_err().message(),
-        "input source failed"
-    );
 }
 
 fn output_contract() -> serde_json::Value {
@@ -1101,5 +1111,86 @@ async fn fixed_buffer_limit() {
             assert!(error.message().contains("64 MiB"));
         }
         harness.client.close().await;
+    }
+}
+
+#[tokio::test]
+async fn coda_preserves_request_words_and_delivered_audio_offsets() {
+    for mode in MODES {
+        let mut value = words();
+        value.spans[0].text = "22".into();
+        value.spans[0].start = Some(Default::default());
+        value.spans[0].end = Some(Default::default());
+        value.spans[0].end.as_mut().unwrap().seconds = 1;
+        value.spans[1].text = "LiveKit".into();
+        value.spans[1].start.as_mut().unwrap().nanos = 0;
+        let mut zero = value.spans[1].clone();
+        zero.text = "to".into();
+        zero.start = zero.end;
+        value.spans.push(zero);
+        let harness = Harness::new(
+            Model::Coda,
+            Script {
+                after_gate: vec![trailer(Some(value))],
+                ..Default::default()
+            },
+        )
+        .await;
+        let options = SynthesisOptions::default()
+            .timestamps(true)
+            .language("de")
+            .audio_format(AudioFormat::Mulaw8000)
+            .time_scale_factor(2.0)
+            .custom_lexicon(vec![PronunciationEntry::new("LiveKit", "l aI v k I t")]);
+        let mut audio = match mode {
+            InputMode::String => harness
+                .client
+                .tts()
+                .synthesize("22 LiveKit to missing.", options),
+            InputMode::Incremental => harness.client.tts().stream(
+                futures_util::stream::iter([Ok("22 Live".into()), Ok("Kit to missing.".into())]),
+                options,
+            ),
+        }
+        .unwrap();
+        assert!(!drain(&mut audio).await.unwrap().is_empty());
+        let request = harness.service.requests.lock().unwrap()[0].clone();
+        assert!(request.timestamps.unwrap().enable);
+        assert_eq!(request.language.as_deref(), Some("de"));
+        assert_eq!(request.custom_lexicon[0].spelling, "LiveKit");
+        assert_eq!(
+            request.audio_parameters.unwrap().time_scale_factor,
+            Some(2.0)
+        );
+        assert_eq!(
+            harness.service.texts.lock().unwrap().concat(),
+            "22 LiveKit to missing."
+        );
+        assert_eq!(
+            audio.timestamps().unwrap(),
+            TimestampResult {
+                status: TimestampStatus {
+                    code: 0,
+                    message: String::new()
+                },
+                spans: vec![
+                    WordTimestamp {
+                        text: "22".into(),
+                        start: 0.0,
+                        end: 1.0
+                    },
+                    WordTimestamp {
+                        text: "LiveKit".into(),
+                        start: 1.0,
+                        end: 2.0
+                    },
+                    WordTimestamp {
+                        text: "to".into(),
+                        start: 2.0,
+                        end: 2.0
+                    },
+                ],
+            }
+        );
     }
 }

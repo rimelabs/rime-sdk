@@ -3,7 +3,7 @@ use crate::{
     client::{validate_timeout, Inner},
     error::request_id,
     timestamps::TimestampTrailer,
-    AudioFormat, Error, ErrorKind, Model, SynthesisOptions, TimestampResult,
+    AudioFormat, Error, ErrorKind, SynthesisOptions, TimestampResult,
 };
 use bytes::Bytes;
 use futures_core::Stream;
@@ -230,12 +230,6 @@ pub(crate) fn start<S>(
 where
     S: Stream<Item = Result<String, Error>> + Send + 'static,
 {
-    if options.timestamps && client.model != Model::MistV3 {
-        return Err(Error::new(
-            ErrorKind::Input,
-            "word timestamps are supported only with Model::MistV3",
-        ));
-    }
     let timeout = options.timeout.unwrap_or(client.timeout);
     validate_timeout(timeout)?;
     let (format, sample_rate) = resolve_audio(

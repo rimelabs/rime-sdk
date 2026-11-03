@@ -37,7 +37,7 @@ type SynthesisOptions struct {
 	SampleRate      int      // 8000, 16000, or 24000 Hz. Zero selects the format's default.
 	TimeScaleFactor *float64 // Duration multiplier, 0.4–2.5. Nil preserves normal speed (1).
 	Timeout         *time.Duration
-	Timestamps      bool                 // Request final word timestamps; supported only with Model="mistv3".
+	Timestamps      bool                 // Request final word timestamps from Coda v2 or Mist v3.
 	CustomLexicon   []PronunciationEntry // Request-wide overrides; copied when the stream is created.
 }
 

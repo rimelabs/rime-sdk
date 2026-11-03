@@ -69,7 +69,7 @@ builders. Import `AudioFormat`, `Model`, and `PronunciationEntry` from
 | `.audio_format(format)` | Output encoding: `AudioFormat::Pcm`, `Wav`, `Mp3`, `Pcm24000`, or `Mulaw8000`. | No | Raw PCM16 at 24 kHz. |
 | `.sample_rate(rate)` | Requested output rate in Hz: `8000`, `16000`, or `24000`. | No | `24000`; `8000` for `Mulaw8000`. |
 | `.time_scale_factor(factor)` | `f32` duration multiplier from `0.4` to `2.5`; below `1` speeds speech up, above `1` slows it down. | No | Omitted; normal duration (`1`). |
-| `.timestamps(enabled)` | `true` requests word timings; supported only with Mist v3. | No | `false` |
+| `.timestamps(enabled)` | `true` requests word timings; supported by Coda v2 and Mist v3. | No | `false` |
 | `.custom_lexicon(entries)` | `Vec<PronunciationEntry>` for Coda, created with `PronunciationEntry::new(spelling, pronunciation)`; pronunciations use space-separated X-SAMPA. | No | Empty vector. |
 | `.timeout(budget)` | `Some(Duration)` overrides the overall timeout; `None` disables it. Zero is invalid. | No | Inherits the client timeout. |
 
@@ -137,6 +137,15 @@ and `spans` with word text and start/end seconds. Nonzero alignment status does
 not fail the audio. The buffer helper returns only bytes, so use an audio stream
 to access timings. Custom lexicons apply to the whole request; the options own
 their entries, and the service validates pronunciations and model/language support.
+
+Coda v2 returns the original request words, such as `22` or `LiveKit`.
+Mist v3 returns normalized spoken words, such as `twenty` and `two`.
+Times refer to the delivered audio and include the requested speed factor.
+A word the service does not speak can have no span; zero-length spans can occur.
+Timestamp support and limits depend on the deployment. Coda v2 currently aligns
+German, English, Spanish, French, Italian, and Portuguese, with an audio limit
+of 180 seconds. An unsupported language, an exceeded alignment limit, or a
+missing aligner returns a nonzero timestamp status while audio remains available.
 
 ## STT
 
