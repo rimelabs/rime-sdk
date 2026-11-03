@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.28](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.27...typescript-v0.1.0-alpha.28) (2026-11-03)
+
+
+### Features
+
+* support Coda timestamps across SDKs ([#126](https://github.com/rimelabs/rime-sdk/issues/126)) ([d7c2e3c](https://github.com/rimelabs/rime-sdk/commit/d7c2e3c0f909244633566f5c2f7a2ec9d0adf74c))
+
 ## [0.1.0-alpha.27](https://github.com/rimelabs/rime-sdk/compare/typescript-v0.1.0-alpha.26...typescript-v0.1.0-alpha.27) (2026-11-01)
 
 
