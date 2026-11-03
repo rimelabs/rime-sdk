@@ -1,0 +1,69 @@
+typescript/src/tts/client.ts
+  s_5e9fd8f764259c::t_7014b4f012f499 31
+go/README.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 55,147-154
+  s_5e9fd8f764259c::t_3620975f809a85 155
+go/timestamps.go
+  s_5e9fd8f764259c::t_7014b4f012f499 12
+  s_5e9fd8f764259c::t_2eebfb9c644c56 13-14
+python/tests/test_timestamps.py
+  s_5e9fd8f764259c::t_89886b941be1d9 8,205-211
+  s_5e9fd8f764259c::t_364b6de9c56af3 196-204
+  s_5e9fd8f764259c::t_48d3111aa476ac 43-44,46,60-61,92-94,99,118-119,128-132,134-143,158-159,172-173,182-183,191-195,212-234
+rust/README.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 72,141-148
+  s_5e9fd8f764259c::t_56cb8ad54c1a0d 149
+typescript/tests/timestamps.test.mjs
+  s_5e9fd8f764259c::t_48d3111aa476ac 1,49,256,263,271,280,283,341
+  s_5e9fd8f764259c::t_364b6de9c56af3 50-59,61-68,70-101,103-117,120-186,189-205,207-252,255,257-262,264-270,272-279,281-282,284-340
+go/timestamps_test.go
+  s_5e9fd8f764259c::t_364b6de9c56af3 7,10,49-58,61-66,68-73,75-78,81,83,94-132,141-153,162-172,174-187,196-209,217-236,244-253,255-273,282-284,287,295-345
+  s_5e9fd8f764259c::t_2dd74fb33af927 41,48,80,86,88,92-93,138-140,160-161,193-195,210,215-216,237,242-243,275-281,294
+typescript/docs/tts.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 73,181,183-184,190,211-230,242
+typescript/README.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 156,220-227
+  s_5e9fd8f764259c::t_435458c3ba3858 228
+python/src/rimelabs_sdk/tts/_timestamps.py
+  s_5e9fd8f764259c::t_7014b4f012f499 10-13
+rust/src/stream.rs
+  s_5e9fd8f764259c::t_2dd74fb33af927 6
+python/README.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 134,199-206
+  s_5e9fd8f764259c::t_110e9e4f937c15 207
+rust/src/timestamps.rs
+  s_5e9fd8f764259c::t_7014b4f012f499 4-5,9
+typescript/src/tts/timestamps.ts
+  s_5e9fd8f764259c::t_7014b4f012f499 5-7
+python/docs/tts.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 70,182,184-185,195,215-234,246
+README.md
+  s_5e9fd8f764259c::t_3c264fa01bb53d 28,34-36
+rust/src/tests/tts_features.rs
+  s_5e9fd8f764259c::t_2eebfb9c644c56 2
+  s_5e9fd8f764259c::t_2dd74fb33af927 466,509,511,514,570,638,659,694,736,775,1116-1130,1139-1145,1150,1153,1156-1160
+  s_5e9fd8f764259c::t_99a3e38ebb1a66 467-507,512,516,522-530,538-563,571-615,617-632,660-688,695-727,737-773,782-792,795-800,1131-1138,1146-1149,1151-1152,1154-1155,1161-1196
+  s_5e9fd8f764259c::t_7415e7c87d32d3 508
+  s_5e9fd8f764259c::t_2337df297649de 510
+rust/src/client.rs
+  s_5e9fd8f764259c::t_2dd74fb33af927 62
+  s_5e9fd8f764259c::t_7014b4f012f499 63
+go/client.go
+  s_5e9fd8f764259c::t_7014b4f012f499 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "89c29643395dad8bb01367311b51f8b7e8d60658",
+  "prompts": {},
+  "sessions": {
+    "s_5e9fd8f764259c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a29f-44f7-7980-ac76-47bd667f9988",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
