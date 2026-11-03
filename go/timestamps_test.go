@@ -251,7 +251,7 @@ func TestCancelledTimestamps(t *testing.T) {
 						t.Fatal(err)
 					}
 					defer stream.Close()
-			if _, err := stream.Recv(); err != nil {
+					if _, err := stream.Recv(); err != nil {
 						t.Fatal(err)
 					}
 					expected := ErrCancelled
