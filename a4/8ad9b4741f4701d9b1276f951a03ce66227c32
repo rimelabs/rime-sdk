@@ -1,0 +1,19 @@
+go/timestamps_test.go
+  s_5e9fd8f764259c::t_003377fe054d72 254
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a48ad9b4741f4701d9b1276f951a03ce66227c32",
+  "prompts": {},
+  "sessions": {
+    "s_5e9fd8f764259c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a29f-44f7-7980-ac76-47bd667f9988",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
