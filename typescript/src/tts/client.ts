@@ -28,7 +28,7 @@ export interface SynthesisOptions {
   sampleRate?: number | null;
   /** Duration multiplier from 0.4 to 2.5. Below 1 speeds speech up; above 1 slows it down. */
   timeScaleFactor?: number | null;
-  /** Request final word timestamps. Supported only with model="mistv3". */
+  /** Request final word timestamps from Coda v2 or Mist v3. */
   timestamps?: boolean;
   /** Request-wide pronunciation overrides; requires a phoneme-capable Coda deployment. */
   customLexicon?: readonly PronunciationEntry[];
@@ -135,10 +135,6 @@ export class TTS {
       options.timestamps === undefined ? false : options.timestamps;
     if (typeof timestamps !== "boolean")
       throw new RimeInputError("timestamps must be a boolean");
-    if (timestamps && this.deployment.model !== "mistv3")
-      throw new RimeInputError(
-        "Word timestamps are supported only with model='mistv3'",
-      );
     const voice =
       options.voice === undefined || options.voice === null
         ? this.deployment.defaultVoice

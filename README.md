@@ -25,13 +25,15 @@ Coda is the default TTS model. Select `mistv3` to use Mist v3:
 The SDK selects the model's endpoint and default voice. Both models use the same
 streaming and discovery methods. Mist v1 and v2 are not supported.
 
-Mist v3 also supports opt-in word timestamps: pass `timestamps=True` in Python,
+Coda v2 and Mist v3 support opt-in word timestamps: pass `timestamps=True` in Python,
 `{ timestamps: true }` in Node.js, `SynthesisOptions{Timestamps: true}` in Go, or
 `SynthesisOptions::default().timestamps(true)` in Rust.
 After fully consuming audio, use `await stream.timestamps()` (Python/Node.js),
 `stream.Timestamps()` (Go), or `stream.timestamps()` (Rust).
 The final result includes status and word start/end
-times in seconds. Timestamps are delivered after generation, not incrementally.
+times in seconds in the delivered audio. Coda v2 spans name the original request
+words; Mist v3 spans name normalized spoken words. Alignment failures do not fail
+successful audio. Timestamps are delivered after generation, not incrementally.
 
 Coda supports request-wide pronunciation overrides through `custom_lexicon`
 (Python), `customLexicon` (Node.js), `CustomLexicon` (Go), or

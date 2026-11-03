@@ -9,8 +9,9 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
-// WordTimestamp is a spoken, normalized word. Start and End are seconds from
-// the beginning of the entire synthesis, independent of the output sample rate.
+// WordTimestamp is a spoken word. Coda v2 returns request words; Mist v3 returns
+// normalized words. Start and End are seconds from the beginning of the delivered
+// audio, independent of the output sample rate.
 type WordTimestamp struct {
 	Text  string
 	Start float64

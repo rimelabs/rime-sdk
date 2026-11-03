@@ -87,9 +87,6 @@ func (t *TTSService) Stream(ctx context.Context, source TextSource, options Synt
 	if err != nil {
 		return nil, err
 	}
-	if options.Timestamps && t.client.model != "mistv3" {
-		return nil, failure(ErrInput, "word timestamps are supported only with Model=mistv3")
-	}
 	if source == nil {
 		return nil, failure(ErrInput, "text source must not be nil")
 	}

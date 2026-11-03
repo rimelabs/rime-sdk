@@ -1,11 +1,12 @@
 use crate::{Error, ErrorKind};
 use rimelabs_api::{SynthesisResponseTrailer, Timestamps};
 
-/// A spoken, normalized word with offsets in seconds from synthesis start.
+/// A spoken word with offsets in seconds in the delivered audio.
+/// Coda v2 returns request words; Mist v3 returns normalized words.
 /// Offsets are independent of the output audio sample rate.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WordTimestamp {
-    /// The normalized word spoken by the service.
+    /// The request word for Coda v2, or normalized word for Mist v3.
     pub text: String,
     /// Start offset in seconds.
     pub start: f64,

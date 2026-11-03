@@ -146,8 +146,6 @@ class _TTS:
         lexicon = snapshot(custom_lexicon)
         if not isinstance(timestamps, bool):
             raise RimeInputError("timestamps must be a boolean")
-        if timestamps and self._model != "mistv3":
-            raise RimeInputError("Word timestamps are supported only with model='mistv3'")
         voice = self._policy.default_voice if voice is None else _policy.nonempty(voice, "voice")
         _policy.nonempty(language, "language")
         profile, sample_rate = resolve_audio(audio_format, sample_rate, time_scale_factor)

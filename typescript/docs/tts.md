@@ -70,7 +70,7 @@ an async iterable of strings. All three accept the following settings:
 | `audioFormat` | `AudioFormat.PCM` (24 kHz) | Output encoding, imported from `@rimelabs/sdk` |
 | `sampleRate` | `24000` (or fixed preset rate) | Requested output rate: `8000`, `16000`, or `24000` Hz |
 | `timeScaleFactor` | Omitted (normal duration) | Duration multiplier from `0.4` to `2.5`; below 1 is faster, above 1 is slower |
-| `timestamps` | `false` | Request final word timestamps; requires `model: "mistv3"` |
+| `timestamps` | `false` | Request final word timestamps from Coda v2 or Mist v3 |
 | `customLexicon` | `[]` | Array of pronunciation overrides for this request; requires Coda |
 | `timeout` | Client setting | Seconds; pass `null` to disable the overall deadline |
 
@@ -178,15 +178,16 @@ preserves the offending spelling and checks such as `no-primary-stress` or
 `unknown-phone`, and `requestId` identifies the request. The whole request fails;
 entries are never silently skipped or repaired.
 
-## Word timestamps (Mist v3)
+## Word timestamps (Coda v2 and Mist v3)
 
-Enable timestamps on a synthesis, consume all audio, then read its result:
+Enable timestamps on a synthesis, consume all audio, then read its result.
+Select `coda` for Coda v2 or `mistv3` for Mist v3:
 
 ```javascript
 import { writeFile } from "node:fs/promises";
 import { Rime } from "@rimelabs/sdk";
 
-const client = new Rime({ model: "mistv3", timeout: 60 });
+const client = new Rime({ model: "coda", timeout: 60 });
 try {
   const audio = client.tts.synthesize("Hello world.", { timestamps: true });
   await writeFile("speech.pcm", audio);
@@ -207,8 +208,26 @@ try {
 `@rimelabs/sdk`. The result is immutable. `spans` is an array of words with `text`,
 `start`, and `end`; times are seconds from the beginning of the entire synthesis,
 including when text arrives incrementally. Resampling to `MULAW_8000` does not
-change these times. Words reflect normalized spoken text, so a number may become
-several words. The model supplies the timings; the SDK does not estimate them.
+change these times. Times include the requested speed factor; the SDK preserves
+the service's values without scaling them again.
+
+Coda v2 spans name the original request words, such as `22` and `LiveKit`,
+including words with custom pronunciations. Mist v3 spans name normalized spoken
+words, so `22` can become `twenty` and `two`. Words removed by the service or
+past the end of speech can have no span. A successful status does not guarantee
+a span for every input word. Zero-length spans can occur. The service supplies
+the timings; the SDK does not estimate them.
+
+For streamed input, the request text is the chunks joined exactly as sent.
+Preserve word boundaries: `"Live"` followed by `"Kit "` forms `"LiveKit "`, while
+`"there."` followed by `"How"` forms `"there.How"`.
+
+Timestamp support depends on the deployment. Coda v2 currently aligns German,
+English, Spanish, French, Italian, and Portuguese. Its aligner accepts up to
+180 seconds of audio, subject to additional model limits, and has a 10-second
+branch deadline. The service reports unsupported languages and alignment limits
+in the timestamp status; they do not fail successful audio. Coda deployments
+without an aligner return status code `12`.
 
 Timestamps arrive once, after generation finishes. They are not incremental
 events for live interruption handling. `timestamps()` never consumes audio or
@@ -220,8 +239,7 @@ accessible after a successfully consumed stream or its client is closed.
 `12` (unimplemented) or `4` (deadline exceeded) carry an explanation and no spans;
 they do not fail successful audio. Missing or malformed timestamp responses reject
 with `RimeStreamError` only when reading timestamps. A synthesis error or
-cancellation also prevents reading a successful timestamp result. Enabling
-timestamps with Coda throws `RimeInputError` before any request is sent.
+cancellation also prevents reading a successful timestamp result.
 
 ## Discover voices and languages
 

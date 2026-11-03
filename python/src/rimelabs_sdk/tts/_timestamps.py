@@ -7,7 +7,10 @@ from .._errors import RimeStreamError
 
 @dataclass(frozen=True)
 class WordTimestamp:
-    """A spoken, normalized word with start/end seconds from synthesis start."""
+    """A spoken word with offsets in seconds in the delivered audio.
+
+    Coda v2 returns request words; Mist v3 returns normalized words.
+    """
 
     text: str
     start: float
