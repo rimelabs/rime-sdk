@@ -1,0 +1,19 @@
+python/tests/test_realtime_prism_settings.py
+  s_c357d2954de5b3::t_2de001f5eff641 365-387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d8260ce6cdcb2a8a7c609414b3f391e80c8865d1",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
