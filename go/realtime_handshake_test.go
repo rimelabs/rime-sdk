@@ -22,7 +22,11 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 		detail string
 	}{
 		{401, "Authentication failed", ErrAuthentication, "Authentication failed"},
-		{403, "Forbidden", ErrAuthentication, "Forbidden"},
+		{403, "Forbidden", ErrPermission, "Forbidden"},
+		{402, "", ErrBilling, "available credits"},
+		{402, `{"error":{"kind":"insufficient_credits","message":"No credits remain"}}`, ErrBilling, "No credits remain"},
+		{403, `{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}`, ErrPermission, "Billing is inactive"},
+		{402, `{"error":{"kind":42,"message":"No credits remain"}}`, ErrBilling, "No credits remain"},
 		{429, "Currently at websocket limit", ErrResourceLimit, "websocket limit"},
 		{429, "", ErrResourceLimit, "connection or rate limit reached"},
 		{503, "conversation capacity reached", ErrUnavailable, "capacity reached"},
@@ -82,6 +86,11 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 				}
 				if cause := errors.Unwrap(sdkError); cause == nil || !strings.Contains(cause.Error(), fmt.Sprintf("HTTP %d", tc.status)) {
 					t.Fatalf("missing HTTP status in cause: %v", cause)
+				}
+				expectedKind := map[int]string{402: "insufficient_credits", 403: "billing_inactive"}[tc.status]
+				serverKind, present := sdkError.ServerKind()
+				if structured := strings.Contains(tc.body, `"kind":"`); present != structured || (structured && serverKind != expectedKind) {
+					t.Fatalf("server kind=%q present=%v", serverKind, present)
 				}
 				if _, ok := sdkError.CloseCode(); ok {
 					t.Fatal("HTTP refusal has a close code")

@@ -56,6 +56,7 @@ export async function transcribe(
   );
   let call: grpc.ClientUnaryCall | undefined;
   let id: string | null = null;
+  let initialMetadata: grpc.Metadata | undefined;
   try {
     deadline.signal.throwIfAborted();
     const result = await abortable(
@@ -80,6 +81,7 @@ export async function transcribe(
         );
         call.on("metadata", (headers: grpc.Metadata) => {
           id = requestId(headers);
+          initialMetadata = headers;
         });
         call.on("status", (status: grpc.StatusObject) => {
           id ??= requestId(status.metadata);
@@ -105,7 +107,7 @@ export async function transcribe(
         throw new RimeTimeoutError(reason.message, id);
       throw new RimeCancelledError("Transcription cancelled", id);
     }
-    throw nativeError(error, id);
+    throw nativeError(error, id, initialMetadata);
   } finally {
     call?.cancel();
     deadline.dispose();

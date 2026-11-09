@@ -278,6 +278,7 @@ Each SDK error inherits from `RimeError`:
 | Error | Meaning |
 | --- | --- |
 | `RimeAuthenticationError` | Missing or rejected credentials |
+| `RimeBillingError` | Insufficient prepaid credits |
 | `RimePermissionError` | Access denied |
 | `RimeInputError` | Invalid input or client use |
 | `RimeResourceLimitError` | Service resource limit reached |

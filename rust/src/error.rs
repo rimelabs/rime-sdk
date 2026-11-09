@@ -8,6 +8,8 @@ pub enum ErrorKind {
     Authentication,
     /// Credentials lack permission.
     Permission,
+    /// The account has insufficient prepaid credits.
+    Billing,
     /// Invalid configuration or source input.
     Input,
     /// A server or local resource limit was exceeded.
@@ -32,6 +34,7 @@ pub struct Error {
     kind: ErrorKind,
     message: Cow<'static, str>,
     request_id: Option<String>,
+    server_kind: Option<String>,
     source: Option<Arc<dyn StdError + Send + Sync>>,
     status_code: Option<u16>,
     close_code: Option<u16>,
@@ -71,6 +74,7 @@ impl Error {
             kind,
             message: message.into(),
             request_id: None,
+            server_kind: None,
             source: None,
             status_code: None,
             close_code: None,
@@ -86,6 +90,16 @@ impl Error {
     /// Refused realtime HTTP upgrade status, such as 503. None means unavailable.
     pub fn status_code(&self) -> Option<u16> {
         self.status_code
+    }
+
+    /// Structured service error kind, such as insufficient_credits, when supplied.
+    pub fn server_kind(&self) -> Option<&str> {
+        self.server_kind.as_deref()
+    }
+
+    pub(crate) fn with_server_kind(mut self, kind: Option<&str>) -> Self {
+        self.server_kind = kind.filter(|kind| !kind.is_empty()).map(str::to_owned);
+        self
     }
 
     /// Received WebSocket close code, such as 1013. None means unavailable.
@@ -165,8 +179,15 @@ impl StdError for Error {
 impl From<tonic::Status> for Error {
     fn from(status: tonic::Status) -> Self {
         use tonic::Code;
+        let server_kind = status
+            .metadata()
+            .get("x-rime-error-kind")
+            .and_then(|value| value.to_str().ok());
         let kind = match status.code() {
             Code::Unauthenticated => ErrorKind::Authentication,
+            Code::PermissionDenied if server_kind == Some("insufficient_credits") => {
+                ErrorKind::Billing
+            }
             Code::PermissionDenied => ErrorKind::Permission,
             Code::InvalidArgument => ErrorKind::Input,
             Code::ResourceExhausted => ErrorKind::ResourceLimit,
@@ -181,6 +202,7 @@ impl From<tonic::Status> for Error {
             Cow::Owned(status.message().to_owned())
         };
         Self::new(kind, message)
+            .with_server_kind(server_kind)
             .with_request_id(request_id(status.metadata()))
             .caused_by(status)
     }

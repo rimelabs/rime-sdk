@@ -5,6 +5,7 @@ import pytest
 
 from rimelabs_sdk import (
     RimeAuthenticationError,
+    RimeBillingError,
     RimePermissionError,
     RimeResourceLimitError,
     RimeUnavailableError,
@@ -26,6 +27,7 @@ async def test_temporary_bearer_auth():
     [
         (200, {"access_token": "token", "expires_in": 60, "audience": "coda.api.rime.ai"}, None),
         (401, {"detail": "secret"}, RimeAuthenticationError),
+        (402, {}, RimeBillingError),
         (403, {}, RimePermissionError),
         (429, {"detail": "secret"}, RimeResourceLimitError),
         (500, {"detail": "secret"}, RimeUnavailableError),

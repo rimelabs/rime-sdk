@@ -9,6 +9,7 @@ import httpx
 
 from ._errors import (
     RimeAuthenticationError,
+    RimeBillingError,
     RimeError,
     RimePermissionError,
     RimeResourceLimitError,
@@ -33,6 +34,8 @@ async def exchange_key(key, policy):
                 headers={"Authorization": "Api-Key " + key},
                 json={"audience": policy.audience},
             ) as response:
+                if response.status_code == 402:
+                    raise RimeBillingError("Credential exchange requires available credits")
                 if response.status_code == 403:
                     raise RimePermissionError("Credential exchange denied permission")
                 if response.status_code == 429:

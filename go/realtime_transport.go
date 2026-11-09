@@ -53,14 +53,19 @@ func rtDial(ctx context.Context, address, key, requestID string, transport http.
 func rtHandshakeError(response *http.Response) *Error {
 	kind, reason := ErrUnavailable, "realtime endpoint rejected the connection"
 	switch response.StatusCode {
-	case 401, 403:
+	case 401:
 		kind, reason = ErrAuthentication, "realtime endpoint rejected credentials"
+	case 402:
+		kind, reason = ErrBilling, "realtime access requires available credits"
+	case 403:
+		kind, reason = ErrPermission, "realtime access is not permitted"
 	case 429:
 		kind, reason = ErrResourceLimit, "realtime connection or rate limit reached"
 	case 503:
 		reason = "realtime endpoint is unavailable"
 	}
 	message := fmt.Sprintf("%s (HTTP %d)", reason, response.StatusCode)
+	var serverKind string
 	if response.Body != nil {
 		defer response.Body.Close()
 		// websocket.Dial returns at most 1024 bytes after a bounded body read.
@@ -70,11 +75,13 @@ func rtHandshakeError(response *http.Response) *Error {
 			if strings.HasPrefix(detail, "{") || strings.HasPrefix(detail, "[") {
 				var envelope struct {
 					Error struct {
-						Message string `json:"message"`
+						Message string          `json:"message"`
+						Kind    json.RawMessage `json:"kind"`
 					} `json:"error"`
 				}
 				if json.Unmarshal(body, &envelope) == nil {
 					detail = envelope.Error.Message
+					_ = json.Unmarshal(envelope.Error.Kind, &serverKind)
 				} else {
 					detail = ""
 				}
@@ -91,7 +98,7 @@ func rtHandshakeError(response *http.Response) *Error {
 		}
 	}
 	return &Error{Kind: kind, Message: message, RequestID: response.Header.Get("x-request-id"), Cause: &connectionError{
-		statusCode: &response.StatusCode, retryAfter: rtRetryAfter(response.Header.Values("Retry-After")),
+		serverKind: serverKind, statusCode: &response.StatusCode, retryAfter: rtRetryAfter(response.Header.Values("Retry-After")),
 	}}
 }
 

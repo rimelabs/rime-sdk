@@ -80,6 +80,8 @@ async def discover(channel, metadata, kind, language, timeout):
             error.code(),
             _request_id(error.initial_metadata(), error.trailing_metadata()),
             error.details(),
+            error.initial_metadata(),
+            error.trailing_metadata(),
         ) from None
     return list(response.speakers if kind == "voices" else response.languages)
 
@@ -113,7 +115,13 @@ class SynthesisCall:
         self.request_id = _request_id(
             error.initial_metadata(), error.trailing_metadata(), self.request_id
         )
-        return rpc_error(error.code(), self.request_id, error.details())
+        return rpc_error(
+            error.code(),
+            self.request_id,
+            error.details(),
+            error.initial_metadata(),
+            error.trailing_metadata(),
+        )
 
     async def _check_status(self):
         code = await self._call.code()
@@ -123,7 +131,13 @@ class SynthesisCall:
             self.request_id,
         )
         if code != grpc.StatusCode.OK:
-            raise rpc_error(code, self.request_id, await self._call.details())
+            raise rpc_error(
+                code,
+                self.request_id,
+                await self._call.details(),
+                await self._call.initial_metadata(),
+                await self._call.trailing_metadata(),
+            )
 
     async def _write(self, message):
         # grpc.aio can report an oversized streaming write as INTERNAL instead

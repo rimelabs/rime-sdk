@@ -67,7 +67,7 @@ func (service *STTService) Transcribe(ctx context.Context, audio []byte, options
 		return Transcription{}, operationError(cause, identity)
 	}
 	if err != nil {
-		return Transcription{}, operationError(err, identity)
+		return Transcription{}, operationError(err, identity, headers, trailers)
 	}
 	if response.Language == nil || response.Language.Tag == "" || response.Language.Source == pb.LanguageSource_LANGUAGE_SOURCE_UNSPECIFIED {
 		return Transcription{}, operationError(failure(ErrStream, "the service did not confirm a resolved language"), identity)

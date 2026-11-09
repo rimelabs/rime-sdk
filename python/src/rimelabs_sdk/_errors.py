@@ -8,6 +8,8 @@ class RimeError(Exception):
     the received WebSocket close code, such as 1013. retry_after_s is the server's
     requested delay in seconds, including zero. None means unavailable. These
     fields do not cause retries or make replay of an accepted request safe.
+    server_kind is the service's structured error kind, such as insufficient_credits.
+    It is None when the service does not provide a structured reason.
     """
 
     def __init__(
@@ -18,16 +20,22 @@ class RimeError(Exception):
         status_code: int | None = None,
         close_code: int | None = None,
         retry_after_s: float | None = None,
+        server_kind: str | None = None,
     ):
         super().__init__(message)
         self.request_id = request_id
         self.status_code = status_code
         self.close_code = close_code
         self.retry_after_s = retry_after_s
+        self.server_kind = server_kind
 
 
 class RimeAuthenticationError(RimeError):
     pass
+
+
+class RimeBillingError(RimeError):
+    """The account has insufficient prepaid credits."""
 
 
 class RimePermissionError(RimeError):

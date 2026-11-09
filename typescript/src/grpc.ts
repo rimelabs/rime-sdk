@@ -12,6 +12,8 @@ export function rpcError(
   code: number,
   requestId: string | null = null,
   details?: string,
+  responseMetadata?: grpc.Metadata,
+  initialMetadata?: grpc.Metadata,
 ): errors.RimeError {
   const classes: Record<number, typeof errors.RimeError> = {
     [grpc.status.UNAUTHENTICATED]: errors.RimeAuthenticationError,
@@ -22,12 +24,21 @@ export function rpcError(
     [grpc.status.DEADLINE_EXCEEDED]: errors.RimeTimeoutError,
     [grpc.status.CANCELLED]: errors.RimeCancelledError,
   };
-  const ErrorType = classes[code] ?? errors.RimeStreamError;
+  const serverKind =
+    initialMetadata?.get("x-rime-error-kind")[0]?.toString() ||
+    responseMetadata?.get("x-rime-error-kind")[0]?.toString() ||
+    null;
+  const ErrorType =
+    code === grpc.status.PERMISSION_DENIED &&
+    serverKind === "insufficient_credits"
+      ? errors.RimeBillingError
+      : (classes[code] ?? errors.RimeStreamError);
   return new ErrorType(
     details?.trim()
       ? details
       : `Rime operation failed: ${grpc.status[code] ?? "UNKNOWN"}`,
     requestId,
+    { serverKind },
   );
 }
 export function serializer<D extends DescMessage>(desc: D) {
@@ -43,6 +54,7 @@ export function requestId(metadata?: grpc.Metadata): string | null {
 export function nativeError(
   error: unknown,
   id: string | null,
+  initialMetadata?: grpc.Metadata,
 ): errors.RimeError {
   if (error instanceof errors.RimeError) return error;
   if (
@@ -58,6 +70,8 @@ export function nativeError(
       "details" in error && typeof error.details === "string"
         ? error.details
         : undefined,
+      metadata instanceof grpc.Metadata ? metadata : undefined,
+      initialMetadata,
     );
   }
   return new errors.RimeStreamError("Rime transport failed", id, {
@@ -70,6 +84,7 @@ export class BidiCall<Input, Output> {
   private readonly statusPromise: Promise<grpc.StatusObject>;
   private status: grpc.StatusObject | null = null;
   private id: string | null = null;
+  private initialMetadata?: grpc.Metadata;
 
   constructor(
     private readonly call: grpc.ClientDuplexStream<Input, Output>,
@@ -78,6 +93,7 @@ export class BidiCall<Input, Output> {
     this.metadataPromise = new Promise((resolve, reject) => {
       this.call.once("metadata", (metadata: grpc.Metadata) => {
         this.id = requestId(metadata);
+        this.initialMetadata = metadata;
         resolve(metadata);
       });
       // A trailers-only response has no metadata event.
@@ -106,7 +122,7 @@ export class BidiCall<Input, Output> {
   }
 
   private error(error: unknown): errors.RimeError {
-    const failure = nativeError(error, this.id);
+    const failure = nativeError(error, this.id, this.initialMetadata);
     this.id ??= failure.requestId;
     return failure;
   }
@@ -127,7 +143,13 @@ export class BidiCall<Input, Output> {
       for await (const response of responses) yield response;
       const status = await abortable(this.statusPromise, this.signal);
       if (status.code !== grpc.status.OK)
-        throw rpcError(status.code, this.id, status.details);
+        throw rpcError(
+          status.code,
+          this.id,
+          status.details,
+          status.metadata,
+          this.initialMetadata,
+        );
     } catch (error) {
       if (this.signal.aborted) throw this.signal.reason;
       throw this.error(error);
@@ -138,7 +160,13 @@ export class BidiCall<Input, Output> {
       this.signal.throwIfAborted();
       if (this.status) {
         if (this.status.code !== grpc.status.OK)
-          throw rpcError(this.status.code, this.id, this.status.details);
+          throw rpcError(
+            this.status.code,
+            this.id,
+            this.status.details,
+            this.status.metadata,
+            this.initialMetadata,
+          );
         throw new errors.RimeStreamError(
           "The service completed before input finished",
           this.id,
@@ -160,7 +188,13 @@ export class BidiCall<Input, Output> {
                     "The service completed before input finished",
                     this.id,
                   )
-                : rpcError(status.code, this.id, status.details),
+                : rpcError(
+                    status.code,
+                    this.id,
+                    status.details,
+                    status.metadata,
+                    this.initialMetadata,
+                  ),
             );
           this.call.once("status", onStatus);
           try {
@@ -178,7 +212,13 @@ export class BidiCall<Input, Output> {
       // server rejection even if the reader has not consumed a response.
       const status = await abortable(this.statusPromise, this.signal);
       if (status.code !== grpc.status.OK)
-        throw rpcError(status.code, this.id, status.details);
+        throw rpcError(
+          status.code,
+          this.id,
+          status.details,
+          status.metadata,
+          this.initialMetadata,
+        );
       throw this.error(error);
     }
   }

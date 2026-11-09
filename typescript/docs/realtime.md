@@ -497,7 +497,11 @@ existing `requestId` retains the server's request ID on an HTTP refusal.
 Invalid or duplicate `Retry-After` headers are ignored. HTTP dates become a delay
 relative to the client clock, with past dates becoming zero.
 
-Error categories stay the same. A WebSocket closure uses `RimeStreamError`;
+HTTP 401 throws `RimeAuthenticationError`, 402 throws `RimeBillingError`, and
+403 throws `RimePermissionError`. `serverKind` retains the structured service
+reason, such as `insufficient_credits` or `billing_inactive`, when supplied.
+HTTP 429 throws `RimeResourceLimitError`; 503 throws `RimeUnavailableError`.
+A WebSocket closure uses `RimeStreamError`;
 no received close code means `closeCode=null`, including a lost connection or
 an empty close frame. These fields require a release with structured connection
 diagnostics. The SDK does not retry startup automatically. These fields do not

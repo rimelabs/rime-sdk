@@ -17,6 +17,7 @@ from rimelabs_sdk import (
     Rime,
     RimeAudioFormatError,
     RimeAuthenticationError,
+    RimeBillingError,
     RimeCancelledError,
     RimeInputError,
     RimePermissionError,
@@ -583,19 +584,30 @@ async def test_incomplete_final_pcm_sample(setup):
 
 @pytest.mark.parametrize("location", ["headers", "trailers", "both"])
 @pytest.mark.parametrize(
-    "status,error_type",
+    "status,error_type,server_kind",
     [
-        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError),
-        (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError),
-        (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError),
+        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError, None),
+        (grpc.StatusCode.PERMISSION_DENIED, RimeBillingError, "insufficient_credits"),
+        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError, "billing_inactive"),
+        (grpc.StatusCode.PERMISSION_DENIED, RimePermissionError, "future_reason"),
+        (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError, "insufficient_credits"),
+        (grpc.StatusCode.UNAUTHENTICATED, RimeAuthenticationError, None),
+        (grpc.StatusCode.UNAVAILABLE, RimeUnavailableError, None),
     ],
 )
-async def test_server_error_without_audio_metadata(setup, location, status, error_type):
+async def test_server_error_without_audio_metadata(
+    setup, location, status, error_type, server_kind
+):
     service, client = setup
     service.mode = "no_audio_error"
     service.rejection_status = status
     service.response_metadata = (("x-request-id", "header-id"),) if location != "trailers" else ()
     service.trailing_metadata = (("x-request-id", "trailer-id"),) if location != "headers" else ()
+    reason_metadata = (("x-rime-error-kind", server_kind),) if server_kind else ()
+    if location != "trailers":
+        service.response_metadata += reason_metadata
+    if location != "headers":
+        service.trailing_metadata += reason_metadata
     expected_id = "trailer-id" if location == "trailers" else "header-id"
     async with client.tts.synthesize("Hello.", timeout=1) as audio:
         result = asyncio.create_task(collect(audio))
@@ -607,6 +619,7 @@ async def test_server_error_without_audio_metadata(setup, location, status, erro
         with pytest.raises(error_type) as caught:
             await result
         assert caught.value.request_id == expected_id
+        assert caught.value.server_kind == server_kind
         assert audio.request_id == expected_id
     assert len(service.calls) == 1
 

@@ -10,6 +10,7 @@ import { BidiCall } from "../dist/grpc.js";
 import {
   RimeAudioFormatError,
   RimeAuthenticationError,
+  RimeBillingError,
   RimeInputError,
   RimePermissionError,
   RimeResourceLimitError,
@@ -80,17 +81,22 @@ async function setup(fn) {
   }
 }
 
-for (const [status, errorType] of [
+for (const [status, errorType, serverKind] of [
   [grpc.status.UNAVAILABLE, RimeUnavailableError],
   [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
   [grpc.status.PERMISSION_DENIED, RimePermissionError],
+  [grpc.status.PERMISSION_DENIED, RimeBillingError, "insufficient_credits"],
+  [grpc.status.PERMISSION_DENIED, RimePermissionError, "billing_inactive"],
+  [grpc.status.PERMISSION_DENIED, RimePermissionError, "future_reason"],
+  [grpc.status.UNAVAILABLE, RimeUnavailableError, "insufficient_credits"],
   [grpc.status.INVALID_ARGUMENT, RimeInputError],
 ]) {
-  test(`write after rejection without reader / ${status}`, () =>
+  test(`write after rejection without reader / ${status} / ${serverKind}`, () =>
     setup(async (server, prepared, signal) => {
       server.mode = "error_before_audio";
       server.rejectionStatus = status;
       server.trailingMetadata = { "x-request-id": "rejected-request" };
+      if (serverKind) server.trailingMetadata["x-rime-error-kind"] = serverKind;
       const call = new SynthesisCall(prepared, signal);
       try {
         await call.start("clementine", "en");
@@ -100,7 +106,8 @@ for (const [status, errorType] of [
           (error) =>
             error instanceof errorType &&
             error.message === "test service rejection" &&
-            error.requestId === "rejected-request",
+            error.requestId === "rejected-request" &&
+            error.serverKind === (serverKind ?? null),
         );
         assert.equal(call.requestId, "rejected-request");
         assert.equal(server.calls.length, 1);

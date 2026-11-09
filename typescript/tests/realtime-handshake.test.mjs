@@ -6,6 +6,8 @@ import { WebSocketServer } from "ws";
 import {
   Rime,
   RimeAuthenticationError,
+  RimeBillingError,
+  RimePermissionError,
   RimeResourceLimitError,
   RimeUnavailableError,
   RimeStreamError,
@@ -18,7 +20,26 @@ const cases = [
     RimeAuthenticationError,
     "Authentication failed",
   ],
-  [403, "Forbidden", RimeAuthenticationError, "Forbidden"],
+  [403, "Forbidden", RimePermissionError, "Forbidden"],
+  [402, "", RimeBillingError, "available credits"],
+  [
+    402,
+    '{"error":{"kind":"insufficient_credits","message":"No credits remain"}}',
+    RimeBillingError,
+    "No credits remain",
+  ],
+  [
+    403,
+    '{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}',
+    RimePermissionError,
+    "Billing is inactive",
+  ],
+  [
+    402,
+    '{"error":{"kind":42,"message":"No credits remain"}}',
+    RimeBillingError,
+    "No credits remain",
+  ],
   [
     429,
     "Currently at websocket limit",
@@ -81,6 +102,14 @@ for (const [index, [status, body, errorType, detail]] of cases.entries()) {
             assert.ok(error.message.includes(`HTTP ${status}`));
             assert.equal(error.requestId, "server-request");
             assert.equal(error.statusCode, status);
+            const expectedKind = {
+              402: "insufficient_credits",
+              403: "billing_inactive",
+            }[status];
+            assert.equal(
+              error.serverKind,
+              String(body).includes('"kind":"') ? expectedKind : null,
+            );
             assert.equal(error.closeCode, null);
             assert.equal(error.retryAfterSeconds, null);
             if (detail) assert.ok(error.message.includes(detail));

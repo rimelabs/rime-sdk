@@ -458,7 +458,11 @@ refusal. Missing values are `None`; zero seconds is a valid delay. Invalid or
 duplicate `Retry-After` headers are ignored. HTTP-date values become a delay
 relative to the client clock, with past dates becoming zero.
 
-HTTP refusals retain their existing error category. A WebSocket closure raises
+HTTP 401 raises `RimeAuthenticationError`, 402 raises `RimeBillingError`, and
+403 raises `RimePermissionError`. `server_kind` retains the structured service
+reason, such as `insufficient_credits` or `billing_inactive`, when supplied.
+HTTP 429 raises `RimeResourceLimitError`; 503 raises `RimeUnavailableError`.
+A WebSocket closure raises
 `RimeStreamError`; a connection that never upgraded has no close code. An absent
 close frame or a frame without a status also has no close code. Do not parse the
 message to decide whether to retry. These fields require an SDK release that

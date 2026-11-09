@@ -1,6 +1,8 @@
 import WebSocket from "ws";
 import {
   RimeAuthenticationError,
+  RimeBillingError,
+  RimePermissionError,
   RimeError,
   RimeResourceLimitError,
   RimeStreamError,
@@ -103,9 +105,15 @@ function handshakeError(
 ) {
   let errorType = RimeUnavailableError;
   let reason = "Realtime endpoint rejected the connection";
-  if ([401, 403].includes(status)) {
+  if (status === 401) {
     errorType = RimeAuthenticationError;
     reason = "Realtime endpoint rejected credentials";
+  } else if (status === 402) {
+    errorType = RimeBillingError;
+    reason = "Realtime access requires available credits";
+  } else if (status === 403) {
+    errorType = RimePermissionError;
+    reason = "Realtime access is not permitted";
   } else if (status === 429) {
     errorType = RimeResourceLimitError;
     reason = "Realtime connection or rate limit reached";
@@ -113,13 +121,18 @@ function handshakeError(
     reason = "Realtime endpoint is unavailable";
   }
   let message = `${reason} (HTTP ${status})`;
+  let serverKind: string | null = null;
   if (body.length > 0 && body.length < 1024) {
     try {
       let detail: unknown = new TextDecoder("utf-8", { fatal: true })
         .decode(body)
         .trim();
-      if (typeof detail === "string" && /^[{[]/.test(detail))
-        detail = JSON.parse(detail)?.error?.message;
+      if (typeof detail === "string" && /^[{[]/.test(detail)) {
+        const error = JSON.parse(detail)?.error;
+        if (typeof error?.kind === "string" && error.kind)
+          serverKind = error.kind;
+        detail = error?.message;
+      }
       if (
         typeof detail === "string" &&
         !detail.trimStart().startsWith("<") &&
@@ -134,6 +147,7 @@ function handshakeError(
   }
   return new errorType(message, requestId, {
     statusCode: status,
+    serverKind,
     retryAfterSeconds,
   });
 }

@@ -17,8 +17,27 @@ async fn http_refusals_preserve_category_and_diagnostics() {
         (
             403,
             b"Forbidden".to_vec(),
-            ErrorKind::Authentication,
+            ErrorKind::Permission,
             Some("Forbidden"),
+        ),
+        (402, vec![], ErrorKind::Billing, Some("available credits")),
+        (
+            402,
+            br#"{"error":{"kind":"insufficient_credits","message":"No credits remain"}}"#.to_vec(),
+            ErrorKind::Billing,
+            Some("No credits remain"),
+        ),
+        (
+            403,
+            br#"{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}"#.to_vec(),
+            ErrorKind::Permission,
+            Some("Billing is inactive"),
+        ),
+        (
+            402,
+            br#"{"error":{"kind":42,"message":"No credits remain"}}"#.to_vec(),
+            ErrorKind::Billing,
+            Some("No credits remain"),
         ),
         (
             429,
@@ -91,6 +110,9 @@ async fn check(
     tokio::time::timeout(Duration::from_secs(5), async {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
+        let server_kind = if body.windows(8).any(|part| part == b"\"kind\":\"") {
+            match status { 402 => Some("insufficient_credits"), 403 => Some("billing_inactive"), _ => None }
+        } else { None };
         let server = tokio::spawn(async move {
             for _ in 0..2 {
                 let (mut socket, _) = listener.accept().await.unwrap();
@@ -114,6 +136,7 @@ async fn check(
             assert_eq!(error.kind(), kind);
             assert_eq!(error.request_id(), Some("server-request"));
             assert_eq!(error.status_code(), Some(status));
+            assert_eq!(error.server_kind(), server_kind);
             assert_eq!(error.close_code(), None);
             assert_eq!(error.retry_after(), None);
             assert!(error.message().contains(&format!("HTTP {status}")));

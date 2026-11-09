@@ -2,6 +2,7 @@ from ._client import Rime
 from ._errors import (
     RimeAudioFormatError,
     RimeAuthenticationError,
+    RimeBillingError,
     RimeCancelledError,
     RimeError,
     RimeInputError,
@@ -25,6 +26,7 @@ __all__ = [
     "Rime",
     "RimeAudioFormatError",
     "RimeAuthenticationError",
+    "RimeBillingError",
     "RimeCancelledError",
     "RimeError",
     "RimeInputError",

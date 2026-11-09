@@ -334,7 +334,7 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 	s.setID(requestID(headers, nil))
 	if err != nil {
 		s.setID(requestID(nil, call.Trailer()))
-		return err
+		return operationError(err, s.RequestID(), headers, call.Trailer())
 	}
 	validFormat := len(headers.Get("x-rime-audio-content-type")) > 0 && headers.Get("x-rime-audio-content-type")[0] == s.format.wireFormat()
 	converter := converter{format: s.format}
@@ -343,7 +343,7 @@ func (s *AudioStream) receive(call pb.TextToSpeech_SynthesizeStreamingClient) er
 		if err != nil {
 			s.setID(requestID(nil, call.Trailer()))
 			if err != io.EOF {
-				return err
+				return operationError(err, s.RequestID(), headers, call.Trailer())
 			}
 			if !validFormat {
 				return failure(ErrAudioFormat, "expected "+s.format.wireFormat()+" from the service")

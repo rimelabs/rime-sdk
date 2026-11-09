@@ -20,10 +20,15 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
     };
     let status = response.status().as_u16();
     let (kind, reason) = match status {
-        401 | 403 => (
+        401 => (
             ErrorKind::Authentication,
             "realtime endpoint rejected credentials",
         ),
+        402 => (
+            ErrorKind::Billing,
+            "realtime access requires available credits",
+        ),
+        403 => (ErrorKind::Permission, "realtime access is not permitted"),
         429 => (
             ErrorKind::ResourceLimit,
             "realtime connection or rate limit reached",
@@ -35,6 +40,7 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
         ),
     };
     let mut message = format!("{reason} (HTTP {status})");
+    let mut server_kind = None;
     // Tungstenite retains only bytes received with the headers. Use a complete,
     // bounded body; partial or chunked bodies cannot provide a reliable message.
     if let Some(body) = response.body().as_ref().filter(|body| {
@@ -54,6 +60,11 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
             } else {
                 None
             };
+            server_kind = json
+                .as_ref()
+                .and_then(|value| value.get("error")?.get("kind")?.as_str())
+                .filter(|kind| !kind.is_empty())
+                .map(str::to_owned);
             let detail = if text.starts_with(['{', '[']) {
                 json.as_ref()
                     .and_then(|v| v.get("error")?.get("message")?.as_str())
@@ -83,6 +94,7 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
         None
     };
     Error::new(kind, message)
+        .with_server_kind(server_kind.as_deref())
         .with_connection_diagnostics(Some(status), None, retry_after)
         .with_request_id(
             response

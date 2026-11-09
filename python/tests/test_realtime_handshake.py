@@ -8,6 +8,8 @@ import pytest
 from rimelabs_sdk import (
     Rime,
     RimeAuthenticationError,
+    RimeBillingError,
+    RimePermissionError,
     RimeResourceLimitError,
     RimeTimeoutError,
     RimeUnavailableError,
@@ -19,7 +21,26 @@ from rimelabs_sdk.realtime import RealtimeTimeouts
     "status,body,error_type,detail",
     [
         (401, b"Authentication failed", RimeAuthenticationError, "Authentication failed"),
-        (403, b"Forbidden", RimeAuthenticationError, "Forbidden"),
+        (403, b"Forbidden", RimePermissionError, "Forbidden"),
+        (402, b"", RimeBillingError, "available credits"),
+        (
+            402,
+            b'{"error":{"kind":"insufficient_credits","message":"No credits remain"}}',
+            RimeBillingError,
+            "No credits remain",
+        ),
+        (
+            403,
+            b'{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}',
+            RimePermissionError,
+            "Billing is inactive",
+        ),
+        (
+            402,
+            b'{"error":{"kind":42,"message":"No credits remain"}}',
+            RimeBillingError,
+            "No credits remain",
+        ),
         (429, b"Currently at websocket limit", RimeResourceLimitError, "websocket limit"),
         (429, b"", RimeResourceLimitError, "connection or rate limit reached"),
         (503, b"conversation capacity reached", RimeUnavailableError, "capacity reached"),
@@ -76,6 +97,8 @@ async def test_http_refusal_preserves_category_and_diagnostics(status, body, err
                 assert f"HTTP {status}" in str(error)
                 assert error.request_id == "server-request"
                 assert error.status_code == status
+                expected_kind = {402: "insufficient_credits", 403: "billing_inactive"}.get(status)
+                assert error.server_kind == (expected_kind if b'"kind":"' in body else None)
                 assert error.close_code is None
                 assert error.retry_after_s is None
                 if detail:
