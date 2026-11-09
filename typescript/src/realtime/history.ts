@@ -16,8 +16,7 @@ export function itemSettings(item: HistoryItem): Record<string, string> {
     case "message":
       if (
         !["user", "assistant", "system"].includes(item.role) ||
-        !utf8(item.text) ||
-        [...item.text].length > 4000
+        !utf8(item.text)
       )
         throw new RimeInputError("invalid history message");
       value.role = item.role;

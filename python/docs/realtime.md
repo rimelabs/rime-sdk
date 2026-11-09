@@ -657,3 +657,60 @@ if isinstance(event.payload, ResponseEnded) and event.payload.truncation is not 
     summary = event.payload.truncation
     print(summary.items_left_out, summary.first_kept_item_id)
 ```
+
+## Optional Prism settings and speech review
+
+Available in the next SDK release. `connect(speed=1.1)` and
+`session.update(speed=0.9)` set speech speed from 0.85 through 1.3.
+`SessionInfo.speed` is the server-confirmed value. `SessionInfo.version` is an
+opaque build string when the server reports one. An omitted version in a later
+update retains the last reported build. Older servers can omit both values.
+
+`TurnDetection` accepts `end_of_turn_min_silence_ms` from 0 through 5000 at
+connection setup. It also accepts `interrupt_min_words` from 1 through 10,
+`interrupt_phrases`, and `acknowledgment_phrases`. Use `TurnDetectionUpdate` for
+those last three fields on an open session. Omitted fields do not change server
+settings. An empty phrase list clears that list. Lists are copied on construction.
+The silence floor is connect-only. `turn_detection=None` keeps its existing
+automatic turn behavior.
+
+```python
+from rimelabs_sdk import realtime as r
+
+async def review(request: r.ReviewRequest) -> r.ReviewDecision:
+    # Requests can arrive before response.created. Use the raw IDs for logging.
+    if "private" in request.text:
+        return r.Replace("I cannot share that information.")
+    return r.Allow()
+
+async with client.realtime.connect(
+    speed=1.1,
+    turn_detection=r.TurnDetection(end_of_turn_min_silence_ms=750),
+    review=r.Review(callback=review, timeout_ms=1000, on_timeout=r.Stop()),
+) as session:
+    await session.update(turn_detection=r.TurnDetectionUpdate(interrupt_phrases=("stop",)))
+```
+
+Review callbacks run concurrently, without an event consumer. They must support
+async cancellation and must not block the event loop. Return `Allow`, `Replace`,
+or `Stop`. A callback error or invalid result submits Stop and ends the session
+with a typed SDK error without the exception text. The SDK sends each retained review once and
+does not wait for an acknowledgment. The server applies `on_timeout` when the
+callback expires. Its policies are `Stop`, `Speak`, and `Say(text=...)`.
+Replacement or Stop cancels only later chunks of that response; response end
+and session close cancel all remaining work. At most 128 callbacks run at once.
+Uncooperative callbacks can delay shutdown. Speculative requests may have no
+public response handle and no later response completion event.
+
+These turn settings and review require the next Prism image. They remain absent
+from default requests so old servers keep working. Do not send them to an older
+image. Session review policy is reported as `SessionInfo.review`, when present.
+
+`SessionEvent.server_time_ms` carries an optional server timestamp. Locally
+created events have no server timestamp. `TranscriptDelta.transcript` carries an
+optional full transcript; replace the previous partial text when it is present,
+including when it is empty. Otherwise append `delta`.
+
+Typed input, proactive instructions, and history messages no longer have a
+4,000-character SDK limit. The server enforces its context limit. Tool and filler
+limits remain in effect.

@@ -172,10 +172,12 @@ async fn options_validate_before_connection() {
         RealtimeConnectOptions::default().turn_detection(TurnDetection {
             eagerness: Some("invalid".into()),
             end_of_turn_timeout_ms: None,
+            ..TurnDetection::default()
         }),
         RealtimeConnectOptions::default().turn_detection(TurnDetection {
             eagerness: None,
             end_of_turn_timeout_ms: Some(999),
+            ..TurnDetection::default()
         }),
         RealtimeConnectOptions::default().tools(vec![ToolDefinition {
             name: "tool".into(),

@@ -52,19 +52,67 @@ export interface ToolDefinition {
 export type Truncation =
   "auto" | "disabled" | { readonly retentionRatio: number };
 export type TurnEagerness = "low" | "medium" | "high" | "auto";
+/** Mutable interruption rules. Omission preserves a value; an empty list clears it. */
+export interface TurnDetectionUpdate {
+  readonly interruptMinWords?: number;
+  readonly interruptPhrases?: readonly string[];
+  readonly acknowledgmentPhrases?: readonly string[];
+}
 /** Omitted fields use the server's turn timing defaults. */
-export interface TurnDetection {
+export interface TurnDetection extends TurnDetectionUpdate {
   /** How readily Prism decides that the user has finished speaking. */
   readonly eagerness?: TurnEagerness;
   /** Maximum silence before ending a turn: an integer from 1000 to 10000 ms. */
   readonly endOfTurnTimeoutMs?: number;
+  /** Minimum silence, 0 through 5000 ms. Fixed after connection setup. */
+  readonly endOfTurnMinSilenceMs?: number;
 }
 /** Effective server settings. Null means the server did not publish the field. */
 export interface TurnDetectionInfo {
   readonly eagerness: TurnEagerness | "unknown" | null;
   readonly endOfTurnTimeoutMs: number | null;
+  readonly endOfTurnMinSilenceMs?: number;
+  readonly interruptMinWords?: number;
+  readonly interruptPhrases?: readonly string[];
+  readonly acknowledgmentPhrases?: readonly string[];
+}
+/** A chunk awaiting review. IDs can name a reply that has not started yet. */
+export interface ReviewRequest {
+  readonly reviewId: string;
+  readonly responseId: string;
+  readonly itemId: string;
+  readonly index: number;
+  readonly text: string;
+}
+export type ReviewDecision =
+  | { readonly action: "allow"; readonly text?: never }
+  | { readonly action: "replace"; readonly text: string }
+  | { readonly action: "stop"; readonly text?: never };
+export type ReviewTimeout =
+  | { readonly action: "stop" | "speak"; readonly text?: never }
+  | { readonly action: "say"; readonly text: string };
+/** Server-confirmed review policy. Absence means the server did not publish it. */
+export interface ReviewSettings {
+  readonly timeoutMs: number;
+  readonly onTimeout: ReviewTimeout;
+}
+/** Async review policy. Callbacks must observe signal and must not block the runtime.
+ * Prism enforces the timeout. Replace and Stop discard later chunks, but cannot
+ * undo tool calls already emitted. */
+export interface Review {
+  readonly callback: (
+    request: ReviewRequest,
+    signal: AbortSignal,
+  ) => Promise<ReviewDecision>;
+  /** 100 through 5000 milliseconds; defaults to 1000. */
+  readonly timeoutMs?: number;
+  /** Defaults to stop. */
+  readonly onTimeout?: ReviewTimeout;
 }
 export interface RealtimeConnectOptions extends RealtimeOperationOptions {
+  /** Speech rate, 0.85 through 1.3. Omission preserves the server default. */
+  readonly speed?: number;
+  readonly review?: Review;
   readonly truncation?: Truncation;
   /** Defaults to wss://prism.api.rime.ai/v1/realtime. */
   readonly endpoint?: string;
@@ -88,6 +136,8 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
 }
 /** Omitted fields keep their values. Empty instructions or tools clear them. */
 export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
+  readonly speed?: number;
+  readonly turnDetection?: TurnDetectionUpdate;
   readonly truncation?: Truncation;
   readonly instructions?: string;
   readonly tools?: readonly ToolDefinition[];
@@ -149,6 +199,10 @@ export interface OutputRef {
   readonly contentIndex: number;
 }
 export interface SessionInfo {
+  readonly speed?: number;
+  /** Opaque server release or commit string. */
+  readonly version?: string;
+  readonly review?: ReviewSettings;
   /** Null when an older server does not publish its history policy. */
   readonly truncation?: Truncation | null;
   /** Settings revision published by the server; null when unavailable.
@@ -251,6 +305,8 @@ export interface InputCommitted {
   readonly itemId: string;
 }
 export interface TranscriptDelta {
+  /** Complete current text, including corrections; absent on older servers. */
+  readonly transcript?: string;
   readonly kind: "transcript.delta";
   readonly itemId: string;
   readonly delta: string;
@@ -381,6 +437,8 @@ export interface ItemTruncated {
   readonly keptText: string | null;
 }
 export interface SessionEvent<Fault extends RealtimeFault = RealtimeFault> {
+  /** Server send time in Unix milliseconds. Absent for old or synthetic events. */
+  readonly serverTimeMs?: number;
   readonly sessionId: string;
   readonly eventId: string;
   readonly requestId: string | null;

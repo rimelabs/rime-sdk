@@ -19,6 +19,7 @@ fn worker() -> (
     let (writes, jobs) = mpsc::channel(1);
     (
         Worker {
+            reviews: crate::realtime::review::Reviews::new(None),
             epoch: 0,
             commands,
             events,

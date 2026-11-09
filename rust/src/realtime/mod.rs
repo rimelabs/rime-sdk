@@ -8,6 +8,7 @@ mod history;
 pub use history::{HistoryItem, HistoryRole};
 mod conversation;
 mod protocol;
+mod review;
 mod session;
 mod transport;
 mod types;

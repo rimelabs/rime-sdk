@@ -214,3 +214,33 @@ function checkAcknowledgmentTypes(ack: Acknowledgment) {
   void [created, item, call, voice];
 }
 void checkAcknowledgmentTypes;
+
+// Additive fields preserve caller-created older views and events.
+const prismOptions: RealtimeConnectOptions = {
+  speed: 1.1,
+  turnDetection: {
+    interruptMinWords: 2,
+    interruptPhrases: [],
+    acknowledgmentPhrases: ["yes"],
+    endOfTurnMinSilenceMs: 800,
+  },
+  review: {
+    onTimeout: { action: "say", text: "One moment." },
+    callback: async (request, signal) => {
+      signal.throwIfAborted();
+      const responseId: string = request.responseId;
+      void responseId;
+      return request.index === 0
+        ? { action: "allow" }
+        : { action: "replace", text: "Approved text" };
+    },
+  },
+};
+void prismOptions;
+const badReview: RealtimeConnectOptions = {
+  review: {
+    // @ts-expect-error A replacement requires text.
+    callback: async () => ({ action: "replace" }),
+  },
+};
+void badReview;

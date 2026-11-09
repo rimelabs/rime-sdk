@@ -22,7 +22,7 @@ pub enum HistoryItem {
         id: Option<String>,
         /// Who says the message.
         role: HistoryRole,
-        /// Message text, at most 4000 Unicode characters on creation.
+        /// Message text. Prism enforces its model context limit.
         text: String,
     },
     /// A past call, shown after its result is added; never executes a tool.
@@ -65,7 +65,6 @@ pub(super) fn settings(item: &HistoryItem) -> Result<Value, Error> {
         return Err(bad());
     }
     match item {
-        HistoryItem::Message { text, .. } if text.chars().count() > 4000 => return Err(bad()),
         HistoryItem::FunctionCall { call_id, name, .. }
             if call_id.is_empty() || name.is_empty() =>
         {

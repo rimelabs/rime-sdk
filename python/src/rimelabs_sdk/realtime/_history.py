@@ -19,8 +19,8 @@ def item_settings(item: t.HistoryItem) -> dict[str, object]:
         if item.role not in ("user", "assistant", "system"):
             raise RimeInputError("history role must be user, assistant, or system")
         value["type"] = "message"
-        if not isinstance(item.text, str) or len(item.text) > 4000:
-            raise RimeInputError("history text must contain at most 4000 characters")
+        if not isinstance(item.text, str):
+            raise RimeInputError("history text must be a string")
     elif isinstance(item, t.HistoryFunctionCall):
         value["type"] = "function_call"
         if not item.call_id or not item.name:

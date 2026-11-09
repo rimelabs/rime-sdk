@@ -1,12 +1,14 @@
 use crate::PcmFormat;
 use bytes::Bytes;
 use serde_json::{Map, Value};
-use std::{collections::BTreeMap, fmt, time::Duration};
+use std::{collections::BTreeMap, fmt, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 /// Your labels for replies, keys to strings, such as `{"step": "3"}`. Prism
 /// takes at most 16, keys up to 64 characters without the `prism_` prefix and
 /// values up to 512.
 pub type Labels = BTreeMap<String, String>;
+
+pub(super) const SPEED_LIMITS: std::ops::RangeInclusive<f64> = 0.85..=1.3;
 
 /// Independent Prism connection, admission, and acknowledgment timeouts.
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +36,109 @@ pub struct TurnDetection {
     pub eagerness: Option<String>,
     /// Maximum silence, from 1000 through 10000 milliseconds.
     pub end_of_turn_timeout_ms: Option<u32>,
+    /// Minimum silence before a turn may end. Fixed when the session starts.
+    pub end_of_turn_min_silence_ms: Option<u32>,
+    /// Words needed to interrupt an active reply.
+    pub interrupt_min_words: Option<u32>,
+    /// Phrases that interrupt without the word threshold. Empty clears the list.
+    pub interrupt_phrases: Option<Vec<String>>,
+    /// Phrases that do not interrupt. Empty clears the list.
+    pub acknowledgment_phrases: Option<Vec<String>>,
+}
+/// Mutable turn settings. Omitted fields keep their values.
+#[derive(Clone, Debug, Default)]
+pub struct TurnDetectionUpdate {
+    /// Words needed to interrupt an active reply.
+    pub interrupt_min_words: Option<u32>,
+    /// Phrases that interrupt without the word threshold.
+    pub interrupt_phrases: Option<Vec<String>>,
+    /// Phrases that do not interrupt.
+    pub acknowledgment_phrases: Option<Vec<String>>,
+}
+/// One provisional speech chunk. Its response need not have started yet.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewRequest {
+    /// Review identifier, unique in this session.
+    pub review_id: String,
+    /// Raw response identifier, including provisional replies.
+    pub response_id: String,
+    /// Message identifier.
+    pub item_id: String,
+    /// Zero-based chunk index within the reply.
+    pub index: u64,
+    /// Proposed speech, not proof that the text was spoken.
+    pub text: String,
+}
+/// A decision on one proposed chunk.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReviewDecision {
+    /// Speak the proposed text.
+    Allow,
+    /// Speak this text and end the rest of the reply.
+    Replace(String),
+    /// Do not speak this chunk or later chunks.
+    Stop,
+}
+/// Server action when a review has no answer in time.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReviewTimeout {
+    /// Stop the reply.
+    Stop,
+    /// Speak the proposed text.
+    Speak,
+    /// Speak this text and end the rest of the reply.
+    Say(String),
+}
+/// Review settings confirmed by the server.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewSettings {
+    /// Server budget for each chunk, in milliseconds.
+    pub timeout_ms: u32,
+    /// Action when no result arrives in time.
+    pub on_timeout: ReviewTimeout,
+}
+type ReviewFuture = Pin<Box<dyn Future<Output = Result<ReviewDecision, crate::Error>> + Send>>;
+/// Session-owned asynchronous review. Callbacks must yield and support cancellation.
+/// Up to 128 reviews run concurrently, including provisional replies. A callback
+/// error sends Stop when possible and then fails the session. Server timeout
+/// policy controls expired reviews; the SDK never retries a result.
+#[derive(Clone)]
+pub struct Review {
+    pub(crate) callback: Arc<dyn Fn(ReviewRequest) -> ReviewFuture + Send + Sync>,
+    pub(crate) settings: ReviewSettings,
+}
+impl fmt::Debug for Review {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Review")
+            .field("settings", &self.settings)
+            .finish_non_exhaustive()
+    }
+}
+impl Review {
+    /// Register a callback. Defaults to a 1000 ms budget and Stop on timeout.
+    pub fn new<F, Fut>(callback: F) -> Self
+    where
+        F: Fn(ReviewRequest) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<ReviewDecision, crate::Error>> + Send + 'static,
+    {
+        Self {
+            callback: Arc::new(move |request| Box::pin(callback(request))),
+            settings: ReviewSettings {
+                timeout_ms: 1000,
+                on_timeout: ReviewTimeout::Stop,
+            },
+        }
+    }
+    /// Set the server budget, from 100 through 5000 ms.
+    pub fn timeout_ms(mut self, value: u32) -> Self {
+        self.settings.timeout_ms = value;
+        self
+    }
+    /// Set the action the server takes on timeout.
+    pub fn on_timeout(mut self, value: ReviewTimeout) -> Self {
+        self.settings.on_timeout = value;
+        self
+    }
 }
 /// Speech to use while an application tool runs.
 #[derive(Clone, Debug)]
@@ -76,6 +181,8 @@ pub struct RealtimeConnectOptions {
     pub(crate) tools: Vec<ToolDefinition>,
     pub(crate) interrupt: bool,
     pub(crate) detection: TurnDetection,
+    pub(crate) speed: Option<f64>,
+    pub(crate) review: Option<Review>,
     pub(crate) truncation: Option<Truncation>,
     pub(crate) timeouts: RealtimeTimeouts,
     pub(crate) request_id: Option<String>,
@@ -90,6 +197,8 @@ impl Default for RealtimeConnectOptions {
             tools: vec![],
             interrupt: true,
             detection: TurnDetection::default(),
+            speed: None,
+            review: None,
             truncation: None,
             timeouts: RealtimeTimeouts::default(),
             request_id: None,
@@ -98,6 +207,16 @@ impl Default for RealtimeConnectOptions {
     }
 }
 impl RealtimeConnectOptions {
+    /// Set the speech speed multiplier, from 0.85 through 1.3. Omission keeps the server default.
+    pub fn speed(mut self, value: f64) -> Self {
+        self.speed = Some(value);
+        self
+    }
+    /// Review each spoken chunk before Prism speaks it. Fixed at connection.
+    pub fn review(mut self, value: Review) -> Self {
+        self.review = Some(value);
+        self
+    }
     /// Set history truncation, also changeable during a call.
     pub fn truncation(mut self, value: Truncation) -> Self {
         self.truncation = Some(value);
@@ -155,6 +274,8 @@ impl RealtimeConnectOptions {
 /// Partial settings for an existing session. Omitted fields keep their values.
 #[derive(Clone, Debug, Default)]
 pub struct RealtimeUpdateOptions {
+    pub(crate) speed: Option<f64>,
+    pub(crate) detection: Option<TurnDetectionUpdate>,
     pub(crate) instructions: Option<String>,
     pub(crate) tools: Option<Vec<ToolDefinition>>,
     pub(crate) voice: Option<String>,
@@ -162,6 +283,16 @@ pub struct RealtimeUpdateOptions {
     pub(crate) truncation: Option<Truncation>,
 }
 impl RealtimeUpdateOptions {
+    /// Set the speech speed for subsequent replies, from 0.85 through 1.3.
+    pub fn speed(mut self, value: f64) -> Self {
+        self.speed = Some(value);
+        self
+    }
+    /// Change interrupt settings for subsequent replies.
+    pub fn turn_detection(mut self, value: TurnDetectionUpdate) -> Self {
+        self.detection = Some(value);
+        self
+    }
     /// Set history truncation, also changeable during a call.
     pub fn truncation(mut self, value: Truncation) -> Self {
         self.truncation = Some(value);
@@ -309,6 +440,20 @@ impl OutputRef {
 /// Effective settings supplied by Prism. None means the field was not published.
 #[derive(Clone, Debug)]
 pub struct SessionInfo {
+    /// Opaque server release or commit, absent on older images.
+    pub version: Option<String>,
+    /// Applied speech speed multiplier.
+    pub speed: Option<f64>,
+    /// Applied review settings, absent when unavailable or disabled.
+    pub review: Option<ReviewSettings>,
+    /// Applied minimum silence, fixed at session setup.
+    pub end_of_turn_min_silence_ms: Option<u64>,
+    /// Applied interruption word threshold.
+    pub interrupt_min_words: Option<u64>,
+    /// Applied interrupt phrases. None differs from an empty list.
+    pub interrupt_phrases: Option<Vec<String>>,
+    /// Applied acknowledgment phrases. None differs from an empty list.
+    pub acknowledgment_phrases: Option<Vec<String>>,
     /// History policy, absent when an older server does not publish it.
     pub truncation: Option<Truncation>,
     /// Settings revision published by the server, if available.
@@ -394,6 +539,8 @@ impl std::error::Error for RealtimeIdleTimeout {}
 /// One event with protocol correlation.
 #[derive(Clone, Debug)]
 pub struct SessionEvent {
+    /// Server send time as Unix milliseconds. Absent for old images and local events.
+    pub server_time_ms: Option<u64>,
     /// Owning session.
     pub session_id: String,
     /// Server event identifier, if supplied.
@@ -469,6 +616,8 @@ pub enum RealtimeEvent {
     },
     /// Incremental input transcription.
     TranscriptDelta {
+        /// All words so far, when supplied. Replace captions even when this is empty.
+        transcript: Option<String>,
         /// Input item.
         item_id: String,
         /// Text to append.

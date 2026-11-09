@@ -214,8 +214,11 @@ enum Kind {
     Drain,
     Update,
     Labels,
+    Review,
 }
 struct Command {
+    review: Option<(ReviewRequest, Instant)>,
+    error_after_write: Option<Error>,
     epoch: u64,
     kind: Kind,
     body: Value,
@@ -252,6 +255,8 @@ struct Answer {
 impl Command {
     fn new(kind: Kind, body: Value) -> Self {
         Self {
+            review: None,
+            error_after_write: None,
             epoch: 0,
             kind,
             body,
@@ -299,6 +304,7 @@ struct Response {
     outputs: HashSet<OutputRef>,
 }
 struct Worker {
+    reviews: super::review::Reviews,
     epoch: u64,
     commands: mpsc::Receiver<Command>,
     events: mpsc::Sender<SessionEvent>,
@@ -346,6 +352,7 @@ pub(super) async fn connect(
         .to_owned();
     inner.spawn(async move {
         let mut worker = Worker {
+            reviews: super::review::Reviews::new(options.review.clone()),
             epoch: 0,
             commands,
             events,
@@ -375,6 +382,7 @@ pub(super) async fn connect(
                 notify,
             )
             .await;
+        worker.reviews.close().await;
         if let Err(e) = &result {
             *error_slot.lock().expect("terminal mutex") = Some(e.clone())
         }
@@ -515,7 +523,7 @@ impl RealtimeSession {
         options: ReplyRequestOptions,
     ) -> Result<ResponseRef, Error> {
         let value = value.into();
-        text(&value, 4000)?;
+        text(&value, usize::MAX)?;
         let metadata = request_metadata(&options.metadata, &[("prism_cause", "user_text")])?;
         let a = self
             .invoke(Command::new(
@@ -581,7 +589,7 @@ impl RealtimeSession {
         value: impl Into<String>,
     ) -> Result<ItemRef, Error> {
         let value = value.into();
-        text(&value, 4000)?;
+        text(&value, usize::MAX)?;
         let role = match role {
             "user" => super::HistoryRole::User,
             "assistant" => super::HistoryRole::Assistant,
@@ -607,7 +615,7 @@ impl RealtimeSession {
         let metadata = request_metadata(&options.metadata, &[("prism_cause", "proactive")])?;
         let mut body = json!({"response":{"metadata":metadata}});
         if let Some(s) = options.instruction {
-            text(&s, 4000)?;
+            text(&s, usize::MAX)?;
             body["response"]["prism_instruction"] = json!(s)
         }
         if let Some(c) = &options.tool_call {

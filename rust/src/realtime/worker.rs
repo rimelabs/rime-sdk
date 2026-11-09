@@ -46,7 +46,15 @@ impl Worker {
                 .pending
                 .iter()
                 .filter(|c| !c.finished)
-                .map(|c| c.deadline)
+                .map(|c| {
+                    if !c.written && !c.cancelled.is_cancelled() {
+                        c.review
+                            .as_ref()
+                            .map_or(c.deadline, |(_, deadline)| c.deadline.min(*deadline))
+                    } else {
+                        c.deadline
+                    }
+                })
                 .min()
                 .unwrap_or_else(|| Instant::now() + std::time::Duration::from_secs(3600));
             tokio::select! {
@@ -56,6 +64,9 @@ impl Worker {
                 }
                 _ = wake.notified() => {},
                 _ = tokio::time::sleep_until(deadline) => {},
+                completed = self.reviews.next(), if self.reviews.has_jobs() => {
+                    if let Some(completed) = completed? { self.review_completed(completed)?; }
+                }
                 command = self.commands.recv() => {
                     if let Some(mut command) = command {
                         if command.kind == Kind::Hold {
@@ -81,6 +92,7 @@ impl Worker {
                         if event.kind == "session.created" {
                             if self.id.is_empty() {
                                 self.id = event.info.as_ref().expect("session view").session_id.clone();
+                                *self.info.lock().expect("session info mutex") = event.info;
                                 let mut command = Command::new(Kind::Update, json!({"session": settings}));
                                 command.deadline = Instant::now() + self.timeouts.request;
                                 command.admission_deadline = command.deadline;
@@ -133,16 +145,85 @@ impl Worker {
                 self.complete(index, event)?;
             }
         }
+        if let Some(error) = self.pending[index].error_after_write.take() {
+            return Err(error);
+        }
         Ok(())
+    }
+    fn review_completed(
+        &mut self,
+        completed: crate::realtime::review::Completed,
+    ) -> Result<(), Error> {
+        let Some(decision) = completed.decision else {
+            return Ok(());
+        };
+        let (decision, error) = match decision {
+            Ok(ReviewDecision::Replace(text)) if text.trim().is_empty() => (
+                ReviewDecision::Stop,
+                Some(Error::new(
+                    ErrorKind::Stream,
+                    "speech review callback returned blank replacement",
+                )),
+            ),
+            Ok(decision) => (decision, None),
+            Err(error) => (ReviewDecision::Stop, Some(error)),
+        };
+        if self
+            .pending
+            .iter()
+            .filter(|command| !command.finished)
+            .count()
+            >= 128
+        {
+            return Err(Error::new(
+                ErrorKind::ResourceLimit,
+                "too many pending review results",
+            ));
+        }
+        let mut body = json!({"review_id": completed.request.review_id});
+        body["action"] = match &decision {
+            ReviewDecision::Allow => json!("allow"),
+            ReviewDecision::Replace(text) => {
+                body["text"] = json!(text);
+                json!("replace")
+            }
+            ReviewDecision::Stop => json!("stop"),
+        };
+        if !matches!(decision, ReviewDecision::Allow) {
+            self.stop_reviews(
+                &completed.request.response_id,
+                Some(completed.request.index),
+            );
+        }
+        let mut command = Command::new(Kind::Review, body);
+        command.review = Some((completed.request, completed.deadline));
+        command.deadline = completed.deadline;
+        command.admission_deadline = completed.deadline;
+        command.error_after_write = error;
+        self.pending.push(command);
+        Ok(())
+    }
+    pub(super) fn stop_reviews(&mut self, response_id: &str, index: Option<u64>) {
+        self.reviews.stop_after(response_id, index);
+        for command in &mut self.pending {
+            if command.review.as_ref().is_some_and(|(request, _)| {
+                request.response_id == response_id && index.is_none_or(|i| request.index > i)
+            }) {
+                command.status.store(2, Ordering::Release);
+                command.cancelled.cancel();
+            }
+        }
     }
     pub(super) fn publish(
         &self,
         payload: RealtimeEvent,
         event_id: String,
         request_id: Option<String>,
+        server_time_ms: Option<u64>,
     ) -> Result<(), Error> {
         self.events
             .try_send(SessionEvent {
+                server_time_ms,
                 session_id: self.id.clone(),
                 event_id,
                 request_id,
@@ -278,6 +359,7 @@ impl Worker {
             },
             String::new(),
             None,
+            None,
         )?;
         if !done {
             if self.pending.len() >= 128 {
@@ -301,6 +383,19 @@ impl Worker {
         });
         let mut i = 0;
         while i < self.pending.len() {
+            if self.pending[i]
+                .review
+                .as_ref()
+                .is_some_and(|(_, deadline)| Instant::now() >= *deadline)
+            {
+                if !self.pending[i].submitted {
+                    if let Some(error) = self.pending[i].error_after_write.take() {
+                        return Err(error);
+                    }
+                }
+                self.pending[i].status.store(2, Ordering::Release);
+                self.pending[i].cancelled.cancel();
+            }
             if self.pending[i].abandoned() {
                 if let Some(r) = self.pending[i].accepted.take() {
                     self.abandon(r)?
@@ -515,7 +610,11 @@ impl Worker {
                 "input_audio_buffer.clear"
             }
             Kind::Audio => "input_audio_buffer.append",
+            Kind::Review => "prism.review.result",
         };
+        if c.kind == Kind::Cancel {
+            self.stop_reviews(&c.target, None);
+        }
         if c.id != 0 {
             return Ok(false);
         }

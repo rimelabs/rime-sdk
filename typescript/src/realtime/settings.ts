@@ -1,6 +1,137 @@
 import { RimeInputError, RimeResourceLimitError } from "../errors.js";
-import type { JsonValue, PrismFiller, ToolDefinition } from "./types.js";
+import type {
+  JsonValue,
+  PrismFiller,
+  ToolDefinition,
+  TurnDetection,
+  TurnDetectionUpdate,
+  Review,
+  ReviewDecision,
+} from "./types.js";
 import type { SessionSettings } from "./protocol.js";
+
+export function speechSpeed(value: number): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < 0.85 ||
+    value > 1.3
+  )
+    throw new RimeInputError("speed must be a finite number from 0.85 to 1.3");
+  return value;
+}
+
+export function turnSettings(
+  value: TurnDetection | TurnDetectionUpdate,
+  initial = false,
+): Partial<SessionSettings["turn_detection"]> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new RimeInputError("turnDetection must be an object");
+  const result: Partial<SessionSettings["turn_detection"]> = {};
+  for (const [name, wire, min, max] of [
+    ["interruptMinWords", "interrupt_min_words", 1, 10],
+    ["endOfTurnMinSilenceMs", "end_of_turn_min_silence_ms", 0, 5000],
+    ["endOfTurnTimeoutMs", "prism_end_of_turn_timeout_ms", 1000, 10000],
+  ] as const) {
+    const n = (value as TurnDetection)[name];
+    if (n === undefined) continue;
+    if (!initial && name !== "interruptMinWords")
+      throw new RimeInputError(`${name} is fixed at connection setup`);
+    if (!Number.isInteger(n) || n < min || n > max)
+      throw new RimeInputError(
+        `${name} must be an integer from ${min} to ${max}`,
+      );
+    result[wire] = n;
+  }
+  const eagerness = (value as TurnDetection).eagerness;
+  if (eagerness !== undefined) {
+    if (!initial)
+      throw new RimeInputError("eagerness is fixed at connection setup");
+    if (!["low", "medium", "high", "auto"].includes(eagerness))
+      throw new RimeInputError(
+        "Turn eagerness must be low, medium, high, or auto",
+      );
+    result.eagerness = eagerness;
+  }
+  for (const [name, wire] of [
+    ["interruptPhrases", "interrupt_phrases"],
+    ["acknowledgmentPhrases", "acknowledgment_phrases"],
+  ] as const) {
+    const phrases = value[name];
+    if (phrases === undefined) continue;
+    if (
+      !Array.isArray(phrases) ||
+      phrases.length > 100 ||
+      Array.from(phrases).some((item) => typeof item !== "string")
+    )
+      throw new RimeInputError(`${name} must contain at most 100 strings`);
+    result[wire] = phrases.map(toolString);
+  }
+  return result;
+}
+
+export function reviewSettings(
+  value: Review,
+): NonNullable<SessionSettings["prism_review"]> {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    typeof value.callback !== "function"
+  )
+    throw new RimeInputError("review requires an async callback");
+  const timeout = value.timeoutMs === undefined ? 1000 : value.timeoutMs;
+  if (!Number.isInteger(timeout) || timeout < 100 || timeout > 5000)
+    throw new RimeInputError(
+      "review.timeoutMs must be an integer from 100 to 5000",
+    );
+  const policy =
+    value.onTimeout === undefined
+      ? { action: "stop" as const }
+      : value.onTimeout;
+  if (
+    !policy ||
+    typeof policy !== "object" ||
+    !["stop", "speak", "say"].includes(policy.action)
+  )
+    throw new RimeInputError("review.onTimeout must be stop, speak, or say");
+  if (policy.action === "say") {
+    if (
+      typeof policy.text !== "string" ||
+      !/\P{White_Space}/u.test(policy.text) ||
+      [...policy.text].length > 500
+    )
+      throw new RimeInputError(
+        "review timeout text must be nonblank and at most 500 characters",
+      );
+    return {
+      timeout_ms: timeout,
+      on_timeout: "say",
+      timeout_line: toolString(policy.text),
+    };
+  }
+  if ("text" in policy && policy.text !== undefined)
+    throw new RimeInputError("Only say accepts timeout text");
+  return { timeout_ms: timeout, on_timeout: policy.action };
+}
+
+export function reviewDecision(value: ReviewDecision): ReviewDecision {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    !["allow", "replace", "stop"].includes(value.action)
+  )
+    throw new RimeInputError(
+      "Review callback must return allow, replace, or stop",
+    );
+  if (value.action === "replace") {
+    if (typeof value.text !== "string" || !/\P{White_Space}/u.test(value.text))
+      throw new RimeInputError("Review replacement must be nonblank text");
+    return { action: "replace", text: toolString(value.text) };
+  }
+  if (value.text !== undefined)
+    throw new RimeInputError("Only replace accepts review text");
+  return { action: value.action };
+}
 
 function toolString(value: string): string {
   // Unicode mode matches lone surrogates without rejecting valid UTF-16 pairs.

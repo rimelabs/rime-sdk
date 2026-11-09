@@ -58,6 +58,14 @@ impl Worker {
             Kind::Clear => self.converter = None,
             Kind::Update | Kind::Labels => {
                 let mut info = e.info.ok_or_else(|| failure("missing session view"))?;
+                if info.version.is_none() {
+                    info.version = self
+                        .info
+                        .lock()
+                        .expect("session info mutex")
+                        .as_ref()
+                        .and_then(|previous| previous.version.clone());
+                }
                 info.session_id = self.id.clone();
                 if !e.interrupt_known {
                     info.interrupt_on_speech = c.body["session"]["turn_detection"]
@@ -88,6 +96,9 @@ impl Worker {
         Ok(())
     }
     pub(super) fn dispatch(&mut self, mut e: Wire) -> Result<(), Error> {
+        if let Some(request) = e.review.take() {
+            return self.reviews.start(request);
+        }
         let mut matched = vec![];
         for (i, c) in self.pending.iter_mut().enumerate() {
             if c.finished || !c.submitted {
@@ -196,6 +207,7 @@ impl Worker {
                     self.ready = false;
                 }
                 ResponseEnded { response, .. } => {
+                    self.stop_reviews(&response.response_id, None);
                     let Some(r) = self.responses.get_mut(&response.response_id) else {
                         return if self.evicted_responses.contains(&response.response_id) {
                             Ok(())
@@ -277,6 +289,9 @@ impl Worker {
                                     .as_ref()
                                     .is_some_and(|s| !s.is_empty() && s == &c.item_id))
                         {
+                            if let Some(error) = c.error_after_write.take() {
+                                return Err(error);
+                            }
                             if busy && matches!(c.kind, Kind::Text | Kind::Reply) && !c.abandoned()
                             {
                                 c.id = 0;
@@ -315,10 +330,16 @@ impl Worker {
                         },
                         String::new(),
                         e.request_id.clone(),
+                        None,
                     )?;
                 }
             }
-            self.publish(p.clone(), e.event_id.clone(), e.request_id.clone())?;
+            self.publish(
+                p.clone(),
+                e.event_id.clone(),
+                e.request_id.clone(),
+                e.server_time_ms,
+            )?;
             if let RealtimeEvent::ResponseStarted { response, .. } = p {
                 if let Some(item_id) = &e.instruction_item_id {
                     self.publish(
@@ -328,6 +349,7 @@ impl Worker {
                         },
                         String::new(),
                         e.request_id.clone(),
+                        None,
                     )?;
                 }
             }

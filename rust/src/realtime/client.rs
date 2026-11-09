@@ -75,8 +75,50 @@ pub(super) fn truncation(value: &Truncation) -> Result<Value, Error> {
         )),
     }
 }
+fn speed(value: f64) -> Result<Value, Error> {
+    if !value.is_finite() || !SPEED_LIMITS.contains(&value) {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "speed must be finite and from 0.85 through 1.3",
+        ));
+    }
+    Ok(json!(value))
+}
+fn interrupts(value: &TurnDetectionUpdate, target: &mut Value) {
+    if let Some(words) = value.interrupt_min_words {
+        target["interrupt_min_words"] = json!(words);
+    }
+    if let Some(phrases) = &value.interrupt_phrases {
+        target["interrupt_phrases"] = json!(phrases);
+    }
+    if let Some(phrases) = &value.acknowledgment_phrases {
+        target["acknowledgment_phrases"] = json!(phrases);
+    }
+}
+pub(super) fn review_settings(value: &ReviewSettings) -> Result<Value, Error> {
+    if !(100..=5000).contains(&value.timeout_ms) {
+        return Err(Error::new(
+            ErrorKind::Input,
+            "review timeout must be 100 to 5000 ms",
+        ));
+    }
+    let mut result = json!({"timeout_ms": value.timeout_ms});
+    result["on_timeout"] = match &value.on_timeout {
+        ReviewTimeout::Stop => json!("stop"),
+        ReviewTimeout::Speak => json!("speak"),
+        ReviewTimeout::Say(text) => {
+            self::text(text, 500)?;
+            result["timeout_line"] = json!(text);
+            json!("say")
+        }
+    };
+    Ok(result)
+}
 pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
     let mut result = json!({});
+    if let Some(value) = o.speed {
+        result["speed"] = speed(value)?;
+    }
     if let Some(value) = &o.truncation {
         result["truncation"] = truncation(value)?;
     }
@@ -89,8 +131,15 @@ pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
     if let Some(value) = o.tools {
         result["tools"] = json!(tool_settings(&value)?)
     }
+    let mut detection = json!({});
     if let Some(value) = o.interrupt {
-        result["turn_detection"] = json!({"interrupt_response": value})
+        detection["interrupt_response"] = json!(value);
+    }
+    if let Some(value) = o.detection {
+        interrupts(&value, &mut detection);
+    }
+    if !detection.as_object().expect("detection object").is_empty() {
+        result["turn_detection"] = detection;
     }
     Ok(result)
 }
@@ -135,6 +184,17 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         }
         d["prism_end_of_turn_timeout_ms"] = json!(n)
     }
+    if let Some(value) = o.detection.end_of_turn_min_silence_ms {
+        d["end_of_turn_min_silence_ms"] = json!(value);
+    }
+    interrupts(
+        &TurnDetectionUpdate {
+            interrupt_min_words: o.detection.interrupt_min_words,
+            interrupt_phrases: o.detection.interrupt_phrases.clone(),
+            acknowledgment_phrases: o.detection.acknowledgment_phrases.clone(),
+        },
+        &mut d,
+    );
     let tools = tool_settings(&o.tools)?;
     if let Some(id) = &o.request_id {
         if id.trim().is_empty() || !id.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
@@ -147,6 +207,12 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
     if let Some(value) = &o.truncation {
         result["truncation"] = truncation(value)?;
+    }
+    if let Some(value) = o.speed {
+        result["speed"] = speed(value)?;
+    }
+    if let Some(value) = &o.review {
+        result["prism_review"] = review_settings(&value.settings)?;
     }
     if let Some(labels) = &o.response_metadata {
         result["prism_response_metadata"] = json!(labels)

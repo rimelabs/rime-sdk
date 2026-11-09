@@ -6,6 +6,12 @@ import * as t from "./types.js";
 import { listedItem } from "./history.js";
 
 export interface SessionSettings {
+  speed?: number;
+  prism_review?: {
+    timeout_ms: number;
+    on_timeout: "stop" | "speak" | "say";
+    timeout_line?: string;
+  };
   truncation?:
     "auto" | "disabled" | { type: "retention_ratio"; retention_ratio: number };
   modalities: ("text" | "audio")[];
@@ -14,6 +20,10 @@ export interface SessionSettings {
     interrupt_response: boolean;
     eagerness?: t.TurnEagerness;
     prism_end_of_turn_timeout_ms?: number;
+    end_of_turn_min_silence_ms?: number;
+    interrupt_min_words?: number;
+    interrupt_phrases?: string[];
+    acknowledgment_phrases?: string[];
   };
   tools: {
     type: "function";
@@ -46,13 +56,17 @@ export function requestMetadata(
   return { ...labels, ...reserved };
 }
 export interface SessionPatch {
+  speed?: number;
   truncation?: SessionSettings["truncation"];
   voice?: string;
   instructions?: string;
   tools?: SessionSettings["tools"];
-  turn_detection?: { interrupt_response: boolean };
+  turn_detection?: Partial<SessionSettings["turn_detection"]>;
 }
 export interface SessionView {
+  speed?: number;
+  version?: string;
+  review?: t.ReviewSettings;
   truncation: t.Truncation | null;
   settingsRevision: number | null;
   id: string;
@@ -100,6 +114,9 @@ export interface SessionIdleTimeout {
 export interface ResponseEnded extends t.ResponseEnded {
   drainToken: string | null;
 }
+export interface ReviewRequested extends t.ReviewRequest {
+  kind: "review.requested";
+}
 export type Acknowledgment =
   | SessionUpdated
   | HistoryListed
@@ -111,6 +128,7 @@ export type Acknowledgment =
   | t.ResponseStarted
   | ResponseEnded;
 export type ServerPayload =
+  | ReviewRequested
   | SessionCreated
   | Acknowledgment
   | t.InputEvent<t.NormalizedRealtimeFault>
@@ -123,6 +141,7 @@ export type ServerPayload =
   | t.FaultEvent<t.NormalizedRealtimeFault>
   | SessionIdleTimeout;
 export interface ServerEvent {
+  serverTimeMs?: number;
   eventId: string;
   requestId: string | null;
   payload: ServerPayload;
@@ -310,6 +329,48 @@ function truncation(value: unknown): t.Truncation {
     return invalid("session.truncation");
   return Object.freeze({ retentionRatio: o.retention_ratio });
 }
+function receivedNumber(
+  value: unknown,
+  name: string,
+  min: number,
+  max: number,
+  whole = true,
+): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    value < min ||
+    value > max ||
+    (whole && !Number.isInteger(value))
+  )
+    invalid(name);
+  return value as number;
+}
+function receivedReview(value: unknown): t.ReviewSettings {
+  const review = object(value, "session.prism_review");
+  const timeoutMs = receivedNumber(
+    review.timeout_ms,
+    "review.timeout_ms",
+    100,
+    5000,
+  );
+  if (review.on_timeout === "say") {
+    const text = string(review.timeout_line, "review.timeout_line");
+    if (!/\P{White_Space}/u.test(text) || [...text].length > 500)
+      invalid("review.timeout_line");
+    return Object.freeze({
+      timeoutMs,
+      onTimeout: Object.freeze({ action: "say", text }),
+    });
+  }
+  if (review.on_timeout !== "stop" && review.on_timeout !== "speak")
+    invalid("review.on_timeout");
+  if (review.timeout_line !== undefined) invalid("review.timeout_line");
+  return Object.freeze({
+    timeoutMs,
+    onTimeout: Object.freeze({ action: review.on_timeout as "stop" | "speak" }),
+  });
+}
 function session(value: unknown): SessionView {
   const view = object(value, "session");
   const detection =
@@ -342,6 +403,32 @@ function session(value: unknown): SessionView {
       invalid("session.turn_detection.prism_end_of_turn_timeout_ms");
     endOfTurnTimeoutMs = value;
   }
+  const extended: Partial<t.TurnDetectionInfo> = {};
+  const mutable = extended as Record<string, unknown>;
+  for (const [wire, name, min, max] of [
+    ["end_of_turn_min_silence_ms", "endOfTurnMinSilenceMs", 0, 5000],
+    ["interrupt_min_words", "interruptMinWords", 1, 10],
+  ] as const) {
+    if (detection[wire] !== undefined)
+      mutable[name] = receivedNumber(
+        detection[wire],
+        `turn_detection.${wire}`,
+        min,
+        max,
+      );
+  }
+  for (const [wire, name] of [
+    ["interrupt_phrases", "interruptPhrases"],
+    ["acknowledgment_phrases", "acknowledgmentPhrases"],
+  ] as const) {
+    if (detection[wire] === undefined) continue;
+    const values = detection[wire];
+    if (!Array.isArray(values) || values.length > 100)
+      invalid(`turn_detection.${wire}`);
+    mutable[name] = Object.freeze(
+      (values as unknown[]).map((item) => string(item, wire)),
+    );
+  }
   const waits =
     view.prism_tool_waits === undefined
       ? {}
@@ -355,6 +442,17 @@ function session(value: unknown): SessionView {
   if (interrupt !== undefined && typeof interrupt !== "boolean")
     invalid("session.prism_effective_interrupt_response");
   return {
+    ...(view.version === undefined
+      ? {}
+      : { version: string(view.version, "session.version") }),
+    ...(view.speed === undefined
+      ? {}
+      : {
+          speed: receivedNumber(view.speed, "session.speed", 0.85, 1.3, false),
+        }),
+    ...(view.prism_review === undefined
+      ? {}
+      : { review: receivedReview(view.prism_review) }),
     settingsRevision: revision(view),
     truncation:
       view.truncation === undefined ? null : truncation(view.truncation),
@@ -371,7 +469,11 @@ function session(value: unknown): SessionView {
           ),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
-    turnDetection: Object.freeze({ eagerness, endOfTurnTimeoutMs }),
+    turnDetection: Object.freeze({
+      eagerness,
+      endOfTurnTimeoutMs,
+      ...extended,
+    }),
     toolResultTimeoutS: duration(waits.result_timeout_s, "result_timeout_s"),
     toolContinuationTimeoutS: duration(
       waits.continuation_timeout_s,
@@ -582,6 +684,9 @@ function decodeValue(
       break;
     case "conversation.item.input_audio_transcription.delta":
       payload = {
+        ...(event.transcript === undefined
+          ? {}
+          : { transcript: string(event.transcript, "transcript") }),
         kind: "transcript.delta",
         itemId: id(event.item_id, "item_id"),
         delta: string(event.delta, "delta"),
@@ -745,6 +850,16 @@ function decodeValue(
       else payload = { kind: "audio.done", output };
       break;
     }
+    case "prism.review.requested":
+      payload = {
+        kind: "review.requested",
+        reviewId: id(event.review_id, "review_id"),
+        responseId: id(event.response_id, "response_id"),
+        itemId: id(event.item_id, "item_id"),
+        index: integer(event.index, "index"),
+        text: string(event.text, "text"),
+      };
+      break;
     case "error":
       payload = { kind: "error", error: fault(event.error) };
       break;
@@ -752,6 +867,9 @@ function decodeValue(
       return null;
   }
   return {
+    ...(event.server_time_ms === undefined
+      ? {}
+      : { serverTimeMs: integer(event.server_time_ms, "server_time_ms") }),
     eventId:
       event.event_id === undefined ? "" : string(event.event_id, "event_id"),
     requestId: optionalString(

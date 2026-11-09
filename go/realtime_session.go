@@ -37,6 +37,9 @@ func realtimeClosedError() error {
 // ordinary and 128 protected responses without audio. Active generation, unresolved
 // tools, holds and pending operations protect metadata. Overflow fails explicitly.
 type RealtimeSession struct {
+	review               *Review
+	reviewTasks          sync.WaitGroup
+	reviewResults        chan rtReviewResult
 	normalClose          atomic.Bool
 	op                   *operation
 	timeouts             RealtimeTimeouts
@@ -92,6 +95,8 @@ type rtResult struct {
 	err     error
 }
 type rtCommand struct {
+	review                        *rtReviewState
+	reviewFailure                 error
 	hold                          *ResponseHold
 	epoch                         uint64
 	finished                      bool
@@ -125,6 +130,10 @@ type rtResponse struct {
 	outputs                    map[OutputRef]bool
 }
 type rtWorker struct {
+	version           *string
+	reviews           map[string]*rtReviewState
+	reviewOrder       []string
+	reviewRunning     int
 	epoch             uint64
 	initialized       bool
 	interrupt         bool
@@ -141,7 +150,7 @@ type rtWorker struct {
 }
 
 func newRealtimeSession(op *operation, t RealtimeTimeouts) *RealtimeSession {
-	return &RealtimeSession{op: op, timeouts: t, commands: make(chan *rtCommand, 128), wake: make(chan struct{}, 1), events: make(chan SessionEvent, 256), initialized: make(chan error, 1), done: make(chan struct{})}
+	return &RealtimeSession{op: op, timeouts: t, commands: make(chan *rtCommand, 128), wake: make(chan struct{}, 1), events: make(chan SessionEvent, 256), initialized: make(chan error, 1), done: make(chan struct{}), reviewResults: make(chan rtReviewResult, rtReviewConcurrency)}
 }
 
 // Info returns an independent copy of the effective settings.
@@ -212,6 +221,28 @@ func (s *RealtimeSession) interruptionPolicy(revision *uint64) (bool, error) {
 
 func cloneSessionInfo(info SessionInfo) SessionInfo {
 	v := info
+	if v.Speed != nil {
+		n := *v.Speed
+		v.Speed = &n
+	}
+	if v.Version != nil {
+		text := *v.Version
+		v.Version = &text
+	}
+	if v.Review != nil {
+		settings := *v.Review
+		v.Review = &settings
+	}
+	if v.EndOfTurnMinSilenceMS != nil {
+		n := *v.EndOfTurnMinSilenceMS
+		v.EndOfTurnMinSilenceMS = &n
+	}
+	if v.InterruptMinWords != nil {
+		n := *v.InterruptMinWords
+		v.InterruptMinWords = &n
+	}
+	v.InterruptPhrases = slices.Clone(v.InterruptPhrases)
+	v.AcknowledgmentPhrases = slices.Clone(v.AcknowledgmentPhrases)
 	if v.Truncation != nil {
 		t := *v.Truncation
 		v.Truncation = &t
@@ -382,7 +413,7 @@ func (s *RealtimeSession) SendText(ctx context.Context, text string) (ResponseRe
 
 // SendTextWithOptions requests a typed reply with labels for this request.
 func (s *RealtimeSession) SendTextWithOptions(ctx context.Context, text string, options ReplyRequestOptions) (ResponseRef, error) {
-	if e := rtText(text, 4000); e != nil {
+	if e := rtInputText(text); e != nil {
 		return ResponseRef{}, e
 	}
 	metadata, err := rtRequestMetadata(options.Metadata, rtObject{"prism_cause": "user_text"})
@@ -398,7 +429,7 @@ func (s *RealtimeSession) AddMessage(ctx context.Context, role, text string) (It
 	if role != "user" && role != "assistant" {
 		return ItemRef{}, failure(ErrInput, "history role must be user or assistant")
 	}
-	if e := rtText(text, 4000); e != nil {
+	if e := rtInputText(text); e != nil {
 		return ItemRef{}, e
 	}
 	return s.CreateItem(ctx, HistoryItem{Type: HistoryMessage, Role: role, Text: text}, "")
@@ -415,7 +446,7 @@ func (s *RealtimeSession) RequestReplyWithOptions(ctx context.Context, o ReplyOp
 	}
 	b := rtObject{"metadata": metadata}
 	if o.Instruction != "" {
-		if e := rtText(o.Instruction, 4000); e != nil {
+		if e := rtInputText(o.Instruction); e != nil {
 			return ResponseRef{}, e
 		}
 		b["prism_instruction"] = o.Instruction
@@ -516,6 +547,7 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 	defer func() {
 		cancel()
 		socketDone.Wait()
+		s.reviewTasks.Wait()
 		s.mu.Lock()
 		s.terminal = terminal
 		s.mu.Unlock()
@@ -546,6 +578,7 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 	go func() { defer socketDone.Done(); rtReadLoop(ctx, conn, reads) }()
 	go func() { defer socketDone.Done(); rtWriteLoop(ctx, conn, writes, written, s.timeouts.Request) }()
 	w := rtWorker{s: s, responses: map[string]*rtResponse{}, interrupt: settings["turn_detection"].(map[string]any)["interrupt_response"].(bool)}
+	defer w.cancelReviews("")
 	initDeadline := time.NewTimer(time.Until(connectionDeadline))
 	defer initDeadline.Stop()
 	tick := time.NewTimer(time.Hour)
@@ -575,6 +608,11 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 			return
 		}
 		deadline := time.Now().Add(time.Hour)
+		for _, state := range w.reviews {
+			if !state.settled && state.deadline.Before(deadline) {
+				deadline = state.deadline
+			}
+		}
 		for _, c := range w.pending {
 			if !c.finished && c.deadline.Before(deadline) {
 				deadline = c.deadline
@@ -602,6 +640,11 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 			return
 		case <-tick.C:
 		case <-s.wake:
+		case result := <-s.reviewResults:
+			if err := w.reviewResult(result); err != nil {
+				terminal = err
+				return
+			}
 		case c := <-s.commands:
 			if c.kind == "hold" {
 				w.finish(c, rtResult{err: w.acquireHold(c)})
@@ -645,6 +688,7 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 			if event.kind == "session.created" {
 				if w.sessionID == "" {
 					w.sessionID = event.info.SessionID
+					w.version = event.info.Version
 					initDeadline.Stop()
 					c := &rtCommand{ctx: ctx, kind: "update", body: rtObject{"session": settings}, deadline: time.Now().Add(s.timeouts.Request), result: make(chan rtResult, 1)}
 					w.pending = append(w.pending, c)
@@ -666,6 +710,10 @@ func (s *RealtimeSession) failureOr(e error) error {
 	return realtimeClosedError()
 }
 func (w *rtWorker) finish(c *rtCommand, r rtResult) {
+	if c.review != nil {
+		c.review.settled = true
+		c.review.cancel()
+	}
 	if c.kind == "update" && !w.initialized && r.err != nil {
 		select {
 		case w.s.initialized <- r.err:
@@ -695,9 +743,9 @@ func (w *rtWorker) response(ref ResponseRef) (*rtResponse, error) {
 	}
 	return r, nil
 }
-func (w *rtWorker) publish(payload RealtimeEvent, eventID, requestID string) error {
+func (w *rtWorker) publish(payload RealtimeEvent, eventID, requestID string, serverTimeMS *uint64) error {
 	select {
-	case w.s.events <- SessionEvent{w.sessionID, eventID, requestID, payload}:
+	case w.s.events <- SessionEvent{SessionID: w.sessionID, EventID: eventID, RequestID: requestID, Payload: payload, ServerTimeMS: serverTimeMS}:
 		return nil
 	default:
 		return failure(ErrResourceLimit, "realtime event consumer is too slow")
@@ -709,7 +757,7 @@ func (w *rtWorker) abandon(ref ResponseRef) error {
 		return nil
 	}
 	r.abandoned = true
-	if e := w.publish(ResponseAbandoned{ref}, "", ""); e != nil {
+	if e := w.publish(ResponseAbandoned{ref}, "", "", nil); e != nil {
 		return e
 	}
 	if !r.done {
@@ -721,6 +769,7 @@ func (w *rtWorker) abandon(ref ResponseRef) error {
 	return nil
 }
 func (w *rtWorker) advance(writes chan<- rtWrite) error {
+	w.expireReviews()
 	kept := w.pending[:0]
 	for _, c := range w.pending {
 		if !c.finished || (c.accepted != nil && !c.delivered.Load()) {
@@ -734,6 +783,9 @@ func (w *rtWorker) advance(writes chan<- rtWrite) error {
 		if c.ctx.Err() != nil {
 			if !c.submitted {
 				w.finish(c, rtResult{err: operationError(context.Cause(c.ctx), "")})
+				if c.reviewFailure != nil {
+					return c.reviewFailure
+				}
 				continue
 			}
 			c.abandoned = true
@@ -755,6 +807,9 @@ func (w *rtWorker) advance(writes chan<- rtWrite) error {
 				return failure(ErrTimeout, "realtime request timed out; outcome unknown")
 			}
 			w.finish(c, rtResult{err: failure(ErrTimeout, "realtime admission timed out")})
+			if c.reviewFailure != nil {
+				return c.reviewFailure
+			}
 			continue
 		}
 		if c.submitted || w.writeBusy {
@@ -800,6 +855,8 @@ func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 	}
 	wire := ""
 	switch c.kind {
+	case "review":
+		wire = "prism.review.result"
 	case "text", "reply":
 		if c.call.callID != "" {
 			r, e := w.response(c.call.ResponseRef)
@@ -998,6 +1055,11 @@ func (w *rtWorker) complete(c *rtCommand, e *rtWire) error {
 func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
 	info := e.info
 	info.SessionID = w.sessionID
+	if info.Version == nil {
+		info.Version = w.version
+	} else {
+		w.version = info.Version
+	}
 	if !e.interruptKnown {
 		info.InterruptOnSpeech = w.interrupt
 		if settings, ok := c.body["session"].(rtObject); ok {
@@ -1013,6 +1075,9 @@ func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
 	e.info = info
 }
 func (w *rtWorker) dispatch(e *rtWire) error {
+	if e.review != nil {
+		return w.beginReview(*e.review)
+	}
 	if e.kind == "session.idle_timeout" {
 		timeout := &RealtimeIdleTimeout{IdleTimeoutS: e.idleTimeoutS}
 		return &Error{Kind: ErrTimeout, Message: timeout.Error(), Cause: timeout}
@@ -1074,6 +1139,7 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		w.latest = id
 		w.ready = false
 	case ResponseEnded:
+		w.cancelReviews(p.Response.responseID)
 		r := w.responses[p.Response.responseID]
 		if r == nil {
 			if slices.Contains(w.evicted, p.Response.responseID) {
@@ -1156,13 +1222,16 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 						w.responses[c.ref.responseID].continued = false
 					}
 					w.finish(c, rtResult{err: rtFaultError(f)})
+					if c.reviewFailure != nil {
+						return c.reviewFailure
+					}
 				}
 			}
 		}
 	}
 	// Publish acceptance before a possible local abandonment event.
 	if e.payload != nil {
-		if err := w.publish(e.payload, e.eventID, e.requestID); err != nil {
+		if err := w.publish(e.payload, e.eventID, e.requestID, e.serverTimeMS); err != nil {
 			return err
 		}
 	}
@@ -1300,17 +1369,26 @@ func (w *rtWorker) written(result rtWritten) error {
 					w.responses[c.ref.responseID].continued = false
 				}
 				w.finish(c, rtResult{err: result.err})
+				if c.reviewFailure != nil {
+					return c.reviewFailure
+				}
 				break
 			}
 			if result.err != nil {
 				return result.err
 			}
 			c.written = true
+			if c.kind == "cancel" {
+				w.cancelReviews(c.ref.responseID)
+			}
 			if c.kind == "audio" {
 				w.converter = c.converter
 			}
 			if c.expected == "" {
 				w.finish(c, rtResult{})
+				if c.reviewFailure != nil {
+					return c.reviewFailure
+				}
 			} else if c.ack != nil {
 				if err := w.complete(c, c.ack); err != nil {
 					return err

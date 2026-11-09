@@ -36,9 +36,6 @@ func rtHistoryItem(item HistoryItem) (rtObject, error) {
 		if item.Role != "user" && item.Role != "assistant" && item.Role != "system" {
 			return nil, failure(ErrInput, "invalid history role")
 		}
-		if utf8.RuneCountInString(item.Text) > 4000 {
-			return nil, failure(ErrInput, "history text exceeds 4000 characters")
-		}
 		v["role"] = item.Role
 		v["text"] = item.Text
 	case HistoryFunctionCall:

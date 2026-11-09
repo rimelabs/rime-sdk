@@ -983,5 +983,8 @@
       }
     },
     "valid": false
-  }
+  },
+  {"name": "transcript correction can have an empty delta", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "", "transcript": "corrected"}, "valid": true},
+  {"name": "engine cumulative transcript remains nonempty", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "", "transcript": ""}, "valid": false},
+  {"name": "legacy transcript delta omits cumulative text", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "word"}, "valid": true}
 ]
