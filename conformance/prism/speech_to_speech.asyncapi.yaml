@@ -100,6 +100,7 @@ operations:
     channel:
       $ref: '#/channels/realtime'
     messages:
+      - $ref: '#/channels/realtime/messages/reviewResult'
       - $ref: '#/channels/realtime/messages/sessionUpdate'
       - $ref: '#/channels/realtime/messages/conversationItemDelete'
       - $ref: '#/channels/realtime/messages/conversationGet'
@@ -116,6 +117,7 @@ operations:
     channel:
       $ref: '#/channels/realtime'
     messages:
+      - $ref: '#/channels/realtime/messages/reviewRequested'
       - $ref: '#/channels/realtime/messages/sessionCreated'
       - $ref: '#/channels/realtime/messages/conversationItemDeleted'
       - $ref: '#/channels/realtime/messages/conversation'

@@ -44,13 +44,13 @@ export class Reviews {
       this.seen.has(value.reviewId)
     )
       return;
+    const limit = this.stopped.get(value.responseId);
+    if (limit !== undefined && value.index > limit.index) return;
     if (this.active.size >= 32)
       throw new RimeResourceLimitError("Too many concurrent review callbacks");
     this.seen.add(value.reviewId);
     if (this.seen.size > 256)
       this.seen.delete(this.seen.values().next().value!);
-    const limit = this.stopped.get(value.responseId);
-    if (limit !== undefined && value.index > limit.index) return;
     const request = Object.freeze({
       reviewId: value.reviewId,
       responseId: value.responseId,

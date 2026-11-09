@@ -299,6 +299,36 @@ test("review callback concurrency is bounded and excess work fails the session",
   assert.equal(finished, 32);
 });
 
+test("a discarded later chunk consumes no review capacity", async (t) => {
+  const full = Promise.withResolvers();
+  let calls = 0;
+  const { session, peer } = await setup(t, {
+    timeoutMs: 5000,
+    callback: async (chunk, signal) => {
+      if (chunk.responseId === "stopped-reply") return { action: "stop" };
+      if (++calls === 32) full.resolve();
+      await stopped(signal);
+      return { action: "allow" };
+    },
+  });
+  request(peer, "stop-here", 0, "stopped-reply");
+  assert.equal((await peer.next("prism.review.result")).action, "stop");
+  for (let index = 0; index < 32; index++)
+    request(peer, `pending-${index}`, index, "another-reply");
+  await full.promise;
+  request(peer, "already-discarded", 1, "stopped-reply");
+  await session.update({ instructions: "Reader barrier" });
+  assert.equal(calls, 32);
+  assert.equal(
+    peer.requests.some(
+      (value) =>
+        value.type === "prism.review.result" &&
+        value.review_id === "already-discarded",
+    ),
+    false,
+  );
+});
+
 test("review timeout policy is copied and validated before connection", async (t) => {
   const { client, peer } = await setup(t, undefined);
   for (const review of [

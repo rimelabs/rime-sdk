@@ -158,11 +158,15 @@ async fn retry_after_is_optional_and_bounded() {
                 socket.write_all(response.as_bytes()).await.unwrap();
             });
             let client = Client::builder().api_key("test").build().unwrap();
+            let started = std::time::SystemTime::now();
             let error = client.realtime().connect(RealtimeConnectOptions::default().endpoint(endpoint)).await.err().unwrap();
             assert_eq!(error.status_code(), Some(503));
             if expected == Some(30) {
                 let delay = error.retry_after().unwrap();
-                assert!(delay > Duration::from_secs(28) && delay <= Duration::from_secs(30));
+                let date = httpdate::parse_http_date(&value).unwrap();
+                let minimum = date.duration_since(std::time::SystemTime::now()).unwrap_or_default();
+                let maximum = date.duration_since(started).unwrap_or_default();
+                assert!(delay >= minimum && delay <= maximum, "{delay:?} outside {minimum:?}..={maximum:?}");
             } else {assert_eq!(error.retry_after(), expected.map(Duration::from_secs));}
             client.close().await; server.await.unwrap();
         }).await.unwrap();
