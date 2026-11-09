@@ -1,0 +1,41 @@
+typescript/src/realtime/review.ts
+  s_c357d2954de5b3::t_2c25b170151ec8 41-46
+rust/src/realtime/types.rs
+  s_c357d2954de5b3::t_b37453dbbc37d3 12-14
+rust/src/realtime/tests/features.rs
+  s_c357d2954de5b3::t_c46be00b78868d 176-232,234-235,246-247,249,252,284
+  s_c357d2954de5b3::t_28d206fc276a9e 233,236-245,248,250-251,253-283,285-299
+rust/src/realtime/protocol.rs
+  s_c357d2954de5b3::t_b37453dbbc37d3 110,202-207
+  s_c357d2954de5b3::t_2ad98a11d73c5a 208-211
+rust/src/realtime/client.rs
+  s_c357d2954de5b3::t_b37453dbbc37d3 87,89-94,97-109,111,154,203-205
+  s_c357d2954de5b3::t_18fdf5f349f65b 206-208,218
+typescript/tests/realtime-review.test.mjs
+  s_c357d2954de5b3::t_d945b077c8d719 79-114,118-125
+  s_c357d2954de5b3::t_43fe5332057b6d 115-117
+conformance/prism/README.md
+  s_c357d2954de5b3::t_4617e008969e57 133-136
+conformance/prism/schema.json
+  s_c357d2954de5b3::t_9d76bea47a5ae0 989-991
+go/testdata/prism/schema.json
+  s_c357d2954de5b3::t_60dca846ee1fa0 989-991
+rust/testdata/prism/schema.json
+  s_c357d2954de5b3::t_e699d0cab5d9fa 989-991
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "461877581ba2cab320589b75273d86e9338c0cdd",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
