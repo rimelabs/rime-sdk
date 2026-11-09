@@ -102,6 +102,7 @@ function handshakeError(
   body: Buffer,
   requestId: string | null,
   retryAfterSeconds: number | null,
+  serverKind: string | null,
 ) {
   let errorType = RimeUnavailableError;
   let reason = "Realtime endpoint rejected the connection";
@@ -121,7 +122,6 @@ function handshakeError(
     reason = "Realtime endpoint is unavailable";
   }
   let message = `${reason} (HTTP ${status})`;
-  let serverKind: string | null = null;
   if (body.length > 0 && body.length < 1024) {
     try {
       let detail: unknown = new TextDecoder("utf-8", { fatal: true })
@@ -189,12 +189,14 @@ export class RealtimeConnection {
         clearTimeout(timer);
         this.refusal = undefined;
         const id = response.headers["x-request-id"];
+        const kind = response.headers["x-rime-error-kind"];
         this.failure(
           handshakeError(
             response.statusCode ?? 0,
             complete ? Buffer.concat(chunks) : Buffer.alloc(0),
             typeof id === "string" ? id : null,
             retryAfter(response.headersDistinct["retry-after"]),
+            typeof kind === "string" && kind ? kind : null,
           ),
         );
         response.destroy();

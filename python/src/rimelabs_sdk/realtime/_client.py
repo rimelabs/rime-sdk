@@ -110,7 +110,8 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
         reason = "Realtime endpoint is unavailable"
     message = f"{reason} (HTTP {status})"
     # websockets bounds the HTTP body read; open_timeout bounds its duration.
-    server_kind = None
+    kind_headers = response.headers.get_all("x-rime-error-kind")
+    server_kind = kind_headers[0] if len(kind_headers) == 1 and kind_headers[0] else None
     body = response.body
     if body and len(body) < 1024:
         try:

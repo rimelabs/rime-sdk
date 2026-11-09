@@ -65,7 +65,7 @@ func rtHandshakeError(response *http.Response) *Error {
 		reason = "realtime endpoint is unavailable"
 	}
 	message := fmt.Sprintf("%s (HTTP %d)", reason, response.StatusCode)
-	var serverKind string
+	serverKind := response.Header.Get("x-rime-error-kind")
 	if response.Body != nil {
 		defer response.Body.Close()
 		// websocket.Dial returns at most 1024 bytes after a bounded body read.
@@ -81,7 +81,10 @@ func rtHandshakeError(response *http.Response) *Error {
 				}
 				if json.Unmarshal(body, &envelope) == nil {
 					detail = envelope.Error.Message
-					_ = json.Unmarshal(envelope.Error.Kind, &serverKind)
+					var bodyKind string
+					if json.Unmarshal(envelope.Error.Kind, &bodyKind) == nil && bodyKind != "" {
+						serverKind = bodyKind
+					}
 				} else {
 					detail = ""
 				}

@@ -17,6 +17,7 @@ from rimelabs_sdk import (
 from rimelabs_sdk.realtime import RealtimeTimeouts
 
 
+@pytest.mark.parametrize("header_kind", [None, "header_kind"])
 @pytest.mark.parametrize(
     "status,body,error_type,detail",
     [
@@ -60,7 +61,9 @@ from rimelabs_sdk.realtime import RealtimeTimeouts
         (429, b"x" * 2048, RimeResourceLimitError, None),
     ],
 )
-async def test_http_refusal_preserves_category_and_diagnostics(status, body, error_type, detail):
+async def test_http_refusal_preserves_category_and_diagnostics(
+    status, body, error_type, detail, header_kind
+):
     closed = asyncio.Queue()
     attempts = 0
 
@@ -70,9 +73,12 @@ async def test_http_refusal_preserves_category_and_diagnostics(status, body, err
         failure = None
         try:
             await reader.readuntil(b"\r\n\r\n")
+            header = f"x-rime-error-kind: {header_kind}\r\n" if header_kind else ""
             writer.write(
-                f"HTTP/1.1 {status} Refused\r\nContent-Length: {len(body)}\r\n"
-                "x-request-id: server-request\r\n\r\n".encode()
+                (
+                    f"HTTP/1.1 {status} Refused\r\nContent-Length: {len(body)}\r\n"
+                    "x-request-id: server-request\r\n" + header + "\r\n"
+                ).encode()
                 + body
             )
             await writer.drain()
@@ -98,7 +104,7 @@ async def test_http_refusal_preserves_category_and_diagnostics(status, body, err
                 assert error.request_id == "server-request"
                 assert error.status_code == status
                 expected_kind = {402: "insufficient_credits", 403: "billing_inactive"}.get(status)
-                assert error.server_kind == (expected_kind if b'"kind":"' in body else None)
+                assert error.server_kind == (expected_kind if b'"kind":"' in body else header_kind)
                 assert error.close_code is None
                 assert error.retry_after_s is None
                 if detail:

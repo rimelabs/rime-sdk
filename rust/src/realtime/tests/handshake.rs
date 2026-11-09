@@ -91,13 +91,13 @@ async fn http_refusals_preserve_category_and_diagnostics() {
         ),
         (429, vec![b'x'; 2048], ErrorKind::ResourceLimit, None),
     ] {
-        check(status, body, kind, detail, false).await;
+        check(status, body, kind, detail, false, None).await;
     }
 }
 
 #[tokio::test]
 async fn unfinished_body_keeps_status_and_closes_without_waiting() {
-    check(429, vec![], ErrorKind::ResourceLimit, None, true).await;
+    check(429, vec![], ErrorKind::ResourceLimit, None, true, None).await;
 }
 
 async fn check(
@@ -106,13 +106,14 @@ async fn check(
     kind: ErrorKind,
     detail: Option<&str>,
     unfinished: bool,
+    header_kind: Option<&'static str>,
 ) {
     tokio::time::timeout(Duration::from_secs(5), async {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
         let server_kind = if body.windows(8).any(|part| part == b"\"kind\":\"") {
             match status { 402 => Some("insufficient_credits"), 403 => Some("billing_inactive"), _ => None }
-        } else { None };
+        } else { header_kind };
         let server = tokio::spawn(async move {
             for _ in 0..2 {
                 let (mut socket, _) = listener.accept().await.unwrap();
@@ -121,7 +122,8 @@ async fn check(
                     request.push(socket.read_u8().await.unwrap());
                 }
                 let length = if unfinished { 100 } else { body.len() };
-                let mut response = format!("HTTP/1.1 {status} Refused\r\nContent-Length: {length}\r\nx-request-id: server-request\r\n\r\n").into_bytes();
+                let header = header_kind.map(|kind| format!("x-rime-error-kind: {kind}\r\n")).unwrap_or_default();
+                let mut response = format!("HTTP/1.1 {status} Refused\r\nContent-Length: {length}\r\nx-request-id: server-request\r\n{header}\r\n").into_bytes();
                 response.extend_from_slice(&body);
                 socket.write_all(&response).await.unwrap();
                 // The SDK must release the connection, even if the peer waits.
@@ -235,5 +237,30 @@ async fn received_close_code_survives_initialization_failure() {
         })
         .await
         .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn http_reason_header_survives_missing_or_unusable_body() {
+    for (body, detail, unfinished) in [
+        (vec![], Some("available credits"), false),
+        (br#"{"error":"#.to_vec(), None, false),
+        (vec![b'x'; 2048], None, false),
+        (vec![], Some("available credits"), true),
+        (
+            br#"{"error":{"kind":"insufficient_credits","message":"No credits remain"}}"#.to_vec(),
+            Some("No credits remain"),
+            false,
+        ),
+    ] {
+        check(
+            402,
+            body,
+            ErrorKind::Billing,
+            detail,
+            unfinished,
+            Some("header_kind"),
+        )
+        .await;
     }
 }

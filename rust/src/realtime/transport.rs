@@ -94,7 +94,12 @@ fn handshake_error(error: tokio_tungstenite::tungstenite::Error) -> Error {
         None
     };
     Error::new(kind, message)
-        .with_server_kind(server_kind.as_deref())
+        .with_server_kind(server_kind.as_deref().or_else(|| {
+            response
+                .headers()
+                .get("x-rime-error-kind")
+                .and_then(|value| value.to_str().ok())
+        }))
         .with_connection_diagnostics(Some(status), None, retry_after)
         .with_request_id(
             response

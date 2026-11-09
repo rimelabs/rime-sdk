@@ -68,61 +68,68 @@ const cases = [
   [429, "x".repeat(2048), RimeResourceLimitError, null],
 ];
 
-for (const [index, [status, body, errorType, detail]] of cases.entries()) {
-  test(
-    `HTTP refusal ${index}: category, diagnostics, cleanup`,
-    { timeout: 5000 },
-    async (t) => {
-      let attempts = 0;
-      const sockets = new Set();
-      const server = createServer((_req, res) => {
-        attempts++;
-        res.writeHead(status, { "x-request-id": "server-request" });
-        res.end(body);
-      });
-      server.on("connection", (socket) => {
-        sockets.add(socket);
-        socket.once("close", () => sockets.delete(socket));
-      });
-      server.listen(0, "127.0.0.1");
-      await once(server, "listening");
-      const client = new Rime({ apiKey: "test" });
-      t.after(async () => {
-        await client.close();
-        server.closeAllConnections();
-        await new Promise((resolve) => server.close(resolve));
-      });
-      for (let attempt = 0; attempt < 2; attempt++) {
-        await assert.rejects(
-          client.realtime.connect({
-            endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
-          }),
-          (error) => {
-            assert.ok(error instanceof errorType);
-            assert.ok(error.message.includes(`HTTP ${status}`));
-            assert.equal(error.requestId, "server-request");
-            assert.equal(error.statusCode, status);
-            const expectedKind = {
-              402: "insufficient_credits",
-              403: "billing_inactive",
-            }[status];
-            assert.equal(
-              error.serverKind,
-              String(body).includes('"kind":"') ? expectedKind : null,
-            );
-            assert.equal(error.closeCode, null);
-            assert.equal(error.retryAfterSeconds, null);
-            if (detail) assert.ok(error.message.includes(detail));
-            else assert.ok(!error.message.includes(": "));
-            return true;
-          },
-        );
-        await Promise.all([...sockets].map((socket) => once(socket, "close")));
-        assert.equal(sockets.size, 0);
-      }
-      assert.equal(attempts, 2);
-    },
-  );
+for (const headerKind of [null, "header_kind"]) {
+  for (const [index, [status, body, errorType, detail]] of cases.entries()) {
+    test(
+      `HTTP refusal ${index}/${headerKind}: category, diagnostics, cleanup`,
+      { timeout: 5000 },
+      async (t) => {
+        let attempts = 0;
+        const sockets = new Set();
+        const server = createServer((_req, res) => {
+          attempts++;
+          res.writeHead(status, {
+            "x-request-id": "server-request",
+            ...(headerKind ? { "x-rime-error-kind": headerKind } : {}),
+          });
+          res.end(body);
+        });
+        server.on("connection", (socket) => {
+          sockets.add(socket);
+          socket.once("close", () => sockets.delete(socket));
+        });
+        server.listen(0, "127.0.0.1");
+        await once(server, "listening");
+        const client = new Rime({ apiKey: "test" });
+        t.after(async () => {
+          await client.close();
+          server.closeAllConnections();
+          await new Promise((resolve) => server.close(resolve));
+        });
+        for (let attempt = 0; attempt < 2; attempt++) {
+          await assert.rejects(
+            client.realtime.connect({
+              endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
+            }),
+            (error) => {
+              assert.ok(error instanceof errorType);
+              assert.ok(error.message.includes(`HTTP ${status}`));
+              assert.equal(error.requestId, "server-request");
+              assert.equal(error.statusCode, status);
+              const expectedKind = {
+                402: "insufficient_credits",
+                403: "billing_inactive",
+              }[status];
+              assert.equal(
+                error.serverKind,
+                String(body).includes('"kind":"') ? expectedKind : headerKind,
+              );
+              assert.equal(error.closeCode, null);
+              assert.equal(error.retryAfterSeconds, null);
+              if (detail) assert.ok(error.message.includes(detail));
+              else assert.ok(!error.message.includes(": "));
+              return true;
+            },
+          );
+          await Promise.all(
+            [...sockets].map((socket) => once(socket, "close")),
+          );
+          assert.equal(sockets.size, 0);
+        }
+        assert.equal(attempts, 2);
+      },
+    );
+  }
 }
 
 for (const [header, expected] of [
