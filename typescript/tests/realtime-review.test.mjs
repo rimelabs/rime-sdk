@@ -76,6 +76,53 @@ test("review callback runs before response.created without an event consumer or 
   await session.update({ instructions: "Still connected" });
 });
 
+test("active review IDs stay deduplicated after completed request eviction", async (t) => {
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  let calls = 0;
+  const { session, peer } = await setup(t, {
+    timeoutMs: 5000,
+    callback: async (chunk, signal) => {
+      if (chunk.reviewId === "held-review") {
+        calls++;
+        entered.resolve();
+        await Promise.race([release.promise, stopped(signal)]);
+      }
+      return { action: "allow" };
+    },
+  });
+  request(peer, "held-review");
+  await entered.promise;
+  try {
+    for (let index = 1; index <= 257; index++) {
+      request(peer, `completed-${index}`, index);
+      assert.equal(
+        (await peer.next("prism.review.result")).review_id,
+        `completed-${index}`,
+      );
+    }
+    request(peer, "held-review");
+    await session.update({ instructions: "Reader barrier" });
+    assert.equal(calls, 1);
+    release.resolve();
+    assert.equal(
+      (await peer.next("prism.review.result")).review_id,
+      "held-review",
+    );
+    await session.update({ instructions: "Submission barrier" });
+    assert.equal(
+      peer.requests.filter(
+        (value) =>
+          value.type === "prism.review.result" &&
+          value.review_id === "held-review",
+      ).length,
+      1,
+    );
+  } finally {
+    release.resolve();
+  }
+});
+
 test("pipelined review replacement cancels later callbacks but preserves earlier ones", async (t) => {
   const ready = [
     Promise.withResolvers(),

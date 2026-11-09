@@ -38,7 +38,12 @@ export class Reviews {
   }
 
   request(value: ReviewRequest): void {
-    if (this.lifetime.aborted || this.seen.has(value.reviewId)) return;
+    if (
+      this.lifetime.aborted ||
+      this.active.has(value.reviewId) ||
+      this.seen.has(value.reviewId)
+    )
+      return;
     if (this.active.size >= 32)
       throw new RimeResourceLimitError("Too many concurrent review callbacks");
     this.seen.add(value.reviewId);

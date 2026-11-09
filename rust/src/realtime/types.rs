@@ -9,6 +9,9 @@ use std::{collections::BTreeMap, fmt, future::Future, pin::Pin, sync::Arc, time:
 pub type Labels = BTreeMap<String, String>;
 
 pub(super) const SPEED_LIMITS: std::ops::RangeInclusive<f64> = 0.85..=1.3;
+pub(super) const INTERRUPT_WORD_LIMITS: std::ops::RangeInclusive<u64> = 1..=10;
+pub(super) const MIN_SILENCE_LIMITS: std::ops::RangeInclusive<u64> = 0..=5000;
+pub(super) const MAX_PHRASES: usize = 100;
 
 /// Independent Prism connection, admission, and acknowledgment timeouts.
 #[derive(Clone, Copy, Debug)]

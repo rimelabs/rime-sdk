@@ -174,6 +174,130 @@ fn speed_bounds_apply_to_connect_updates_and_received_settings() {
 }
 
 #[tokio::test]
+async fn turn_setting_limits_apply_before_connect_and_update_writes() {
+    let invalid_interrupts = [
+        TurnDetectionUpdate {
+            interrupt_min_words: Some(0),
+            ..TurnDetectionUpdate::default()
+        },
+        TurnDetectionUpdate {
+            interrupt_min_words: Some(11),
+            ..TurnDetectionUpdate::default()
+        },
+        TurnDetectionUpdate {
+            interrupt_phrases: Some(vec!["stop".into(); 101]),
+            ..TurnDetectionUpdate::default()
+        },
+        TurnDetectionUpdate {
+            acknowledgment_phrases: Some(vec!["yes".into(); 101]),
+            ..TurnDetectionUpdate::default()
+        },
+    ];
+    let mut peer = Peer::new().await;
+    let (_client, session) = peer.setup().await;
+    for invalid in invalid_interrupts {
+        let detection = TurnDetection {
+            interrupt_min_words: invalid.interrupt_min_words,
+            interrupt_phrases: invalid.interrupt_phrases.clone(),
+            acknowledgment_phrases: invalid.acknowledgment_phrases.clone(),
+            ..TurnDetection::default()
+        };
+        assert_eq!(
+            client::settings(&RealtimeConnectOptions::default().turn_detection(detection))
+                .unwrap_err()
+                .kind(),
+            crate::ErrorKind::Input
+        );
+        assert_eq!(
+            session
+                .update(RealtimeUpdateOptions::default().turn_detection(invalid))
+                .await
+                .unwrap_err()
+                .kind(),
+            crate::ErrorKind::Input
+        );
+    }
+    assert_eq!(
+        client::settings(
+            &RealtimeConnectOptions::default().turn_detection(TurnDetection {
+                end_of_turn_min_silence_ms: Some(5001),
+                ..TurnDetection::default()
+            })
+        )
+        .unwrap_err()
+        .kind(),
+        crate::ErrorKind::Input
+    );
+    peer.no_request().await;
+    session.close().await;
+
+    for (words, silence, count) in [(1, 0, 0), (10, 5000, 100)] {
+        let phrases = vec!["word".into(); count];
+        let encoded = client::settings(&RealtimeConnectOptions::default().turn_detection(
+            TurnDetection {
+                interrupt_min_words: Some(words),
+                end_of_turn_min_silence_ms: Some(silence),
+                end_of_turn_timeout_ms: Some(10000),
+                interrupt_phrases: Some(phrases.clone()),
+                acknowledgment_phrases: Some(phrases.clone()),
+                ..TurnDetection::default()
+            },
+        ))
+        .unwrap();
+        assert_eq!(encoded["turn_detection"]["interrupt_min_words"], words);
+        assert_eq!(
+            encoded["turn_detection"]["end_of_turn_min_silence_ms"],
+            silence
+        );
+        assert_eq!(
+            encoded["turn_detection"]["interrupt_phrases"]
+                .as_array()
+                .unwrap()
+                .len(),
+            count
+        );
+        let patch = client::patch(RealtimeUpdateOptions::default().turn_detection(
+            TurnDetectionUpdate {
+                interrupt_min_words: Some(words),
+                interrupt_phrases: Some(phrases.clone()),
+                acknowledgment_phrases: Some(phrases),
+            },
+        ))
+        .unwrap();
+        assert_eq!(
+            patch["turn_detection"]["acknowledgment_phrases"]
+                .as_array()
+                .unwrap()
+                .len(),
+            count
+        );
+    }
+}
+
+#[test]
+fn received_turn_settings_reject_out_of_range_values() {
+    for (field, value) in [
+        ("interrupt_min_words", json!(0)),
+        ("interrupt_min_words", json!(11)),
+        ("end_of_turn_min_silence_ms", json!(5001)),
+        ("interrupt_phrases", json!(vec!["stop"; 101])),
+        ("acknowledgment_phrases", json!(vec!["yes"; 101])),
+    ] {
+        let mut detection = json!({});
+        detection[field] = value;
+        assert!(
+            protocol::decode(
+                &json!({"type":"session.updated","session":{"id":"s","turn_detection":detection}})
+                    .to_string(),
+                "s"
+            )
+            .is_err(),
+            "{field}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn unsolicited_review_fails_the_session_without_sending_a_result() {
     let mut peer = Peer::new().await;
     let (_client, session) = peer.setup().await;

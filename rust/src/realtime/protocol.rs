@@ -107,6 +107,7 @@ fn response_usage(response: &Value) -> Result<Option<ResponseUsage>, Error> {
 fn strings(value: &Value) -> Result<Vec<String>, Error> {
     value
         .as_array()
+        .filter(|values| values.len() <= MAX_PHRASES)
         .ok_or_else(|| invalid("phrases"))?
         .iter()
         .map(string)
@@ -198,6 +199,16 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
             .map(integer)
             .transpose()?;
         s.interrupt_min_words = d.get("interrupt_min_words").map(integer).transpose()?;
+        if s.end_of_turn_min_silence_ms
+            .is_some_and(|value| !MIN_SILENCE_LIMITS.contains(&value))
+        {
+            return Err(invalid("session.turn_detection.end_of_turn_min_silence_ms"));
+        }
+        if s.interrupt_min_words
+            .is_some_and(|value| !INTERRUPT_WORD_LIMITS.contains(&value))
+        {
+            return Err(invalid("session.turn_detection.interrupt_min_words"));
+        }
         s.interrupt_phrases = d.get("interrupt_phrases").map(strings).transpose()?;
         s.acknowledgment_phrases = d.get("acknowledgment_phrases").map(strings).transpose()?;
         if let Some(v) = d.get("eagerness") {

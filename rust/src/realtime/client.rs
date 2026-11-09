@@ -84,16 +84,31 @@ fn speed(value: f64) -> Result<Value, Error> {
     }
     Ok(json!(value))
 }
-fn interrupts(value: &TurnDetectionUpdate, target: &mut Value) {
+fn interrupts(value: &TurnDetectionUpdate, target: &mut Value) -> Result<(), Error> {
     if let Some(words) = value.interrupt_min_words {
+        if !INTERRUPT_WORD_LIMITS.contains(&u64::from(words)) {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "interrupt_min_words must be from 1 through 10",
+            ));
+        }
         target["interrupt_min_words"] = json!(words);
     }
-    if let Some(phrases) = &value.interrupt_phrases {
-        target["interrupt_phrases"] = json!(phrases);
+    for (name, phrases) in [
+        ("interrupt_phrases", &value.interrupt_phrases),
+        ("acknowledgment_phrases", &value.acknowledgment_phrases),
+    ] {
+        if let Some(phrases) = phrases {
+            if phrases.len() > MAX_PHRASES {
+                return Err(Error::new(
+                    ErrorKind::Input,
+                    format!("{name} must contain at most {MAX_PHRASES} strings"),
+                ));
+            }
+            target[name] = json!(phrases);
+        }
     }
-    if let Some(phrases) = &value.acknowledgment_phrases {
-        target["acknowledgment_phrases"] = json!(phrases);
-    }
+    Ok(())
 }
 pub(super) fn review_settings(value: &ReviewSettings) -> Result<Value, Error> {
     if !(100..=5000).contains(&value.timeout_ms) {
@@ -136,7 +151,7 @@ pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
         detection["interrupt_response"] = json!(value);
     }
     if let Some(value) = o.detection {
-        interrupts(&value, &mut detection);
+        interrupts(&value, &mut detection)?;
     }
     if !detection.as_object().expect("detection object").is_empty() {
         result["turn_detection"] = detection;
@@ -185,6 +200,12 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         d["prism_end_of_turn_timeout_ms"] = json!(n)
     }
     if let Some(value) = o.detection.end_of_turn_min_silence_ms {
+        if !MIN_SILENCE_LIMITS.contains(&u64::from(value)) {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "end_of_turn_min_silence_ms must be from 0 through 5000",
+            ));
+        }
         d["end_of_turn_min_silence_ms"] = json!(value);
     }
     interrupts(
@@ -194,7 +215,7 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
             acknowledgment_phrases: o.detection.acknowledgment_phrases.clone(),
         },
         &mut d,
-    );
+    )?;
     let tools = tool_settings(&o.tools)?;
     if let Some(id) = &o.request_id {
         if id.trim().is_empty() || !id.bytes().all(|b| (0x20..=0x7e).contains(&b)) {

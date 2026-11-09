@@ -130,3 +130,7 @@ empty delta for a correction. SDK decoders also accept an empty cumulative
 transcript and adapters clear the caption in that case. That defensive behavior
 is tested separately from the engine schema, like other forward-compatible
 server values.
+
+Review results permit an omitted `event_id` in the engine contract. SDK writers
+still supply one for error correlation. The fixture follows the engine's optional
+field rule rather than making the SDK's stricter sending convention mandatory.
