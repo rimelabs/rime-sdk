@@ -1,0 +1,30 @@
+typescript/src/realtime/review.ts
+  s_c357d2954de5b3::t_86f9e1ba3f9b3e 47-48
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_c357d2954de5b3::t_471fb0e7887fb2 103,120
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_c357d2954de5b3::t_471fb0e7887fb2 103,120
+rust/src/realtime/tests/handshake.rs
+  s_c357d2954de5b3::t_83a30efefba3a2 161,166-169
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_c357d2954de5b3::t_471fb0e7887fb2 103,120
+typescript/tests/realtime-review.test.mjs
+  s_c357d2954de5b3::t_8fc032d4c0d57e 324-326
+  s_c357d2954de5b3::t_cf07fb7466a6ba 302-323,327-331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b2c17dc19b63ebb5c89cfeb50742756f5493e89",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
