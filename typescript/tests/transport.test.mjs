@@ -20,12 +20,26 @@ import {
 } from "../dist/errors.js";
 import { FakeService } from "./service.mjs";
 
-for (const [code, ErrorType] of [
+for (const [code, ErrorType, initialKind, trailingKind, expectedKind] of [
   [grpc.status.RESOURCE_EXHAUSTED, RimeResourceLimitError],
   [grpc.status.OK, RimeStreamError],
+  [
+    grpc.status.PERMISSION_DENIED,
+    RimeBillingError,
+    "insufficient_credits",
+    null,
+    "insufficient_credits",
+  ],
+  [
+    grpc.status.PERMISSION_DENIED,
+    RimeBillingError,
+    "insufficient_credits",
+    "billing_inactive",
+    "insufficient_credits",
+  ],
 ]) {
   test(
-    `final status settles a write whose callback never fires / ${code}`,
+    `final status settles a write whose callback never fires / ${code}/${initialKind}/${trailingKind}`,
     { timeout: 1000 },
     async () => {
       const native = new EventEmitter();
@@ -36,10 +50,17 @@ for (const [code, ErrorType] of [
         (error) =>
           error instanceof ErrorType &&
           error.requestId === "write-request" &&
+          error.serverKind === (expectedKind ?? null) &&
           (code === grpc.status.OK || error.message === "request too large"),
       );
+      if (initialKind) {
+        const initial = new grpc.Metadata();
+        initial.set("x-rime-error-kind", initialKind);
+        native.emit("metadata", initial);
+      }
       const metadata = new grpc.Metadata();
       metadata.set("x-request-id", "write-request");
+      if (trailingKind) metadata.set("x-rime-error-kind", trailingKind);
       native.emit("status", { code, details: "request too large", metadata });
       await pending;
       assert.equal(native.listenerCount("status"), 0);
@@ -228,3 +249,21 @@ for (const [name, payload] of [
       }
     }));
 }
+
+test("discovery preserves a billing reason from initial metadata", () =>
+  setup(async (server, prepared, signal) => {
+    server.mode = "discovery_error";
+    server.rejectionStatus = grpc.status.PERMISSION_DENIED;
+    server.responseMetadata = {
+      "x-request-id": "billing-request",
+      "x-rime-error-kind": "insufficient_credits",
+    };
+    await assert.rejects(
+      discover(prepared, "voices", undefined, signal),
+      (error) =>
+        error instanceof RimeBillingError &&
+        error.serverKind === "insufficient_credits" &&
+        error.requestId === "billing-request" &&
+        error.message === server.rejectionMessage,
+    );
+  }));

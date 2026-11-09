@@ -301,3 +301,31 @@ async fn append_stream_emits_delta_before_eof_and_requires_ok_status() {
         h.client.close().await;
     }
 }
+
+#[tokio::test]
+async fn stt_billing_refusal_retains_initial_reason() {
+    for (code, trailing, expected) in [
+        (tonic::Code::PermissionDenied, None, ErrorKind::Billing),
+        (
+            tonic::Code::PermissionDenied,
+            Some("billing_inactive"),
+            ErrorKind::Billing,
+        ),
+        (tonic::Code::Unavailable, None, ErrorKind::Unavailable),
+    ] {
+        let h = Harness::new(Mode::RejectAfterHeaders(
+            code,
+            "insufficient_credits",
+            trailing,
+        ))
+        .await;
+        let mut stream = h.stream(futures_util::stream::empty());
+        let error = next(&mut stream).await.unwrap().unwrap_err();
+        assert_eq!(error.kind(), expected);
+        assert_eq!(error.server_kind(), Some("insufficient_credits"));
+        assert_eq!(error.request_id(), Some("rejected-stt"));
+        assert_eq!(error.message(), "test rejection");
+        assert_eq!(h.service.calls.load(Ordering::SeqCst), 1);
+        h.client.close().await;
+    }
+}

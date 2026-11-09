@@ -5,6 +5,8 @@ import * as schema from "@rimelabs/api";
 export class RecognitionService {
   mode = "normal";
   rejection = grpc.status.UNAVAILABLE;
+  responseMetadata = {};
+  trailingMetadata = {};
   calls = [];
   unaryCalls = [];
   metadata = [];
@@ -16,6 +18,20 @@ export class RecognitionService {
     this.markCancelled = resolve;
   });
   release = () => {};
+  refusal(call) {
+    const headers = new grpc.Metadata();
+    for (const [name, value] of Object.entries(this.responseMetadata))
+      headers.set(name, value);
+    if (Object.keys(this.responseMetadata).length) call.sendMetadata(headers);
+    const metadata = new grpc.Metadata();
+    metadata.set("x-request-id", "stt-rejected");
+    for (const [name, value] of Object.entries(this.trailingMetadata))
+      metadata.set(name, value);
+    return Object.assign(new Error("deliberate rejection"), {
+      code: this.rejection,
+      metadata,
+    });
+  }
   async start() {
     this.server = new grpc.Server({
       "grpc.max_receive_message_length": 17 * 1024 * 1024,
@@ -55,12 +71,7 @@ export class RecognitionService {
             this.mode === "reject" ? "stt-rejected" : "stt-request",
           );
           if (this.mode === "reject") {
-            callback(
-              Object.assign(new Error("deliberate rejection"), {
-                code: this.rejection,
-                metadata,
-              }),
-            );
+            callback(this.refusal(call));
             return;
           }
           call.sendMetadata(metadata);
@@ -92,15 +103,7 @@ export class RecognitionService {
               create(method.output, { payload: { case: name, value } }),
             );
           const fail = () => {
-            const metadata = new grpc.Metadata();
-            metadata.set("x-request-id", "stt-rejected");
-            call.emit(
-              "error",
-              Object.assign(new Error("deliberate rejection"), {
-                code: this.rejection,
-                metadata,
-              }),
-            );
+            call.emit("error", this.refusal(call));
           };
           call.on("cancelled", () => this.markCancelled());
           call.on("error", () => {});

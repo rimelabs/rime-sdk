@@ -11,6 +11,8 @@ class RecognitionService:
     def __init__(self):
         self.mode = "normal"
         self.rejection = grpc.StatusCode.UNAVAILABLE
+        self.response_metadata = ()
+        self.trailing_metadata = ()
         self.calls = []
         self.unary_calls = []
         self.metadata = []
@@ -26,7 +28,11 @@ class RecognitionService:
         self.metadata.append(dict(context.invocation_metadata()))
         self.config_seen.set()
         if self.mode == "reject":
-            context.set_trailing_metadata((("x-request-id", "stt-rejected"),))
+            if self.response_metadata:
+                await context.send_initial_metadata(self.response_metadata)
+            context.set_trailing_metadata(
+                (("x-request-id", "stt-rejected"),) + self.trailing_metadata
+            )
             await context.abort(self.rejection, "deliberate rejection")
         await context.send_initial_metadata((("x-request-id", "stt-request"),))
         if self.mode == "no_completion":
@@ -61,7 +67,11 @@ class RecognitionService:
             assert config.WhichOneof("payload") == "config"
             self.config_seen.set()
             if self.mode == "reject":
-                context.set_trailing_metadata((("x-request-id", "stt-rejected"),))
+                if self.response_metadata:
+                    await context.send_initial_metadata(self.response_metadata)
+                context.set_trailing_metadata(
+                    (("x-request-id", "stt-rejected"),) + self.trailing_metadata
+                )
                 await context.abort(self.rejection, "deliberate rejection")
             await context.send_initial_metadata((("x-request-id", "stt-request"),))
             if self.mode == "no_acceptance":

@@ -23,7 +23,7 @@ use tokio_stream::wrappers::{ReceiverStream, TcpListenerStream};
 use tokio_util::sync::CancellationToken;
 use tonic::{
     transport::{Endpoint, Server},
-    Request, Response, Status,
+    Code, Request, Response, Status,
 };
 
 type Responses =
@@ -40,6 +40,7 @@ enum Mode {
     OddFrame,
     DelayedHeaders,
     Reject(tonic::Code, Option<&'static str>),
+    RejectAfterHeaders(tonic::Code, &'static str, Option<&'static str>),
     Flood,
 }
 
@@ -90,6 +91,23 @@ impl TextToSpeech for Service {
                     .insert("x-rime-error-kind", reason.parse().unwrap());
             }
             return Err(error);
+        }
+        if let Mode::RejectAfterHeaders(code, initial, trailing) = self.mode {
+            let mut error = Status::new(code, "test error");
+            if let Some(reason) = trailing {
+                error
+                    .metadata_mut()
+                    .insert("x-rime-error-kind", reason.parse().unwrap());
+            }
+            let stream = futures_util::stream::once(async move { Err(error) });
+            let mut response = Response::new(Box::pin(stream) as Responses);
+            response
+                .metadata_mut()
+                .insert("x-request-id", "rejected-request".parse().unwrap());
+            response
+                .metadata_mut()
+                .insert("x-rime-error-kind", initial.parse().unwrap());
+            return Ok(response);
         }
         let mut input = request.into_inner();
         let (sender, receiver) = mpsc::channel(2);
@@ -728,29 +746,48 @@ async fn fragments_are_sent_before_source_finishes_and_final_audio_is_drained() 
 
 #[tokio::test]
 async fn grpc_billing_reasons_preserve_semantics_and_diagnostics() {
-    for (code, reason, expected) in [
+    for (mode, expected, reason) in [
         (
-            tonic::Code::PermissionDenied,
-            "insufficient_credits",
+            Mode::Reject(Code::PermissionDenied, Some("insufficient_credits")),
             ErrorKind::Billing,
-        ),
-        (
-            tonic::Code::PermissionDenied,
-            "billing_inactive",
-            ErrorKind::Permission,
-        ),
-        (
-            tonic::Code::PermissionDenied,
-            "future_reason",
-            ErrorKind::Permission,
-        ),
-        (
-            tonic::Code::Unavailable,
             "insufficient_credits",
+        ),
+        (
+            Mode::Reject(Code::PermissionDenied, Some("billing_inactive")),
+            ErrorKind::Permission,
+            "billing_inactive",
+        ),
+        (
+            Mode::Reject(Code::PermissionDenied, Some("future_reason")),
+            ErrorKind::Permission,
+            "future_reason",
+        ),
+        (
+            Mode::Reject(Code::Unavailable, Some("insufficient_credits")),
             ErrorKind::Unavailable,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(Code::PermissionDenied, "insufficient_credits", None),
+            ErrorKind::Billing,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(
+                Code::PermissionDenied,
+                "insufficient_credits",
+                Some("billing_inactive"),
+            ),
+            ErrorKind::Billing,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(Code::Unavailable, "insufficient_credits", None),
+            ErrorKind::Unavailable,
+            "insufficient_credits",
         ),
     ] {
-        let harness = Harness::new(Mode::Reject(code, Some(reason))).await;
+        let harness = Harness::new(mode).await;
         let mut audio = harness
             .client
             .tts()

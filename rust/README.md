@@ -344,8 +344,8 @@ bodies use a default message. Bodies of 1024 bytes or more also use the default
 message. The SDK does not retry the connection automatically.
 
 Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session updates,
-`RealtimeFault::retryable()`, and `ErrorKind::Realtime` are pending the next
-release. Use this checkout for those APIs.
+`RealtimeFault::retryable()`, `ErrorKind::Realtime`, `ErrorKind::Billing`, and
+`Error::server_kind()` are pending the next release. Use this checkout for those APIs.
 
 When you upgrade from alpha.9, `info()` returns an owned `SessionInfo` snapshot.
 Store it before borrowing its fields. Add `request_id`, `response_metadata`, and

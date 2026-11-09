@@ -6,7 +6,11 @@ use super::{
     queue::TranscriptQueue,
     TranscriptionMode, TranscriptionOptions, TranscriptionUpdate,
 };
-use crate::{client::Inner, error::request_id, Error, ErrorKind};
+use crate::{
+    client::Inner,
+    error::{request_id, rpc_error},
+    Error, ErrorKind,
+};
 use bytes::Bytes;
 use futures_core::Stream;
 use futures_util::StreamExt;
@@ -83,7 +87,7 @@ where
         if let Some(id) = request_id(response.metadata()) {
             shared.set_request_id(id);
         }
-        let mut responses = response.into_inner();
+        let (metadata, mut responses, _) = response.into_parts();
         let mut state = TranscriptState::new(options.output_contract);
         let mut accepted = Some(accepted);
         loop {
@@ -92,9 +96,13 @@ where
                     .await
                     .map_err(|_| {
                         Error::new(ErrorKind::Timeout, "transcription acceptance timed out")
-                    })??
+                    })?
+                    .map_err(|status| rpc_error(status, Some(&metadata)))?
             } else {
-                responses.message().await?
+                responses
+                    .message()
+                    .await
+                    .map_err(|status| rpc_error(status, Some(&metadata)))?
             };
             let Some(message) = message else {
                 break;
@@ -108,7 +116,11 @@ where
                 }
             }
         }
-        if let Some(trailers) = responses.trailers().await? {
+        if let Some(trailers) = responses
+            .trailers()
+            .await
+            .map_err(|status| rpc_error(status, Some(&metadata)))?
+        {
             if let Some(id) = request_id(&trailers) {
                 shared.set_request_id(id);
             }

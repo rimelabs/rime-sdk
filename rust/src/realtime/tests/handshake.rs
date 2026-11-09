@@ -7,97 +7,42 @@ use tokio::{
 
 #[tokio::test]
 async fn http_refusals_preserve_category_and_diagnostics() {
-    for (status, body, kind, detail) in [
-        (
-            401,
-            b"Authentication failed".to_vec(),
-            ErrorKind::Authentication,
-            Some("Authentication failed"),
-        ),
-        (
-            403,
-            b"Forbidden".to_vec(),
-            ErrorKind::Permission,
-            Some("Forbidden"),
-        ),
-        (402, vec![], ErrorKind::Billing, Some("available credits")),
-        (
-            402,
-            br#"{"error":{"kind":"insufficient_credits","message":"No credits remain"}}"#.to_vec(),
-            ErrorKind::Billing,
-            Some("No credits remain"),
-        ),
-        (
-            403,
-            br#"{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}"#.to_vec(),
-            ErrorKind::Permission,
-            Some("Billing is inactive"),
-        ),
-        (
-            402,
-            br#"{"error":{"kind":42,"message":"No credits remain"}}"#.to_vec(),
-            ErrorKind::Billing,
-            Some("No credits remain"),
-        ),
-        (
-            429,
-            b"Currently at websocket limit".to_vec(),
-            ErrorKind::ResourceLimit,
-            Some("websocket limit"),
-        ),
-        (
-            429,
-            vec![],
-            ErrorKind::ResourceLimit,
-            Some("connection or rate limit reached"),
-        ),
-        (
-            503,
-            b"conversation capacity reached".to_vec(),
-            ErrorKind::Unavailable,
-            Some("capacity reached"),
-        ),
-        (
-            503,
-            b"engine is draining".to_vec(),
-            ErrorKind::Unavailable,
-            Some("engine is draining"),
-        ),
-        (
-            503,
-            br#"{"error":{"message":"graph is not ready"}}"#.to_vec(),
-            ErrorKind::Unavailable,
-            Some("graph is not ready"),
-        ),
-        (
-            503,
-            b"<html>proxy error</html>".to_vec(),
-            ErrorKind::Unavailable,
-            None,
-        ),
-        (503, br#"{"error":"#.to_vec(), ErrorKind::Unavailable, None),
-        (
-            503,
-            br#"{"error":null}"#.to_vec(),
-            ErrorKind::Unavailable,
-            None,
-        ),
-        (503, vec![255], ErrorKind::Unavailable, None),
-        (
-            503,
-            b"bad\x00message".to_vec(),
-            ErrorKind::Unavailable,
-            None,
-        ),
-        (429, vec![b'x'; 2048], ErrorKind::ResourceLimit, None),
+    for (status, body, kind, detail, server_kind) in [
+        (401, b"Authentication failed".to_vec(), ErrorKind::Authentication, Some("Authentication failed"), None),
+        (403, b"Forbidden".to_vec(), ErrorKind::Permission, Some("Forbidden"), None),
+        (402, vec![], ErrorKind::Billing, Some("available credits"), None),
+        (402, br#"{"error":{"kind":"insufficient_credits","message":"No credits remain"}}"#.to_vec(), ErrorKind::Billing, Some("No credits remain"), Some("insufficient_credits")),
+        (403, br#"{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}"#.to_vec(), ErrorKind::Permission, Some("Billing is inactive"), Some("billing_inactive")),
+        (402, br#"{"error":{"kind":42,"message":"No credits remain"}}"#.to_vec(), ErrorKind::Billing, Some("No credits remain"), None),
+        (403, br#"{ "error": { "kind": "future_reason", "message": "Unavailable for this account" } }"#.to_vec(), ErrorKind::Permission, Some("Unavailable for this account"), Some("future_reason")),
+        (429, b"Currently at websocket limit".to_vec(), ErrorKind::ResourceLimit, Some("websocket limit"), None),
+        (429, vec![], ErrorKind::ResourceLimit, Some("connection or rate limit reached"), None),
+        (503, b"conversation capacity reached".to_vec(), ErrorKind::Unavailable, Some("capacity reached"), None),
+        (503, b"engine is draining".to_vec(), ErrorKind::Unavailable, Some("engine is draining"), None),
+        (503, br#"{"error":{"message":"graph is not ready"}}"#.to_vec(), ErrorKind::Unavailable, Some("graph is not ready"), None),
+        (503, b"<html>proxy error</html>".to_vec(), ErrorKind::Unavailable, None, None),
+        (503, br#"{"error":"#.to_vec(), ErrorKind::Unavailable, None, None),
+        (503, br#"{"error":null}"#.to_vec(), ErrorKind::Unavailable, None, None),
+        (503, vec![255], ErrorKind::Unavailable, None, None),
+        (503, b"bad\x00message".to_vec(), ErrorKind::Unavailable, None, None),
+        (429, vec![b'x'; 2048], ErrorKind::ResourceLimit, None, None),
     ] {
-        check(status, body, kind, detail, false, None).await;
+        check(status, body, kind, detail, false, None, server_kind).await;
     }
 }
 
 #[tokio::test]
 async fn unfinished_body_keeps_status_and_closes_without_waiting() {
-    check(429, vec![], ErrorKind::ResourceLimit, None, true, None).await;
+    check(
+        429,
+        vec![],
+        ErrorKind::ResourceLimit,
+        None,
+        true,
+        None,
+        None,
+    )
+    .await;
 }
 
 async fn check(
@@ -107,13 +52,11 @@ async fn check(
     detail: Option<&str>,
     unfinished: bool,
     header_kind: Option<&'static str>,
+    expected_server_kind: Option<&str>,
 ) {
     tokio::time::timeout(Duration::from_secs(5), async {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
-        let server_kind = if body.windows(8).any(|part| part == b"\"kind\":\"") {
-            match status { 402 => Some("insufficient_credits"), 403 => Some("billing_inactive"), _ => None }
-        } else { header_kind };
         let server = tokio::spawn(async move {
             for _ in 0..2 {
                 let (mut socket, _) = listener.accept().await.unwrap();
@@ -138,7 +81,7 @@ async fn check(
             assert_eq!(error.kind(), kind);
             assert_eq!(error.request_id(), Some("server-request"));
             assert_eq!(error.status_code(), Some(status));
-            assert_eq!(error.server_kind(), server_kind);
+            assert_eq!(error.server_kind(), expected_server_kind);
             assert_eq!(error.close_code(), None);
             assert_eq!(error.retry_after(), None);
             assert!(error.message().contains(&format!("HTTP {status}")));
@@ -242,15 +185,21 @@ async fn received_close_code_survives_initialization_failure() {
 
 #[tokio::test]
 async fn http_reason_header_survives_missing_or_unusable_body() {
-    for (body, detail, unfinished) in [
-        (vec![], Some("available credits"), false),
-        (br#"{"error":"#.to_vec(), None, false),
-        (vec![b'x'; 2048], None, false),
-        (vec![], Some("available credits"), true),
+    for (body, detail, unfinished, server_kind) in [
+        (
+            vec![],
+            Some("available credits"),
+            false,
+            Some("header_kind"),
+        ),
+        (br#"{"error":"#.to_vec(), None, false, Some("header_kind")),
+        (vec![b'x'; 2048], None, false, Some("header_kind")),
+        (vec![], Some("available credits"), true, Some("header_kind")),
         (
             br#"{"error":{"kind":"insufficient_credits","message":"No credits remain"}}"#.to_vec(),
             Some("No credits remain"),
             false,
+            Some("insufficient_credits"),
         ),
     ] {
         check(
@@ -260,6 +209,7 @@ async fn http_reason_header_survives_missing_or_unusable_body() {
             detail,
             unfinished,
             Some("header_kind"),
+            server_kind,
         )
         .await;
     }

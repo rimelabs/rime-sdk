@@ -881,3 +881,39 @@ test("invalid contract does not open an RPC", async (t) => {
   );
   assert.equal(service.calls.length, 0);
 });
+
+for (const operation of ["unary", "streaming"]) {
+  for (const location of ["headers", "trailers", "conflict"]) {
+    test(`STT billing refusal retains reason: ${operation}/${location}`, async (t) => {
+      const { service, client } = await setup(t);
+      service.mode = "reject";
+      service.rejection = grpc.status.PERMISSION_DENIED;
+      if (location !== "trailers")
+        service.responseMetadata = {
+          "x-rime-error-kind": "insufficient_credits",
+        };
+      if (location !== "headers")
+        service.trailingMetadata = {
+          "x-rime-error-kind":
+            location === "conflict"
+              ? "billing_inactive"
+              : "insufficient_credits",
+        };
+      const stream =
+        operation === "streaming"
+          ? client.stt.stream(source(), { language: "en" })
+          : null;
+      await assert.rejects(
+        stream
+          ? stream.next()
+          : client.stt.transcribe(Buffer.from("wav"), { language: "en" }),
+        (error) =>
+          error instanceof sdk.RimeBillingError &&
+          error.serverKind === "insufficient_credits" &&
+          error.requestId === "stt-rejected" &&
+          error.message === "deliberate rejection",
+      );
+      await stream?.cancel();
+    });
+  }
+}

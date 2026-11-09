@@ -1,4 +1,5 @@
 use std::{borrow::Cow, error::Error as StdError, fmt, sync::Arc, time::Duration};
+use tonic::{metadata::MetadataMap, Code, Status};
 
 /// Stable categories for application error handling.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -176,39 +177,48 @@ impl StdError for Error {
     }
 }
 
-impl From<tonic::Status> for Error {
-    fn from(status: tonic::Status) -> Self {
-        use tonic::Code;
-        let server_kind = status
-            .metadata()
-            .get("x-rime-error-kind")
-            .and_then(|value| value.to_str().ok());
-        let kind = match status.code() {
-            Code::Unauthenticated => ErrorKind::Authentication,
-            Code::PermissionDenied if server_kind == Some("insufficient_credits") => {
-                ErrorKind::Billing
-            }
-            Code::PermissionDenied => ErrorKind::Permission,
-            Code::InvalidArgument => ErrorKind::Input,
-            Code::ResourceExhausted => ErrorKind::ResourceLimit,
-            Code::Unavailable => ErrorKind::Unavailable,
-            Code::DeadlineExceeded => ErrorKind::Timeout,
-            Code::Cancelled => ErrorKind::Cancelled,
-            _ => ErrorKind::Stream,
-        };
-        let message = if status.message().trim().is_empty() {
-            Cow::Borrowed("speech service request failed")
-        } else {
-            Cow::Owned(status.message().to_owned())
-        };
-        Self::new(kind, message)
-            .with_server_kind(server_kind)
-            .with_request_id(request_id(status.metadata()))
-            .caused_by(status)
+impl From<Status> for Error {
+    fn from(status: Status) -> Self {
+        rpc_error(status, None)
     }
 }
 
-pub(crate) fn request_id(metadata: &tonic::metadata::MetadataMap) -> Option<&str> {
+/// Maps a failed RPC using response headers received before stream completion.
+pub(crate) fn rpc_error(status: Status, initial_metadata: Option<&MetadataMap>) -> Error {
+    let server_kind = initial_metadata
+        .into_iter()
+        .chain(std::iter::once(status.metadata()))
+        .filter_map(|metadata| {
+            metadata
+                .get("x-rime-error-kind")
+                .and_then(|value| value.to_str().ok())
+        })
+        .find(|kind| !kind.is_empty());
+    let kind = match status.code() {
+        Code::Unauthenticated => ErrorKind::Authentication,
+        Code::PermissionDenied if server_kind == Some("insufficient_credits") => ErrorKind::Billing,
+        Code::PermissionDenied => ErrorKind::Permission,
+        Code::InvalidArgument => ErrorKind::Input,
+        Code::ResourceExhausted => ErrorKind::ResourceLimit,
+        Code::Unavailable => ErrorKind::Unavailable,
+        Code::DeadlineExceeded => ErrorKind::Timeout,
+        Code::Cancelled => ErrorKind::Cancelled,
+        _ => ErrorKind::Stream,
+    };
+    let message = if status.message().trim().is_empty() {
+        Cow::Borrowed("speech service request failed")
+    } else {
+        Cow::Owned(status.message().to_owned())
+    };
+    Error::new(kind, message)
+        .with_server_kind(server_kind)
+        .with_request_id(
+            request_id(status.metadata()).or_else(|| initial_metadata.and_then(request_id)),
+        )
+        .caused_by(status)
+}
+
+pub(crate) fn request_id(metadata: &MetadataMap) -> Option<&str> {
     metadata
         .get("x-request-id")
         .and_then(|value| value.to_str().ok())
