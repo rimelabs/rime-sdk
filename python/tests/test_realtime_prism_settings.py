@@ -362,3 +362,26 @@ async def test_invalid_speed_fails_before_connect(monkeypatch, speed):
 def test_invalid_turn_settings(options):
     with pytest.raises(RimeInputError):
         r.TurnDetection(**options)
+
+
+async def test_response_end_cancels_pending_review(monkeypatch):
+    started, cancelled = asyncio.Event(), asyncio.Event()
+
+    async def review(request):
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+
+    async with configured(monkeypatch, review=r.Review(callback=review)) as (current, peer):
+        peer.emit("prism.typed_input.ready")
+        pending = asyncio.create_task(current.send_text("Hello"))
+        request = await peer.next("response.create")
+        peer.accepted(request, response_id="active")
+        await pending
+        requested(peer, response="active")
+        await started.wait()
+        peer.ended(response_id="active")
+        await cancelled.wait()
+        assert peer.sent.empty()
