@@ -1,0 +1,37 @@
+go/realtime_prism_features_test.go
+  s_c357d2954de5b3::t_3e49e2b39f9d02 218-226
+python/src/rimelabs_sdk/realtime/_session.py
+  s_c357d2954de5b3::t_dd1c39d975eab2 411-419
+  s_c357d2954de5b3::t_7a997ce6dfec86 410
+python/tests/test_realtime_prism_settings.py
+  s_c357d2954de5b3::t_1a0811bff1643c 156-157,161-193
+  s_c357d2954de5b3::t_16eb5b8d489fee 158-160
+rust/src/realtime/dispatch.rs
+  s_c357d2954de5b3::t_dd1c39d975eab2 303-314
+typescript/tests/realtime-prism-settings.test.mjs
+  s_c357d2954de5b3::t_1a0811bff1643c 173
+typescript/src/realtime/session.ts
+  s_c357d2954de5b3::t_16eb5b8d489fee 469-471
+  s_c357d2954de5b3::t_dd1c39d975eab2 465-468,472-475
+  s_c357d2954de5b3::t_305fd79a5f760e 464
+go/realtime_session.go
+  s_c357d2954de5b3::t_dd1c39d975eab2 1221-1226
+rust/src/realtime/tests/features.rs
+  s_c357d2954de5b3::t_1a0811bff1643c 382
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "599bdf3505e9dc45e7f5f9561dce5e77b3785b66",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
