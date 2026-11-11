@@ -96,6 +96,43 @@ fn dispatch(worker: &mut Worker, event: Value) {
         .unwrap();
     worker.dispatch(event).unwrap();
 }
+
+#[tokio::test]
+async fn cancelled_queued_review_preserves_callback_failure() {
+    for cutoff in [None, Some(0)] {
+        let (mut worker, writes, mut jobs, _) = worker();
+        let _guard = queue_text(&mut worker);
+        worker.advance(&writes).unwrap();
+        // Keep another write outstanding so the review result remains queued.
+        let _outstanding = jobs.recv().await.unwrap();
+        let request = ReviewRequest {
+            review_id: "failed-review".into(),
+            response_id: "provisional".into(),
+            item_id: "speech".into(),
+            index: 1,
+            text: "Proposed speech.".into(),
+        };
+        worker
+            .review_completed(crate::realtime::review::Completed {
+                request,
+                deadline: Instant::now() + Duration::from_secs(1),
+                decision: Some(Err(Error::input(std::io::Error::other("policy failed")))),
+            })
+            .unwrap();
+        worker.advance(&writes).unwrap();
+        assert!(jobs.try_recv().is_err());
+        // Response completion or an earlier Stop can cancel that queued result.
+        worker.stop_reviews("provisional", cutoff);
+        let error = worker.advance(&writes).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Input);
+        assert_eq!(
+            std::error::Error::source(&error).unwrap().to_string(),
+            "policy failed"
+        );
+        assert!(jobs.try_recv().is_err());
+    }
+}
+
 #[tokio::test]
 async fn cancellation_before_writer_entry_waits_for_confirmed_skip() {
     let (mut worker, writes, mut jobs, _) = worker();

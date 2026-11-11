@@ -8,6 +8,7 @@ import {
   RimeResourceLimitError,
 } from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
+import { RealtimeConnection } from "../dist/realtime/transport.js";
 
 const test = (name, body) => nativeTest(name, { timeout: 5000 }, body);
 
@@ -224,6 +225,75 @@ test("response completion cancels its outstanding review work", async (t) => {
     0,
   );
 });
+
+for (const ending of ["response completion", "preceding stop"]) {
+  test(`${ending} cancels queued review writes without failing the session`, async (t) => {
+    const callbackEntered = Promise.withResolvers();
+    const { session, peer } = await setup(t, {
+      callback: async (chunk) => {
+        if (chunk.index === 1) callbackEntered.resolve();
+        return {
+          action:
+            ending === "preceding stop" && chunk.index === 0 ? "stop" : "allow",
+        };
+      },
+    });
+    const held = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const original = RealtimeConnection.prototype.send;
+    let blocked = false;
+    t.mock.method(
+      RealtimeConnection.prototype,
+      "send",
+      async function (encoded) {
+        const kind = JSON.parse(encoded).type;
+        if (
+          !blocked &&
+          kind ===
+            (ending === "preceding stop"
+              ? "prism.review.result"
+              : "session.update")
+        ) {
+          blocked = true;
+          held.resolve();
+          await release.promise;
+        }
+        return original.call(this, encoded);
+      },
+    );
+    let blocker;
+    try {
+      if (ending === "response completion") {
+        peer.emit("response.created", { response: { id: "reply" } });
+        blocker = session.update({
+          instructions: "Hold the serialized writer",
+        });
+        blocker.catch(() => {});
+      } else request(peer, "review-first", 0, "reply");
+      await held.promise;
+      request(peer, "review-queued", 1, "reply");
+      await callbackEntered.promise;
+      await nextTurn();
+      if (ending === "response completion") {
+        peer.ended("reply");
+        await nextTurn();
+      }
+      release.resolve();
+      if (blocker) await blocker;
+      else await peer.next("prism.review.result");
+      await session.update({ instructions: "The session remains usable" });
+      if (ending === "response completion")
+        assert.equal(
+          peer.requests.filter((event) => event.type === "prism.review.result")
+            .length,
+          0,
+        );
+    } finally {
+      release.resolve();
+      if (blocker) await blocker.catch(() => {});
+    }
+  });
+}
 
 test("client close joins callback cleanup after transport failure", async (t) => {
   const entered = Promise.withResolvers();

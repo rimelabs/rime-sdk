@@ -385,6 +385,58 @@ async def test_invalid_speed_fails_before_connect(monkeypatch, speed):
                 pytest.fail("invalid speed connected")
 
 
+async def test_callback_failure_survives_expired_stop_write(monkeypatch):
+    completed = asyncio.Event()
+
+    async def review(request):
+        completed.set()
+        raise ValueError("policy failed")
+
+    async with configured(
+        monkeypatch, review=r.Review(callback=review, timeout_ms=100, on_timeout=r.Speak())
+    ) as (current, peer):
+        async with current._write_lock:
+            requested(peer)
+            await completed.wait()
+            await asyncio.sleep(0.15)
+        with pytest.raises(RimeStreamError, match="Speech review callback failed"):
+            await asyncio.wait_for(anext(current.events), 0.3)
+        assert peer.sent.empty(), "An expired Stop must not be submitted"
+
+
+@pytest.mark.parametrize("decision", [r.Stop(), r.Replace("replacement")])
+async def test_expired_verdict_does_not_cancel_later_timeout_speak_chunk(monkeypatch, decision):
+    completed = asyncio.Event()
+    seen = []
+
+    async def review(request):
+        seen.append(request.index)
+        completed.set()
+        return decision if request.index == 0 else r.Allow()
+
+    async with configured(
+        monkeypatch, review=r.Review(callback=review, timeout_ms=100, on_timeout=r.Speak())
+    ) as (current, peer):
+        async with current._write_lock:
+            requested(peer, index=0)
+            await completed.wait()
+            await asyncio.sleep(0.15)
+        # Wait for the abandoned write without supplying any server completion.
+        pending = asyncio.create_task(current.update(speed=1.1))
+        update = await peer.next("session.update")
+        peer.emit(
+            "session.updated",
+            prism_request_event_id=update["event_id"],
+            session={"id": "session-1"},
+        )
+        await pending
+        requested(peer, index=1)
+        result = await peer.next("prism.review.result")
+        assert result["review_id"] == "review-guess-1"
+        assert result["action"] == "allow"
+        assert seen == [0, 1]
+
+
 @pytest.mark.parametrize(
     "options",
     [

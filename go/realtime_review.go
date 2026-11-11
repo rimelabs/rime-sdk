@@ -21,6 +21,22 @@ func rtReviewSettings(review Review) (rtObject, error) {
 		return nil, failure(ErrInput, "review timeout must be from 100 through 5000 ms")
 	}
 	result := rtObject{"timeout_ms": timeout}
+	// Value-receiver variants also implement ReviewTimeout as pointers.
+	// Leave typed nil pointers unchanged so the policy switch rejects them.
+	switch policy := review.OnTimeout.(type) {
+	case *ReviewTimeoutStop:
+		if policy != nil {
+			review.OnTimeout = *policy
+		}
+	case *ReviewTimeoutSpeak:
+		if policy != nil {
+			review.OnTimeout = *policy
+		}
+	case *ReviewTimeoutSay:
+		if policy != nil {
+			review.OnTimeout = *policy
+		}
+	}
 	switch policy := review.OnTimeout.(type) {
 	case nil, ReviewTimeoutStop:
 		result["on_timeout"] = "stop"
@@ -38,6 +54,21 @@ func rtReviewSettings(review Review) (rtObject, error) {
 }
 
 func rtReviewVerdict(decision ReviewDecision) (rtObject, bool, error) {
+	// Accept both forms of each public variant, but not typed nil pointers.
+	switch value := decision.(type) {
+	case *ReviewAllow:
+		if value != nil {
+			decision = *value
+		}
+	case *ReviewStop:
+		if value != nil {
+			decision = *value
+		}
+	case *ReviewReplace:
+		if value != nil {
+			decision = *value
+		}
+	}
 	switch value := decision.(type) {
 	case ReviewAllow:
 		return rtObject{"action": "allow"}, false, nil

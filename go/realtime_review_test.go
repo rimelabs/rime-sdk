@@ -43,6 +43,59 @@ func TestRealtimeReviewBeforeResponseAndWithoutConsumer(t *testing.T) {
 	}
 }
 
+func TestRealtimeReviewPointerDecisionsReachServer(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		decision ReviewDecision
+		action   string
+	}{
+		{"allow", &ReviewAllow{}, "allow"},
+		{"stop", &ReviewStop{}, "stop"},
+		{"replace", &ReviewReplace{Text: "Approved replacement."}, "replace"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newRealtimePeer(t)
+			_, session := p.setupWith(t, RealtimeConnectOptions{Review: &Review{Callback: func(context.Context, ReviewRequest) (ReviewDecision, error) {
+				return tc.decision, nil
+			}}})
+			rtReviewRequest(p, "pointer", "provisional", 0)
+			result := p.next("prism.review.result")
+			if result["action"] != tc.action || tc.action == "replace" && result["text"] != "Approved replacement." {
+				t.Fatal(result)
+			}
+			// A valid pointer result must not fail the session after writing Stop.
+			p.turn(session, "after-pointer")
+		})
+	}
+}
+
+func TestRealtimeReviewPointerTimeoutPolicies(t *testing.T) {
+	for _, tc := range []struct {
+		policy ReviewTimeout
+		action string
+	}{
+		{&ReviewTimeoutStop{}, "stop"},
+		{&ReviewTimeoutSpeak{}, "speak"},
+		{&ReviewTimeoutSay{Text: "Please wait."}, "say"},
+	} {
+		settings, err := rtReviewSettings(Review{OnTimeout: tc.policy, Callback: func(context.Context, ReviewRequest) (ReviewDecision, error) { return ReviewAllow{}, nil }})
+		if err != nil || settings["on_timeout"] != tc.action || tc.action == "say" && settings["timeout_line"] != "Please wait." {
+			t.Fatal(settings, err)
+		}
+	}
+	for _, policy := range []ReviewTimeout{(*ReviewTimeoutStop)(nil), (*ReviewTimeoutSpeak)(nil), (*ReviewTimeoutSay)(nil)} {
+		_, err := rtReviewSettings(Review{OnTimeout: policy, Callback: func(context.Context, ReviewRequest) (ReviewDecision, error) { return ReviewAllow{}, nil }})
+		if !errors.Is(err, ErrInput) {
+			t.Fatal("nil timeout pointer accepted", err)
+		}
+	}
+	for _, decision := range []ReviewDecision{(*ReviewAllow)(nil), (*ReviewStop)(nil), (*ReviewReplace)(nil)} {
+		if _, _, err := rtReviewVerdict(decision); !errors.Is(err, ErrInput) {
+			t.Fatal("nil decision pointer accepted", err)
+		}
+	}
+}
+
 func TestRealtimeReviewStopPreservesEarlierAndCancelsLater(t *testing.T) {
 	p := newRealtimePeer(t)
 	started := make(chan uint64, 3)

@@ -149,7 +149,7 @@ export class Reviews {
         active.request.index > limit
       )
         active.stop.abort(
-          new RimeStreamError("A preceding review ended this reply"),
+          new RimeCancelledError("A preceding review ended this reply"),
         );
   }
 
@@ -158,7 +158,7 @@ export class Reviews {
     this.stopped.delete(responseId);
     for (const active of this.active.values())
       if (active.request.responseId === responseId)
-        active.stop.abort(new RimeStreamError("Review reply ended"));
+        active.stop.abort(new RimeCancelledError("Review reply ended"));
   }
 
   async close(): Promise<void> {

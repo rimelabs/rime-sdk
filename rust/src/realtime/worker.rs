@@ -401,6 +401,9 @@ impl Worker {
                     self.abandon(r)?
                 }
                 if !self.pending[i].submitted {
+                    if let Some(error) = self.pending[i].error_after_write.take() {
+                        return Err(error);
+                    }
                     self.pending[i].finish(Err(Error::new(
                         ErrorKind::Cancelled,
                         "operation cancelled before submission",

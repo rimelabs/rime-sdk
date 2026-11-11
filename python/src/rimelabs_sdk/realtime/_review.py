@@ -105,12 +105,15 @@ class Reviews:
             await self._send(event, deadline)
             if not isinstance(decision, t.Allow):
                 self.end(request.response_id, request.index)
-            if failed:
-                self._fail(RimeStreamError("Speech review callback failed; stop submitted"))
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001 -- writer failures terminate the session
             self._fail(RimeStreamError("Speech review result could not be submitted"))
+        finally:
+            if failed:
+                # An expired or cancelled queued Stop does not erase the policy
+                # failure. The server still owns its configured timeout action.
+                self._fail(RimeStreamError("Speech review callback failed; stop attempted"))
 
     def cancel(self) -> None:
         self._closed = True
