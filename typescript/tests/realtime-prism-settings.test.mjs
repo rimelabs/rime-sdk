@@ -170,11 +170,11 @@ test("invalid settings fail before sending and fixed turn fields cannot be updat
 test("long Unicode text reaches Prism through typed, proactive and history operations", async (t) => {
   const { session, peer } = await setup(t);
   const value = "😀".repeat(4001);
+  peer.emit("prism.typed_input.ready");
   for (const operation of [
     () => session.sendText(value),
     () => session.requestReply({ instruction: value }),
   ]) {
-    peer.emit("prism.typed_input.ready");
     const result = operation();
     const request = await peer.next("response.create");
     assert.equal(
@@ -199,7 +199,6 @@ test("long Unicode text reaches Prism through typed, proactive and history opera
   assert.equal(request.item.text, value);
   peer.ack(request);
   await history;
-  peer.emit("prism.typed_input.ready");
   const following = session.sendText("still usable");
   peer.accepted(await peer.next("response.create"));
   await following;

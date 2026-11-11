@@ -408,6 +408,16 @@ class RealtimeSession:
             return result
         except t.RimeRealtimeError as refusal:
             if (
+                kind == "response.create"
+                and continuation is None
+                and refusal.fault.scope == "event"
+                and refusal.fault.code in {"invalid_typed_input", "invalid_instruction"}
+                and ready_epoch == self._ready_epoch
+            ):
+                # These correlated validation refusals consume no turn. Prism
+                # keeps its ready state, so it need not send another ready event.
+                self._ready.set()
+            if (
                 continuation is not None
                 and refusal.fault.scope == "event"
                 and refusal.fault.code == "tool_continuation_not_ready"

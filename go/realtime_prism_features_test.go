@@ -215,7 +215,15 @@ func TestRealtimePrismLongTextReachesServerInAllPaths(t *testing.T) {
 			if err := <-done; !errors.As(err, &fault) || fault.Code != code {
 				t.Fatal(err)
 			}
-			p.turn(session, "after-refusal")
+			go func() {
+				_, err := session.SendText(context.Background(), "short follow-up")
+				done <- err
+			}()
+			following := p.next("response.create")
+			p.send(rtObject{"type": "response.created", "prism_request_event_id": following["event_id"], "response": rtObject{"id": "after-refusal"}})
+			if err := <-done; err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 	if _, err := rtTools([]ToolDefinition{{Name: strings.Repeat("x", 4001), Parameters: rtObject{}}}); !errors.Is(err, ErrInput) {

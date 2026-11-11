@@ -462,6 +462,18 @@ export class RealtimeSession {
       return await abortable(result.promise, deadline.signal);
     } catch (error) {
       if (
+        kind === "response.create" &&
+        !continuation &&
+        error instanceof t.RimeRealtimeError &&
+        error.fault.scope === "event" &&
+        ["invalid_typed_input", "invalid_instruction"].includes(
+          error.fault.code,
+        ) &&
+        epoch === this.readyEpoch
+      )
+        // A correlated validation refusal consumes no turn or server ready state.
+        this.ready.set();
+      if (
         continuation &&
         error instanceof t.RimeRealtimeError &&
         error.fault.scope === "event" &&

@@ -379,8 +379,8 @@ async fn long_text_reaches_server_on_all_three_paths_and_errors_remain_server_er
     let mut peer = Peer::new().await;
     let (_client, session) = peer.setup().await;
     let long = "🦀".repeat(4001);
+    peer.send(json!({"type":"prism.typed_input.ready"})).await;
     for proactive in [false, true] {
-        peer.send(json!({"type":"prism.typed_input.ready"})).await;
         let task = {
             let session = session.clone();
             let text = long.clone();

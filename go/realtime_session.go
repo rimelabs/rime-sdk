@@ -1218,6 +1218,12 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 					c.written = false
 					c.deadline = c.admissionDeadline
 				} else {
+					// Validation refused the request without consuming a server turn.
+					// Do not override a newer speech, response, or ready event.
+					if (c.kind == "text" || c.kind == "reply") && f.Scope == "event" &&
+						(f.Code == "invalid_typed_input" || f.Code == "invalid_instruction") && c.epoch == w.epoch {
+						w.ready = true
+					}
 					if c.kind == "continue" && f.Code == "tool_continuation_not_ready" {
 						w.responses[c.ref.responseID].continued = false
 					}

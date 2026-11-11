@@ -300,6 +300,18 @@ impl Worker {
                                 c.written = false;
                                 c.deadline = c.admission_deadline
                             } else {
+                                // Validation consumed no turn. Preserve any newer
+                                // speech, response, or readiness transition.
+                                if matches!(c.kind, Kind::Text | Kind::Reply)
+                                    && f.scope == "event"
+                                    && matches!(
+                                        f.code.as_str(),
+                                        "invalid_typed_input" | "invalid_instruction"
+                                    )
+                                    && c.epoch == self.epoch
+                                {
+                                    self.ready = true;
+                                }
                                 if c.kind == Kind::Continue
                                     && f.code == "tool_continuation_not_ready"
                                 {

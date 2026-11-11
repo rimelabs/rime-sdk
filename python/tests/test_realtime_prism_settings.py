@@ -153,6 +153,44 @@ async def test_long_text_is_submitted_to_server(monkeypatch, path):
         await pending
 
 
+@pytest.mark.parametrize("proactive", [False, True])
+@pytest.mark.parametrize("newer_speech", [False, True])
+async def test_rejected_text_restores_only_unchanged_admission(
+    monkeypatch, proactive, newer_speech
+):
+    async with session(monkeypatch) as (current, peer, _):
+        peer.emit("prism.typed_input.ready")
+        pending = asyncio.create_task(
+            current.request_reply(instruction="too long")
+            if proactive
+            else current.send_text("too long")
+        )
+        request = await peer.next("response.create")
+        if newer_speech:
+            peer.emit("input_audio_buffer.speech_started", item_id="spoken", audio_start_ms=0)
+        peer.emit(
+            "error",
+            error={
+                "code": "invalid_instruction" if proactive else "invalid_typed_input",
+                "scope": "event",
+                "owner": {"event_id": request["event_id"]},
+            },
+        )
+        with pytest.raises(r.RimeRealtimeError):
+            await pending
+        following = asyncio.create_task(current.send_text("short follow-up"))
+        try:
+            if newer_speech:
+                with pytest.raises(TimeoutError):
+                    await asyncio.wait_for(peer.sent.get(), 0.03)
+                peer.emit("prism.typed_input.ready")
+            peer.accepted(await peer.next("response.create"))
+            await following
+        finally:
+            following.cancel()
+            await asyncio.gather(following, return_exceptions=True)
+
+
 @pytest.mark.parametrize(
     "decision,action",
     [(r.Allow(), "allow"), (r.Replace("Replacement"), "replace"), (r.Stop(), "stop")],
