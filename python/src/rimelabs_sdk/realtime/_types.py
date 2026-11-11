@@ -361,9 +361,13 @@ class SessionInfo:
 class RealtimeFault:
     code: str
     message: str
-    scope: Literal["event", "utterance", "response", "tool_roundtrip", "session", "unknown"]
+    scope: Literal[
+        "event", "utterance", "response", "tool_roundtrip", "review", "session", "unknown"
+    ]
     request_id: str | None = None
     response_id: str | None = None
+    # The reviewed chunk's ID; absent for faults without review ownership.
+    review_id: str | None = None
     item_id: str | None = None
     call_ids: tuple[str, ...] = ()
     correlation_id: str | None = None

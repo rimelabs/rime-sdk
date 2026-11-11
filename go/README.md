@@ -839,6 +839,10 @@ Close cancels and joins callback work. A callback that ignores its context can
 therefore delay Close. Server errors such as `review_not_found` remain available
 as ordinary `FaultEvent` values.
 
+A timeout's fault has `Scope: "review"`, `ReviewID`, and `ResponseID`.
+It does not itself mean the response failed: `ReviewTimeoutSpeak` and
+`ReviewTimeoutSay` can still complete it. Read `ResponseEnded` for the outcome.
+
 The added fields can break positional Go struct literals. Use keyed literals,
 such as `rime.TranscriptDelta{ItemID: id, Delta: text}`. Existing keyed literals
 continue to compile; new received pointers default to nil.

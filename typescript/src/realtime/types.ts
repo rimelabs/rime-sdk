@@ -233,10 +233,13 @@ export interface RealtimeFault {
     | "utterance"
     | "response"
     | "tool_roundtrip"
+    | "review"
     | "session"
     | "unknown";
   readonly requestId: string | null;
   readonly responseId: string | null;
+  /** The reviewed chunk's ID, or null when absent. Optional on caller-created faults. */
+  readonly reviewId?: string | null;
   readonly itemId: string | null;
   readonly callIds: readonly string[];
   readonly correlationId: string | null;

@@ -80,6 +80,20 @@ fn shared_protocol() {
             assert!(result.is_err(), "{}", c["name"])
         } else {
             let event = result.unwrap_or_else(|e| panic!("{}: {e}", c["name"]));
+            if let Some(expected) = c.get("expected_fault") {
+                let Some(crate::realtime::RealtimeEvent::Fault(fault)) =
+                    &event.as_ref().unwrap().payload
+                else {
+                    panic!("missing fault: {}", c["name"]);
+                };
+                assert_eq!(fault.code, expected["code"].as_str().unwrap());
+                assert_eq!(fault.scope, expected["scope"].as_str().unwrap());
+                assert_eq!(fault.review_id.as_deref(), expected["review_id"].as_str());
+                assert_eq!(
+                    fault.response_id.as_deref(),
+                    expected["response_id"].as_str()
+                );
+            }
             if let Some(expected) = c.get("expected_truncation") {
                 let Some(crate::realtime::RealtimeEvent::ResponseEnded { truncation, .. }) =
                     &event.as_ref().unwrap().payload

@@ -806,9 +806,14 @@ or `Say(text)`. The SDK drops expired callback results and does not retry result
 or wait for an acknowledgment. A callback error, panic, or blank replacement
 attempts Stop, then fails the session with `ErrorKind::Stream`.
 
+A timeout's `RealtimeFault` has scope `"review"`, `review_id`, and `response_id`.
+It does not itself mean the response failed: `Speak` and `Say` can still
+complete it. Read `RealtimeEvent::ResponseEnded` for the outcome.
+
 This is a breaking Rust interface change. Add `..TurnDetection::default()` to
 input literals. Add `transcript: None` to constructed `TranscriptDelta` values,
 or `..` to patterns that do not use the new field. Add `server_time_ms: None` to
 constructed `SessionEvent` values. Constructed `SessionInfo` values must supply
-the new optional fields as well. Existing consumers that only read these values
+the new optional fields as well. Add `review_id: None` to constructed
+`RealtimeFault` values. Existing consumers that only read these values
 can keep their current behavior.

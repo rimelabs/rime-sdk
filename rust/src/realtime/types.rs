@@ -489,12 +489,14 @@ pub struct RealtimeFault {
     pub code: String,
     /// Service explanation.
     pub message: String,
-    /// Event, utterance, response, tool_roundtrip, session, or unknown.
+    /// Event, utterance, response, tool_roundtrip, review, session, or unknown.
     pub scope: String,
     /// Owning request ID.
     pub request_id: Option<String>,
     /// Owning response ID.
     pub response_id: Option<String>,
+    /// Reviewed chunk identifier; absent for faults without review ownership.
+    pub review_id: Option<String>,
     /// Owning item ID.
     pub item_id: Option<String>,
     /// Owning function calls.

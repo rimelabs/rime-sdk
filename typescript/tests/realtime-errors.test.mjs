@@ -25,6 +25,20 @@ const previousFault = {
   parameter: "response.prism_instruction",
 };
 
+test("caller-created review faults retain their chunk ID when normalized", () => {
+  const input = {
+    ...previousFault,
+    code: "review_timeout",
+    scope: "review",
+    reviewId: "review-1",
+  };
+  const error = new RimeRealtimeError(input);
+  assert.equal(error.fault.reviewId, "review-1");
+  assert.equal(error.fault.scope, "review");
+  assert.equal(error.fault.retryable, false);
+  assert.ok(Object.isFrozen(error.fault));
+});
+
 async function setup(t) {
   const peer = await new Peer().start();
   const client = new Rime({ apiKey: "test" });

@@ -789,6 +789,10 @@ Say text is nonblank and at most 500 Unicode characters. Stop is the default.
 Prism enforces this policy. A local deadline cannot measure the server's exact
 remaining time. Expired callback decisions are discarded.
 
+A timeout's fault has scope `"review"`, `reviewId`, and `responseId`.
+It does not itself mean the response failed: `speak` and `say` can still
+complete it. Read `response.ended` for the outcome.
+
 A request contains `reviewId`, `responseId`, `itemId`, `index`, and `text`.
 These are immutable values. A speculative request can arrive before the reply
 starts, and its reply may never start. The request does not mean its text was

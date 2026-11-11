@@ -42,5 +42,13 @@
   { "code": "voice_activity_detection_failed", "retryable": false },
   { "code": "future_error", "retryable": false },
   { "code": "UNAVAILABLE", "retryable": false },
-  { "code": "", "retryable": false }
+  { "code": "", "retryable": false },
+  {
+    "code": "review_not_found",
+    "retryable": false
+  },
+  {
+    "code": "review_timeout",
+    "retryable": false
+  }
 ]

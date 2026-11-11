@@ -127,3 +127,34 @@ async def test_request_error_exposes_the_same_fault_as_the_event(monkeypatch):
         assert fault.parameter == "response.prism_instruction"
         assert fault.correlation_id == "diagnostic-1"
         assert peer.sent.empty()
+
+
+async def test_review_timeout_preserves_owner_and_allows_response_completion(monkeypatch):
+    async with asyncio.timeout(2), session(monkeypatch) as (current, peer, _):
+        response = await accepted_turn(current, peer)
+        peer.emit(
+            "error",
+            error={
+                "code": "review_timeout",
+                "message": "the review had no answer in time",
+                "scope": "review",
+                "owner": {
+                    "kind": "review",
+                    "response_id": response.response_id,
+                    "review_id": "review-1",
+                },
+            },
+        )
+        events = current.events
+        async for event in events:
+            if isinstance(event.payload, r.FaultEvent):
+                fault = event.payload.error
+                break
+        assert fault.scope == "review"
+        assert fault.review_id == "review-1"
+        assert fault.response_id == response.response_id
+        assert not fault.retryable
+        peer.ended(status="completed")
+        ended = (await anext(events)).payload
+        assert isinstance(ended, r.ResponseEnded)
+        assert ended.status == "completed"

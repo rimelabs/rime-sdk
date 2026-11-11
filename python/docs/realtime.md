@@ -278,7 +278,8 @@ Omitting `metadata` keeps the existing request shape. Replies to speech use
 the session labels because they have no client request.
 
 Text passed to `send_text`, `add_message`, or `request_reply(instruction=...)`
-must be nonblank and at most 4,000 characters. History roles are `"user"` and
+must be nonblank. Prism bounds each text by its model's context window in Unicode
+code points; the SDK returns the server's refusal. History roles are `"user"` and
 `"assistant"`. A one-reply instruction does not replace session instructions.
 
 Returning a `ResponseRef` means generation started. Wait for `ResponseEnded` to
@@ -560,8 +561,9 @@ Available in the next SDK release. The Prism server must support history operati
 Read history to obtain the items the next reply would see, in server order.
 Create messages with user, assistant, or system roles, past function calls, and
 function results. Creating an item does not start a reply or execute a tool.
-Message text is limited to 4000 Unicode characters. Optional client item IDs have
-1 to 32 characters. Tool arguments and results preserve the supplied strings.
+Prism bounds each message's text by its model's context window in Unicode code
+points. The SDK returns the server's refusal. Optional client item IDs have 1 to
+32 characters. Tool arguments and results preserve the supplied strings.
 
 Omit the insertion anchor to append, use `root` to insert first, or give an item
 ID to insert after its whole turn. Results go after their calls and cannot take
@@ -697,6 +699,9 @@ or `Stop`. A callback error or invalid result submits Stop and ends the session
 with a typed SDK error without the exception text. The SDK sends each retained review once and
 does not wait for an acknowledgment. The server applies `on_timeout` when the
 callback expires. Its policies are `Stop`, `Speak`, and `Say(text=...)`.
+The timeout's `FaultEvent.error` has scope `"review"`, `review_id`, and
+`response_id`. A review timeout does not itself mean the response failed;
+`Speak` and `Say` can still complete it. Read `ResponseEnded` for the outcome.
 Replacement or Stop cancels only later chunks of that response; response end
 and session close cancel all remaining work. At most 128 callbacks run at once.
 Uncooperative callbacks can delay shutdown. Speculative requests may have no

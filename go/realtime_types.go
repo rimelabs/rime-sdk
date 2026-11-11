@@ -231,7 +231,9 @@ type SessionInfo struct {
 // RealtimeFault preserves structured service fault details. Use errors.As.
 type RealtimeFault struct {
 	Code, Message, Scope, RequestID, ResponseID, ItemID, CorrelationID, Parameter string
-	CallIDs                                                                       []string
+	// ReviewID identifies the reviewed chunk; empty when the fault has no review owner.
+	ReviewID string
+	CallIDs  []string
 }
 
 // RealtimeIdleTimeout reports the server's idle limit when it closes a conversation.

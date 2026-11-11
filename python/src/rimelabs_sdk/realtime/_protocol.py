@@ -448,13 +448,16 @@ def _fault(value: object) -> t.RealtimeFault:
         code=_string(error.get("code", "unknown"), "error.code"),
         message=_string(error.get("message", ""), "error.message"),
         scope=cast(
-            Literal["event", "utterance", "response", "tool_roundtrip", "session", "unknown"],
+            Literal[
+                "event", "utterance", "response", "tool_roundtrip", "review", "session", "unknown"
+            ],
             scope
-            if scope in ("event", "utterance", "response", "tool_roundtrip", "session")
+            if scope in ("event", "utterance", "response", "tool_roundtrip", "review", "session")
             else "unknown",
         ),
         request_id=_optional_string(owner.get("event_id"), "error.owner.event_id"),
         response_id=_optional_string(owner.get("response_id"), "error.owner.response_id"),
+        review_id=_optional_string(owner.get("review_id"), "error.owner.review_id"),
         item_id=_optional_string(owner.get("item_id"), "error.owner.item_id"),
         call_ids=tuple(_id(value, "error.owner.call_ids") for value in calls),
         correlation_id=_optional_string(error.get("correlation_id"), "error.correlation_id"),

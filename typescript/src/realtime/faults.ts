@@ -6,12 +6,14 @@ const normalizedFaults = new WeakSet<NormalizedRealtimeFault>();
 export function normalizeFault(fault: RealtimeFault): NormalizedRealtimeFault {
   if (normalizedFaults.has(fault as NormalizedRealtimeFault))
     return fault as NormalizedRealtimeFault;
+  const reviewId = fault.reviewId;
   const snapshot = {
     code: fault.code,
     message: fault.message,
     scope: fault.scope,
     requestId: fault.requestId,
     responseId: fault.responseId,
+    ...(reviewId === undefined ? {} : { reviewId }),
     itemId: fault.itemId,
     callIds: Object.freeze([...(fault.callIds ?? [])]),
     correlationId: fault.correlationId,

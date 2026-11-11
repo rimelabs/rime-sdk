@@ -937,6 +937,7 @@ components:
         - const: utterance
         - const: response
         - const: tool_roundtrip
+        - const: review
         - const: session
     errorCode:
       oneOf:
@@ -981,6 +982,8 @@ components:
         - const: turn_failed
         - const: no_audio
         - const: voice_activity_detection_failed
+        - const: review_not_found
+        - const: review_timeout
     errorOwner:
       oneOf:
         - type: object
@@ -1017,6 +1020,15 @@ components:
               type: array
               items:
                 type: string
+        - type: object
+          required: [kind, response_id, review_id]
+          properties:
+            kind:
+              const: review
+            response_id:
+              type: string
+            review_id:
+              type: string
         - type: object
           required: [kind]
           properties:

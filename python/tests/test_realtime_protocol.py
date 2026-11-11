@@ -33,6 +33,10 @@ def test_shared_protocol_decoding(case):
     else:
         result = protocol.decode(raw, "session-1")
         assert (result.payload.kind if result else "ignored") == case["expected_kind"]
+        if "expected_fault" in case:
+            assert isinstance(result.payload, r.FaultEvent)
+            for name, expected in case["expected_fault"].items():
+                assert getattr(result.payload.error, name) == expected
         if "expected_truncation" in case:
             expected = case["expected_truncation"]
             assert result.payload.truncation == (

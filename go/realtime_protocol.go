@@ -296,7 +296,7 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 		f.Message = decoder.string(v)
 	}
 	if v, ok := o["scope"]; ok {
-		f.Scope = rtEnum(decoder.string(v), "event", "utterance", "response", "tool_roundtrip", "session")
+		f.Scope = rtEnum(decoder.string(v), "event", "utterance", "response", "tool_roundtrip", "review", "session")
 	}
 	f.CorrelationID = decoder.optional(o["correlation_id"])
 	f.Parameter = decoder.optional(o["param"])
@@ -304,6 +304,7 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 		d := decoder.object(o["owner"])
 		f.RequestID = decoder.optional(d["event_id"])
 		f.ResponseID = decoder.optional(d["response_id"])
+		f.ReviewID = decoder.optional(d["review_id"])
 		f.ItemID = decoder.optional(d["item_id"])
 		if d["call_ids"] != nil {
 			a, ok := d["call_ids"].([]any)

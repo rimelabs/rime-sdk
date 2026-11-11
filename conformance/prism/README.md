@@ -32,6 +32,12 @@ decoder tests check that behavior without relaxing client request validation.
 A future server value can fail the current schema check and still be accepted
 by the SDK decoder. The SDK does not use this fixture to reject incoming events.
 
+Review faults carry scope `review` and name their chunk in `owner.review_id`,
+alongside `owner.response_id`. The error schemas and ownership cases follow
+`interfaces/speech_to_speech.asyncapi.yaml` in `rimelabs/rime` at
+`20a1b933cc9edecc9bb6fc83e4c195b4561ef7f0`. A review timeout applies the
+session's timeout policy; `speak` and `say` can still complete the response.
+
 Each SDK runs the cases in `schema.json` against the schema fixture. Local test
 peers also validate outgoing SDK requests against the message schemas, including
 initialization, tools, audio, and playback reports. Rust and Go use package-local

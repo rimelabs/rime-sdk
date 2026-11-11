@@ -988,5 +988,79 @@
   {"name": "engine cumulative transcript remains nonempty", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "", "transcript": ""}, "valid": false},
   {"name": "legacy transcript delta omits cumulative text", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "word"}, "valid": true},
   {"name": "review result event id is optional in engine contract", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "allow"}, "valid": true},
-  {"name": "review result event id must be a string when supplied", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "allow", "event_id": 7}, "valid": false}
+  {"name": "review result event id must be a string when supplied", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "allow", "event_id": 7}, "valid": false},
+  {
+    "name": "review timeout error includes chunk owner",
+    "schema": "errorInfo",
+    "value": {
+      "type": "server_error",
+      "code": "review_timeout",
+      "message": "the review had no answer in time",
+      "param": null,
+      "event_id": null,
+      "correlation_id": "diagnostic-1",
+      "scope": "review",
+      "owner": {
+        "kind": "review",
+        "response_id": "reply-1",
+        "review_id": "review-1"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "review owner requires review ID",
+    "schema": "errorInfo",
+    "value": {
+      "type": "server_error",
+      "code": "review_timeout",
+      "message": "the review had no answer in time",
+      "param": null,
+      "event_id": null,
+      "correlation_id": "diagnostic-1",
+      "scope": "review",
+      "owner": {
+        "kind": "review",
+        "response_id": "reply-1"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "review owner requires string review ID",
+    "schema": "errorInfo",
+    "value": {
+      "type": "server_error",
+      "code": "review_timeout",
+      "message": "the review had no answer in time",
+      "param": null,
+      "event_id": null,
+      "correlation_id": "diagnostic-1",
+      "scope": "review",
+      "owner": {
+        "kind": "review",
+        "response_id": "reply-1",
+        "review_id": 7
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown review result is a request refusal",
+    "schema": "errorInfo",
+    "value": {
+      "type": "invalid_request_error",
+      "code": "review_not_found",
+      "message": "the review had no answer in time",
+      "param": null,
+      "event_id": null,
+      "correlation_id": "diagnostic-1",
+      "scope": "event",
+      "owner": {
+        "kind": "event",
+        "event_id": "request-1"
+      }
+    },
+    "valid": true
+  }
 ]
