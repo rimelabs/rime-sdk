@@ -282,12 +282,14 @@ for (const ending of ["response completion", "preceding stop"]) {
       if (blocker) await blocker;
       else await peer.next("prism.review.result");
       await session.update({ instructions: "The session remains usable" });
-      if (ending === "response completion")
-        assert.equal(
-          peer.requests.filter((event) => event.type === "prism.review.result")
-            .length,
-          0,
-        );
+      assert.equal(
+        peer.requests.filter(
+          (event) =>
+            event.type === "prism.review.result" &&
+            event.review_id === "review-queued",
+        ).length,
+        0,
+      );
     } finally {
       release.resolve();
       if (blocker) await blocker.catch(() => {});
