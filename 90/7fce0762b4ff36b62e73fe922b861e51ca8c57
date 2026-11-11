@@ -1,0 +1,35 @@
+python/src/rimelabs_sdk/realtime/_review.py
+  s_c357d2954de5b3::t_80b5d5cf5d1756 112-116
+typescript/tests/realtime-review.test.mjs
+  s_c357d2954de5b3::t_45f52b128c6576 11,229-261,263-268,270-296
+  s_c357d2954de5b3::t_30853ffe414f4e 262,269,297
+go/realtime_review_test.go
+  s_c357d2954de5b3::t_6e11b7f7c21236 46-98
+go/realtime_review.go
+  s_c357d2954de5b3::t_7c6782e5f8429c 24-39,57-71
+rust/src/realtime/worker.rs
+  s_c357d2954de5b3::t_7c6782e5f8429c 404-406
+typescript/src/realtime/review.ts
+  s_c357d2954de5b3::t_9044cc8b226df8 152,161
+python/tests/test_realtime_prism_settings.py
+  s_c357d2954de5b3::t_554700d4335720 388-439
+rust/src/realtime/tests/submission.rs
+  s_c357d2954de5b3::t_6e11b7f7c21236 99-126,132-135
+  s_c357d2954de5b3::t_4441505249b93e 127-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "907fce0762b4ff36b62e73fe922b861e51ca8c57",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
