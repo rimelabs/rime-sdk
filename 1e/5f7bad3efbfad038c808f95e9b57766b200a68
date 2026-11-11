@@ -1,0 +1,19 @@
+typescript/tests/realtime-review.test.mjs
+  s_c357d2954de5b3::t_4828527885c96b 285-292
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1e5f7bad3efbfad038c808f95e9b57766b200a68",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
