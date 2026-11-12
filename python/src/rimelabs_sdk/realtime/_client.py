@@ -19,8 +19,10 @@ from websockets.exceptions import InvalidHandshake, InvalidStatus, InvalidURI
 
 from .._errors import (
     RimeAuthenticationError,
+    RimeBillingError,
     RimeError,
     RimeInputError,
+    RimePermissionError,
     RimeResourceLimitError,
     RimeTimeoutError,
     RimeUnavailableError,
@@ -92,9 +94,15 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
     status = response.status_code
     error_type: type[RimeError] = RimeUnavailableError
     reason = "Realtime endpoint rejected the connection"
-    if status in (401, 403):
+    if status == 401:
         error_type = RimeAuthenticationError
         reason = "Realtime endpoint rejected credentials"
+    elif status == 402:
+        error_type = RimeBillingError
+        reason = "Realtime access requires available credits"
+    elif status == 403:
+        error_type = RimePermissionError
+        reason = "Realtime access is not permitted"
     elif status == 429:
         error_type = RimeResourceLimitError
         reason = "Realtime connection or rate limit reached"
@@ -102,13 +110,19 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
         reason = "Realtime endpoint is unavailable"
     message = f"{reason} (HTTP {status})"
     # websockets bounds the HTTP body read; open_timeout bounds its duration.
+    kind_headers = response.headers.get_all("x-rime-error-kind")
+    server_kind = kind_headers[0] if len(kind_headers) == 1 and kind_headers[0] else None
     body = response.body
     if body and len(body) < 1024:
         try:
             detail = body.decode("utf-8").strip()
             if detail.startswith(("{", "[")):
                 payload = json.loads(detail)
-                detail = payload.get("error", {}).get("message")
+                error_details = payload.get("error", {})
+                kind = error_details.get("kind")
+                if isinstance(kind, str) and kind:
+                    server_kind = kind
+                detail = error_details.get("message")
             if (
                 isinstance(detail, str)
                 and not detail.lstrip().startswith("<")
@@ -125,6 +139,7 @@ def _handshake_error(error: InvalidStatus) -> RimeError:
         message,
         request_id=request_id,
         status_code=status,
+        server_kind=server_kind,
         retry_after_s=_retry_after(response.headers.get_all("retry-after")),
     )
 

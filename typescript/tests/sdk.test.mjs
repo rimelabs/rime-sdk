@@ -13,6 +13,7 @@ import {
   RimeUnavailableError,
   RimeAudioFormatError,
   RimeAuthenticationError,
+  RimeBillingError,
   RimePermissionError,
   RimeResourceLimitError,
 } from "../dist/index.js";
@@ -290,6 +291,7 @@ test("private Themis HTTP exchange", async () => {
     );
     for (const [code, errorType] of [
       [401, RimeAuthenticationError],
+      [402, RimeBillingError],
       [403, RimePermissionError],
       [429, RimeResourceLimitError],
       [500, RimeUnavailableError],
@@ -328,6 +330,7 @@ test("private Themis HTTP exchange", async () => {
 
 for (const [status, errorType] of [
   [401, RimeAuthenticationError],
+  [402, RimeBillingError],
   [403, RimePermissionError],
   [429, RimeResourceLimitError],
   [503, RimeUnavailableError],

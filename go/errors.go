@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -19,13 +20,15 @@ func (k ErrorKind) Error() string { return string(k) }
 const (
 	ErrAuthentication ErrorKind = "authentication"
 	ErrPermission     ErrorKind = "permission"
-	ErrInput          ErrorKind = "input"
-	ErrResourceLimit  ErrorKind = "resource_limit"
-	ErrUnavailable    ErrorKind = "unavailable"
-	ErrTimeout        ErrorKind = "timeout"
-	ErrAudioFormat    ErrorKind = "audio_format"
-	ErrCancelled      ErrorKind = "cancelled"
-	ErrStream         ErrorKind = "stream"
+	// ErrBilling indicates that the account has insufficient prepaid credits.
+	ErrBilling       ErrorKind = "billing"
+	ErrInput         ErrorKind = "input"
+	ErrResourceLimit ErrorKind = "resource_limit"
+	ErrUnavailable   ErrorKind = "unavailable"
+	ErrTimeout       ErrorKind = "timeout"
+	ErrAudioFormat   ErrorKind = "audio_format"
+	ErrCancelled     ErrorKind = "cancelled"
+	ErrStream        ErrorKind = "stream"
 
 	// ErrRealtime is a structured Prism service fault. Inspect *RealtimeFault for details.
 	ErrRealtime ErrorKind = "realtime"
@@ -54,6 +57,16 @@ func (e *Error) StatusCode() (int, bool) {
 	return 0, false
 }
 
+// ServerKind returns the structured service error kind, such as insufficient_credits.
+// The second result is false when no structured reason was supplied.
+func (e *Error) ServerKind() (string, bool) {
+	var details *connectionError
+	if errors.As(e.Cause, &details) && details.serverKind != "" {
+		return details.serverKind, true
+	}
+	return "", false
+}
+
 // CloseCode returns a received WebSocket close code, such as 1013.
 // The second result is false when no close code was received.
 func (e *Error) CloseCode() (int, bool) {
@@ -75,12 +88,16 @@ func (e *Error) RetryAfter() (time.Duration, bool) {
 	return 0, false
 }
 
-// Connection metadata stays in the error chain to preserve Error's public struct layout.
+// Transport diagnostics stay in the error chain to preserve Error's public struct layout.
 type connectionError struct {
+	serverKind string
+	cause      error
 	statusCode *int
 	closeCode  *int
 	retryAfter *time.Duration
 }
+
+func (e *connectionError) Unwrap() error { return e.cause }
 
 func (e *connectionError) Error() string {
 	if e.statusCode != nil {
@@ -89,12 +106,15 @@ func (e *connectionError) Error() string {
 	if e.closeCode != nil {
 		return fmt.Sprintf("realtime connection closed (WebSocket close %d)", *e.closeCode)
 	}
+	if e.cause != nil {
+		return e.cause.Error()
+	}
 	return "realtime connection diagnostics"
 }
 
 func failure(kind ErrorKind, message string) *Error { return &Error{Kind: kind, Message: message} }
 
-func operationError(err error, id string) *Error {
+func operationError(err error, id string, headers ...metadata.MD) *Error {
 	var existing *Error
 	if errors.As(err, &existing) {
 		result := *existing
@@ -127,9 +147,22 @@ func operationError(err error, id string) *Error {
 			kind = ErrCancelled
 		}
 	}
+	var serverKind string
+	for _, values := range headers {
+		if kinds := values.Get("x-rime-error-kind"); len(kinds) > 0 && kinds[0] != "" {
+			serverKind = kinds[0]
+			break
+		}
+	}
+	if kind == ErrPermission && serverKind == "insufficient_credits" {
+		kind = ErrBilling
+	}
 	message := "operation failed"
 	if serviceStatus, ok := status.FromError(err); ok && strings.TrimSpace(serviceStatus.Message()) != "" {
 		message = serviceStatus.Message()
+	}
+	if serverKind != "" {
+		err = &connectionError{serverKind: serverKind, cause: err}
 	}
 	return &Error{Kind: kind, Message: message, RequestID: id, Cause: err}
 }

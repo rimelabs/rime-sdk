@@ -278,17 +278,31 @@ func TestPartialAudioThenErrorAndNoReplay(t *testing.T) {
 }
 
 func TestServerRejectionPreservesStatusAndTrailers(t *testing.T) {
-	for _, code := range []codes.Code{codes.Unauthenticated, codes.PermissionDenied, codes.InvalidArgument, codes.ResourceExhausted, codes.Unavailable, codes.DeadlineExceeded, codes.Canceled, codes.Internal} {
-		t.Run(code.String(), func(t *testing.T) {
+	for _, tc := range []struct {
+		code     codes.Code
+		reason   string
+		expected ErrorKind
+	}{
+		{codes.Unauthenticated, "", ErrAuthentication}, {codes.PermissionDenied, "", ErrPermission},
+		{codes.PermissionDenied, "insufficient_credits", ErrBilling}, {codes.PermissionDenied, "billing_inactive", ErrPermission},
+		{codes.PermissionDenied, "future_reason", ErrPermission}, {codes.Unavailable, "insufficient_credits", ErrUnavailable},
+		{codes.InvalidArgument, "", ErrInput}, {codes.ResourceExhausted, "", ErrResourceLimit},
+		{codes.Unavailable, "", ErrUnavailable}, {codes.DeadlineExceeded, "", ErrTimeout},
+		{codes.Canceled, "", ErrCancelled}, {codes.Internal, "", ErrStream},
+	} {
+		t.Run(tc.code.String()+tc.reason, func(t *testing.T) {
 			c := setupClient(t, &testService{synthesis: func(stream grpc.BidiStreamingServer[pb.StreamingSynthesisRequest, pb.SynthesisResponseStream]) error {
-				stream.SetTrailer(metadata.Pairs("x-request-id", "rejected"))
-				return status.Error(code, "rejection")
+				stream.SetTrailer(metadata.Pairs("x-request-id", "rejected", "x-rime-error-kind", tc.reason))
+				return status.Error(tc.code, "rejection")
 			}})
 			s := mustStream(t, c, strings.Repeat("Hello world. ", 1000), SynthesisOptions{})
 			_, err := drain(s)
 			var sdkErr *Error
-			if !errors.As(err, &sdkErr) || sdkErr.RequestID != "rejected" || sdkErr.Kind != operationError(status.Error(code, ""), "").Kind {
+			if !errors.As(err, &sdkErr) || sdkErr.RequestID != "rejected" || sdkErr.Kind != tc.expected {
 				t.Fatalf("%+v", err)
+			}
+			if reason, present := sdkErr.ServerKind(); reason != tc.reason || present != (tc.reason != "") {
+				t.Fatalf("reason=%q present=%v", reason, present)
 			}
 		})
 	}

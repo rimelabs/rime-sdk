@@ -23,7 +23,7 @@ use tokio_stream::wrappers::{ReceiverStream, TcpListenerStream};
 use tokio_util::sync::CancellationToken;
 use tonic::{
     transport::{Endpoint, Server},
-    Request, Response, Status,
+    Code, Request, Response, Status,
 };
 
 type Responses =
@@ -39,7 +39,8 @@ enum Mode {
     BadFormat,
     OddFrame,
     DelayedHeaders,
-    Reject(tonic::Code),
+    Reject(tonic::Code, Option<&'static str>),
+    RejectAfterHeaders(tonic::Code, &'static str, Option<&'static str>),
     Flood,
 }
 
@@ -79,12 +80,34 @@ impl TextToSpeech for Service {
             "Bearer test-key"
         );
         self.calls.fetch_add(1, Ordering::SeqCst);
-        if let Mode::Reject(code) = self.mode {
+        if let Mode::Reject(code, reason) = self.mode {
             let mut error = Status::new(code, "test error");
             error
                 .metadata_mut()
                 .insert("x-request-id", "rejected-request".parse().unwrap());
+            if let Some(reason) = reason {
+                error
+                    .metadata_mut()
+                    .insert("x-rime-error-kind", reason.parse().unwrap());
+            }
             return Err(error);
+        }
+        if let Mode::RejectAfterHeaders(code, initial, trailing) = self.mode {
+            let mut error = Status::new(code, "test error");
+            if let Some(reason) = trailing {
+                error
+                    .metadata_mut()
+                    .insert("x-rime-error-kind", reason.parse().unwrap());
+            }
+            let stream = futures_util::stream::once(async move { Err(error) });
+            let mut response = Response::new(Box::pin(stream) as Responses);
+            response
+                .metadata_mut()
+                .insert("x-request-id", "rejected-request".parse().unwrap());
+            response
+                .metadata_mut()
+                .insert("x-rime-error-kind", initial.parse().unwrap());
+            return Ok(response);
         }
         let mut input = request.into_inner();
         let (sender, receiver) = mpsc::channel(2);
@@ -495,7 +518,7 @@ async fn grpc_errors_match_shared_contract() {
             Some("RimeStreamError") => ErrorKind::Stream,
             value => panic!("unsupported shared error class for {name}: {value:?}"),
         };
-        let harness = Harness::new(Mode::Reject(code)).await;
+        let harness = Harness::new(Mode::Reject(code, None)).await;
         let mut audio = harness
             .client
             .tts()
@@ -719,4 +742,62 @@ async fn fragments_are_sent_before_source_finishes_and_final_audio_is_drained() 
         "The value is 1.7 percent without final punctuation"
     );
     harness.client.close().await;
+}
+
+#[tokio::test]
+async fn grpc_billing_reasons_preserve_semantics_and_diagnostics() {
+    for (mode, expected, reason) in [
+        (
+            Mode::Reject(Code::PermissionDenied, Some("insufficient_credits")),
+            ErrorKind::Billing,
+            "insufficient_credits",
+        ),
+        (
+            Mode::Reject(Code::PermissionDenied, Some("billing_inactive")),
+            ErrorKind::Permission,
+            "billing_inactive",
+        ),
+        (
+            Mode::Reject(Code::PermissionDenied, Some("future_reason")),
+            ErrorKind::Permission,
+            "future_reason",
+        ),
+        (
+            Mode::Reject(Code::Unavailable, Some("insufficient_credits")),
+            ErrorKind::Unavailable,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(Code::PermissionDenied, "insufficient_credits", None),
+            ErrorKind::Billing,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(
+                Code::PermissionDenied,
+                "insufficient_credits",
+                Some("billing_inactive"),
+            ),
+            ErrorKind::Billing,
+            "insufficient_credits",
+        ),
+        (
+            Mode::RejectAfterHeaders(Code::Unavailable, "insufficient_credits", None),
+            ErrorKind::Unavailable,
+            "insufficient_credits",
+        ),
+    ] {
+        let harness = Harness::new(mode).await;
+        let mut audio = harness
+            .client
+            .tts()
+            .synthesize("Hello.", SynthesisOptions::default())
+            .unwrap();
+        let error = next(&mut audio).await.unwrap().unwrap_err();
+        assert_eq!(error.kind(), expected);
+        assert_eq!(error.server_kind(), Some(reason));
+        assert_eq!(error.request_id(), Some("rejected-request"));
+        assert_eq!(error.message(), "test error");
+        assert_eq!(harness.service.calls.load(Ordering::SeqCst), 1);
+    }
 }

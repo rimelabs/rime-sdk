@@ -326,8 +326,14 @@ Missing values are `None`; `Some(Duration::ZERO)` is a valid delay. An absent
 close frame or empty close frame has no close code. Invalid, duplicate, or
 unrepresentable `Retry-After` values are ignored. HTTP dates use the client clock,
 with past dates becoming zero. These methods require a release with structured
-connection diagnostics. Error categories are unchanged. The SDK does not retry
+connection diagnostics. The SDK does not retry
 startup automatically, and this metadata does not make request replay safe.
+
+`Error::server_kind()` returns the structured service reason, such as
+`insufficient_credits` or `billing_inactive`, when supplied. HTTP 401 returns
+`ErrorKind::Authentication`, 402 returns `ErrorKind::Billing`, and 403 returns
+`ErrorKind::Permission`. A gRPC permission refusal with `insufficient_credits`
+also returns `ErrorKind::Billing`.
 
 If Prism refuses the connection with HTTP 429, `realtime().connect()` returns
 `ErrorKind::ResourceLimit`. HTTP 503 returns `ErrorKind::Unavailable`.
@@ -338,8 +344,8 @@ bodies use a default message. Bodies of 1024 bytes or more also use the default
 message. The SDK does not retry the connection automatically.
 
 Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session updates,
-`RealtimeFault::retryable()`, and `ErrorKind::Realtime` are pending the next
-release. Use this checkout for those APIs.
+`RealtimeFault::retryable()`, `ErrorKind::Realtime`, `ErrorKind::Billing`, and
+`Error::server_kind()` are pending the next release. Use this checkout for those APIs.
 
 When you upgrade from alpha.9, `info()` returns an owned `SessionInfo` snapshot.
 Store it before borrowing its fields. Add `request_id`, `response_metadata`, and

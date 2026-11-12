@@ -354,8 +354,14 @@ that does not fit `time.Duration` returns `false`, for both delay-seconds and
 HTTP-date values. Duplicate `Retry-After` headers are ignored; HTTP dates use
 the client clock and past dates become zero.
 These methods require a release with structured connection diagnostics.
-Error categories are unchanged and the SDK does not automatically retry startup.
+The SDK does not automatically retry startup.
 The metadata does not make replay of an accepted request safe.
+
+`ServerKind()` returns the structured service reason, such as
+`insufficient_credits` or `billing_inactive`, and whether it was supplied.
+HTTP 401 matches `ErrAuthentication`, 402 matches `ErrBilling`, and 403 matches
+`ErrPermission`. A gRPC permission refusal with `insufficient_credits` also
+matches `ErrBilling`.
 
 If Prism refuses the connection with HTTP 429, `Realtime.Connect` returns
 an error matching `ErrResourceLimit`. HTTP 503 returns `ErrUnavailable`.

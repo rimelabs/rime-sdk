@@ -2,6 +2,8 @@
 export interface RimeErrorOptions extends ErrorOptions {
   /** Refused HTTP upgrade status, such as 503; null when unavailable. */
   statusCode?: number | null;
+  /** Structured service error kind, such as insufficient_credits; null when absent. */
+  serverKind?: string | null;
   /** Received WebSocket close code, such as 1013; null when unavailable. */
   closeCode?: number | null;
   /** Server-requested delay in seconds. Zero is valid; null means unavailable. */
@@ -11,6 +13,7 @@ export interface RimeErrorOptions extends ErrorOptions {
 export class RimeError extends Error {
   readonly requestId: string | null;
   readonly statusCode: number | null;
+  readonly serverKind: string | null;
   readonly closeCode: number | null;
   readonly retryAfterSeconds: number | null;
   constructor(
@@ -22,11 +25,14 @@ export class RimeError extends Error {
     this.name = new.target.name;
     this.requestId = requestId;
     this.statusCode = options?.statusCode ?? null;
+    this.serverKind = options?.serverKind ?? null;
     this.closeCode = options?.closeCode ?? null;
     this.retryAfterSeconds = options?.retryAfterSeconds ?? null;
   }
 }
 export class RimeAuthenticationError extends RimeError {}
+/** The account has insufficient prepaid credits. */
+export class RimeBillingError extends RimeError {}
 export class RimePermissionError extends RimeError {}
 export class RimeInputError extends RimeError {}
 export class RimeResourceLimitError extends RimeError {}

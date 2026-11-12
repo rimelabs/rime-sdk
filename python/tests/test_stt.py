@@ -17,6 +17,7 @@ from rimelabs_sdk import (
     Rime,
     RimeAudioFormatError,
     RimeAuthenticationError,
+    RimeBillingError,
     RimeCancelledError,
     RimeInputError,
     RimePermissionError,
@@ -825,3 +826,24 @@ async def test_invalid_output_contract_does_not_open_rpc(stt_setup):
     with pytest.raises(RimeInputError):
         client.stt.stream(source(), language="en", output_contract="append_fragments")
     assert not service.calls
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("location", ["headers", "trailers", "conflict"])
+async def test_stt_billing_refusal_preserves_initial_reason(stt_setup, streaming, location):
+    service, client = stt_setup
+    service.mode, service.rejection = "reject", grpc.StatusCode.PERMISSION_DENIED
+    if location != "trailers":
+        service.response_metadata = (("x-rime-error-kind", "insufficient_credits"),)
+    if location != "headers":
+        trailing_reason = "billing_inactive" if location == "conflict" else "insufficient_credits"
+        service.trailing_metadata = (("x-rime-error-kind", trailing_reason),)
+    with pytest.raises(RimeBillingError) as caught:
+        if streaming:
+            async with client.stt.stream(source(), language="en") as stream:
+                await anext(stream)
+        else:
+            await client.stt.transcribe(b"wav", language="en")
+    assert caught.value.server_kind == "insufficient_credits"
+    assert caught.value.request_id == "stt-rejected"
+    assert str(caught.value) == "deliberate rejection"

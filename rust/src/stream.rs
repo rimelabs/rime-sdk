@@ -1,7 +1,7 @@
 use crate::{
     audio::{resolve_audio, Converter},
     client::{validate_timeout, Inner},
-    error::request_id,
+    error::{request_id, rpc_error},
     timestamps::TimestampTrailer,
     AudioFormat, Error, ErrorKind, SynthesisOptions, TimestampResult,
 };
@@ -400,9 +400,13 @@ async fn receive(
         .metadata()
         .get("x-rime-audio-content-type")
         .is_some_and(|value| value == format.wire_format());
-    let mut responses = response.into_inner();
+    let (metadata, mut responses, _) = response.into_parts();
     let mut converter = Converter::new(format);
-    while let Some(response) = responses.message().await.map_err(Error::from)? {
+    while let Some(response) = responses
+        .message()
+        .await
+        .map_err(|status| rpc_error(status, Some(&metadata)))?
+    {
         let data = match response.payload {
             Some(synthesis_response_stream::Payload::Trailer(trailer)) => {
                 if let Some(timestamps) = &timestamps {
@@ -438,7 +442,11 @@ async fn receive(
         }
         enqueue(&audio, &progress, converter.process(&data, false)?).await?;
     }
-    if let Some(trailers) = responses.trailers().await.map_err(Error::from)? {
+    if let Some(trailers) = responses
+        .trailers()
+        .await
+        .map_err(|status| rpc_error(status, Some(&metadata)))?
+    {
         if let Some(value) = request_id(&trailers) {
             let _ = id.set(value.into());
         }

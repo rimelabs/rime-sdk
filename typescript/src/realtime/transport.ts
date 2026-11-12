@@ -1,6 +1,8 @@
 import WebSocket from "ws";
 import {
   RimeAuthenticationError,
+  RimeBillingError,
+  RimePermissionError,
   RimeError,
   RimeResourceLimitError,
   RimeStreamError,
@@ -100,12 +102,19 @@ function handshakeError(
   body: Buffer,
   requestId: string | null,
   retryAfterSeconds: number | null,
+  serverKind: string | null,
 ) {
   let errorType = RimeUnavailableError;
   let reason = "Realtime endpoint rejected the connection";
-  if ([401, 403].includes(status)) {
+  if (status === 401) {
     errorType = RimeAuthenticationError;
     reason = "Realtime endpoint rejected credentials";
+  } else if (status === 402) {
+    errorType = RimeBillingError;
+    reason = "Realtime access requires available credits";
+  } else if (status === 403) {
+    errorType = RimePermissionError;
+    reason = "Realtime access is not permitted";
   } else if (status === 429) {
     errorType = RimeResourceLimitError;
     reason = "Realtime connection or rate limit reached";
@@ -118,8 +127,12 @@ function handshakeError(
       let detail: unknown = new TextDecoder("utf-8", { fatal: true })
         .decode(body)
         .trim();
-      if (typeof detail === "string" && /^[{[]/.test(detail))
-        detail = JSON.parse(detail)?.error?.message;
+      if (typeof detail === "string" && /^[{[]/.test(detail)) {
+        const error = JSON.parse(detail)?.error;
+        if (typeof error?.kind === "string" && error.kind)
+          serverKind = error.kind;
+        detail = error?.message;
+      }
       if (
         typeof detail === "string" &&
         !detail.trimStart().startsWith("<") &&
@@ -134,6 +147,7 @@ function handshakeError(
   }
   return new errorType(message, requestId, {
     statusCode: status,
+    serverKind,
     retryAfterSeconds,
   });
 }
@@ -175,12 +189,14 @@ export class RealtimeConnection {
         clearTimeout(timer);
         this.refusal = undefined;
         const id = response.headers["x-request-id"];
+        const kind = response.headers["x-rime-error-kind"];
         this.failure(
           handshakeError(
             response.statusCode ?? 0,
             complete ? Buffer.concat(chunks) : Buffer.alloc(0),
             typeof id === "string" ? id : null,
             retryAfter(response.headersDistinct["retry-after"]),
+            typeof kind === "string" && kind ? kind : null,
           ),
         );
         response.destroy();

@@ -84,6 +84,7 @@ enum Mode {
     NeverComplete,
     Flood,
     Reject(tonic::Code),
+    RejectAfterHeaders(tonic::Code, &'static str, Option<&'static str>),
 }
 #[derive(Clone)]
 struct Service {
@@ -160,6 +161,23 @@ impl SpeechToText for Service {
                 .metadata_mut()
                 .insert("x-request-id", "rejected-stt".parse().unwrap());
             return Err(error);
+        }
+        if let Mode::RejectAfterHeaders(code, initial, trailing) = self.mode {
+            let mut error = Status::new(code, "test rejection");
+            if let Some(reason) = trailing {
+                error
+                    .metadata_mut()
+                    .insert("x-rime-error-kind", reason.parse().unwrap());
+            }
+            let stream = futures_util::stream::once(async move { Err(error) });
+            let mut response = Response::new(Box::pin(stream) as Responses);
+            response
+                .metadata_mut()
+                .insert("x-request-id", "rejected-stt".parse().unwrap());
+            response
+                .metadata_mut()
+                .insert("x-rime-error-kind", initial.parse().unwrap());
+            return Ok(response);
         }
         let mut input = request.into_inner();
         let first = input.message().await?.unwrap();

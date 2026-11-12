@@ -22,7 +22,11 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 		detail string
 	}{
 		{401, "Authentication failed", ErrAuthentication, "Authentication failed"},
-		{403, "Forbidden", ErrAuthentication, "Forbidden"},
+		{403, "Forbidden", ErrPermission, "Forbidden"},
+		{402, "", ErrBilling, "available credits"},
+		{402, `{"error":{"kind":"insufficient_credits","message":"No credits remain"}}`, ErrBilling, "No credits remain"},
+		{403, `{"error":{"kind":"billing_inactive","message":"Billing is inactive"}}`, ErrPermission, "Billing is inactive"},
+		{402, `{"error":{"kind":42,"message":"No credits remain"}}`, ErrBilling, "No credits remain"},
 		{429, "Currently at websocket limit", ErrResourceLimit, "websocket limit"},
 		{429, "", ErrResourceLimit, "connection or rate limit reached"},
 		{503, "conversation capacity reached", ErrUnavailable, "capacity reached"},
@@ -35,70 +39,83 @@ func TestRealtimeHandshakeRefusal(t *testing.T) {
 		{503, "bad\x00message", ErrUnavailable, ""},
 		{429, strings.Repeat("x", 2048), ErrResourceLimit, ""},
 	}
-	for i, tc := range cases {
-		t.Run(fmt.Sprint(i), func(t *testing.T) {
-			var attempts atomic.Int32
-			released := make(chan struct{}, 4)
-			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				attempts.Add(1)
-				w.Header().Set("x-request-id", "server-request")
-				w.WriteHeader(tc.status)
-				fmt.Fprint(w, tc.body)
-			}))
-			server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
-				if state == http.StateIdle || state == http.StateClosed {
-					released <- struct{}{}
+	for _, headerKind := range []string{"", "header_kind"} {
+		for i, tc := range cases {
+			t.Run(fmt.Sprint(i)+headerKind, func(t *testing.T) {
+				var attempts atomic.Int32
+				released := make(chan struct{}, 4)
+				server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					attempts.Add(1)
+					w.Header().Set("x-request-id", "server-request")
+					if headerKind != "" {
+						w.Header().Set("x-rime-error-kind", headerKind)
+					}
+					w.WriteHeader(tc.status)
+					fmt.Fprint(w, tc.body)
+				}))
+				server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+					if state == http.StateIdle || state == http.StateClosed {
+						released <- struct{}{}
+					}
 				}
-			}
-			server.Start()
-			defer server.Close()
-			client, err := NewClient(Config{APIKey: "test"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer client.Close()
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			for attempt := 0; attempt < 2; attempt++ {
-				session, err := client.Realtime.Connect(ctx, RealtimeConnectOptions{
-					Endpoint: "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/realtime",
-				})
-				var sdkError *Error
-				if session != nil || !errors.Is(err, tc.kind) || !errors.As(err, &sdkError) {
-					t.Fatalf("session=%v error=%v", session, err)
+				server.Start()
+				defer server.Close()
+				client, err := NewClient(Config{APIKey: "test"})
+				if err != nil {
+					t.Fatal(err)
 				}
-				if !strings.Contains(sdkError.Message, fmt.Sprintf("HTTP %d", tc.status)) || sdkError.RequestID != "server-request" {
-					t.Fatalf("diagnostics: %+v", sdkError)
-				}
-				if tc.detail != "" {
-					if !strings.Contains(sdkError.Message, tc.detail) {
+				defer client.Close()
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				for attempt := 0; attempt < 2; attempt++ {
+					session, err := client.Realtime.Connect(ctx, RealtimeConnectOptions{
+						Endpoint: "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/realtime",
+					})
+					var sdkError *Error
+					if session != nil || !errors.Is(err, tc.kind) || !errors.As(err, &sdkError) {
+						t.Fatalf("session=%v error=%v", session, err)
+					}
+					if !strings.Contains(sdkError.Message, fmt.Sprintf("HTTP %d", tc.status)) || sdkError.RequestID != "server-request" {
+						t.Fatalf("diagnostics: %+v", sdkError)
+					}
+					if tc.detail != "" {
+						if !strings.Contains(sdkError.Message, tc.detail) {
+							t.Fatal(sdkError.Message)
+						}
+					} else if strings.Contains(sdkError.Message, ": ") {
 						t.Fatal(sdkError.Message)
 					}
-				} else if strings.Contains(sdkError.Message, ": ") {
-					t.Fatal(sdkError.Message)
+					if code, ok := sdkError.StatusCode(); !ok || code != tc.status {
+						t.Fatalf("status=%d present=%v", code, ok)
+					}
+					if cause := errors.Unwrap(sdkError); cause == nil || !strings.Contains(cause.Error(), fmt.Sprintf("HTTP %d", tc.status)) {
+						t.Fatalf("missing HTTP status in cause: %v", cause)
+					}
+					expectedKind := map[int]string{402: "insufficient_credits", 403: "billing_inactive"}[tc.status]
+					serverKind, present := sdkError.ServerKind()
+					if !strings.Contains(tc.body, `"kind":"`) {
+						expectedKind = headerKind
+					}
+					if serverKind != expectedKind || present != (expectedKind != "") {
+						t.Fatalf("server kind=%q present=%v", serverKind, present)
+					}
+					if _, ok := sdkError.CloseCode(); ok {
+						t.Fatal("HTTP refusal has a close code")
+					}
+					if _, ok := sdkError.RetryAfter(); ok {
+						t.Fatal("missing header has retry timing")
+					}
+					select {
+					case <-released:
+					case <-ctx.Done():
+						t.Fatal("refused HTTP request stayed active")
+					}
 				}
-				if code, ok := sdkError.StatusCode(); !ok || code != tc.status {
-					t.Fatalf("status=%d present=%v", code, ok)
+				if attempts.Load() != 2 {
+					t.Fatalf("unexpected attempts: %d", attempts.Load())
 				}
-				if cause := errors.Unwrap(sdkError); cause == nil || !strings.Contains(cause.Error(), fmt.Sprintf("HTTP %d", tc.status)) {
-					t.Fatalf("missing HTTP status in cause: %v", cause)
-				}
-				if _, ok := sdkError.CloseCode(); ok {
-					t.Fatal("HTTP refusal has a close code")
-				}
-				if _, ok := sdkError.RetryAfter(); ok {
-					t.Fatal("missing header has retry timing")
-				}
-				select {
-				case <-released:
-				case <-ctx.Done():
-					t.Fatal("refused HTTP request stayed active")
-				}
-			}
-			if attempts.Load() != 2 {
-				t.Fatalf("unexpected attempts: %d", attempts.Load())
-			}
-		})
+			})
+		}
 	}
 }
 

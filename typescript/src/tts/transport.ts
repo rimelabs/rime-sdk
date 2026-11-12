@@ -88,6 +88,7 @@ async function unary<I extends DescMessage, O extends DescMessage>(
 ): Promise<MessageShape<O>> {
   let call: grpc.ClientUnaryCall | undefined;
   let id: string | null = null;
+  let initialMetadata: grpc.Metadata | undefined;
   try {
     signal.throwIfAborted();
     const operation = new Promise<MessageShape<O>>((resolve, reject) => {
@@ -101,6 +102,7 @@ async function unary<I extends DescMessage, O extends DescMessage>(
       );
       call.once("metadata", (metadata: grpc.Metadata) => {
         id = requestId(metadata);
+        initialMetadata = metadata;
       });
     });
     return await abortable(operation, signal);
@@ -113,7 +115,7 @@ async function unary<I extends DescMessage, O extends DescMessage>(
         });
       throw signal.reason;
     }
-    throw nativeError(error, id);
+    throw nativeError(error, id, initialMetadata);
   }
 }
 

@@ -2,6 +2,7 @@ import { abortable } from "./cancellation.js";
 import {
   RimeError,
   RimeAuthenticationError,
+  RimeBillingError,
   RimePermissionError,
   RimeTimeoutError,
   RimeCancelledError,
@@ -38,6 +39,10 @@ export async function exchangeKey(
       // The refresh timeout ends when this function rejects. Cancel the body
       // now so an unfinished error response cannot retain the connection.
       await response.body?.cancel().catch(() => {});
+      if (response.status === 402)
+        throw new RimeBillingError(
+          "Credential exchange requires available credits",
+        );
       if (response.status === 403)
         throw new RimePermissionError("Credential exchange denied permission");
       if (response.status === 429)

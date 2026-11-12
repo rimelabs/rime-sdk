@@ -242,7 +242,7 @@ func (stream *TranscriptionStream) receive(rpc grpc.BidiStreamingClient[pb.Strea
 	stream.setRequestID(requestID(headers, nil))
 	defer func() { stream.setRequestID(requestID(headers, rpc.Trailer())) }()
 	if err != nil {
-		return TranscriptionFinal{}, err
+		return TranscriptionFinal{}, operationError(err, stream.RequestID(), headers, rpc.Trailer())
 	}
 	state := transcriptState{textLimit: stream.limits.transcriptBytes, outputContract: stream.config.OutputContract}
 	for {
@@ -251,7 +251,7 @@ func (stream *TranscriptionStream) receive(rpc grpc.BidiStreamingClient[pb.Strea
 			return state.finish()
 		}
 		if err != nil {
-			return TranscriptionFinal{}, err
+			return TranscriptionFinal{}, operationError(err, stream.RequestID(), headers, rpc.Trailer())
 		}
 		partial, err := state.accept(message, stream.inputDone.Load())
 		if err != nil {

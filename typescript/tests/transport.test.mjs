@@ -10,6 +10,7 @@ import { BidiCall } from "../dist/grpc.js";
 import {
   RimeAudioFormatError,
   RimeAuthenticationError,
+  RimeBillingError,
   RimeInputError,
   RimePermissionError,
   RimeResourceLimitError,
@@ -19,12 +20,26 @@ import {
 } from "../dist/errors.js";
 import { FakeService } from "./service.mjs";
 
-for (const [code, ErrorType] of [
+for (const [code, ErrorType, initialKind, trailingKind, expectedKind] of [
   [grpc.status.RESOURCE_EXHAUSTED, RimeResourceLimitError],
   [grpc.status.OK, RimeStreamError],
+  [
+    grpc.status.PERMISSION_DENIED,
+    RimeBillingError,
+    "insufficient_credits",
+    null,
+    "insufficient_credits",
+  ],
+  [
+    grpc.status.PERMISSION_DENIED,
+    RimeBillingError,
+    "insufficient_credits",
+    "billing_inactive",
+    "insufficient_credits",
+  ],
 ]) {
   test(
-    `final status settles a write whose callback never fires / ${code}`,
+    `final status settles a write whose callback never fires / ${code}/${initialKind}/${trailingKind}`,
     { timeout: 1000 },
     async () => {
       const native = new EventEmitter();
@@ -35,10 +50,17 @@ for (const [code, ErrorType] of [
         (error) =>
           error instanceof ErrorType &&
           error.requestId === "write-request" &&
+          error.serverKind === (expectedKind ?? null) &&
           (code === grpc.status.OK || error.message === "request too large"),
       );
+      if (initialKind) {
+        const initial = new grpc.Metadata();
+        initial.set("x-rime-error-kind", initialKind);
+        native.emit("metadata", initial);
+      }
       const metadata = new grpc.Metadata();
       metadata.set("x-request-id", "write-request");
+      if (trailingKind) metadata.set("x-rime-error-kind", trailingKind);
       native.emit("status", { code, details: "request too large", metadata });
       await pending;
       assert.equal(native.listenerCount("status"), 0);
@@ -80,17 +102,22 @@ async function setup(fn) {
   }
 }
 
-for (const [status, errorType] of [
+for (const [status, errorType, serverKind] of [
   [grpc.status.UNAVAILABLE, RimeUnavailableError],
   [grpc.status.UNAUTHENTICATED, RimeAuthenticationError],
   [grpc.status.PERMISSION_DENIED, RimePermissionError],
+  [grpc.status.PERMISSION_DENIED, RimeBillingError, "insufficient_credits"],
+  [grpc.status.PERMISSION_DENIED, RimePermissionError, "billing_inactive"],
+  [grpc.status.PERMISSION_DENIED, RimePermissionError, "future_reason"],
+  [grpc.status.UNAVAILABLE, RimeUnavailableError, "insufficient_credits"],
   [grpc.status.INVALID_ARGUMENT, RimeInputError],
 ]) {
-  test(`write after rejection without reader / ${status}`, () =>
+  test(`write after rejection without reader / ${status} / ${serverKind}`, () =>
     setup(async (server, prepared, signal) => {
       server.mode = "error_before_audio";
       server.rejectionStatus = status;
       server.trailingMetadata = { "x-request-id": "rejected-request" };
+      if (serverKind) server.trailingMetadata["x-rime-error-kind"] = serverKind;
       const call = new SynthesisCall(prepared, signal);
       try {
         await call.start("clementine", "en");
@@ -100,7 +127,8 @@ for (const [status, errorType] of [
           (error) =>
             error instanceof errorType &&
             error.message === "test service rejection" &&
-            error.requestId === "rejected-request",
+            error.requestId === "rejected-request" &&
+            error.serverKind === (serverKind ?? null),
         );
         assert.equal(call.requestId, "rejected-request");
         assert.equal(server.calls.length, 1);
@@ -221,3 +249,21 @@ for (const [name, payload] of [
       }
     }));
 }
+
+test("discovery preserves a billing reason from initial metadata", () =>
+  setup(async (server, prepared, signal) => {
+    server.mode = "discovery_error";
+    server.rejectionStatus = grpc.status.PERMISSION_DENIED;
+    server.responseMetadata = {
+      "x-request-id": "billing-request",
+      "x-rime-error-kind": "insufficient_credits",
+    };
+    await assert.rejects(
+      discover(prepared, "voices", undefined, signal),
+      (error) =>
+        error instanceof RimeBillingError &&
+        error.serverKind === "insufficient_credits" &&
+        error.requestId === "billing-request" &&
+        error.message === server.rejectionMessage,
+    );
+  }));

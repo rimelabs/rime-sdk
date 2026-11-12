@@ -12,6 +12,8 @@ import {
   RimeStreamError,
   RimeTimeoutError,
   RimeAuthenticationError,
+  RimeBillingError,
+  RimePermissionError,
   RimeUnavailableError,
   RimeRealtimeError,
   RealtimeAdmissionTimeout,
@@ -611,7 +613,13 @@ for (const mode of [
   });
 }
 
-for (const status of [401, 403, 500, 302]) {
+for (const [status, errorType] of [
+  [401, RimeAuthenticationError],
+  [402, RimeBillingError],
+  [403, RimePermissionError],
+  [500, RimeUnavailableError],
+  [302, RimeUnavailableError],
+]) {
   test(`handshake HTTP ${status} maps to an SDK error without following redirects`, async (t) => {
     const server = createServer((req, res) => {
       res.writeHead(status, { Location: "http://localhost/elsewhere" });
@@ -628,9 +636,7 @@ for (const status of [401, 403, 500, 302]) {
       client.realtime.connect({
         endpoint: `ws://127.0.0.1:${server.address().port}/v1/realtime`,
       }),
-      status < 500 && status !== 302
-        ? RimeAuthenticationError
-        : RimeUnavailableError,
+      errorType,
     );
   });
 }

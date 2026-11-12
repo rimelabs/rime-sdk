@@ -328,7 +328,7 @@ func (c *Client) discover(ctx context.Context, timeout *time.Duration, call disc
 		if err == nil {
 			return result, nil
 		}
-		mapped := operationError(err, id)
+		mapped := operationError(err, id, headers, trailers)
 		if !errors.Is(mapped, ErrUnavailable) || attempt == 2 {
 			return nil, mapped
 		}

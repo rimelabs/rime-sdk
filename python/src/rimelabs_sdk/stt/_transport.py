@@ -79,6 +79,8 @@ async def transcribe(channel, metadata, audio, language, mode, terms, policy, ca
             error.code(),
             request_id(error.initial_metadata(), error.trailing_metadata(), identity),
             error.details(),
+            error.initial_metadata(),
+            error.trailing_metadata(),
         ) from None
     finally:
         call.cancel()
@@ -103,7 +105,13 @@ class TranscriptionCall:
         self.request_id = request_id(
             error.initial_metadata(), error.trailing_metadata(), self.request_id
         )
-        return rpc_error(error.code(), self.request_id, error.details())
+        return rpc_error(
+            error.code(),
+            self.request_id,
+            error.details(),
+            error.initial_metadata(),
+            error.trailing_metadata(),
+        )
 
     async def _status(self):
         code = await self._call.code()
@@ -113,7 +121,13 @@ class TranscriptionCall:
             self.request_id,
         )
         if code != grpc.StatusCode.OK:
-            raise rpc_error(code, self.request_id, await self._call.details())
+            raise rpc_error(
+                code,
+                self.request_id,
+                await self._call.details(),
+                await self._call.initial_metadata(),
+                await self._call.trailing_metadata(),
+            )
 
     async def _write(self, message):
         try:
