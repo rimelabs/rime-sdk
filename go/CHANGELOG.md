@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.20](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.19...go/v0.1.0-alpha.20) (2026-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rust public structs and transcript event variants have new fields. Update explicit literals and exhaustive field patterns as documented in rust/README.md. Go callers must replace positional public struct literals with keyed fields. Full new-image end-to-end validation remains pending.
+
+### Features
+
+* add Prism settings and speech review callbacks ([#131](https://github.com/rimelabs/rime-sdk/issues/131)) ([107e5ce](https://github.com/rimelabs/rime-sdk/commit/107e5cee69d45f3ffe01d7e322d28993f95f819b))
+
 ## [0.1.0-alpha.19](https://github.com/rimelabs/rime-sdk/compare/go/v0.1.0-alpha.18...go/v0.1.0-alpha.19) (2026-11-03)
 
 
