@@ -455,6 +455,8 @@ export class RealtimeSession {
         });
         submitted = true;
         await abortable(this.socket.send(encoded), deadline.signal);
+        if (kind === "response.cancel" && target !== undefined)
+          this.reviews?.end(target);
       } finally {
         release();
         beforeSend.dispose();

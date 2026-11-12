@@ -95,7 +95,9 @@ type rtResult struct {
 	err     error
 }
 type rtCommand struct {
-	review                        *rtReviewState
+	review *rtReviewState
+	// A successful review write cancels higher-index chunks when true.
+	reviewCutsOff                 bool
 	reviewFailure                 error
 	hold                          *ResponseHold
 	epoch                         uint64
@@ -1389,6 +1391,15 @@ func (w *rtWorker) written(result rtWritten) error {
 			}
 			if c.kind == "audio" {
 				w.converter = c.converter
+			}
+			if state := c.review; state != nil && c.reviewCutsOff {
+				state.cutsOff = true
+				for _, other := range w.reviews {
+					if other.request.ResponseID == state.request.ResponseID && other.request.Index > state.request.Index {
+						other.settled = true
+						other.cancel()
+					}
+				}
 			}
 			if c.expected == "" {
 				w.finish(c, rtResult{})

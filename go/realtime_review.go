@@ -175,20 +175,11 @@ func (w *rtWorker) reviewResult(result rtReviewResult) error {
 		body, cutsOff = rtObject{"action": "stop"}, true
 		callbackFailure = &Error{Kind: ErrStream, Message: "review callback failed", Cause: err}
 	}
-	if cutsOff {
-		state.cutsOff = true
-		for _, other := range w.reviews {
-			if other.request.ResponseID == state.request.ResponseID && other.request.Index > state.request.Index {
-				other.settled = true
-				other.cancel()
-			}
-		}
-	}
 	if len(w.pending) >= 128 {
 		return failure(ErrResourceLimit, "too many pending review results")
 	}
 	body["review_id"] = state.request.ReviewID
-	w.pending = append(w.pending, &rtCommand{ctx: state.ctx, kind: "review", body: body, deadline: state.deadline, review: state, reviewFailure: callbackFailure})
+	w.pending = append(w.pending, &rtCommand{ctx: state.ctx, kind: "review", body: body, deadline: state.deadline, review: state, reviewCutsOff: cutsOff, reviewFailure: callbackFailure})
 	return nil
 }
 

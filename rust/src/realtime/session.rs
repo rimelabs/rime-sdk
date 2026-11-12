@@ -218,6 +218,8 @@ enum Kind {
 }
 struct Command {
     review: Option<(ReviewRequest, Instant)>,
+    /// Whether a successful review write cancels higher-index chunks.
+    review_cuts_off: bool,
     error_after_write: Option<Error>,
     epoch: u64,
     kind: Kind,
@@ -256,6 +258,7 @@ impl Command {
     fn new(kind: Kind, body: Value) -> Self {
         Self {
             review: None,
+            review_cuts_off: false,
             error_after_write: None,
             epoch: 0,
             kind,

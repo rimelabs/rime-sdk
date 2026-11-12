@@ -145,6 +145,15 @@ impl Worker {
                 self.complete(index, event)?;
             }
         }
+        if !result.skipped && self.pending[index].review_cuts_off {
+            let (request, _) = self.pending[index]
+                .review
+                .as_ref()
+                .expect("review cutoff has a request");
+            let response_id = request.response_id.clone();
+            let cutoff = request.index;
+            self.stop_reviews(&response_id, Some(cutoff));
+        }
         if let Some(error) = self.pending[index].error_after_write.take() {
             return Err(error);
         }
@@ -189,14 +198,9 @@ impl Worker {
             }
             ReviewDecision::Stop => json!("stop"),
         };
-        if !matches!(decision, ReviewDecision::Allow) {
-            self.stop_reviews(
-                &completed.request.response_id,
-                Some(completed.request.index),
-            );
-        }
         let mut command = Command::new(Kind::Review, body);
         command.review = Some((completed.request, completed.deadline));
+        command.review_cuts_off = !matches!(decision, ReviewDecision::Allow);
         command.deadline = completed.deadline;
         command.admission_deadline = completed.deadline;
         command.error_after_write = error;

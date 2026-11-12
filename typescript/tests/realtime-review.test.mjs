@@ -6,6 +6,7 @@ import {
   RimeInputError,
   RimeStreamError,
   RimeResourceLimitError,
+  RimeCancelledError,
 } from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 import { RealtimeConnection } from "../dist/realtime/transport.js";
@@ -225,6 +226,92 @@ test("response completion cancels its outstanding review work", async (t) => {
     0,
   );
 });
+
+for (const cancelBeforeWrite of [false, true]) {
+  const name = cancelBeforeWrite
+    ? "cancelling a queued response.cancel leaves its reviews active"
+    : "writing response.cancel aborts reviews before response.done";
+  test(name, async (t) => {
+    const entered = Promise.withResolvers();
+    const releaseCallback = Promise.withResolvers();
+    let callbackSignal;
+    const { session, peer } = await setup(t, {
+      timeoutMs: 5000,
+      callback: async (_chunk, signal) => {
+        callbackSignal = signal;
+        entered.resolve();
+        await Promise.race([releaseCallback.promise, stopped(signal)]);
+        return { action: "allow" };
+      },
+    });
+    peer.emit("prism.typed_input.ready");
+    const creating = session.sendText("Hello");
+    peer.accepted(await peer.next("response.create"), "reply");
+    const response = await creating;
+    request(peer, "review-cancelling", 0, "reply");
+    await entered.promise;
+    const held = Promise.withResolvers();
+    const releaseWriter = Promise.withResolvers();
+    const original = RealtimeConnection.prototype.send;
+    let blocker;
+    let cancellation;
+    try {
+      if (cancelBeforeWrite) {
+        t.mock.method(
+          RealtimeConnection.prototype,
+          "send",
+          async function (encoded) {
+            if (JSON.parse(encoded).type === "session.update") {
+              held.resolve();
+              await releaseWriter.promise;
+            }
+            return original.call(this, encoded);
+          },
+        );
+        blocker = session.update({
+          instructions: "Hold the serialized writer",
+        });
+        blocker.catch(() => {});
+        await held.promise;
+        const caller = new AbortController();
+        cancellation = session.cancel(response, { signal: caller.signal });
+        await nextTurn();
+        caller.abort();
+        await assert.rejects(cancellation, RimeCancelledError);
+        assert.equal(callbackSignal.aborted, false);
+        releaseWriter.resolve();
+        await blocker;
+        releaseCallback.resolve();
+        assert.equal(
+          (await peer.next("prism.review.result")).review_id,
+          "review-cancelling",
+        );
+      } else {
+        cancellation = session.cancel(response);
+        cancellation.catch(() => {});
+        await peer.next("response.cancel");
+        await session.update({ instructions: "Cancellation writer barrier" });
+        assert.equal(callbackSignal.aborted, true);
+      }
+    } finally {
+      releaseWriter.resolve();
+      releaseCallback.resolve();
+      peer.ended("reply", "cancelled");
+      await cancellation?.catch(() => {});
+      await blocker?.catch(() => {});
+    }
+    await session.update({ instructions: "The session remains usable" });
+    assert.equal(
+      peer.requests.filter((event) => event.type === "response.cancel").length,
+      cancelBeforeWrite ? 0 : 1,
+    );
+    assert.equal(
+      peer.requests.filter((event) => event.type === "prism.review.result")
+        .length,
+      cancelBeforeWrite ? 1 : 0,
+    );
+  });
+}
 
 for (const ending of ["response completion", "preceding stop"]) {
   test(`${ending} cancels queued review writes without failing the session`, async (t) => {
