@@ -457,7 +457,11 @@ def _fault(value: object) -> t.RealtimeFault:
         ),
         request_id=_optional_string(owner.get("event_id"), "error.owner.event_id"),
         response_id=_optional_string(owner.get("response_id"), "error.owner.response_id"),
-        review_id=_optional_string(owner.get("review_id"), "error.owner.review_id"),
+        review_id=(
+            _id(owner.get("review_id"), "error.owner.review_id")
+            if scope == "review"
+            else _optional_id(owner.get("review_id"), "error.owner.review_id")
+        ),
         item_id=_optional_string(owner.get("item_id"), "error.owner.item_id"),
         call_ids=tuple(_id(value, "error.owner.call_ids") for value in calls),
         correlation_id=_optional_string(error.get("correlation_id"), "error.correlation_id"),

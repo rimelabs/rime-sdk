@@ -517,7 +517,10 @@ function fault(value: unknown): t.NormalizedRealtimeFault {
         : "unknown",
     requestId: optionalString(owner.event_id, "error.owner.event_id"),
     responseId: optionalString(owner.response_id, "error.owner.response_id"),
-    reviewId: optionalString(owner.review_id, "error.owner.review_id"),
+    reviewId:
+      scope === "review"
+        ? id(owner.review_id, "error.owner.review_id")
+        : optionalId(owner.review_id, "error.owner.review_id"),
     itemId: optionalString(owner.item_id, "error.owner.item_id"),
     callIds: calls.map((value) => id(value, "error.owner.call_ids")),
     correlationId: optionalString(error.correlation_id, "error.correlation_id"),

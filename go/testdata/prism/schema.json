@@ -987,6 +987,9 @@
   {"name": "transcript correction can have an empty delta", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "", "transcript": "corrected"}, "valid": true},
   {"name": "engine cumulative transcript remains nonempty", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "", "transcript": ""}, "valid": false},
   {"name": "legacy transcript delta omits cumulative text", "schema": "transcriptionDeltaEvent", "value": {"type": "conversation.item.input_audio_transcription.delta", "event_id": "evt", "item_id": "input", "content_index": 0, "delta": "word"}, "valid": true},
+  {"name": "review replacement rejects Unicode next-line whitespace", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "replace", "text": "\u0085"}, "valid": false},
+  {"name": "review replacement accepts byte-order mark as text", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "replace", "text": "\ufeff"}, "valid": true},
+  {"name": "review replacement accepts information separator as text", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "replace", "text": "\u001c"}, "valid": true},
   {"name": "review result event id is optional in engine contract", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "allow"}, "valid": true},
   {"name": "review result event id must be a string when supplied", "schema": "reviewResultEvent", "value": {"type": "prism.review.result", "review_id": "review", "action": "allow", "event_id": 7}, "valid": false},
   {
@@ -1046,12 +1049,12 @@
     "valid": false
   },
   {
-    "name": "unknown review result is a request refusal",
+    "name": "review not found fault with event ownership",
     "schema": "errorInfo",
     "value": {
       "type": "invalid_request_error",
       "code": "review_not_found",
-      "message": "the review had no answer in time",
+      "message": "no review review-missing is open",
       "param": null,
       "event_id": null,
       "correlation_id": "diagnostic-1",

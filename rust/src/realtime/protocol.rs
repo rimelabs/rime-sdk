@@ -250,6 +250,14 @@ fn fault(v: &Value) -> Result<RealtimeFault, Error> {
     let field = |k| -> Result<Option<String>, Error> {
         optional(owner.and_then(|o| o.get(k)).unwrap_or(&Value::Null))
     };
+    let review_id = owner
+        .and_then(|owner| owner.get("review_id"))
+        .filter(|value| !value.is_null())
+        .map(id)
+        .transpose()?;
+    if o.get("scope").and_then(Value::as_str) == Some("review") && review_id.is_none() {
+        return Err(invalid("error.owner.review_id"));
+    }
     let calls = match owner.and_then(|o| o.get("call_ids")) {
         None | Some(Value::Null) => vec![],
         Some(Value::Array(a)) => a.iter().map(id).collect::<Result<_, _>>()?,
@@ -279,7 +287,7 @@ fn fault(v: &Value) -> Result<RealtimeFault, Error> {
         ),
         request_id: field("event_id")?,
         response_id: field("response_id")?,
-        review_id: field("review_id")?,
+        review_id,
         item_id: field("item_id")?,
         call_ids: calls,
         correlation_id: optional(&v["correlation_id"])?,

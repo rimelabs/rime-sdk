@@ -307,6 +307,8 @@ def test_phrase_input_is_snapshotted_and_fixed_fields_not_updatable():
     value = r.TurnDetectionUpdate(interrupt_phrases=phrases)
     phrases.clear()
     assert value.interrupt_phrases == ("stop",)
+    with pytest.raises(TypeError, match="end_of_turn_min_silence_ms"):
+        r.TurnDetectionUpdate(end_of_turn_min_silence_ms=100)
     with pytest.raises(RimeInputError):
         r.TurnDetection(end_of_turn_min_silence_ms=-1)
 

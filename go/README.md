@@ -564,7 +564,7 @@ sends nothing and permits other operations to continue. Terminal failures take
 precedence over queued events and remain available from later session operations.
 Normal closure returns `io.EOF` after the remaining queued events.
 
-Prism enforces the text limit for typed turns, proactive instructions, and history.
+Prism enforces its context limit for typed turns, proactive instructions, and history.
 The SDK preserves the server's refusal and does not impose a 4,000-character cap.
 Tool filler text and filler instructions contain at most 500 Unicode scalar values. Input audio
 contains complete PCM16 frames and at most 192000 bytes per chunk. Input supports

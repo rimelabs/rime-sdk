@@ -42,7 +42,7 @@ function stopped(signal) {
   );
 }
 
-test("review callback runs before response.created without an event consumer or success ACK", async (t) => {
+test("review callback runs without response.created, an event consumer, or a success ACK", async (t) => {
   const calls = [];
   const { session, peer } = await setup(t, {
     callback: async (chunk) => {

@@ -10,7 +10,8 @@ recognize the former `prsm` names.
   are omitted.
   The tool filler rules follow `interfaces/speech_to_speech.asyncapi.yaml` in
   `rimelabs/rime` at commit `e0ce7ac08`, which added per-tool filler controls.
-  The filler whitespace pattern spells out Unicode `White_Space` to match
+  The filler and review replacement schemas share a nonblank-text rule that
+  spells out Unicode `White_Space` to match
   the engine's Rust validation in both Python and JavaScript. Their `\S`
   patterns use different whitespace sets. SDK tests also reject invalid UTF-8
   before connection setup, as required by the engine's JSON parser.

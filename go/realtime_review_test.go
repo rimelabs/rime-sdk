@@ -3,6 +3,7 @@ package rime
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -286,6 +287,9 @@ func TestRealtimeReviewTimeoutPoliciesAndReceivedSettings(t *testing.T) {
 		view := decoder.view(rtObject{"id": "session-1", "prism_review": settings})
 		if decoder.err != nil || view.Review == nil || view.Review.TimeoutMS != 1000 {
 			t.Fatal(view, decoder.err)
+		}
+		if !reflect.DeepEqual(view.Review.OnTimeout, policy) {
+			t.Fatalf("decoded timeout policy = %#v, want %#v", view.Review.OnTimeout, policy)
 		}
 	}
 }
