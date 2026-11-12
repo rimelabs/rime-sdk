@@ -99,6 +99,21 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 	}
 }
 
+func TestRealtimeReviewFaultRequiresOwnerID(t *testing.T) {
+	for _, owner := range []string{`null`, `{}`, `{"review_id":null}`, `{"review_id":""}`} {
+		raw := []byte(`{"type":"error","error":{"scope":"review","code":"review_timeout","owner":` + owner + `}}`)
+		if _, err := decodeRealtime(raw, "session-1"); !errors.Is(err, ErrStream) {
+			t.Fatalf("accepted review fault owner %s: %v", owner, err)
+		}
+	}
+	for _, scope := range []string{"event", "response", "session"} {
+		raw := []byte(`{"type":"error","error":{"scope":"` + scope + `","code":"future_error"}}`)
+		if _, err := decodeRealtime(raw, "session-1"); err != nil {
+			t.Fatalf("legacy %s fault rejected: %v", scope, err)
+		}
+	}
+}
+
 func TestRealtimeNudgeInstructionAndUsage(t *testing.T) {
 	p := newRealtimePeer(t)
 	_, s := p.setup(t)

@@ -316,6 +316,9 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 			}
 		}
 	}
+	if f.Scope == "review" && f.ReviewID == "" {
+		decoder.bad("review fault owner.review_id")
+	}
 	return f
 }
 func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
