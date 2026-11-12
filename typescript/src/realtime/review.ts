@@ -153,12 +153,17 @@ export class Reviews {
         );
   }
 
-  end(responseId: string): void {
-    clearTimeout(this.stopped.get(responseId)?.timer);
-    this.stopped.delete(responseId);
+  /** Abort active callbacks without releasing a retained Stop or Replace cutoff. */
+  cancel(responseId: string): void {
     for (const active of this.active.values())
       if (active.request.responseId === responseId)
         active.stop.abort(new RimeCancelledError("Review reply ended"));
+  }
+
+  end(responseId: string): void {
+    clearTimeout(this.stopped.get(responseId)?.timer);
+    this.stopped.delete(responseId);
+    this.cancel(responseId);
   }
 
   async close(): Promise<void> {

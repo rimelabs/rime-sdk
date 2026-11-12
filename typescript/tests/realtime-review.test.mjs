@@ -313,6 +313,63 @@ for (const cancelBeforeWrite of [false, true]) {
   });
 }
 
+for (const decision of [
+  { action: "stop" },
+  { action: "replace", text: "Approved replacement" },
+]) {
+  test(`response.cancel preserves the preceding ${decision.action} cutoff`, async (t) => {
+    const entered = Promise.withResolvers();
+    const seen = [];
+    let earlierSignal;
+    const { session, peer } = await setup(t, {
+      timeoutMs: 5000,
+      callback: async (chunk, signal) => {
+        seen.push(chunk.index);
+        if (chunk.index === 0) {
+          earlierSignal = signal;
+          entered.resolve();
+          await stopped(signal);
+          return { action: "allow" };
+        }
+        return chunk.index === 1 ? decision : { action: "allow" };
+      },
+    });
+    peer.emit("prism.typed_input.ready");
+    const creating = session.sendText("Hello");
+    peer.accepted(await peer.next("response.create"), "reply");
+    const response = await creating;
+    request(peer, "review-earlier", 0, "reply");
+    await entered.promise;
+    request(peer, "review-cutoff", 1, "reply");
+    assert.equal(
+      (await peer.next("prism.review.result")).action,
+      decision.action,
+    );
+    await session.update({ instructions: "Review result writer barrier" });
+    assert.equal(earlierSignal.aborted, false);
+    const cancellation = session.cancel(response);
+    cancellation.catch(() => {});
+    try {
+      await peer.next("response.cancel");
+      await session.update({ instructions: "Cancellation writer barrier" });
+      assert.equal(earlierSignal.aborted, true);
+      request(peer, "review-late", 2, "reply");
+      await session.update({ instructions: "Late review reader barrier" });
+      assert.deepEqual(seen, [0, 1]);
+      assert.deepEqual(
+        peer.requests
+          .filter((event) => event.type === "prism.review.result")
+          .map((event) => event.review_id),
+        ["review-cutoff"],
+      );
+    } finally {
+      peer.ended("reply", "cancelled");
+      await cancellation;
+    }
+    await session.update({ instructions: "The session remains usable" });
+  });
+}
+
 for (const ending of ["response completion", "preceding stop"]) {
   test(`${ending} cancels queued review writes without failing the session`, async (t) => {
     const callbackEntered = Promise.withResolvers();
@@ -363,7 +420,9 @@ for (const ending of ["response completion", "preceding stop"]) {
       await nextTurn();
       if (ending === "response completion") {
         peer.ended("reply");
-        await nextTurn();
+        for await (const event of session.events) {
+          if (event.payload.kind === "response.ended") break;
+        }
       }
       release.resolve();
       if (blocker) await blocker;
