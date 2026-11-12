@@ -1,0 +1,21 @@
+go/realtime_protocol_test.go
+  s_c357d2954de5b3::t_792f10ed9c0ee8 102-116
+go/realtime_protocol.go
+  s_c357d2954de5b3::t_d7a757c5aac7ee 319-321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "25982f598eb4c8715c5d710df45baf1ae1a8c94e",
+  "prompts": {},
+  "sessions": {
+    "s_c357d2954de5b3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1c12f-dc29-72e1-ab34-9fae05eef824",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
