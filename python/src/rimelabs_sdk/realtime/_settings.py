@@ -6,8 +6,55 @@ from collections import deque
 from collections.abc import Sequence
 
 from .._errors import RimeInputError, RimeResourceLimitError
+from . import _types as t
 from ._protocol import _Tool
 from ._types import JsonObject, PrismFiller, ToolDefinition
+
+
+def speed_setting(value: float) -> float:
+    """Validate the supplied speech rate without supplying a default."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.85 <= value <= 1.3:
+        raise RimeInputError("Speed must be a number from 0.85 to 1.3")
+    return value
+
+
+def turn_settings(value: t.TurnDetectionUpdate) -> dict[str, t.JsonValue]:
+    """Snapshot supplied turn settings. Empty phrase lists clear the server setting."""
+    if not isinstance(value, t.TurnDetectionUpdate):
+        raise RimeInputError("turn_detection must be a TurnDetectionUpdate value")
+    result: dict[str, t.JsonValue] = {}
+    for name in ("interrupt_min_words", "interrupt_phrases", "acknowledgment_phrases"):
+        setting = getattr(value, name)
+        if setting is not None:
+            result[name] = list(setting) if isinstance(setting, tuple) else setting
+    if isinstance(value, t.TurnDetection):
+        for name, wire in (
+            ("eagerness", "eagerness"),
+            ("end_of_turn_timeout_ms", "prism_end_of_turn_timeout_ms"),
+            ("end_of_turn_min_silence_ms", "end_of_turn_min_silence_ms"),
+        ):
+            setting = getattr(value, name)
+            if setting is not None:
+                result[wire] = setting
+    return result
+
+
+def review_settings(value: t.ReviewSettings) -> t.JsonObject:
+    """Encode the fixed review policy independently of the callback."""
+    if not isinstance(value, t.ReviewSettings):
+        raise RimeInputError("review must be a Review value")
+    action = value.on_timeout
+    result: t.JsonObject = {
+        "timeout_ms": value.timeout_ms,
+        "on_timeout": "stop"
+        if isinstance(action, t.Stop)
+        else "speak"
+        if isinstance(action, t.Speak)
+        else "say",
+    }
+    if isinstance(action, t.Say):
+        result["timeout_line"] = action.text
+    return result
 
 
 def _filler_settings(filler: PrismFiller) -> JsonObject:

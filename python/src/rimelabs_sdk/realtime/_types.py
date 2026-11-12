@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
@@ -67,8 +68,109 @@ class RetentionRatio:
 Truncation: TypeAlias = Literal["auto", "disabled"] | RetentionRatio
 
 
+@dataclass(frozen=True)
+class Allow:
+    """Speak the reviewed chunk."""
+
+
+@dataclass(frozen=True)
+class Stop:
+    """Stop speech at this chunk, including all later chunks."""
+
+
+@dataclass(frozen=True)
+class Replace:
+    """Speak text instead of this chunk and end the rest of the reply."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class Speak:
+    """Speak the original chunk if its review times out."""
+
+
+@dataclass(frozen=True)
+class Say:
+    """Speak text instead of a timed-out chunk and end the reply."""
+
+    text: str
+
+
+ReviewDecision: TypeAlias = Allow | Replace | Stop
+
+
 @dataclass(frozen=True, kw_only=True)
-class TurnDetection:
+class ReviewRequest:
+    """Proposed speech, possibly before response creation. It is not spoken text."""
+
+    review_id: str
+    response_id: str
+    item_id: str
+    index: int
+    text: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class ReviewSettings:
+    """Fixed session review policy. The server owns the timeout deadline."""
+
+    timeout_ms: int = 1000
+    on_timeout: Stop | Speak | Say = field(default_factory=Stop)
+
+    def __post_init__(self):
+        if type(self.timeout_ms) is not int or not 100 <= self.timeout_ms <= 5000:
+            raise RimeInputError("Review timeout must be an integer from 100 to 5000 ms")
+        if not isinstance(self.on_timeout, (Stop, Speak, Say)):
+            raise RimeInputError("Review timeout action must be Stop, Speak, or Say")
+        if isinstance(self.on_timeout, Say):
+            # A timeout line has the same text contract as a fixed filler.
+            PrismFiller(type="text", text=self.on_timeout.text)
+
+
+@dataclass(frozen=True, kw_only=True)
+class Review(ReviewSettings):
+    """Async review callback. Concurrent invocations must cooperate with cancellation.
+
+    Exceptions stop the chunk and fail the session. A callback timeout uses
+    the server's timeout policy. Review does not prevent or undo tool execution.
+    """
+
+    callback: Callable[[ReviewRequest], Awaitable[ReviewDecision]]
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not callable(self.callback):
+            raise RimeInputError("Review callback must be callable")
+
+
+@dataclass(frozen=True, kw_only=True)
+class TurnDetectionUpdate:
+    """Mutable interruption rules. None keeps a setting; an empty tuple clears a list."""
+
+    interrupt_min_words: int | None = None
+    interrupt_phrases: tuple[str, ...] | None = None
+    acknowledgment_phrases: tuple[str, ...] | None = None
+
+    def __post_init__(self):
+        if self.interrupt_min_words is not None and (
+            type(self.interrupt_min_words) is not int or not 1 <= self.interrupt_min_words <= 10
+        ):
+            raise RimeInputError("Interrupt minimum must be an integer from 1 to 10")
+        for name in ("interrupt_phrases", "acknowledgment_phrases"):
+            value = getattr(self, name)
+            if value is not None:
+                if (
+                    not isinstance(value, (tuple, list))
+                    or len(value) > 100
+                    or any(not isinstance(phrase, str) for phrase in value)
+                ):
+                    raise RimeInputError(f"{name} must contain at most 100 strings")
+                object.__setattr__(self, name, tuple(value))
+
+
+@dataclass(frozen=True, kw_only=True)
+class TurnDetection(TurnDetectionUpdate):
     """Optional turn timing overrides. None leaves a setting to the server.
 
     Eagerness controls how readily Prism ends a turn. The silence limit is
@@ -77,8 +179,13 @@ class TurnDetection:
 
     eagerness: TurnEagerness | None = None
     end_of_turn_timeout_ms: int | None = None
+    end_of_turn_min_silence_ms: int | None = None
 
     def __post_init__(self):
+        super().__post_init__()
+        silence = self.end_of_turn_min_silence_ms
+        if silence is not None and (type(silence) is not int or not 0 <= silence <= 5000):
+            raise RimeInputError("Minimum silence must be an integer from 0 to 5000 ms")
         if self.eagerness is not None and self.eagerness not in ("low", "medium", "high", "auto"):
             raise RimeInputError("Turn eagerness must be low, medium, high, or auto")
         value = self.end_of_turn_timeout_ms
@@ -94,6 +201,10 @@ class TurnDetectionInfo:
 
     eagerness: TurnEagerness | Literal["unknown"] | None = None
     end_of_turn_timeout_ms: int | None = None
+    end_of_turn_min_silence_ms: int | None = None
+    interrupt_min_words: int | None = None
+    interrupt_phrases: tuple[str, ...] | None = None
+    acknowledgment_phrases: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -228,6 +339,9 @@ class SessionInfo:
 
     settings_revision: int | None = None
     truncation: Truncation | None = None
+    speed: float | None = None
+    version: str | None = None
+    review: ReviewSettings | None = None
     session_id: str
     model: Literal["prism"]
     voice: str
@@ -247,9 +361,13 @@ class SessionInfo:
 class RealtimeFault:
     code: str
     message: str
-    scope: Literal["event", "utterance", "response", "tool_roundtrip", "session", "unknown"]
+    scope: Literal[
+        "event", "utterance", "response", "tool_roundtrip", "review", "session", "unknown"
+    ]
     request_id: str | None = None
     response_id: str | None = None
+    # The reviewed chunk's ID; absent for faults without review ownership.
+    review_id: str | None = None
     item_id: str | None = None
     call_ids: tuple[str, ...] = ()
     correlation_id: str | None = None
@@ -316,6 +434,7 @@ class InputCommitted:
 class TranscriptDelta:
     item_id: str
     delta: str
+    transcript: str | None = None
     kind: Literal["transcript.delta"] = field(default="transcript.delta", init=False)
 
 
@@ -492,6 +611,7 @@ class SessionEvent:
     event_id: str
     request_id: str | None
     payload: InputEvent | ResponseEvent | ItemTruncated | FaultEvent
+    server_time_ms: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

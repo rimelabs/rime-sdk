@@ -54,6 +54,8 @@ func rtFiniteJSON(value any) bool {
 }
 
 type rtWire struct {
+	serverTimeMS                            *uint64
+	review                                  *ReviewRequest
 	history                                 []HistoryItem
 	createdID                               string
 	interruptKnown                          bool
@@ -149,6 +151,40 @@ func rtEnum(s string, values ...string) string {
 func (decoder *rtDecoder) view(v any) SessionInfo {
 	o := decoder.object(v)
 	s := SessionInfo{SessionID: decoder.id(o["id"]), Model: "prism", InterruptOnSpeech: true}
+	if value, present := o["version"]; present {
+		text := decoder.string(value)
+		s.Version = &text
+	}
+	if value, present := o["speed"]; present {
+		speed, ok := value.(float64)
+		if !ok || rtSpeed(speed) != nil {
+			decoder.bad("session.speed")
+		}
+		s.Speed = &speed
+	}
+	if value, present := o["prism_review"]; present {
+		review := decoder.object(value)
+		timeout := decoder.integer(review["timeout_ms"])
+		if timeout < 100 || timeout > 5000 {
+			decoder.bad("session.prism_review.timeout_ms")
+		}
+		var policy ReviewTimeout
+		switch decoder.string(review["on_timeout"]) {
+		case "stop":
+			policy = ReviewTimeoutStop{}
+		case "speak":
+			policy = ReviewTimeoutSpeak{}
+		case "say":
+			text := decoder.string(review["timeout_line"])
+			if rtText(text, 500) != nil {
+				decoder.bad("session.prism_review.timeout_line")
+			}
+			policy = ReviewTimeoutSay{Text: text}
+		default:
+			decoder.bad("session.prism_review.on_timeout")
+		}
+		s.Review = &ReviewSettings{TimeoutMS: timeout, OnTimeout: policy}
+	}
 	if v, ok := o["truncation"]; ok {
 		t := Truncation{}
 		if mode, ok := v.(string); ok {
@@ -185,6 +221,32 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 	}
 	if v, ok := o["turn_detection"]; ok {
 		d := decoder.object(v)
+		if v, present := d["end_of_turn_min_silence_ms"]; present {
+			n := decoder.integer(v)
+			if n > 5000 {
+				decoder.bad("minimum silence")
+			}
+			s.EndOfTurnMinSilenceMS = &n
+		}
+		if v, present := d["interrupt_min_words"]; present {
+			n := decoder.integer(v)
+			if n < 1 || n > 10 {
+				decoder.bad("interrupt minimum")
+			}
+			s.InterruptMinWords = &n
+		}
+		for key, target := range map[string]*[]string{"interrupt_phrases": &s.InterruptPhrases, "acknowledgment_phrases": &s.AcknowledgmentPhrases} {
+			if value, present := d[key]; present {
+				values, ok := value.([]any)
+				if !ok || len(values) > 100 {
+					decoder.bad(key)
+				}
+				*target = make([]string, 0, len(values))
+				for _, phrase := range values {
+					*target = append(*target, decoder.string(phrase))
+				}
+			}
+		}
 		if v, ok := d["eagerness"]; ok {
 			x := rtEnum(decoder.string(v), "low", "medium", "high", "auto")
 			s.Eagerness = &x
@@ -234,7 +296,7 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 		f.Message = decoder.string(v)
 	}
 	if v, ok := o["scope"]; ok {
-		f.Scope = rtEnum(decoder.string(v), "event", "utterance", "response", "tool_roundtrip", "session")
+		f.Scope = rtEnum(decoder.string(v), "event", "utterance", "response", "tool_roundtrip", "review", "session")
 	}
 	f.CorrelationID = decoder.optional(o["correlation_id"])
 	f.Parameter = decoder.optional(o["param"])
@@ -242,6 +304,7 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 		d := decoder.object(o["owner"])
 		f.RequestID = decoder.optional(d["event_id"])
 		f.ResponseID = decoder.optional(d["response_id"])
+		f.ReviewID = decoder.optional(d["review_id"])
 		f.ItemID = decoder.optional(d["item_id"])
 		if d["call_ids"] != nil {
 			a, ok := d["call_ids"].([]any)
@@ -252,6 +315,9 @@ func (decoder *rtDecoder) fault(v any) *RealtimeFault {
 				f.CallIDs = append(f.CallIDs, decoder.id(v))
 			}
 		}
+	}
+	if f.Scope == "review" && f.ReviewID == "" {
+		decoder.bad("review fault owner.review_id")
 	}
 	return f
 }
@@ -280,6 +346,9 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		return ResponseRef{sessionID, decoder.id(v)}
 	}
 	switch k {
+	case "prism.review.requested":
+		w.kind = "review.requested"
+		w.review = &ReviewRequest{ReviewID: decoder.id(o["review_id"]), ResponseID: decoder.id(o["response_id"]), ItemID: decoder.id(o["item_id"]), Index: decoder.integer(o["index"]), Text: decoder.string(o["text"])}
 	case "session.created", "session.updated":
 		w.kind = k
 		w.info = decoder.view(o["session"])
@@ -355,7 +424,12 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.payload = InputCommitted{decoder.id(o["item_id"])}
 	case "conversation.item.input_audio_transcription.delta":
 		w.kind = "transcript.delta"
-		w.payload = TranscriptDelta{decoder.id(o["item_id"]), decoder.string(o["delta"])}
+		var transcript *string
+		if value, present := o["transcript"]; present {
+			text := decoder.string(value)
+			transcript = &text
+		}
+		w.payload = TranscriptDelta{ItemID: decoder.id(o["item_id"]), Delta: decoder.string(o["delta"]), Transcript: transcript}
 	case "conversation.item.input_audio_transcription.completed":
 		w.kind = "transcript.final"
 		w.payload = TranscriptFinal{decoder.id(o["item_id"]), decoder.string(o["transcript"])}
@@ -485,6 +559,10 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 	}
 	if v, ok := o["event_id"]; ok {
 		w.eventID = decoder.string(v)
+	}
+	if v, present := o["server_time_ms"]; present {
+		n := decoder.integer(v)
+		w.serverTimeMS = &n
 	}
 	w.requestID = decoder.optional(o["prism_request_event_id"])
 	return w, nil

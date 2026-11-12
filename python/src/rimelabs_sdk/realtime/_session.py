@@ -17,7 +17,7 @@ from collections import OrderedDict
 from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal, Self, TypeVar
+from typing import Any, Literal, Self, TypeVar, cast
 from weakref import WeakKeyDictionary, WeakSet
 
 from websockets.exceptions import ConnectionClosed
@@ -34,7 +34,8 @@ from .._pcm import InputConverter
 from . import _protocol as p
 from . import _types as t
 from ._history import history_id, item_settings
-from ._settings import InterruptionPolicies, tool_settings
+from ._review import Reviews
+from ._settings import InterruptionPolicies, speed_setting, tool_settings, turn_settings
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
@@ -118,7 +119,9 @@ class RealtimeSession:
     than dropping audio or blocking control messages.
     """
 
-    def __init__(self, socket: Any, timeouts: t.RealtimeTimeouts):
+    def __init__(
+        self, socket: Any, timeouts: t.RealtimeTimeouts, *, review: t.Review | None = None
+    ):
         self._loop = asyncio.get_running_loop()
         self._pid = os.getpid()
         self._socket = socket
@@ -145,6 +148,9 @@ class RealtimeSession:
         self._latest: str | None = None
         self._tasks: set[asyncio.Task[Any]] = set()
         self._input_converter: InputConverter | None = None
+        self._reviews = (
+            Reviews(review, self._send_review, self._fail) if review is not None else None
+        )
         self._reader = asyncio.create_task(self._read(), name="rime:realtime-reader")
         self._close_task: asyncio.Task[None] | None = None
 
@@ -280,6 +286,23 @@ class RealtimeSession:
             self._fail(failure)
             raise failure from None
 
+    async def _send_review(self, event: dict[str, object], deadline: float) -> None:
+        # A queued result can expire. Once a write starts, let the writer finish;
+        # cancelling a callback must not interrupt a WebSocket frame in flight.
+        abandoned = asyncio.Event()
+        timer = asyncio.get_running_loop().call_at(deadline, abandoned.set)
+        task = asyncio.create_task(self._send(event, abandoned))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            abandoned.set()
+            raise
+        finally:
+            timer.cancel()
+
     async def _request(
         self,
         request: p.Request[_ResultT],
@@ -360,8 +383,8 @@ class RealtimeSession:
         if request.kind == "session.update":
             settings = body.get("session")
             if isinstance(settings, dict):
-                pending.interrupt_on_speech = settings.get("turn_detection", {}).get(
-                    "interrupt_response"
+                pending.interrupt_on_speech = cast(
+                    bool | None, settings.get("turn_detection", {}).get("interrupt_response")
                 )
         item = body.get("item")
         if request is p.HISTORY_ITEM or request is p.HISTORY_RESULT:
@@ -377,11 +400,23 @@ class RealtimeSession:
                 await self._send(
                     {"type": kind, "event_id": event_id, **body}, abandoned, submitted=submitted
                 )
+                if kind == "response.cancel" and target is not None and self._reviews is not None:
+                    self._reviews.end(target)
                 result = await future
             if abandoned.is_set() and isinstance(result, t.ResponseStarted):
                 self._abandon_response(result.response)
             return result
         except t.RimeRealtimeError as refusal:
+            if (
+                kind == "response.create"
+                and continuation is None
+                and refusal.fault.scope == "event"
+                and refusal.fault.code in {"invalid_typed_input", "invalid_instruction"}
+                and ready_epoch == self._ready_epoch
+            ):
+                # These correlated validation refusals consume no turn. Prism
+                # keeps its ready state, so it need not send another ready event.
+                self._ready.set()
             if (
                 continuation is not None
                 and refusal.fault.scope == "event"
@@ -410,8 +445,8 @@ class RealtimeSession:
 
     @staticmethod
     def _text(value: str) -> None:
-        if not isinstance(value, str) or not value.strip() or len(value) > 4000:
-            raise RimeInputError("Text must be nonblank and at most 4000 characters")
+        if not isinstance(value, str) or not value.strip():
+            raise RimeInputError("Text must be nonblank")
 
     async def _create(
         self, body: dict[str, object], request: p.Request[t.ResponseStarted] = p.CREATE
@@ -450,6 +485,8 @@ class RealtimeSession:
         tools: Sequence[t.ToolDefinition] | None = None,
         voice: str | None = None,
         interrupt_on_speech: bool | None = None,
+        speed: float | None = None,
+        turn_detection: t.TurnDetectionUpdate | None = None,
         truncation: t.Truncation | None = None,
     ) -> t.SessionInfo:
         """Apply supplied settings and wait for the server acknowledgment.
@@ -472,10 +509,16 @@ class RealtimeSession:
                     settings["voice"] = value
         if tools is not None:
             settings["tools"] = tool_settings(tools)
+        if speed is not None:
+            settings["speed"] = speed_setting(speed)
+        if turn_detection is not None:
+            if isinstance(turn_detection, t.TurnDetection):
+                raise RimeInputError("Use TurnDetectionUpdate for mutable interruption settings")
+            settings["turn_detection"] = turn_settings(turn_detection)
         if interrupt_on_speech is not None:
             if not isinstance(interrupt_on_speech, bool):
                 raise RimeInputError("interrupt_on_speech must be a boolean")
-            settings["turn_detection"] = {"interrupt_response": interrupt_on_speech}
+            settings.setdefault("turn_detection", {})["interrupt_response"] = interrupt_on_speech
         event = await self._request(p.UPDATE, {"session": settings})
         assert event.info is not None
         return event.info
@@ -744,6 +787,8 @@ class RealtimeSession:
             return
         self._failure = error
         self._closed = True
+        if self._reviews is not None:
+            self._reviews.cancel()
         self._ready.set()
         for state in self._responses.values():
             state.done.set()
@@ -789,6 +834,13 @@ class RealtimeSession:
 
     def _dispatch(self, event: p.ServerEvent) -> None:
         payload, echo = event.payload, event.request_id
+        if isinstance(payload, t.ReviewRequest):
+            if self._reviews is None:
+                raise RimeStreamError("Speech review arrived without a configured callback")
+            self._reviews.receive(payload)
+            return
+        if isinstance(payload, p.ResponseEnded) and self._reviews is not None:
+            self._reviews.end(payload.response.response_id)
         if isinstance(payload, p.SessionIdleTimeout):
             self._fail(t.RealtimeIdleTimeout(payload.idle_timeout_s))
             return
@@ -843,6 +895,13 @@ class RealtimeSession:
             self._info = t.SessionInfo(
                 session_id=self._session_id(),
                 model="prism",
+                version=view.version
+                if view.version is not None
+                else self._info.version
+                if self._info is not None
+                else self._created.result().version,
+                speed=view.speed,
+                review=view.review,
                 voice=view.voice,
                 interrupt_on_speech=view.interrupt_on_speech
                 if view.interrupt_on_speech is not None
@@ -904,7 +963,12 @@ class RealtimeSession:
                     and payload.content_index == 0
                 ):
                     self._settle(key, payload)
-            self._publish(payload, event_id=event.event_id, request_id=echo)
+            self._publish(
+                payload,
+                event_id=event.event_id,
+                request_id=echo,
+                server_time_ms=event.server_time_ms,
+            )
             return
         if isinstance(payload, t.InputReady):
             self._ready_epoch += 1
@@ -965,6 +1029,7 @@ class RealtimeSession:
                 ),
                 event_id=event.event_id,
                 request_id=echo,
+                server_time_ms=event.server_time_ms,
             )
             return
         elif isinstance(payload, t.ToolCall):
@@ -1004,7 +1069,9 @@ class RealtimeSession:
             if fault.scope == "session":
                 self._fail(error)
                 return
-        self._publish(payload, event_id=event.event_id, request_id=echo)
+        self._publish(
+            payload, event_id=event.event_id, request_id=echo, server_time_ms=event.server_time_ms
+        )
 
     def _publish(
         self,
@@ -1012,6 +1079,7 @@ class RealtimeSession:
         *,
         event_id: str = "",
         request_id: str | None = None,
+        server_time_ms: int | None = None,
     ) -> None:
         try:
             self._queue.put_nowait(
@@ -1020,6 +1088,7 @@ class RealtimeSession:
                     event_id=event_id,
                     request_id=request_id,
                     payload=payload,
+                    server_time_ms=server_time_ms,
                 )
             )
         except asyncio.QueueFull:
@@ -1051,6 +1120,8 @@ class RealtimeSession:
             self._response_interruptions.clear()
             self._reader.cancel()
             await asyncio.gather(self._reader, return_exceptions=True)
+            if self._reviews is not None:
+                await self._reviews.close()
             tasks = list(self._tasks)
             for task in tasks:
                 task.cancel()

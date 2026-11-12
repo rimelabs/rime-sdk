@@ -486,7 +486,8 @@ their request shape, and replies to speech use session labels.
 | `events` | Take the single owned `Stream<Item = Result<SessionEvent, Error>>`. |
 | `close` | Stop the session and wait for cleanup. |
 
-Text turns and history contain at most 4000 Unicode scalar values. Audio chunks
+Prism enforces text and history limits against its model context window. The SDK
+returns server refusals without its own 4,000-character cap. Audio chunks
 contain complete PCM16 frames and at most 192000 bytes. Input supports mono or
 stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and receives
 mono 24 kHz PCM. Clear audio to reset the streaming converter. A change of input
@@ -654,7 +655,7 @@ Available in the next SDK release. The Prism server must support history operati
 Read history to obtain the items the next reply would see, in server order.
 Create messages with user, assistant, or system roles, past function calls, and
 function results. Creating an item does not start a reply or execute a tool.
-Message text is limited to 4000 Unicode characters. Optional client item IDs have
+Prism enforces message text limits. Optional client item IDs have
 1 to 32 characters. Tool arguments and results preserve the supplied strings.
 
 Omit the insertion anchor to append, use `root` to insert first, or give an item
@@ -746,3 +747,73 @@ if let RealtimeEvent::ResponseEnded { truncation: Some(summary), .. } = &event.p
 
 Migration: add `truncation: None` to constructed `ResponseEnded` values without a
 summary. Add `truncation` or `..` to patterns that list every variant field.
+
+## Additional Prism settings and speech review
+
+These interfaces are unreleased. Speed, server version, and removal of the
+4,000-character text cap work with image `20261104`. The review hook, interrupt
+phrases, minimum silence, cumulative transcripts, and event timestamps need a
+supporting Prism image. New settings are omitted unless supplied. A refusal is
+returned without removing the requested setting or reconnecting automatically.
+
+Use `.speed(1.1)` on `RealtimeConnectOptions` or `RealtimeUpdateOptions` to set
+the speech speed multiplier for subsequent replies. Prism accepts 0.85 through
+1.3. `session.info().speed` reports the confirmed value when supplied by the
+server. `session.info().version` is an opaque release or commit string.
+
+`TurnDetection` adds `interrupt_min_words`, `interrupt_phrases`,
+`acknowledgment_phrases`, and `end_of_turn_min_silence_ms`. All are optional.
+`RealtimeUpdateOptions::turn_detection(TurnDetectionUpdate { ... })` changes
+the three interrupt settings. Empty phrase lists clear them. Minimum silence
+is fixed at connection and must be less than the maximum silence. The server
+applies phrase matching and rejects invalid combinations. Active replies retain
+their earlier settings.
+
+`SessionEvent.server_time_ms` is the server send time in Unix milliseconds,
+when available. It is `None` for synthetic SDK events and old server messages.
+`TranscriptDelta.transcript` contains all words so far, when available. Replace
+the displayed caption with this value even if it is empty. When it is `None`,
+append `delta` as before. Preserve separate captions for separate item IDs.
+
+```rust,no_run
+use rimelabs_sdk::{Client, Error, RealtimeConnectOptions, Review, ReviewDecision, ReviewTimeout};
+
+# async fn example(client: &Client) -> Result<(), Error> {
+let review = Review::new(|request| async move {
+    if request.text.contains("private number") {
+        Ok(ReviewDecision::Replace("I cannot share that number.".into()))
+    } else {
+        Ok(ReviewDecision::Allow)
+    }
+}).timeout_ms(1000).on_timeout(ReviewTimeout::Stop);
+let session = client.realtime().connect(RealtimeConnectOptions::default().review(review)).await?;
+// Consume session events and audio as usual.
+session.close().await;
+# Ok(()) }
+```
+
+Review callbacks run concurrently without waiting for the public event consumer.
+Up to 128 tasks run at once. Requests can precede `response.created` and contain
+raw identifiers, not a retained `ResponseRef`. Callbacks must yield to the async
+runtime and support cancellation. The session cancels and joins them on close.
+Recently seen review IDs are retained in a bounded cache to suppress duplicates.
+
+`Allow` speaks the proposed chunk. `Replace(text)` speaks the replacement and
+ends later chunks. `Stop` suppresses that chunk and later chunks. Earlier chunks
+still need their own decisions. Tool calls already emitted are not undone.
+The server applies the configured timeout action, which can be `Stop`, `Speak`,
+or `Say(text)`. The SDK drops expired callback results and does not retry results
+or wait for an acknowledgment. A callback error, panic, or blank replacement
+attempts Stop, then fails the session with `ErrorKind::Stream`.
+
+A timeout's `RealtimeFault` has scope `"review"`, `review_id`, and `response_id`.
+It does not itself mean the response failed: `Speak` and `Say` can still
+complete it. Read `RealtimeEvent::ResponseEnded` for the outcome.
+
+This is a breaking Rust interface change. Add `..TurnDetection::default()` to
+input literals. Add `transcript: None` to constructed `TranscriptDelta` values,
+or `..` to patterns that do not use the new field. Add `server_time_ms: None` to
+constructed `SessionEvent` values. Constructed `SessionInfo` values must supply
+the new optional fields as well. Add `review_id: None` to constructed
+`RealtimeFault` values. Existing consumers that only read these values
+can keep their current behavior.

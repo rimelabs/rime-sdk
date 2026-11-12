@@ -13,6 +13,10 @@ channels:
       ws:
         method: GET
     messages:
+      reviewResult:
+        $ref: '#/components/messages/reviewResult'
+      reviewRequested:
+        $ref: '#/components/messages/reviewRequested'
       conversationItemDeleted:
         $ref: '#/components/messages/conversationItemDeleted'
       conversation:
@@ -96,6 +100,7 @@ operations:
     channel:
       $ref: '#/channels/realtime'
     messages:
+      - $ref: '#/channels/realtime/messages/reviewResult'
       - $ref: '#/channels/realtime/messages/sessionUpdate'
       - $ref: '#/channels/realtime/messages/conversationItemDelete'
       - $ref: '#/channels/realtime/messages/conversationGet'
@@ -112,6 +117,7 @@ operations:
     channel:
       $ref: '#/channels/realtime'
     messages:
+      - $ref: '#/channels/realtime/messages/reviewRequested'
       - $ref: '#/channels/realtime/messages/sessionCreated'
       - $ref: '#/channels/realtime/messages/conversationItemDeleted'
       - $ref: '#/channels/realtime/messages/conversation'
@@ -141,6 +147,14 @@ operations:
 
 components:
   messages:
+    reviewResult:
+      name: prism.review.result
+      payload:
+        $ref: '#/components/schemas/reviewResultEvent'
+    reviewRequested:
+      name: prism.review.requested
+      payload:
+        $ref: '#/components/schemas/reviewRequestedEvent'
     sessionUpdate:
       name: session.update
       title: Initialize the session
@@ -335,10 +349,16 @@ components:
       type: string
     serverEvent:
       type: object
-      required: [event_id]
+      required:
+      - event_id
       properties:
         event_id:
           type: string
+        server_time_ms:
+          type: integer
+          minimum: 0
+          x-format: timestamp
+
     modality:
       oneOf:
         - const: text
@@ -430,12 +450,16 @@ components:
                 type:
                   const: none
 
-    fillerText:
+    nonBlankText:
       type: string
       minLength: 1
-      maxLength: 500
       # Match Rust Unicode White_Space across Python and JavaScript validators.
       pattern: '[^\u0009-\u000D\u0020\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]'
+
+    fillerText:
+      allOf:
+      - $ref: '#/components/schemas/nonBlankText'
+      maxLength: 500
 
     turnDetection:
       type: object
@@ -446,13 +470,40 @@ components:
           default: true
         eagerness:
           type: string
-          enum: [low, medium, high, auto]
+          enum:
+          - low
+          - medium
+          - high
+          - auto
           default: auto
         prism_end_of_turn_timeout_ms:
           type: integer
           minimum: 1000
           maximum: 10000
           default: 5000
+        interrupt_min_words:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        interrupt_phrases:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+          default: []
+        acknowledgment_phrases:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+          default: []
+        end_of_turn_min_silence_ms:
+          type: integer
+          minimum: 0
+          maximum: 5000
+          default: 0
+
     turnDetectionView:
       allOf:
         - $ref: '#/components/schemas/turnDetection'
@@ -465,8 +516,10 @@ components:
       properties:
         modalities:
           allOf:
-            - $ref: '#/components/schemas/clientModalities'
-          default: [text, audio]
+          - $ref: '#/components/schemas/clientModalities'
+          default:
+          - text
+          - audio
         voice:
           type: string
         instructions:
@@ -483,7 +536,7 @@ components:
           $ref: '#/components/schemas/audioFormat'
         turn_detection:
           allOf:
-            - $ref: '#/components/schemas/turnDetection'
+          - $ref: '#/components/schemas/turnDetection'
         prism_client_caps:
           type: array
           uniqueItems: true
@@ -493,6 +546,14 @@ components:
           $ref: '#/components/schemas/truncation'
         prism_response_metadata:
           $ref: '#/components/schemas/labels'
+        speed:
+          type: number
+          minimum: 0.85
+          maximum: 1.3
+          default: 1
+        prism_review:
+          allOf:
+          - $ref: '#/components/schemas/reviewSettings'
 
     truncation:
       oneOf:
@@ -522,17 +583,17 @@ components:
     sessionView:
       type: object
       required:
-        - id
-        - object
-        - model
-        - modalities
-        - instructions
-        - tools
-        - tool_choice
-        - input_audio_format
-        - turn_detection
-        - prism_effective_interrupt_response
-        - prism_tool_waits
+      - id
+      - object
+      - model
+      - modalities
+      - instructions
+      - tools
+      - tool_choice
+      - input_audio_format
+      - turn_detection
+      - prism_effective_interrupt_response
+      - prism_tool_waits
       properties:
         prism_settings_revision:
           type: integer
@@ -569,18 +630,31 @@ components:
           type: boolean
         prism_tool_waits:
           type: object
-          required: [result_timeout_s, continuation_timeout_s]
+          required:
+          - result_timeout_s
+          - continuation_timeout_s
           properties:
             result_timeout_s:
               oneOf:
-                - type: number
-                  exclusiveMinimum: 0
-                - type: 'null'
+              - type: number
+                exclusiveMinimum: 0
+              - type: 'null'
             continuation_timeout_s:
               oneOf:
-                - type: number
-                  exclusiveMinimum: 0
-                - type: 'null'
+              - type: number
+                exclusiveMinimum: 0
+              - type: 'null'
+        speed:
+          type: number
+        prism_review:
+          allOf:
+          - $ref: '#/components/schemas/reviewSettings'
+          - type: object
+            required:
+            - timeout_ms
+            - on_timeout
+        version:
+          type: string
 
     messageRole:
       oneOf:
@@ -665,7 +739,6 @@ components:
         prism_input_text:
           type: string
           minLength: 1
-          maxLength: 4000
           pattern: '\S'
         metadata:
           allOf:
@@ -705,7 +778,6 @@ components:
         prism_instruction:
           type: string
           minLength: 1
-          maxLength: 4000
           pattern: '\S'
         prism_call_id:
           type: string
@@ -869,6 +941,7 @@ components:
         - const: utterance
         - const: response
         - const: tool_roundtrip
+        - const: review
         - const: session
     errorCode:
       oneOf:
@@ -913,6 +986,8 @@ components:
         - const: turn_failed
         - const: no_audio
         - const: voice_activity_detection_failed
+        - const: review_not_found
+        - const: review_timeout
     errorOwner:
       oneOf:
         - type: object
@@ -949,6 +1024,15 @@ components:
               type: array
               items:
                 type: string
+        - type: object
+          required: [kind, response_id, review_id]
+          properties:
+            kind:
+              const: review
+            response_id:
+              type: string
+            review_id:
+              type: string
         - type: object
           required: [kind]
           properties:
@@ -1489,19 +1573,25 @@ components:
 
     transcriptionDeltaEvent:
       allOf:
-        - $ref: '#/components/schemas/serverEvent'
-        - type: object
-          required: [type, item_id, content_index, delta]
-          properties:
-            type:
-              const: conversation.item.input_audio_transcription.delta
-            item_id:
-              type: string
-            content_index:
-              const: 0
-            delta:
-              type: string
-              minLength: 1
+      - $ref: '#/components/schemas/serverEvent'
+      - type: object
+        required:
+        - type
+        - item_id
+        - content_index
+        - delta
+        properties:
+          type:
+            const: conversation.item.input_audio_transcription.delta
+          item_id:
+            type: string
+          content_index:
+            const: 0
+          delta:
+            type: string
+          transcript:
+            type: string
+            minLength: 1
 
     transcriptionCompletedEvent:
       allOf:
@@ -1729,3 +1819,95 @@ components:
               type: string
               minLength: 1
               description: The item the request named.
+
+    reviewSettings:
+      type: object
+      additionalProperties: false
+      required:
+      - on_timeout
+      properties:
+        timeout_ms:
+          type: integer
+          minimum: 100
+          maximum: 5000
+          default: 1000
+        on_timeout:
+          oneOf:
+          - const: stop
+          - const: speak
+          - const: say
+        timeout_line:
+          allOf:
+          - $ref: '#/components/schemas/fillerText'
+      if:
+        properties:
+          on_timeout:
+            const: say
+      then:
+        required:
+        - timeout_line
+      else:
+        not:
+          required:
+          - timeout_line
+
+
+    reviewResultEvent:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - review_id
+      - action
+      properties:
+        type:
+          const: prism.review.result
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+        review_id:
+          type: string
+        action:
+          oneOf:
+          - const: allow
+          - const: replace
+          - const: stop
+        text:
+          $ref: '#/components/schemas/nonBlankText'
+      if:
+        properties:
+          action:
+            const: replace
+      then:
+        required:
+        - text
+      else:
+        not:
+          required:
+          - text
+
+
+    reviewRequestedEvent:
+      allOf:
+      - $ref: '#/components/schemas/serverEvent'
+      - type: object
+        required:
+        - type
+        - review_id
+        - response_id
+        - item_id
+        - index
+        - text
+        properties:
+          type:
+            const: prism.review.requested
+          review_id:
+            type: string
+          response_id:
+            type: string
+          item_id:
+            type: string
+          index:
+            type: integer
+            minimum: 0
+          text:
+            type: string

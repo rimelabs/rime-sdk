@@ -24,7 +24,13 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		InstructionItemID *string         `json:"expected_instruction_item_id"`
 		IdleTimeoutS      *float64        `json:"expected_idle_timeout_s"`
 		KeptText          *string         `json:"expected_kept_text"`
-		Truncation        *struct {
+		Fault             *struct {
+			Code       string `json:"code"`
+			Scope      string `json:"scope"`
+			ReviewID   string `json:"review_id"`
+			ResponseID string `json:"response_id"`
+		} `json:"expected_fault"`
+		Truncation *struct {
 			ItemsLeftOut    uint64  `json:"items_left_out"`
 			FirstKeptItemID *string `json:"first_kept_item_id"`
 		} `json:"expected_truncation"`
@@ -50,6 +56,12 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 			}
 			if kind != c.Expected {
 				t.Fatalf("got %s, want %s", kind, c.Expected)
+			}
+			if c.Fault != nil {
+				fault := e.payload.(FaultEvent).Fault
+				if fault.Code != c.Fault.Code || fault.Scope != c.Fault.Scope || fault.ReviewID != c.Fault.ReviewID || fault.ResponseID != c.Fault.ResponseID {
+					t.Fatalf("unexpected fault: %#v", fault)
+				}
 			}
 			if kind == "item.truncated" {
 				payload, ok := e.payload.(ItemTruncated)
@@ -84,6 +96,21 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 				t.Fatalf("unexpected idle timeout: %#v", e)
 			}
 		})
+	}
+}
+
+func TestRealtimeReviewFaultRequiresOwnerID(t *testing.T) {
+	for _, owner := range []string{`null`, `{}`, `{"review_id":null}`, `{"review_id":""}`} {
+		raw := []byte(`{"type":"error","error":{"scope":"review","code":"review_timeout","owner":` + owner + `}}`)
+		if _, err := decodeRealtime(raw, "session-1"); !errors.Is(err, ErrStream) {
+			t.Fatalf("accepted review fault owner %s: %v", owner, err)
+		}
+	}
+	for _, scope := range []string{"event", "response", "session"} {
+		raw := []byte(`{"type":"error","error":{"scope":"` + scope + `","code":"future_error"}}`)
+		if _, err := decodeRealtime(raw, "session-1"); err != nil {
+			t.Fatalf("legacy %s fault rejected: %v", scope, err)
+		}
 	}
 }
 

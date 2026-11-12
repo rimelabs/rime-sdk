@@ -10,7 +10,8 @@ recognize the former `prsm` names.
   are omitted.
   The tool filler rules follow `interfaces/speech_to_speech.asyncapi.yaml` in
   `rimelabs/rime` at commit `e0ce7ac08`, which added per-tool filler controls.
-  The filler whitespace pattern spells out Unicode `White_Space` to match
+  The filler and review replacement schemas share a nonblank-text rule that
+  spells out Unicode `White_Space` to match
   the engine's Rust validation in both Python and JavaScript. Their `\S`
   patterns use different whitespace sets. SDK tests also reject invalid UTF-8
   before connection setup, as required by the engine's JSON parser.
@@ -31,6 +32,12 @@ server events, fields, and enum values for forward compatibility. Separate
 decoder tests check that behavior without relaxing client request validation.
 A future server value can fail the current schema check and still be accepted
 by the SDK decoder. The SDK does not use this fixture to reject incoming events.
+
+Review faults carry scope `review` and name their chunk in `owner.review_id`,
+alongside `owner.response_id`. The error schemas and ownership cases follow
+`interfaces/speech_to_speech.asyncapi.yaml` in `rimelabs/rime` at
+`20a1b933cc9edecc9bb6fc83e4c195b4561ef7f0`. A review timeout applies the
+session's timeout policy; `speak` and `say` can still complete the response.
 
 Each SDK runs the cases in `schema.json` against the schema fixture. Local test
 peers also validate outgoing SDK requests against the message schemas, including
@@ -117,3 +124,20 @@ This reports prompt exclusions and does not remove stored conversation history.
 The [response lifetime contract](response-lifetime.md) records the common
 ownership rules and links to executable language tests. It does not change the
 Prism wire schema.
+
+The optional speed, version, timestamp, cumulative transcript, interruption,
+silence-floor, and review shapes follow `rimelabs/rime` at `0c61366ab`.
+The schema keeps newer server fields optional so older image fixtures remain
+valid. Typed input, proactive instructions, and history text have no local
+4,000-character limit. New client settings remain absent unless requested.
+SERVE-273 manual turn controls are excluded from this update.
+
+The engine schema requires nonempty cumulative transcript text but permits an
+empty delta for a correction. SDK decoders also accept an empty cumulative
+transcript and adapters clear the caption in that case. That defensive behavior
+is tested separately from the engine schema, like other forward-compatible
+server values.
+
+Review results permit an omitted `event_id` in the engine contract. SDK writers
+still supply one for error correlation. The fixture follows the engine's optional
+field rule rather than making the SDK's stricter sending convention mandatory.

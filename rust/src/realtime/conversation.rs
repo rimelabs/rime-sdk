@@ -623,6 +623,7 @@ pub(super) fn assert_measured_playback_is_not_interrupted<P: ConversationPlaybac
         });
     }
     let event = SessionEvent {
+        server_time_ms: None,
         session_id: session.info().session_id,
         event_id: String::new(),
         request_id: None,

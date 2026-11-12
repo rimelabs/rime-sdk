@@ -15,12 +15,6 @@ from . import _types as t
 from ._history import listed_item
 
 
-class _TurnDetection(TypedDict):
-    interrupt_response: bool
-    eagerness: NotRequired[t.TurnEagerness]
-    prism_end_of_turn_timeout_ms: NotRequired[int]
-
-
 class _Function(TypedDict):
     name: str
     description: str
@@ -36,12 +30,14 @@ class _Tool(TypedDict):
 class SessionSettings(TypedDict):
     modalities: list[Literal["text", "audio"]]
     input_audio_format: Literal["pcm16"]
-    turn_detection: _TurnDetection
+    turn_detection: dict[str, t.JsonValue]
     tools: list[_Tool]
     voice: NotRequired[str]
     instructions: NotRequired[str]
     prism_response_metadata: NotRequired[t.Labels]
     truncation: NotRequired[t.JsonValue]
+    speed: NotRequired[float]
+    prism_review: NotRequired[t.JsonObject]
 
 
 def response_metadata(value: object) -> t.Labels:
@@ -66,11 +62,15 @@ class SessionPatch(TypedDict, total=False):
     voice: str
     instructions: str
     tools: list[_Tool]
-    turn_detection: dict[str, bool]
+    turn_detection: dict[str, t.JsonValue]
+    speed: float
 
 
 @dataclass(frozen=True, kw_only=True)
 class SessionView:
+    speed: float | None = None
+    version: str | None = None
+    review: t.ReviewSettings | None = None
     truncation: t.Truncation | None = None
     settings_revision: int | None = None
     id: str
@@ -160,11 +160,13 @@ ServerPayload: TypeAlias = (
     | t.ToolCall
     | t.FaultEvent
     | SessionIdleTimeout
+    | t.ReviewRequest
 )
 
 
 @dataclass(frozen=True, kw_only=True)
 class ServerEvent:
+    server_time_ms: int | None = None
     event_id: str
     request_id: str | None
     payload: ServerPayload
@@ -318,6 +320,46 @@ def _truncation(value: object) -> t.Truncation:
     _invalid("session.truncation")
 
 
+def _optional_integer(view: dict[str, object], name: str, minimum: int, maximum: int) -> int | None:
+    if name not in view:
+        return None
+    value = _integer(view[name], name)
+    if not minimum <= value <= maximum:
+        _invalid(name)
+    return value
+
+
+def _phrases(view: dict[str, object], name: str) -> tuple[str, ...] | None:
+    if name not in view:
+        return None
+    value = view[name]
+    if not isinstance(value, list) or len(value) > 100:
+        _invalid(name)
+    return tuple(_string(item, name) for item in value)
+
+
+def _review(value: object) -> t.ReviewSettings:
+    view = _object(value, "prism_review")
+    action = view.get("on_timeout")
+    policy: t.Stop | t.Speak | t.Say
+    if action == "stop":
+        policy = t.Stop()
+    elif action == "speak":
+        policy = t.Speak()
+    elif action == "say":
+        policy = t.Say(_string(view.get("timeout_line"), "timeout_line"))
+    else:
+        _invalid("prism_review.on_timeout")
+    if action != "say" and "timeout_line" in view:
+        _invalid("prism_review.timeout_line")
+    try:
+        return t.ReviewSettings(
+            timeout_ms=_integer(view.get("timeout_ms"), "timeout_ms"), on_timeout=policy
+        )
+    except RimeInputError:
+        _invalid("prism_review")
+
+
 def _session(value: object) -> SessionView:
     view = _object(value, "session")
     detection = (
@@ -351,7 +393,20 @@ def _session(value: object) -> SessionView:
         if "prism_effective_interrupt_response" in view:
             _invalid("session.prism_effective_interrupt_response")
         interrupt = None
+    speed = None
+    if "speed" in view:
+        value = view["speed"]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (float, int))
+            or not 0.85 <= value <= 1.3
+        ):
+            _invalid("session.speed")
+        speed = float(value)
     return SessionView(
+        speed=speed,
+        version=_string(view["version"], "session.version") if "version" in view else None,
+        review=_review(view["prism_review"]) if "prism_review" in view else None,
         truncation=_truncation(view["truncation"]) if "truncation" in view else None,
         settings_revision=_revision(view, "session.prism_settings_revision"),
         id=_id(view.get("id"), "session.id"),
@@ -366,6 +421,12 @@ def _session(value: object) -> SessionView:
         turn_detection=t.TurnDetectionInfo(
             eagerness=cast(t.TurnEagerness | Literal["unknown"] | None, eagerness),
             end_of_turn_timeout_ms=end_timeout,
+            end_of_turn_min_silence_ms=_optional_integer(
+                detection, "end_of_turn_min_silence_ms", 0, 5000
+            ),
+            interrupt_min_words=_optional_integer(detection, "interrupt_min_words", 1, 10),
+            interrupt_phrases=_phrases(detection, "interrupt_phrases"),
+            acknowledgment_phrases=_phrases(detection, "acknowledgment_phrases"),
         ),
         tool_result_timeout_s=_duration(waits.get("result_timeout_s"), "result_timeout_s"),
         tool_continuation_timeout_s=_duration(
@@ -387,13 +448,20 @@ def _fault(value: object) -> t.RealtimeFault:
         code=_string(error.get("code", "unknown"), "error.code"),
         message=_string(error.get("message", ""), "error.message"),
         scope=cast(
-            Literal["event", "utterance", "response", "tool_roundtrip", "session", "unknown"],
+            Literal[
+                "event", "utterance", "response", "tool_roundtrip", "review", "session", "unknown"
+            ],
             scope
-            if scope in ("event", "utterance", "response", "tool_roundtrip", "session")
+            if scope in ("event", "utterance", "response", "tool_roundtrip", "review", "session")
             else "unknown",
         ),
         request_id=_optional_string(owner.get("event_id"), "error.owner.event_id"),
         response_id=_optional_string(owner.get("response_id"), "error.owner.response_id"),
+        review_id=(
+            _id(owner.get("review_id"), "error.owner.review_id")
+            if scope == "review"
+            else _optional_id(owner.get("review_id"), "error.owner.review_id")
+        ),
         item_id=_optional_string(owner.get("item_id"), "error.owner.item_id"),
         call_ids=tuple(_id(value, "error.owner.call_ids") for value in calls),
         correlation_id=_optional_string(error.get("correlation_id"), "error.correlation_id"),
@@ -458,7 +526,15 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         return t.ResponseRef(session_id=session_id, response_id=_id(value, "response.id"))
 
     payload: ServerPayload
-    if kind == "session.created":
+    if kind == "prism.review.requested":
+        payload = t.ReviewRequest(
+            review_id=_id(event.get("review_id"), "review_id"),
+            response_id=_id(event.get("response_id"), "response_id"),
+            item_id=_id(event.get("item_id"), "item_id"),
+            index=_integer(event.get("index"), "index"),
+            text=_string(event.get("text"), "text"),
+        )
+    elif kind == "session.created":
         payload = SessionCreated(session=_session(event.get("session")))
     elif kind == "session.updated":
         payload = SessionUpdated(session=_session(event.get("session")))
@@ -538,7 +614,11 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
         payload = t.InputCommitted(item_id=_id(event.get("item_id"), "item_id"))
     elif kind == "conversation.item.input_audio_transcription.delta":
         payload = t.TranscriptDelta(
-            item_id=_id(event.get("item_id"), "item_id"), delta=_string(event.get("delta"), "delta")
+            item_id=_id(event.get("item_id"), "item_id"),
+            delta=_string(event.get("delta"), "delta"),
+            transcript=_string(event["transcript"], "transcript")
+            if "transcript" in event
+            else None,
         )
     elif kind == "conversation.item.input_audio_transcription.completed":
         payload = t.TranscriptFinal(
@@ -675,6 +755,7 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
     else:
         return None
     return ServerEvent(
+        server_time_ms=_optional_integer(event, "server_time_ms", 0, 9007199254740991),
         event_id=_string(event.get("event_id", ""), "event_id"),
         request_id=_optional_string(event.get("prism_request_event_id"), "prism_request_event_id"),
         payload=payload,

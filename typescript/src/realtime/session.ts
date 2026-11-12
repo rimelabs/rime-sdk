@@ -18,7 +18,13 @@ import { RealtimeConnection } from "./transport.js";
 import * as t from "./types.js";
 import * as p from "./protocol.js";
 import { historyId, itemSettings } from "./history.js";
-import { InterruptionPolicies, toolSettings } from "./settings.js";
+import {
+  InterruptionPolicies,
+  toolSettings,
+  turnSettings,
+  speechSpeed,
+} from "./settings.js";
+import { Reviews } from "./review.js";
 
 const NOT_READY = new Set([
   "typed_turn_busy",
@@ -71,10 +77,12 @@ function outputKey(output: t.OutputRef) {
   ]);
 }
 function text(value: string) {
-  if (typeof value !== "string" || !value.trim() || [...value].length > 4000)
-    throw new RimeInputError(
-      "Text must be nonblank and at most 4000 characters",
-    );
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    /[\uD800-\uDFFF]/u.test(value)
+  )
+    throw new RimeInputError("Text must be nonblank valid UTF-8");
 }
 
 /** A local metadata hold. Call release() in finally; no wire messages are sent. */
@@ -88,6 +96,7 @@ export interface ResponseHold {
 export class RealtimeSession {
   private readonly created = new Deferred<p.SessionView>();
   private sessionId: string | null = null;
+  private createdVersion?: string;
   private sessionInfo: t.SessionInfo | null = null;
   private readonly lifetime = new AbortController();
   private failure: RimeError | null = null;
@@ -111,13 +120,22 @@ export class RealtimeSession {
   private latest: string | null = null;
   private readonly tasks = new Set<Promise<unknown>>();
   private converter: InputConverter | null = null;
+  private readonly reviews?: Reviews;
 
   /** @internal Use client.realtime.connect(). */
   constructor(
     private readonly socket: RealtimeConnection,
     private readonly timeouts: Required<t.RealtimeTimeouts>,
     private readonly forget: () => void,
+    review?: t.Review,
   ) {
+    if (review !== undefined)
+      this.reviews = new Reviews(
+        review,
+        this.lifetime.signal,
+        (result, signal) => this.send(result, signal),
+        (error) => this.fail(error),
+      );
     setMaxListeners(0, this.lifetime.signal);
     socket.onFailure = (error) => this.fail(error);
     socket.onMessage = (raw) => {
@@ -437,12 +455,26 @@ export class RealtimeSession {
         });
         submitted = true;
         await abortable(this.socket.send(encoded), deadline.signal);
+        if (kind === "response.cancel" && target !== undefined)
+          this.reviews?.cancel(target);
       } finally {
         release();
         beforeSend.dispose();
       }
       return await abortable(result.promise, deadline.signal);
     } catch (error) {
+      if (
+        kind === "response.create" &&
+        !continuation &&
+        error instanceof t.RimeRealtimeError &&
+        error.fault.scope === "event" &&
+        ["invalid_typed_input", "invalid_instruction"].includes(
+          error.fault.code,
+        ) &&
+        epoch === this.readyEpoch
+      )
+        // A correlated validation refusal consumes no turn or server ready state.
+        this.ready.set();
       if (
         continuation &&
         error instanceof t.RimeRealtimeError &&
@@ -524,6 +556,10 @@ export class RealtimeSession {
    * Cancellation after submission does not undo an accepted update. */
   async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
     const settings: p.SessionPatch = {};
+    if (options.speed !== undefined)
+      settings.speed = speechSpeed(options.speed);
+    if (options.turnDetection !== undefined)
+      settings.turn_detection = turnSettings(options.turnDetection);
     if (options.truncation !== undefined)
       settings.truncation = p.truncationSettings(options.truncation);
     for (const name of ["instructions", "voice"] as const) {
@@ -540,6 +576,7 @@ export class RealtimeSession {
       if (typeof options.interruptOnSpeech !== "boolean")
         throw new RimeInputError("interruptOnSpeech must be a boolean");
       settings.turn_detection = {
+        ...settings.turn_detection,
         interrupt_response: options.interruptOnSpeech,
       };
     }
@@ -938,7 +975,10 @@ export class RealtimeSession {
     this.created.reject(error);
     for (const pending of this.pending.values()) pending.result.reject(error);
     this.queued.set();
-    void this.socket.close().then(() => this.forget());
+    void this.socket.close().then(async () => {
+      await this.reviews?.close();
+      this.forget();
+    });
   }
   private dispatch(event: p.ServerEvent) {
     const { payload, requestId: echo } = event;
@@ -978,12 +1018,20 @@ export class RealtimeSession {
         );
     }
     switch (payload.kind) {
+      case "review.requested":
+        if (!this.reviews)
+          throw new RimeStreamError(
+            "Review requested without a configured callback",
+          );
+        this.reviews.request(payload);
+        return;
       case "session.idle_timeout":
         this.fail(new t.RealtimeIdleTimeout(payload.idleTimeoutS));
         return;
       case "session.created":
         if (this.sessionId === null) {
           this.sessionId = payload.session.id;
+          this.createdVersion = payload.session.version;
           this.created.resolve(payload.session);
         }
         return;
@@ -991,8 +1039,13 @@ export class RealtimeSession {
         const view = payload.session;
         const pending = this.pending.get(echo ?? "");
         if (!pending) return;
+        const version =
+          view.version ?? this.sessionInfo?.version ?? this.createdVersion;
         this.sessionInfo = Object.freeze({
           sessionId: this.id(),
+          ...(view.speed === undefined ? {} : { speed: view.speed }),
+          ...(version === undefined ? {} : { version }),
+          ...(view.review === undefined ? {} : { review: view.review }),
           model: "prism",
           voice: view.voice,
           interruptOnSpeech:
@@ -1095,6 +1148,7 @@ export class RealtimeSession {
         break;
       }
       case "response.ended": {
+        this.reviews?.end(payload.response.responseId);
         const state = this.responses.get(payload.response.responseId);
         if (!state) {
           if (this.evictedResponses.has(payload.response.responseId)) return;
@@ -1112,7 +1166,7 @@ export class RealtimeSession {
           )
             this.settle(key, payload);
         const { drainToken, ...ended } = payload;
-        this.publish(ended, event.eventId, echo);
+        this.publish(ended, event.eventId, echo, event.serverTimeMs);
         return;
       }
       case "tool.call": {
@@ -1161,7 +1215,7 @@ export class RealtimeSession {
         break;
       }
     }
-    this.publish(payload, event.eventId, echo);
+    this.publish(payload, event.eventId, echo, event.serverTimeMs);
   }
   private wireResponse(id: string): ResponseState {
     const state = this.responses.get(id);
@@ -1173,6 +1227,7 @@ export class RealtimeSession {
     payload: t.SessionEvent<t.NormalizedRealtimeFault>["payload"],
     eventId = "",
     requestId: string | null = null,
+    serverTimeMs?: number,
   ) {
     if (this.queue.length >= 256) {
       const error = new RimeResourceLimitError(
@@ -1184,6 +1239,7 @@ export class RealtimeSession {
     this.queue.push(
       Object.freeze({
         sessionId: this.id(),
+        ...(serverTimeMs === undefined ? {} : { serverTimeMs }),
         eventId,
         requestId,
         payload: Object.freeze(payload),
@@ -1203,6 +1259,7 @@ export class RealtimeSession {
         try {
           await this.socket.close();
           await Promise.allSettled([...this.tasks]);
+          await this.reviews?.close();
         } finally {
           for (const state of this.responses.values())
             responseInterruptions.delete(state.ref);

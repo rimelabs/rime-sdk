@@ -1,6 +1,7 @@
 package rime
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -12,6 +13,77 @@ type RealtimeTimeouts struct{ Connect, Ready, Request time.Duration }
 type TurnDetection struct {
 	Eagerness          string
 	EndOfTurnTimeoutMS int
+	// Nil leaves the server default. Minimum silence is fixed at connection.
+	EndOfTurnMinSilenceMS *int
+	InterruptMinWords     *int
+	// Nil omits the setting; an empty slice explicitly clears it.
+	InterruptPhrases      []string
+	AcknowledgmentPhrases []string
+}
+
+// TurnDetectionUpdate contains the turn settings that may change during a session.
+// Nil values leave the current setting unchanged; empty lists clear it.
+type TurnDetectionUpdate struct {
+	InterruptMinWords     *int
+	InterruptPhrases      []string
+	AcknowledgmentPhrases []string
+}
+
+// ReviewRequest is one spoken chunk, possibly before its response is announced.
+// A review request does not establish that its text was spoken.
+type ReviewRequest struct {
+	ReviewID, ResponseID, ItemID string
+	Index                        uint64
+	Text                         string
+}
+
+// ReviewDecision permits, replaces, or stops a chunk. Review does not undo tool calls.
+type ReviewDecision interface{ reviewDecision() }
+
+// ReviewAllow permits the chunk as written.
+type ReviewAllow struct{}
+
+// ReviewReplace replaces this chunk and ends the reply after the replacement.
+type ReviewReplace struct{ Text string }
+
+// ReviewStop omits this chunk and ends the reply after any earlier allowed chunks.
+type ReviewStop struct{}
+
+func (ReviewAllow) reviewDecision()   {}
+func (ReviewReplace) reviewDecision() {}
+func (ReviewStop) reviewDecision()    {}
+
+// ReviewTimeout is the server action when no verdict arrives in time.
+type ReviewTimeout interface{ reviewTimeout() }
+
+// ReviewTimeoutStop ends the reply if its review expires.
+type ReviewTimeoutStop struct{}
+
+// ReviewTimeoutSpeak allows the original chunk if its review expires.
+type ReviewTimeoutSpeak struct{}
+
+// ReviewTimeoutSay replaces the chunk with Text if its review expires.
+type ReviewTimeoutSay struct{ Text string }
+
+func (ReviewTimeoutStop) reviewTimeout()  {}
+func (ReviewTimeoutSpeak) reviewTimeout() {}
+func (ReviewTimeoutSay) reviewTimeout()   {}
+
+// Review enables review at connection. Callbacks run concurrently, independently
+// of Recv, and must honor context cancellation. Close waits for them to return.
+// Do not call Close from a callback. Callback errors attempt Stop and fail the session.
+type Review struct {
+	Callback func(context.Context, ReviewRequest) (ReviewDecision, error)
+	// TimeoutMS is 100 through 5000. Zero selects the server default of 1000.
+	TimeoutMS int
+	// Nil selects Stop. The server remains the authority for timeout timing.
+	OnTimeout ReviewTimeout
+}
+
+// ReviewSettings contains the settings confirmed by the server, without a callback.
+type ReviewSettings struct {
+	TimeoutMS uint64
+	OnTimeout ReviewTimeout
 }
 
 // TruncationMode selects the history policy when the context fills.
@@ -46,6 +118,9 @@ type ToolDefinition struct {
 
 // RealtimeConnectOptions configure Prism independently of the parent TTS client.
 type RealtimeConnectOptions struct {
+	// Speed is omitted when nil. A supplied multiplier must be 0.85 through 1.3.
+	Speed  *float64
+	Review *Review
 	// Truncation is nil when omitted or not published by an older server.
 	Truncation                    *Truncation
 	Endpoint, Voice, Instructions string
@@ -118,6 +193,8 @@ func (r OutputRef) ContentIndex() uint64  { return r.contentIndex }
 // Nil fields keep their values. An empty string clears instructions; an empty,
 // non-nil Tools slice removes all tools. Tools replaces the complete list.
 type RealtimeUpdateOptions struct {
+	Speed         *float64
+	TurnDetection *TurnDetectionUpdate
 	// Truncation is nil when omitted or not published by an older server.
 	Truncation        *Truncation
 	Instructions      *string
@@ -128,6 +205,14 @@ type RealtimeUpdateOptions struct {
 
 // SessionInfo contains the settings returned by Prism. Nil fields were not published.
 type SessionInfo struct {
+	// Nil means the older server did not publish the value.
+	Speed                 *float64
+	Version               *string
+	Review                *ReviewSettings
+	EndOfTurnMinSilenceMS *uint64
+	InterruptMinWords     *uint64
+	InterruptPhrases      []string
+	AcknowledgmentPhrases []string
 	// Truncation is nil when omitted or not published by an older server.
 	Truncation *Truncation
 	// SettingsRevision is nil when the server did not publish it.
@@ -146,7 +231,9 @@ type SessionInfo struct {
 // RealtimeFault preserves structured service fault details. Use errors.As.
 type RealtimeFault struct {
 	Code, Message, Scope, RequestID, ResponseID, ItemID, CorrelationID, Parameter string
-	CallIDs                                                                       []string
+	// ReviewID identifies the reviewed chunk; empty when the fault has no review owner.
+	ReviewID string
+	CallIDs  []string
 }
 
 // RealtimeIdleTimeout reports the server's idle limit when it closes a conversation.
@@ -178,6 +265,8 @@ type RealtimeEvent interface{ isRealtimeEvent() }
 type SessionEvent struct {
 	SessionID, EventID, RequestID string
 	Payload                       RealtimeEvent
+	// ServerTimeMS is the server's Unix time in milliseconds; nil if absent.
+	ServerTimeMS *uint64
 }
 type InputReady struct{}
 type SpeechHint struct{ AudioStartMS uint64 }
@@ -191,7 +280,11 @@ type SpeechStopped struct {
 	EndReason  string
 }
 type InputCommitted struct{ ItemID string }
-type TranscriptDelta struct{ ItemID, Delta string }
+type TranscriptDelta struct {
+	ItemID, Delta string
+	// Transcript replaces accumulated captions when present, including empty text.
+	Transcript *string
+}
 type TranscriptFinal struct{ ItemID, Text string }
 type TranscriptFailed struct {
 	ItemID string

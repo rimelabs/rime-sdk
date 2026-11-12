@@ -114,7 +114,6 @@ test("wrong deletion acknowledgment fails session", async (t) => {
 for (const item of [
   { type: "message", id: "", role: "system", text: "x" },
   { type: "message", role: "bad", text: "x" },
-  { type: "message", role: "user", text: "x".repeat(4001) },
   { type: "message", role: "user", text: "\ud800" },
   { type: "function_call", callId: "", name: "f", arguments: "{}" },
   { type: "unknown" },

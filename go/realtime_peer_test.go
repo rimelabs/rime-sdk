@@ -33,6 +33,9 @@ func newRealtimePeerWithPause(t *testing.T, pause bool) *realtimePeer {
 	return newRealtimePeerWithSession(t, pause, nil)
 }
 func newRealtimePeerWithSession(t *testing.T, pause bool, initial rtObject) *realtimePeer {
+	return newRealtimePeerWithViews(t, pause, rtObject{"id": "session-1"}, initial)
+}
+func newRealtimePeerWithViews(t *testing.T, pause bool, created, initial rtObject) *realtimePeer {
 	if initial == nil {
 		initial = rtObject{"id": "session-1", "voice": "test"}
 	}
@@ -57,7 +60,7 @@ func newRealtimePeerWithSession(t *testing.T, pause bool, initial rtObject) *rea
 		}
 		p.conn <- c
 		send := func(v rtObject) error { b, _ := json.Marshal(v); return c.Write(r.Context(), websocket.MessageText, b) }
-		_ = send(rtObject{"type": "session.created", "session": rtObject{"id": "session-1"}})
+		_ = send(rtObject{"type": "session.created", "session": created})
 		initialized := false
 		for {
 			_, b, e := c.Read(r.Context())

@@ -9,6 +9,8 @@ pub(super) struct Wire {
     pub created_id: Option<String>,
     pub interrupt_known: bool,
     pub event_id: String,
+    pub server_time_ms: Option<u64>,
+    pub review: Option<ReviewRequest>,
     pub request_id: Option<String>,
     pub target: String,
     pub index: u64,
@@ -102,9 +104,55 @@ fn response_usage(response: &Value) -> Result<Option<ResponseUsage>, Error> {
         context_window: integer(&value["context_window"])?,
     }))
 }
+fn strings(value: &Value) -> Result<Vec<String>, Error> {
+    value
+        .as_array()
+        .filter(|values| values.len() <= MAX_PHRASES)
+        .ok_or_else(|| invalid("phrases"))?
+        .iter()
+        .map(string)
+        .collect()
+}
+fn review_settings(value: &Value) -> Result<ReviewSettings, Error> {
+    object(value)?;
+    let timeout_ms = integer(&value["timeout_ms"])?;
+    if !(100..=5000).contains(&timeout_ms) {
+        return Err(invalid("review.timeout_ms"));
+    }
+    let on_timeout = match value["on_timeout"].as_str() {
+        Some("stop") => ReviewTimeout::Stop,
+        Some("speak") => ReviewTimeout::Speak,
+        Some("say") => ReviewTimeout::Say(string(&value["timeout_line"])?),
+        _ => return Err(invalid("review.on_timeout")),
+    };
+    let settings = ReviewSettings {
+        timeout_ms: timeout_ms as u32,
+        on_timeout,
+    };
+    if !matches!(settings.on_timeout, ReviewTimeout::Say(_)) && value.get("timeout_line").is_some()
+    {
+        return Err(invalid("review.timeout_line"));
+    }
+    super::client::review_settings(&settings).map_err(|_| invalid("review settings"))?;
+    Ok(settings)
+}
 fn view(v: &Value) -> Result<SessionInfo, Error> {
     let o = object(v)?;
     let mut s = SessionInfo {
+        version: o.get("version").map(string).transpose()?,
+        speed: o
+            .get("speed")
+            .map(|v| {
+                v.as_f64()
+                    .filter(|v| v.is_finite() && SPEED_LIMITS.contains(v))
+                    .ok_or_else(|| invalid("session.speed"))
+            })
+            .transpose()?,
+        review: o.get("prism_review").map(review_settings).transpose()?,
+        end_of_turn_min_silence_ms: None,
+        interrupt_min_words: None,
+        interrupt_phrases: None,
+        acknowledgment_phrases: None,
         truncation: o
             .get("truncation")
             .map(|value| {
@@ -146,6 +194,23 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
     }
     if let Some(v) = o.get("turn_detection") {
         let d = object(v)?;
+        s.end_of_turn_min_silence_ms = d
+            .get("end_of_turn_min_silence_ms")
+            .map(integer)
+            .transpose()?;
+        s.interrupt_min_words = d.get("interrupt_min_words").map(integer).transpose()?;
+        if s.end_of_turn_min_silence_ms
+            .is_some_and(|value| !MIN_SILENCE_LIMITS.contains(&value))
+        {
+            return Err(invalid("session.turn_detection.end_of_turn_min_silence_ms"));
+        }
+        if s.interrupt_min_words
+            .is_some_and(|value| !INTERRUPT_WORD_LIMITS.contains(&value))
+        {
+            return Err(invalid("session.turn_detection.interrupt_min_words"));
+        }
+        s.interrupt_phrases = d.get("interrupt_phrases").map(strings).transpose()?;
+        s.acknowledgment_phrases = d.get("acknowledgment_phrases").map(strings).transpose()?;
         if let Some(v) = d.get("eagerness") {
             s.eagerness = Some(enumeration(string(v)?, &["low", "medium", "high", "auto"]))
         }
@@ -185,6 +250,14 @@ fn fault(v: &Value) -> Result<RealtimeFault, Error> {
     let field = |k| -> Result<Option<String>, Error> {
         optional(owner.and_then(|o| o.get(k)).unwrap_or(&Value::Null))
     };
+    let review_id = owner
+        .and_then(|owner| owner.get("review_id"))
+        .filter(|value| !value.is_null())
+        .map(id)
+        .transpose()?;
+    if o.get("scope").and_then(Value::as_str) == Some("review") && review_id.is_none() {
+        return Err(invalid("error.owner.review_id"));
+    }
     let calls = match owner.and_then(|o| o.get("call_ids")) {
         None | Some(Value::Null) => vec![],
         Some(Value::Array(a)) => a.iter().map(id).collect::<Result<_, _>>()?,
@@ -208,11 +281,13 @@ fn fault(v: &Value) -> Result<RealtimeFault, Error> {
                 "utterance",
                 "response",
                 "tool_roundtrip",
+                "review",
                 "session",
             ],
         ),
         request_id: field("event_id")?,
         response_id: field("response_id")?,
+        review_id,
         item_id: field("item_id")?,
         call_ids: calls,
         correlation_id: optional(&v["correlation_id"])?,
@@ -234,6 +309,8 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         history: vec![],
         created_id: None,
         event_id: String::new(),
+        server_time_ms: None,
+        review: None,
         request_id: None,
         target: String::new(),
         index: 0,
@@ -261,6 +338,16 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
             w.interrupt_known = v["session"]
                 .get("prism_effective_interrupt_response")
                 .is_some()
+        }
+        "prism.review.requested" => {
+            w.kind = "review.requested".into();
+            w.review = Some(ReviewRequest {
+                review_id: id(&v["review_id"])?,
+                response_id: id(&v["response_id"])?,
+                item_id: id(&v["item_id"])?,
+                index: integer(&v["index"])?,
+                text: string(&v["text"])?,
+            });
         }
         "session.idle_timeout" => {
             if string(&v["reason"])? != "idle_timeout" {
@@ -366,6 +453,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         "conversation.item.input_audio_transcription.delta" => {
             w.kind = "transcript.delta".into();
             w.payload = Some(TranscriptDelta {
+                transcript: o.get("transcript").map(string).transpose()?,
                 item_id: id(&v["item_id"])?,
                 delta: string(&v["delta"])?,
             })
@@ -540,6 +628,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
         }
         _ => return Ok(None),
     }
+    w.server_time_ms = o.get("server_time_ms").map(integer).transpose()?;
     w.event_id = o
         .get("event_id")
         .map(string)

@@ -564,8 +564,9 @@ sends nothing and permits other operations to continue. Terminal failures take
 precedence over queued events and remain available from later session operations.
 Normal closure returns `io.EOF` after the remaining queued events.
 
-Text turns and history contain at most 4000 Unicode scalar values. Tool filler
-text and filler instructions contain at most 500 Unicode scalar values. Input audio
+Prism enforces its context limit for typed turns, proactive instructions, and history.
+The SDK preserves the server's refusal and does not impose a 4,000-character cap.
+Tool filler text and filler instructions contain at most 500 Unicode scalar values. Input audio
 contains complete PCM16 frames and at most 192000 bytes per chunk. Input supports
 mono or stereo at 8, 16, 24, or 48 kHz. The session sends mono 16 kHz PCM and
 receives mono 24 kHz PCM. A clear or input-format change resets conversion.
@@ -669,7 +670,7 @@ Available in the next SDK release. The Prism server must support history operati
 Read history to obtain the items the next reply would see, in server order.
 Create messages with user, assistant, or system roles, past function calls, and
 function results. Creating an item does not start a reply or execute a tool.
-Message text is limited to 4000 Unicode characters. Optional client item IDs have
+Prism enforces message text limits. Optional client item IDs have
 1 to 32 characters. Tool arguments and results preserve the supplied strings.
 
 Pass an empty string as the insertion anchor to append, use `root` to insert
@@ -757,3 +758,91 @@ if ended, ok := event.Payload.(rime.ResponseEnded); ok && ended.Truncation != ni
 
 Migration: use keyed `ResponseEnded` struct literals. Existing unkeyed literals
 must include both `Truncation` and `Usage`, with nil for each when unavailable.
+
+## Prism settings, event metadata, and review
+
+These interfaces are available in the next SDK release. New turn settings and
+review require a supporting Prism image. The default connection omits them and
+continues to work with older images. A requested feature is never silently removed
+when the server rejects it.
+
+```go
+speed, words, silence := 1.1, 2, 800
+session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{
+    Speed: &speed,
+    TurnDetection: rime.TurnDetection{
+        InterruptMinWords: &words,
+        InterruptPhrases: []string{"stop", "wait"},
+        AcknowledgmentPhrases: []string{"uh-huh"},
+        EndOfTurnMinSilenceMS: &silence,
+    },
+})
+if err != nil {
+    return err
+}
+defer session.Close()
+```
+
+`Speed` accepts a multiplier from 0.85 through 1.3. Set it in `RealtimeUpdateOptions`
+to change later replies. Mutable interrupt settings use
+`RealtimeUpdateOptions.TurnDetection`, a `*TurnDetectionUpdate`. A nil list leaves
+its setting unchanged; a non-nil empty list clears it. Minimum silence is fixed at
+connection. The server checks its relation to the maximum silence. Public settings
+change only after acknowledgment. An active reply keeps the rules it began with.
+
+`SessionInfo` reports optional `Speed`, `Version`, `Review`, and applied turn
+settings. `Version` is an opaque release or commit string. It retains the last
+reported value if a later update omits it. A value never reported remains nil.
+`SessionEvent.ServerTimeMS` is an optional Unix millisecond time
+from the server, not the client receive time. Clock offset contributes to their
+difference. `TranscriptDelta.Transcript` contains all words so far when present.
+Replace captions with it, including when it is empty. Otherwise append `Delta`.
+
+Enable review once at connection with a callback:
+
+```go
+review := &rime.Review{
+    TimeoutMS: 1000,
+    OnTimeout: rime.ReviewTimeoutStop{},
+    Callback: func(ctx context.Context, request rime.ReviewRequest) (rime.ReviewDecision, error) {
+        // Apply the application's policy. Check ctx while doing external work.
+        if err := ctx.Err(); err != nil {
+            return nil, err
+        }
+        return rime.ReviewAllow{}, nil
+    },
+}
+session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{Review: review})
+```
+
+Return `ReviewAllow{}`, `ReviewReplace{Text: "Approved text."}`, or `ReviewStop{}`.
+Replacement text must be nonblank. Timeout policy is `ReviewTimeoutStop{}`,
+`ReviewTimeoutSpeak{}`, or `ReviewTimeoutSay{Text: "Please wait."}`. Timeout speech
+has the same 500-character limit as filler speech. Zero timeout selects 1000 ms;
+explicit values must be 100 through 5000 ms.
+
+Callbacks run concurrently and independently of `Recv`. A request can precede
+`response.created`; it therefore contains plain IDs and does not require a response
+handle. Reviewed text is not proof that speech played. Review cannot undo tools
+that have already run. Replace or Stop cancels later outstanding reviews for that
+response while allowing earlier ones to complete.
+
+The session permits at most 32 active callbacks and retains at most 128 recent
+review IDs. Capacity overflow fails with `ErrResourceLimit`. The server owns the
+actual timeout action. Local expiry cancels work and discards late results.
+Callback errors, panics, and invalid decisions attempt Stop, then fail the session
+with `ErrStream`. Results are sent once without waiting for an acknowledgment and
+are never retried after an uncertain write.
+
+Callbacks must honor cancellation and must not call `session.Close()` themselves.
+Close cancels and joins callback work. A callback that ignores its context can
+therefore delay Close. Server errors such as `review_not_found` remain available
+as ordinary `FaultEvent` values.
+
+A timeout's fault has `Scope: "review"`, `ReviewID`, and `ResponseID`.
+It does not itself mean the response failed: `ReviewTimeoutSpeak` and
+`ReviewTimeoutSay` can still complete it. Read `ResponseEnded` for the outcome.
+
+The added fields can break positional Go struct literals. Use keyed literals,
+such as `rime.TranscriptDelta{ItemID: id, Delta: text}`. Existing keyed literals
+continue to compile; new received pointers default to nil.

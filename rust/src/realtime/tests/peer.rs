@@ -44,13 +44,16 @@ impl Peer {
     }
     #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
     pub async fn with_paused_reads(pause: bool) -> Self {
-        Self::configured(pause, None).await
+        Self::configured(pause, None, None).await
     }
     pub async fn with_initial_interruption(interrupt: bool) -> Self {
-        Self::configured(false, Some(interrupt)).await
+        Self::configured(false, Some(interrupt), None).await
+    }
+    pub async fn with_version_on_creation(version: &str) -> Self {
+        Self::configured(false, None, Some(version.into())).await
     }
     #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
-    async fn configured(pause: bool, interrupt: Option<bool>) -> Self {
+    async fn configured(pause: bool, interrupt: Option<bool>, version: Option<String>) -> Self {
         super::schema::prepare();
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
@@ -73,13 +76,13 @@ impl Peer {
             })
             .await
             .unwrap();
-            ws.send(Message::Text(
-                json!({"type":"session.created","session":{"id":"session-1"}})
-                    .to_string()
-                    .into(),
-            ))
-            .await
-            .unwrap();
+            let mut created = json!({"type":"session.created","session":{"id":"session-1"}});
+            if let Some(version) = version {
+                created["session"]["version"] = json!(version);
+            }
+            ws.send(Message::Text(created.to_string().into()))
+                .await
+                .unwrap();
             let used = header
                 .lock()
                 .unwrap()

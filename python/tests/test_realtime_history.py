@@ -120,7 +120,6 @@ async def test_cancelled_history_result_still_unblocks_tool_continuation(monkeyp
     [
         (r.HistoryMessage(role="system", text="x", id=""), None),
         (r.HistoryMessage(role="invalid", text="x"), None),
-        (r.HistoryMessage(role="user", text="x" * 4001), None),
         (r.HistoryMessage(role="user", text=chr(0xD800)), None),
         (r.HistoryFunctionCall(call_id="", name="f"), None),
         (r.HistoryFunctionResult(call_id="c", output="x"), "root"),

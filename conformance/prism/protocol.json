@@ -2135,5 +2135,143 @@
       }
     },
     "invalid": true
+  },
+  {
+    "name": "review timeout preserves review ownership",
+    "event": {
+      "type": "error",
+      "event_id": "error-1",
+      "error": {
+        "type": "server_error",
+        "code": "review_timeout",
+        "message": "the review had no answer in time",
+        "param": null,
+        "event_id": null,
+        "correlation_id": "diagnostic-1",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1",
+          "review_id": "review-1"
+        }
+      }
+    },
+    "expected_kind": "error",
+    "expected_fault": {
+      "code": "review_timeout",
+      "scope": "review",
+      "response_id": "reply-1",
+      "review_id": "review-1"
+    }
+  },
+  {
+    "name": "older response fault has no review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "unavailable",
+        "scope": "response",
+        "owner": {
+          "kind": "response",
+          "response_id": "reply-1"
+        }
+      }
+    },
+    "expected_kind": "error",
+    "expected_fault": {
+      "code": "unavailable",
+      "scope": "response",
+      "response_id": "reply-1",
+      "review_id": null
+    }
+  },
+  {
+    "name": "review fault rejects numeric review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "type": "server_error",
+        "code": "review_timeout",
+        "message": "the review had no answer in time",
+        "param": null,
+        "event_id": null,
+        "correlation_id": "diagnostic-1",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1",
+          "review_id": 7
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "review fault rejects empty review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "review_timeout",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1",
+          "review_id": ""
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "review fault rejects missing review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "review_timeout",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1"
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "review fault rejects null review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "code": "review_timeout",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1",
+          "review_id": null
+        }
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "review fault rejects object review ID",
+    "event": {
+      "type": "error",
+      "error": {
+        "type": "server_error",
+        "code": "review_timeout",
+        "message": "the review had no answer in time",
+        "param": null,
+        "event_id": null,
+        "correlation_id": "diagnostic-1",
+        "scope": "review",
+        "owner": {
+          "kind": "review",
+          "response_id": "reply-1",
+          "review_id": {}
+        }
+      }
+    },
+    "invalid": true
   }
 ]

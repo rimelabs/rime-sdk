@@ -208,6 +208,13 @@ for (const item of cases) {
         decode(raw, "session-1")?.payload.kind ?? "ignored",
         item.expected_kind,
       );
+      if ("expected_fault" in item) {
+        const fault = decode(raw, "session-1").payload.error;
+        assert.equal(fault.code, item.expected_fault.code);
+        assert.equal(fault.scope, item.expected_fault.scope);
+        assert.equal(fault.reviewId, item.expected_fault.review_id);
+        assert.equal(fault.responseId, item.expected_fault.response_id);
+      }
       if ("expected_kept_text" in item) {
         assert.deepEqual(decode(raw, "session-1").payload, {
           kind: "item.truncated",

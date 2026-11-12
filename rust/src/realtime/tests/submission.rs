@@ -19,6 +19,7 @@ fn worker() -> (
     let (writes, jobs) = mpsc::channel(1);
     (
         Worker {
+            reviews: crate::realtime::review::Reviews::new(None),
             epoch: 0,
             commands,
             events,
@@ -95,6 +96,109 @@ fn dispatch(worker: &mut Worker, event: Value) {
         .unwrap();
     worker.dispatch(event).unwrap();
 }
+
+#[tokio::test(start_paused = true)]
+async fn expired_review_does_not_cut_off_later_chunks() {
+    for decision in [
+        ReviewDecision::Stop,
+        ReviewDecision::Replace("Replacement.".into()),
+    ] {
+        for handed_to_writer in [false, true] {
+            let (mut worker, writes, mut jobs, _) = worker();
+            worker.reviews = crate::realtime::review::Reviews::new(Some(
+                Review::new(|_| async { Ok(ReviewDecision::Allow) })
+                    .on_timeout(ReviewTimeout::Speak),
+            ));
+            let request = ReviewRequest {
+                review_id: "first".into(),
+                response_id: "reply".into(),
+                item_id: "speech".into(),
+                index: 0,
+                text: "Proposed speech.".into(),
+            };
+            let later = ReviewRequest {
+                review_id: "later".into(),
+                index: 1,
+                ..request.clone()
+            };
+            let _guard = if handed_to_writer {
+                None
+            } else {
+                let guard = queue_text(&mut worker);
+                worker.advance(&writes).unwrap();
+                let _outstanding = jobs.recv().await.unwrap();
+                Some(guard)
+            };
+            worker
+                .review_completed(crate::realtime::review::Completed {
+                    request,
+                    deadline: Instant::now() + Duration::from_millis(100),
+                    decision: Some(Ok(decision.clone())),
+                })
+                .unwrap();
+            worker.advance(&writes).unwrap();
+            let job = if handed_to_writer {
+                Some(jobs.recv().await.unwrap())
+            } else {
+                None
+            };
+            tokio::time::advance(Duration::from_millis(100)).await;
+            worker.advance(&writes).unwrap();
+            if let Some(job) = job {
+                let (mut sink, mut sent, _) = gate();
+                let result = write_frames(&mut sink, job, Duration::from_secs(1)).await;
+                assert!(result.skipped);
+                assert!(sent.try_recv().is_err());
+                worker.written(result).unwrap();
+            }
+            assert!(jobs.try_recv().is_err());
+            assert!(
+                worker.reviews.allows(&later),
+                "an unsent review cutoff refused a later review"
+            );
+            worker.reviews.start(later).unwrap();
+            assert!(worker.reviews.has_jobs());
+            worker.reviews.close().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn cancelled_queued_review_preserves_callback_failure() {
+    for cutoff in [None, Some(0)] {
+        let (mut worker, writes, mut jobs, _) = worker();
+        let _guard = queue_text(&mut worker);
+        worker.advance(&writes).unwrap();
+        // Keep another write outstanding so the review result remains queued.
+        let _outstanding = jobs.recv().await.unwrap();
+        let request = ReviewRequest {
+            review_id: "failed-review".into(),
+            response_id: "provisional".into(),
+            item_id: "speech".into(),
+            index: 1,
+            text: "Proposed speech.".into(),
+        };
+        worker
+            .review_completed(crate::realtime::review::Completed {
+                request,
+                deadline: Instant::now() + Duration::from_secs(1),
+                decision: Some(Err(Error::input(std::io::Error::other("policy failed")))),
+            })
+            .unwrap();
+        worker.advance(&writes).unwrap();
+        assert!(jobs.try_recv().is_err());
+        // Response completion or an earlier Stop can cancel that queued result.
+        worker.stop_reviews("provisional", cutoff);
+        let error = worker.advance(&writes).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::Input);
+        assert_eq!(
+            std::error::Error::source(&error).unwrap().to_string(),
+            "policy failed"
+        );
+        assert!(jobs.try_recv().is_err());
+    }
+}
+
 #[tokio::test]
 async fn cancellation_before_writer_entry_waits_for_confirmed_skip() {
     let (mut worker, writes, mut jobs, _) = worker();

@@ -9,7 +9,12 @@ import { cancellation, scope } from "./async.js";
 import { RealtimeSession } from "./session.js";
 import { RealtimeConnection } from "./transport.js";
 import type { RealtimeConnectOptions, RealtimeTimeouts } from "./types.js";
-import { toolSettings } from "./settings.js";
+import {
+  toolSettings,
+  turnSettings,
+  speechSpeed,
+  reviewSettings,
+} from "./settings.js";
 import { responseMetadata, truncationSettings } from "./protocol.js";
 import type { SessionSettings } from "./protocol.js";
 
@@ -95,30 +100,15 @@ export class Realtime {
     };
     if (options.truncation !== undefined)
       settings.truncation = truncationSettings(options.truncation);
-    if (options.turnDetection !== undefined) {
-      const detection = options.turnDetection;
-      if (
-        !detection ||
-        typeof detection !== "object" ||
-        Array.isArray(detection)
-      )
-        throw new RimeInputError("turnDetection must be an object");
-      if (detection.eagerness !== undefined) {
-        if (!["low", "medium", "high", "auto"].includes(detection.eagerness))
-          throw new RimeInputError(
-            "Turn eagerness must be low, medium, high, or auto",
-          );
-        settings.turn_detection.eagerness = detection.eagerness;
-      }
-      if (detection.endOfTurnTimeoutMs !== undefined) {
-        const value = detection.endOfTurnTimeoutMs;
-        if (!Number.isInteger(value) || value < 1000 || value > 10000)
-          throw new RimeInputError(
-            "End-of-turn timeout must be an integer from 1000 to 10000 ms",
-          );
-        settings.turn_detection.prism_end_of_turn_timeout_ms = value;
-      }
-    }
+    if (options.speed !== undefined)
+      settings.speed = speechSpeed(options.speed);
+    if (options.review !== undefined)
+      settings.prism_review = reviewSettings(options.review);
+    if (options.turnDetection !== undefined)
+      Object.assign(
+        settings.turn_detection,
+        turnSettings(options.turnDetection, true),
+      );
     if (options.responseMetadata != null)
       settings.prism_response_metadata = responseMetadata(
         options.responseMetadata,
@@ -156,8 +146,11 @@ export class Realtime {
         } catch {
           throw new RimeUnavailableError("Realtime handshake failed");
         }
-        session = new RealtimeSession(socket, limits, () =>
-          this.sessions.delete(session!),
+        session = new RealtimeSession(
+          socket,
+          limits,
+          () => this.sessions.delete(session!),
+          options.review,
         );
         this.sessions.add(session);
         await abortable(

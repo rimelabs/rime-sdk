@@ -300,10 +300,10 @@ session labels in Prism's response. The SDK adds the required `prism_` fields;
 caller keys cannot use that prefix. Omitting `metadata` keeps the existing
 request shape. Replies to speech use the session labels.
 
-`sendText` and `addMessage` require nonblank text of at most 4,000 Unicode
-characters. `addMessage` accepts `"user"` and `"assistant"` roles. `createItem`
+`sendText` and `addMessage` require nonblank text. Prism checks the text against
+its model context window and returns a structured error when it is too long. `addMessage` accepts `"user"` and `"assistant"` roles. `createItem`
 also accepts `"system"` messages and allows blank message text, with the same
-length limit. A reply instruction applies to one response; it does not replace
+server limit. A reply instruction applies to one response; it does not replace
 session instructions.
 
 A returned `ResponseRef` means generation started. Read `response.ended` for the
@@ -610,7 +610,7 @@ Available in the next SDK release. The Prism server must support history operati
 Read history to obtain the items the next reply would see, in server order.
 Create messages with user, assistant, or system roles, past function calls, and
 function results. Creating an item does not start a reply or execute a tool.
-Message text is limited to 4000 Unicode characters. Optional client item IDs have
+Prism checks message text against its model context window. Optional client item IDs have
 1 to 32 characters. Tool arguments and results preserve the supplied strings.
 
 Omit the insertion anchor to append, use `root` to insert first, or give an item
@@ -705,3 +705,107 @@ if (event.payload.kind === "response.ended" && event.payload.truncation) {
   console.log(summary.itemsLeftOut, summary.firstKeptItemId);
 }
 ```
+
+## Speech speed and interruption settings
+
+Pass `speed` at connection or in `session.update`. Its range is 0.85 through
+1.3. Omission preserves the server default. The next reply uses an accepted
+change; a reply already running keeps its settings. `session.info.speed`
+reports the confirmed value when the server supplies it.
+
+```ts
+const session = await client.realtime.connect({
+  speed: 1.1,
+  turnDetection: {
+    interruptMinWords: 2,
+    interruptPhrases: ["stop", "wait"],
+    acknowledgmentPhrases: ["uh-huh"],
+    endOfTurnMinSilenceMs: 800,
+  },
+});
+await session.update({
+  speed: 1,
+  interruptOnSpeech: true,
+  turnDetection: { interruptPhrases: [], acknowledgmentPhrases: ["yes"] },
+});
+```
+
+`interruptMinWords` is an integer from 1 through 10. Each phrase list accepts
+at most 100 strings. An omitted list preserves its value; an empty list clears
+it. Prism applies the rules. The SDK does not count words or match phrases.
+Read confirmed values from `session.info.turnDetection`.
+
+`endOfTurnMinSilenceMs` is an integer from 0 through 5000. Set it at connection
+only. It must be less than the server's end-of-turn timeout. Prism rejects an
+invalid combination. The SDK does not guess a default timeout for this check.
+
+The new turn settings need a supporting Prism image. They are omitted unless
+supplied, including minimum silence `0`. An older server can reject an explicit
+new setting. The SDK returns that error and does not remove the setting or retry.
+
+## Server metadata and transcript corrections
+
+`session.info.version` is an optional server release or commit string. It is
+opaque and does not provide a capability check. `SessionEvent.serverTimeMs`
+is the server send time in Unix milliseconds when available. Local synthetic
+events and old-server events omit it. A receive-time difference also includes
+clock offset, so it is not a pure network latency measurement.
+
+A `transcript.delta` event retains `delta` and can include `transcript`, the
+complete current text. For captions, replace the text when `transcript !==
+undefined`; otherwise append `delta`. An empty `transcript` is a correction to
+empty text. Keep caption state separate for each `itemId` and clear it after
+a final transcript or failure.
+
+## Review spoken replies
+
+Configure one async callback at connection. The SDK handles review requests
+without requiring a consumer of `session.events`.
+
+```ts
+const session = await client.realtime.connect({
+  review: {
+    timeoutMs: 1000,
+    onTimeout: { action: "stop" },
+    callback: async (request, signal) => {
+      signal.throwIfAborted();
+      const decision = await reviewText(request.text, { signal });
+      return decision.allowed
+        ? { action: "allow" }
+        : { action: "replace", text: "I cannot share that information." };
+    },
+  },
+});
+```
+
+The callback returns `{ action: "allow" }`, `{ action: "replace", text }`, or
+`{ action: "stop" }`. Replacement text must be nonblank. Prism checks its context
+limit. Replace and Stop discard later chunks of the same reply. They cannot
+undo tool calls already emitted.
+
+`timeoutMs` accepts 100 through 5000 and defaults to 1000. The timeout policy
+is `{ action: "stop" }`, `{ action: "speak" }`, or `{ action: "say", text }`.
+Say text is nonblank and at most 500 Unicode characters. Stop is the default.
+Prism enforces this policy. A local deadline cannot measure the server's exact
+remaining time. Expired callback decisions are discarded.
+
+A timeout's fault has scope `"review"`, `reviewId`, and `responseId`.
+It does not itself mean the response failed: `speak` and `say` can still
+complete it. Read `response.ended` for the outcome.
+
+A request contains `reviewId`, `responseId`, `itemId`, `index`, and `text`.
+These are immutable values. A speculative request can arrive before the reply
+starts, and its reply may never start. The request does not mean its text was
+spoken. Use the reply's returned text and history to see the accepted output.
+
+The session permits up to 32 concurrent callbacks. Callbacks must observe the
+supplied `AbortSignal`, finish promptly after cancellation, and avoid blocking
+the runtime. The session aborts work on expiry, on reply completion, and on
+close. Close waits for callback cleanup. If a callback throws or returns an
+invalid decision, the SDK attempts Stop and fails the session with
+`RimeStreamError`. Exceeding the work limit fails with `RimeResourceLimitError`.
+Review results have no success acknowledgment and are never automatically retried.
+
+Review is omitted unless configured and needs a supporting Prism image. An
+older server's refusal is returned without continuing unreviewed. Confirmed
+policy is available as `session.info.review` when the server supplies it.

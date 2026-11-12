@@ -31,6 +31,89 @@ func rtDispatch(t *testing.T, w *rtWorker, value rtObject) {
 		t.Fatal(err)
 	}
 }
+
+func TestRealtimeExpiredReviewDoesNotCutOffLaterChunks(t *testing.T) {
+	for _, decision := range []ReviewDecision{ReviewStop{}, ReviewReplace{Text: "Replacement."}} {
+		for _, handedToWriter := range []bool{false, true} {
+			name := "stop"
+			if _, ok := decision.(ReviewReplace); ok {
+				name = "replace"
+			}
+			if handedToWriter {
+				name += "-writer-skip"
+			} else {
+				name += "-queued-expiry"
+			}
+			t.Run(name, func(t *testing.T) {
+				w, writes := rtSubmissionWorker()
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				laterContext, cancelLater := context.WithCancel(context.Background())
+				defer cancelLater()
+				state := &rtReviewState{
+					request: ReviewRequest{ReviewID: "first", ResponseID: "reply", Index: 0},
+					ctx:     ctx, cancel: cancel, deadline: time.Now().Add(time.Second),
+				}
+				later := &rtReviewState{
+					request: ReviewRequest{ReviewID: "later", ResponseID: "reply", Index: 1},
+					ctx:     laterContext, cancel: cancelLater, deadline: time.Now().Add(time.Second),
+				}
+				w.reviews = map[string]*rtReviewState{"first": state, "later": later}
+				w.reviewRunning = 1
+				if err := w.reviewResult(rtReviewResult{state: state, decision: decision}); err != nil {
+					t.Fatal(err)
+				}
+				command := w.pending[0]
+				if handedToWriter {
+					if err := w.advance(writes); err != nil {
+						t.Fatal(err)
+					}
+					job := <-writes
+					cancel()
+					result := rtWriteFrames(context.Background(), job, time.Second, func(context.Context, []byte) error {
+						t.Fatal("expired review result reached the transport")
+						return nil
+					})
+					if !result.skipped {
+						t.Fatal("writer did not skip the expired review")
+					}
+					if err := w.written(result); err != nil {
+						t.Fatal(err)
+					}
+				} else {
+					w.writeBusy = true
+					cancel()
+					command.deadline = time.Now().Add(-time.Second)
+					if err := w.advance(writes); err != nil {
+						t.Fatal(err)
+					}
+					if command.submitted {
+						t.Fatal("expired queued review was submitted")
+					}
+				}
+				if !command.finished {
+					t.Fatal("expired review was not settled")
+				}
+				if laterContext.Err() != nil {
+					t.Fatal("unsent review cutoff cancelled a later chunk")
+				}
+				w.s.review = &Review{TimeoutMS: 1000, OnTimeout: ReviewTimeoutSpeak{}, Callback: func(context.Context, ReviewRequest) (ReviewDecision, error) {
+					return ReviewAllow{}, nil
+				}}
+				w.s.reviewResults = make(chan rtReviewResult, 1)
+				defer w.s.reviewTasks.Wait()
+				if err := w.beginReview(ReviewRequest{ReviewID: "next", ResponseID: "reply", Index: 2}); err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := w.reviews["next"]; !ok {
+					t.Fatal("unsent review cutoff refused a later review")
+				}
+				defer w.cancelReviews("")
+			})
+		}
+	}
+}
+
 func TestRealtimeSubmissionCancellationBeforeWriterEntry(t *testing.T) {
 	w, writes := rtSubmissionWorker()
 	ctx, cancel := context.WithCancel(context.Background())

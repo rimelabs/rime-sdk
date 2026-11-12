@@ -3,6 +3,7 @@ package rime
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"net/url"
 	"reflect"
 	"strconv"
@@ -15,8 +16,46 @@ import (
 type RealtimeService struct{ client *Client }
 
 func rtText(s string, limit int) error {
-	if !utf8.ValidString(s) || strings.TrimSpace(s) == "" || utf8.RuneCountInString(s) > limit {
+	if rtInputText(s) != nil || utf8.RuneCountInString(s) > limit {
 		return failure(ErrInput, "text must be valid, nonblank UTF-8 within the character limit")
+	}
+	return nil
+}
+
+func rtInputText(s string) error {
+	if !utf8.ValidString(s) || strings.TrimSpace(s) == "" {
+		return failure(ErrInput, "text must be valid, nonblank UTF-8")
+	}
+	return nil
+}
+
+func rtSpeed(speed float64) error {
+	if math.IsNaN(speed) || math.IsInf(speed, 0) || speed < 0.85 || speed > 1.3 {
+		return failure(ErrInput, "speed must be finite and from 0.85 through 1.3")
+	}
+	return nil
+}
+
+func rtInterruptSettings(d rtObject, words *int, interrupts, acknowledgments []string) error {
+	if words != nil {
+		if *words < 1 || *words > 10 {
+			return failure(ErrInput, "interrupt minimum must be from 1 through 10")
+		}
+		d["interrupt_min_words"] = *words
+	}
+	for key, phrases := range map[string][]string{"interrupt_phrases": interrupts, "acknowledgment_phrases": acknowledgments} {
+		if phrases == nil {
+			continue
+		}
+		if len(phrases) > 100 {
+			return failure(ErrInput, "at most 100 interrupt or acknowledgment phrases are allowed")
+		}
+		for _, phrase := range phrases {
+			if !utf8.ValidString(phrase) {
+				return failure(ErrInput, "phrases must be valid UTF-8")
+			}
+		}
+		d[key] = append([]string{}, phrases...)
 	}
 	return nil
 }
@@ -134,6 +173,12 @@ func rtTruncation(value Truncation) (any, error) {
 }
 func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
 	settings := rtObject{}
+	if o.Speed != nil {
+		if err := rtSpeed(*o.Speed); err != nil {
+			return nil, err
+		}
+		settings["speed"] = *o.Speed
+	}
 	if o.Truncation != nil {
 		value, err := rtTruncation(*o.Truncation)
 		if err != nil {
@@ -156,8 +201,17 @@ func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
 		}
 		settings["tools"] = tools
 	}
+	detection := rtObject{}
 	if o.InterruptOnSpeech != nil {
-		settings["turn_detection"] = rtObject{"interrupt_response": *o.InterruptOnSpeech}
+		detection["interrupt_response"] = *o.InterruptOnSpeech
+	}
+	if d := o.TurnDetection; d != nil {
+		if err := rtInterruptSettings(detection, d.InterruptMinWords, d.InterruptPhrases, d.AcknowledgmentPhrases); err != nil {
+			return nil, err
+		}
+	}
+	if len(detection) > 0 {
+		settings["turn_detection"] = detection
 	}
 	b, err := json.Marshal(settings)
 	if err != nil || !utf8.Valid(b) {
@@ -232,6 +286,15 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		interrupt = *o.InterruptOnSpeech
 	}
 	d := rtObject{"interrupt_response": interrupt}
+	if err := rtInterruptSettings(d, o.TurnDetection.InterruptMinWords, o.TurnDetection.InterruptPhrases, o.TurnDetection.AcknowledgmentPhrases); err != nil {
+		return "", nil, t, err
+	}
+	if n := o.TurnDetection.EndOfTurnMinSilenceMS; n != nil {
+		if *n < 0 || *n > 5000 {
+			return "", nil, t, failure(ErrInput, "minimum silence must be from 0 through 5000 ms")
+		}
+		d["end_of_turn_min_silence_ms"] = *n
+	}
 	if s := o.TurnDetection.Eagerness; s != "" {
 		if rtEnum(s, "low", "medium", "high", "auto") == "unknown" {
 			return "", nil, t, failure(ErrInput, "invalid turn eagerness")
@@ -252,6 +315,19 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if o.Speed != nil {
+		if err := rtSpeed(*o.Speed); err != nil {
+			return "", nil, t, err
+		}
+		settings["speed"] = *o.Speed
+	}
+	if o.Review != nil {
+		review, err := rtReviewSettings(*o.Review)
+		if err != nil {
+			return "", nil, t, err
+		}
+		settings["prism_review"] = review
+	}
 	if o.Truncation != nil {
 		value, err := rtTruncation(*o.Truncation)
 		if err != nil {
@@ -301,6 +377,13 @@ func (r *RealtimeService) Connect(ctx context.Context, options RealtimeConnectOp
 		return nil, err
 	}
 	s := newRealtimeSession(op, t)
+	if options.Review != nil {
+		review := *options.Review
+		if review.TimeoutMS == 0 {
+			review.TimeoutMS = 1000
+		}
+		s.review = &review
+	}
 	r.client.mu.Lock()
 	if r.client.closed {
 		r.client.mu.Unlock()

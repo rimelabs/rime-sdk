@@ -28,8 +28,8 @@ from .._errors import (
 from ._protocol import SessionSettings, truncation_settings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
-from ._settings import tool_settings
-from ._types import Labels, RealtimeTimeouts, ToolDefinition, Truncation, TurnDetection
+from ._settings import review_settings, speed_setting, tool_settings, turn_settings
+from ._types import Labels, RealtimeTimeouts, Review, ToolDefinition, Truncation, TurnDetection
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -148,6 +148,8 @@ class Realtime:
         tools: Sequence[ToolDefinition] = (),
         interrupt_on_speech: bool = True,
         turn_detection: TurnDetection | None = None,
+        speed: float | None = None,
+        review: Review | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
         request_id: str | None = None,
         response_metadata: Labels | None = None,
@@ -193,15 +195,16 @@ class Realtime:
         }
         if truncation is not None:
             settings["truncation"] = truncation_settings(truncation)
+        if speed is not None:
+            settings["speed"] = speed_setting(speed)
+        if review is not None:
+            if not isinstance(review, Review):
+                raise RimeInputError("review must be a Review value")
+            settings["prism_review"] = review_settings(review)
         if turn_detection is not None:
             if not isinstance(turn_detection, TurnDetection):
                 raise RimeInputError("turn_detection must be a TurnDetection value")
-            if turn_detection.eagerness is not None:
-                settings["turn_detection"]["eagerness"] = turn_detection.eagerness
-            if turn_detection.end_of_turn_timeout_ms is not None:
-                settings["turn_detection"]["prism_end_of_turn_timeout_ms"] = (
-                    turn_detection.end_of_turn_timeout_ms
-                )
+            settings["turn_detection"].update(turn_settings(turn_detection))
         if response_metadata is not None:
             settings["prism_response_metadata"] = _response_metadata(response_metadata)
         if request_id is not None and (
@@ -244,7 +247,7 @@ class Realtime:
                     raise RimeUnavailableError("Realtime endpoint is unavailable") from None
                 except (InvalidHandshake, InvalidURI, ValueError):
                     raise RimeUnavailableError("Realtime handshake failed") from None
-                session = RealtimeSession(socket, timeouts)
+                session = RealtimeSession(socket, timeouts, review=review)
                 self._sessions.add(session)
                 await session._initialize(settings)
                 self._client._check_open()
