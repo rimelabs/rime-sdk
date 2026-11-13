@@ -1,0 +1,19 @@
+rust/src/tests/tts_features.rs
+  s_8ce4d03cbced0f::t_871bc367b29dfa 631
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3b95e153bbc5039b4969b9ca1101e8ac1d1a9678",
+  "prompts": {},
+  "sessions": {
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
