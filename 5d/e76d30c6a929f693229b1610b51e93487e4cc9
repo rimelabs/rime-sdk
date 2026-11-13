@@ -1,0 +1,47 @@
+conformance/prism/protocol.json
+  s_162ba25a23eeaf::t_6efee8f71af6b7 180-191,928,1496,1500-1505,1509-1514,1518-1522
+go/realtime_history.go
+  s_162ba25a23eeaf::t_a44a0b91452ebc 62-65,67-69,88
+go/realtime_protocol.go
+  s_162ba25a23eeaf::t_28afd5904eedc7 222,357-360,383-385
+go/realtime_protocol_test.go
+  s_162ba25a23eeaf::t_3a2bbceaae7c04 26,99-107
+go/testdata/prism/protocol.json
+  s_162ba25a23eeaf::t_5b54aa0b88b09d 180-191,928,1496,1500-1505,1509-1514,1518-1522
+python/src/rimelabs_sdk/realtime/_history.py
+  s_162ba25a23eeaf::t_ad67e3d10ead2e 52-59
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_162ba25a23eeaf::t_016bc5fff82b34 367,543-551,564-566
+python/tests/test_realtime_protocol.py
+  s_162ba25a23eeaf::t_aadedb8c33e33d 54-56
+rust/src/realtime/history.rs
+  s_162ba25a23eeaf::t_050d5ea61767c3 95-96,98-103,142
+rust/src/realtime/protocol.rs
+  s_162ba25a23eeaf::t_e8335d3697aa42 195,367-373,393
+rust/src/realtime/tests/protocol.rs
+  s_162ba25a23eeaf::t_1223c801c71f1b 147-157
+rust/testdata/prism/protocol.json
+  s_162ba25a23eeaf::t_fbb73e0a651f78 180-191,928,1496,1500-1505,1509-1514,1518-1522
+typescript/src/realtime/history.ts
+  s_162ba25a23eeaf::t_a47b3dd4a300ff 49-50,54-60
+typescript/src/realtime/protocol.ts
+  s_162ba25a23eeaf::t_82bb5381cbf7a8 377,598-605,627-631
+typescript/tests/realtime-protocol.test.mjs
+  s_162ba25a23eeaf::t_2733b2c8412d94 258-262
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5de76d30c6a929f693229b1610b51e93487e4cc9",
+  "prompts": {},
+  "sessions": {
+    "s_162ba25a23eeaf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-af2065fa8b30ce91a",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
