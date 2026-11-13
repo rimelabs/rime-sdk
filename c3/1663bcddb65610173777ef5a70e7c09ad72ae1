@@ -1,0 +1,31 @@
+go/realtime_lifecycle_test.go
+  s_8ce4d03cbced0f::t_3660d3a4f0163b 15-16,410-426
+go/realtime_peer_test.go
+  s_8ce4d03cbced0f::t_96250dd6910986 29-30,48,70-73
+go/realtime_session.go
+  s_8ce4d03cbced0f::t_df92bfe053abae 575-578,583
+go/realtime_transport.go
+  s_8ce4d03cbced0f::t_c11c4675393339 165-180
+rust/src/realtime/tests/lifecycle.rs
+  s_8ce4d03cbced0f::t_51be9d487a0b7d 369-378
+rust/src/realtime/tests/peer.rs
+  s_8ce4d03cbced0f::t_a1d827147e4302 33-34,69-70,105-109,131,208-210
+rust/src/realtime/transport.rs
+  s_8ce4d03cbced0f::t_e938a5a0b9142f 13-17,21-24,181,229-234,245-261
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c31663bcddb65610173777ef5a70e7c09ad72ae1",
+  "prompts": {},
+  "sessions": {
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
