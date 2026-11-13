@@ -1,0 +1,29 @@
+typescript/src/realtime/conversation.ts
+  s_fe22416756bd69::t_068df6738bde19 126-128
+typescript/tests/conversation.test.mjs
+  s_26048aae4bfdf2::t_c7f9127ff79c72 913-932
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a1e0bcc7495da961b7e53b1f1966a2fc45e6f119",
+  "prompts": {},
+  "sessions": {
+    "s_26048aae4bfdf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab4a39e0f7251d95a",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_fe22416756bd69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae07d460cb670d308",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
