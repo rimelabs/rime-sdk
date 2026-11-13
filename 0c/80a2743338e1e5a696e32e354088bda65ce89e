@@ -1,0 +1,39 @@
+typescript/README.md
+  s_2721cfa5a46218::t_312ace9e277991 125-127
+typescript/docs/realtime.md
+  s_2721cfa5a46218::t_c5a88fe88bad81 175,290,456-457,808-861
+typescript/src/realtime/client.ts
+  s_2721cfa5a46218::t_c907e16675829a 116-120,159
+typescript/src/realtime/protocol.ts
+  s_2721cfa5a46218::t_7a008cb639e390 566-578,582,588-593
+typescript/src/realtime/session.ts
+  s_2721cfa5a46218::t_dfced2b61c303f 74-75,99,113-118,268,270,281-282,855-884,895-896,909-945
+typescript/src/realtime/types.ts
+  s_2721cfa5a46218::t_aa63f110dd4626 136-140
+typescript/tests/realtime-raw.test.mjs
+  s_0e73b25dc04567::t_1072bf38d7bba7 1-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "0c80a2743338e1e5a696e32e354088bda65ce89e",
+  "prompts": {},
+  "sessions": {
+    "s_0e73b25dc04567": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01cf5a3c732b0583",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_2721cfa5a46218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a999de1fdf6c84354",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
