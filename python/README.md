@@ -122,6 +122,9 @@ These optional `Rime(...)` arguments configure TTS. They do not configure STT or
 
 ### Connection keepalive
 
+The optional `enable_tts_keepalive` constructor argument is backward-compatible;
+valid existing client configurations need no changes.
+
 HTTP/2 keepalive is disabled by default. Enable it with
 `Rime(enable_tts_keepalive=True)` to configure a 60-second keepalive interval,
 a 20-second response timeout, and pings between RPCs. Idle probes continue

@@ -51,6 +51,8 @@ Select Mist v3 with `Rime(model="mistv3")`. Mist v1 and v2 are not supported.
 | `timeout` | `None` | Positive numeric seconds or `datetime.timedelta` for an overall deadline; `None` disables it |
 | `enable_tts_keepalive` | `False` | Enable fixed 60s/20s HTTP/2 keepalive for hosted Coda/Mist TTS, including between RPCs |
 
+`enable_tts_keepalive` is an optional, backward-compatible constructor argument.
+Valid existing client configurations need no changes.
 See [connection keepalive](https://github.com/rimelabs/rime-sdk/blob/main/python/README.md#connection-keepalive)
 for endpoint scope, reconnection, and unfinished-stream lifetime limits.
 

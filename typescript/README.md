@@ -144,6 +144,9 @@ These optional `new Rime({...})` fields configure TTS. They do not configure STT
 
 ### Connection keepalive
 
+The optional `enableTTSKeepalive` field is backward-compatible; valid existing
+client configurations need no changes.
+
 HTTP/2 keepalive is disabled by default. Enable it with
 `new Rime({ enableTTSKeepalive: true })` to configure a 60-second keepalive
 interval, a 20-second response timeout, and pings between RPCs. The policy applies

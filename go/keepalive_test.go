@@ -22,6 +22,12 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
+const (
+	keepaliveTestInterval    = 10 * time.Second
+	keepaliveTestTimeout     = time.Second
+	keepaliveTestObservation = keepaliveTestInterval + 5*time.Second
+)
+
 type keepaliveTestConnection struct {
 	net.Conn
 	stalled      atomic.Bool
@@ -99,6 +105,17 @@ func setupKeepaliveClient(t *testing.T, config Config, service *testService) (*C
 	if err != nil {
 		t.Fatal(err)
 	}
+	if client.ttsKeepalive != nil {
+		parameters := *client.ttsKeepalive
+		want := keepalive.ClientParameters{Time: time.Minute, Timeout: 20 * time.Second, PermitWithoutStream: true}
+		if parameters != want {
+			t.Fatalf("hosted keepalive configuration: got %+v, want %+v", parameters, want)
+		}
+		// grpc-go permits intervals of at least ten seconds.
+		parameters.Time = keepaliveTestInterval
+		parameters.Timeout = keepaliveTestTimeout
+		client.ttsKeepalive = &parameters
+	}
 	listener := bufconn.Listen(1 << 20)
 	server := grpc.NewServer(grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
 		MinTime: time.Second, PermitWithoutStream: true,
@@ -164,6 +181,9 @@ func TestHostedTTSKeepaliveScope(t *testing.T) {
 	results := make(chan outcome, len(cases))
 	for _, test := range cases {
 		client, connections, dials := setupKeepaliveClient(t, test.config, &testService{})
+		if configured := client.ttsKeepalive != nil; configured != (test.want || test.service == transcriptionService) {
+			t.Fatalf("%s: hosted keepalive configured=%t", test.name, configured)
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if test.service == transcriptionService {
 			client.sttTarget = client.target
@@ -187,8 +207,8 @@ func TestHostedTTSKeepaliveScope(t *testing.T) {
 					result.err = errors.New("ineligible connection sent a keepalive ping")
 					return
 				}
-				if elapsed := ping.Sub(idleStarted); elapsed < 55*time.Second || elapsed > 75*time.Second {
-					result.err = fmt.Errorf("keepalive interval: got %v, want approximately 60s", elapsed)
+				if elapsed := ping.Sub(idleStarted); elapsed < keepaliveTestInterval-time.Second || elapsed > keepaliveTestObservation {
+					result.err = fmt.Errorf("keepalive interval: got %v, want approximately %v", elapsed, keepaliveTestInterval)
 					return
 				}
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -200,7 +220,7 @@ func TestHostedTTSKeepaliveScope(t *testing.T) {
 				if dials.Load() != 1 {
 					result.err = errors.New("healthy keepalive replaced the connection")
 				}
-			case <-time.After(75 * time.Second):
+			case <-time.After(keepaliveTestObservation):
 				if test.want {
 					result.err = errors.New("hosted TTS connection sent no idle keepalive ping")
 				}
@@ -242,19 +262,19 @@ func TestHostedTTSKeepaliveRecoversSilentStall(t *testing.T) {
 	var pingedAt time.Time
 	select {
 	case pingedAt = <-connection.pings:
-		if elapsed := pingedAt.Sub(stalledAt); elapsed < 55*time.Second || elapsed > 75*time.Second {
+		if elapsed := pingedAt.Sub(stalledAt); elapsed < keepaliveTestInterval-time.Second || elapsed > keepaliveTestObservation {
 			t.Fatalf("keepalive interval: %v", elapsed)
 		}
-	case <-time.After(75 * time.Second):
+	case <-time.After(keepaliveTestObservation):
 		t.Fatal("stalled connection sent no keepalive ping")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if !client.conn.WaitForStateChange(ctx, connectivity.Ready) {
 		t.Fatal("keepalive did not retire the stalled transport")
 	}
-	if elapsed := time.Since(pingedAt); elapsed < 18*time.Second {
-		t.Fatalf("transport closed before the 20s response budget: %v", elapsed)
+	if elapsed := time.Since(pingedAt); elapsed < keepaliveTestTimeout-200*time.Millisecond {
+		t.Fatalf("transport closed before the %v response budget: %v", keepaliveTestTimeout, elapsed)
 	}
 	if service.discoveries.Load() != 1 {
 		t.Fatal("timed-out discovery was replayed")

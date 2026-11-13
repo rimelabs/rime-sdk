@@ -73,6 +73,21 @@ while audio is buffered for the reader. With no overall timeout, these pauses
 have no fixed time limit. Close unfinished streams and set `Timeout` when their
 lifetime must be bounded.
 
+### Keepalive compatibility
+
+Adding `Config.EnableTTSKeepalive` is a Go source compatibility break for earlier
+positional `Config` literals: the struct now has an additional field. Migrate to
+keyed fields, for example:
+
+```go
+config := rime.Config{APIKey: key, Model: "mistv3"}
+```
+
+Existing keyed literals and `rime.Config{}` remain compatible. Omitting
+`EnableTTSKeepalive` leaves it `false` and preserves the disabled default.
+The Python, TypeScript, and Rust keepalive options are additive and do not require
+changes to valid existing client configurations.
+
 ### Synthesis options
 
 All three TTS methods accept `rime.SynthesisOptions{}` with these optional fields.

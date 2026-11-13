@@ -59,6 +59,9 @@ These optional `Client::builder()` methods configure TTS. They do not configure 
 
 ### Connection keepalive
 
+The optional `.enable_tts_keepalive(enabled)` builder method is backward-compatible;
+valid existing client configurations need no changes.
+
 HTTP/2 keepalive is disabled by default. Opt in with
 `Client::builder().enable_tts_keepalive(true)` to configure a 60-second keepalive
 interval, a 20-second response timeout, and pings between RPCs. The policy applies

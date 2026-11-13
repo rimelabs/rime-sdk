@@ -10,6 +10,12 @@ import { Rime, RimeInputError, RimeTimeoutError } from "../dist/index.js";
 import { transport } from "../dist/tts/transport.js";
 import { transport as recognitionTransport } from "../dist/stt/transport.js";
 
+const hostedKeepaliveOptions = {
+  "grpc.keepalive_time_ms": 60000,
+  "grpc.keepalive_timeout_ms": 20000,
+  "grpc.keepalive_permit_without_calls": 1,
+};
+
 class Peer {
   server = http2.createServer();
   proxy = net.createServer();
@@ -99,18 +105,27 @@ class Peer {
   }
 }
 
-function route(t, targets, captured = []) {
+function route(t, targets, captured = [], keepaliveTiming) {
   const makeClient = transport.makeClient;
   t.mock.method(transport, "makeClient", (target, enabled) => {
     const original = makeClient(target, enabled);
     const options = original.getChannel().internalChannel.getOptions();
     original.close();
     captured.push(options);
+    if (keepaliveTiming)
+      for (const [key, value] of Object.entries(hostedKeepaliveOptions))
+        assert.equal(options[key], value);
     return new grpc.Client(
       targets[target] ?? targets.default,
       grpc.credentials.createInsecure(),
       {
         ...options,
+        ...(keepaliveTiming
+          ? {
+              "grpc.keepalive_time_ms": keepaliveTiming.intervalMs,
+              "grpc.keepalive_timeout_ms": keepaliveTiming.timeoutMs,
+            }
+          : {}),
         "grpc.use_local_subchannel_pool": 1,
       },
     );
@@ -147,15 +162,10 @@ for (const [configuration, enabled] of [
     });
     assert.equal(captured.length, 0);
     assert.deepEqual(await client.languages.list(), ["en"]);
-    const expected = {
-      "grpc.keepalive_time_ms": 60000,
-      "grpc.keepalive_timeout_ms": 20000,
-      "grpc.keepalive_permit_without_calls": 1,
-    };
-    for (const [key, value] of Object.entries(expected))
+    for (const [key, value] of Object.entries(hostedKeepaliveOptions))
       assert.equal(captured[0][key], enabled ? value : undefined);
     const recognition = recognitionTransport.makeClient("stt.api.rime.ai:443");
-    for (const key of Object.keys(expected))
+    for (const key of Object.keys(hostedKeepaliveOptions))
       assert.equal(
         recognition.getChannel().internalChannel.getOptions()[key],
         undefined,
@@ -174,7 +184,7 @@ for (const value of [null, 0, 1, "true", [], {}])
 
 test(
   "native keepalive reuses healthy connections and retires silent stalls",
-  { timeout: 100000 },
+  { timeout: 20000 },
   async (t) => {
     const healthy = new Peer(),
       stalled = new Peer();
@@ -182,7 +192,7 @@ test(
       "coda.api.rime.ai:443": await healthy.start(),
       "mist.api.rime.ai:443": await stalled.start(),
     };
-    route(t, targets);
+    route(t, targets, [], { intervalMs: 1000, timeoutMs: 300 });
     const coda = new Rime({ apiKey: "test-key", enableTTSKeepalive: true });
     const mist = new Rime({
       apiKey: "test-key",
@@ -206,7 +216,7 @@ test(
     await Promise.all([
       (async () => {
         const [ping] = await healthyPing;
-        assert.ok(ping - started >= 55000 && ping - started <= 75000);
+        assert.ok(ping - started >= 800 && ping - started <= 3000);
         assert.deepEqual(await coda.languages.list(), ["en"]);
         assert.equal(healthy.connections, 1);
         const closed = once(healthy.events, "closed");
@@ -215,12 +225,13 @@ test(
       })(),
       (async () => {
         const [ping] = await stalledPing;
-        assert.ok(ping - started >= 55000 && ping - started <= 75000);
+        assert.ok(ping - started >= 800 && ping - started <= 3000);
         await once(stalled.events, "closed");
-        assert.ok(performance.now() - ping >= 18000);
+        assert.ok(performance.now() - ping >= 200);
         assert.equal(stalled.discoveries, 1);
         stalled.stalled = false;
         assert.deepEqual(await mist.languages.list(), ["en"]);
+        assert.equal(stalled.discoveries, 2);
         assert.equal(stalled.connections, 2);
       })(),
     ]);

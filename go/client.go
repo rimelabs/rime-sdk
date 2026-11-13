@@ -79,7 +79,7 @@ type Client struct {
 	realtimeTransport  http.RoundTripper // Private seam for controlled WebSocket transport tests.
 	limits             streamLimits
 
-	enableTTSKeepalive bool
+	ttsKeepalive *keepalive.ClientParameters
 }
 
 type TTSService struct{ client *Client }
@@ -139,7 +139,13 @@ func NewClient(config Config) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{key: key, target: target, voice: voice, model: model, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
-	c.enableTTSKeepalive = config.EnableTTSKeepalive
+	if config.EnableTTSKeepalive && (target == hostedCodaTarget || target == hostedMistTarget) {
+		c.ttsKeepalive = &keepalive.ClientParameters{
+			Time:                time.Minute,
+			Timeout:             20 * time.Second,
+			PermitWithoutStream: true,
+		}
+	}
 	c.sttTarget, c.sttLimits = "stt.api.rime.ai:443", defaultTranscriptionLimits
 	c.Realtime = &RealtimeService{c}
 	c.STT = &STTService{c}
@@ -243,12 +249,8 @@ func (c *Client) prepareService(ctx context.Context, service rpcService) (*grpc.
 	}
 	if *slot == nil {
 		options := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDisableRetry(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(receiveLimit), grpc.MaxCallSendMsgSize(131072), grpc.MaxRetryRPCBufferSize(0))}
-		if service == synthesisService && c.enableTTSKeepalive && (target == hostedCodaTarget || target == hostedMistTarget) {
-			options = append(options, grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                time.Minute,
-				Timeout:             20 * time.Second,
-				PermitWithoutStream: true,
-			}))
+		if service == synthesisService && c.ttsKeepalive != nil {
+			options = append(options, grpc.WithKeepaliveParams(*c.ttsKeepalive))
 		}
 		options = append(options, dialOptions...)
 		var err error

@@ -14,6 +14,13 @@ from rimelabs_sdk.stt import _transport as stt_transport
 from rimelabs_sdk.tts import _transport
 
 logger = logging.getLogger(__name__)
+KEEPALIVE_OPTIONS = {
+    "grpc.keepalive_time_ms": 60000,
+    "grpc.keepalive_timeout_ms": 20000,
+    "grpc.http2.ping_timeout_ms": 20000,
+    "grpc.keepalive_permit_without_calls": 1,
+    "grpc.http2.max_pings_without_data": 0,
+}
 
 
 @pytest.mark.parametrize(
@@ -48,13 +55,7 @@ async def test_keepalive_scope(monkeypatch, options, enabled):
         await transport.close()
         recognition = stt_transport.make_channel(stt_policy.POLICY)
         await recognition.close()
-    expected = {
-        "grpc.keepalive_time_ms": 60000,
-        "grpc.keepalive_timeout_ms": 20000,
-        "grpc.http2.ping_timeout_ms": 20000,
-        "grpc.keepalive_permit_without_calls": 1,
-        "grpc.http2.max_pings_without_data": 0,
-    }
+    expected = KEEPALIVE_OPTIONS
     keys = expected.keys() & captured[0].keys()
     assert {key: captured[0][key] for key in keys} == (expected if enabled else {})
     assert not expected.keys() & captured[1].keys()
@@ -142,6 +143,13 @@ async def test_keepalive_wire_and_recovery(monkeypatch, caplog):
         routes = {"coda.api.rime.ai:443": first_target, "mist.api.rime.ai:443": second_target}
 
         def channel(target, credentials, **kwargs):
+            configured = dict(kwargs["options"])
+            assert {key: configured[key] for key in KEEPALIVE_OPTIONS} == KEEPALIVE_OPTIONS
+            # Assert the hosted policy before accelerating the native timers.
+            kwargs["options"] = [
+                (key, value // 60 if key in KEEPALIVE_OPTIONS and key.endswith("_ms") else value)
+                for key, value in kwargs["options"]
+            ]
             # Disable bandwidth-estimation pings so only keepalive is observed.
             kwargs["options"] = [*kwargs["options"], ("grpc.http2.bdp_probe", 0)]
             return grpc.aio.insecure_channel(routes[target], **kwargs)
@@ -159,31 +167,32 @@ async def test_keepalive_wire_and_recovery(monkeypatch, caplog):
                 await mist.languages.list(timeout=0.15)
 
             async def recover():
-                ping = await asyncio.wait_for(stalled.pings.get(), 75)
+                ping = await asyncio.wait_for(stalled.pings.get(), 5)
                 logger.info("Stalled transport ping after %.3fs", ping - started)
-                assert 55 <= ping - started <= 75
-                await asyncio.wait_for(stalled.closed.wait(), 30)
+                assert 0.75 <= ping - started <= 5
+                await asyncio.wait_for(stalled.closed.wait(), 3)
                 logger.info("Stalled transport closed after %.3fs", time.monotonic() - ping)
-                assert time.monotonic() - ping >= 18
+                assert time.monotonic() - ping >= 0.25
                 assert second.discovery_calls == 1
                 stalled.stalled = False
                 assert await mist.languages.list() == ["en", "de"]
+                assert second.discovery_calls == 2
                 assert stalled.connections == 2
 
             async def preserve():
                 pings = []
                 for count in range(3):
-                    ping = await asyncio.wait_for(healthy.pings.get(), 75)
+                    ping = await asyncio.wait_for(healthy.pings.get(), 5)
                     pings.append(ping)
                     logger.info("Healthy idle ping %d after %.3fs", count + 1, ping - started)
-                assert 55 <= pings[0] - started <= 75
-                assert all(55 <= right - left <= 75 for left, right in pairwise(pings)), [
+                assert 0.75 <= pings[0] - started <= 5
+                assert all(0.75 <= right - left <= 5 for left, right in pairwise(pings)), [
                     ping - started for ping in pings
                 ]
                 assert await coda.languages.list() == ["en", "de"]
                 assert healthy.connections == 1
 
-            async with asyncio.timeout(240), asyncio.TaskGroup() as tasks:
+            async with asyncio.timeout(20), asyncio.TaskGroup() as tasks:
                 tasks.create_task(preserve())
                 tasks.create_task(recover())
         await asyncio.wait_for(healthy.closed.wait(), 3)

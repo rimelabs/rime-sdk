@@ -19,7 +19,7 @@ func TestHostedTTSKeepalivePausedSourceLifetime(t *testing.T) {
 		configuration := Config{EnableTTSKeepalive: true}
 		if withDeadline {
 			name = "overall_deadline"
-			configuration = Config{Model: "mistv3", Timeout: 75 * time.Second, EnableTTSKeepalive: true}
+			configuration = Config{Model: "mistv3", Timeout: keepaliveTestInterval + 3*time.Second, EnableTTSKeepalive: true}
 		}
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -40,6 +40,7 @@ func TestHostedTTSKeepalivePausedSourceLifetime(t *testing.T) {
 				return rpc.Context().Err()
 			}}
 			client, connections, _ := setupKeepaliveClient(t, configuration, service)
+			client.limits.progress = 200 * time.Millisecond
 			first := true
 			stream, err := client.TTS.Stream(context.Background(), func(ctx context.Context) (string, error) {
 				if first {
@@ -60,7 +61,7 @@ func TestHostedTTSKeepalivePausedSourceLifetime(t *testing.T) {
 			}
 			connection := <-connections
 			pingReceived := false
-			observation := time.NewTimer(75 * time.Second)
+			observation := time.NewTimer(keepaliveTestObservation)
 			defer observation.Stop()
 		observe:
 			for {
@@ -84,7 +85,7 @@ func TestHostedTTSKeepalivePausedSourceLifetime(t *testing.T) {
 				}
 			}
 			if !pingReceived {
-				t.Fatal("paused RPC sent no production keepalive ping")
+				t.Fatal("paused RPC sent no keepalive ping")
 			}
 			if !withDeadline {
 				select {

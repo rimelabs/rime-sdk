@@ -80,6 +80,29 @@ This changes the earlier alpha API. Move complete-string calls from `stream` to
 under `client.tts()` and rename `synthesize_stream` to `stream`. The old entry
 points have no compatibility aliases. STT and realtime methods retain their names.
 
+## TTS connection keepalive
+
+Hosted Coda/Mist connections support opt-in gRPC keepalive with a 60-second
+interval, a 20-second response timeout, and pings between calls. Keepalive is
+disabled by default in every SDK.
+
+| SDK | Opt-in setting |
+| --- | --- |
+| Go | `rime.Config{EnableTTSKeepalive: true}` |
+| Python | `Rime(enable_tts_keepalive=True)` |
+| TypeScript | `new Rime({ enableTTSKeepalive: true })` |
+| Rust | `Client::builder().enable_tts_keepalive(true)` |
+
+The keepalive addition has a source compatibility break only in Go: the new
+`Config.EnableTTSKeepalive` field invalidates earlier positional `Config` literals.
+Existing keyed literals and `Config{}` remain compatible. See the
+[Go migration example](go/README.md#keepalive-compatibility).
+The Python argument, TypeScript option, and Rust builder method are additive;
+valid existing client configurations need no changes.
+
+The package READMEs describe endpoint scope, connection recovery, and native
+library differences.
+
 ## Local setup
 
 All four SDKs use versioned API packages with STT definitions. The commands

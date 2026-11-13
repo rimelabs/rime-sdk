@@ -234,6 +234,10 @@ async fn silent_stall_is_retired_and_the_next_call_reconnects() {
     );
     probe.stalled.store(false, Ordering::SeqCst);
     assert_eq!(harness.client.languages().await.unwrap(), ["en"]);
+    assert_eq!(
+        harness.service.discoveries.load(Ordering::SeqCst),
+        discoveries + 1
+    );
     assert_eq!(probe.connections.load(Ordering::SeqCst), 2);
     harness.client.close().await;
 }
