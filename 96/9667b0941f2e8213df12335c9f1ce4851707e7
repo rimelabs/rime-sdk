@@ -1,0 +1,27 @@
+go/README.md
+  s_26048aae4bfdf2::t_2828b538e91566 454-459,643-648
+go/realtime_conversation.go
+  s_26048aae4bfdf2::t_d14738fd07febf 47-48,364,381-386,389-391
+go/realtime_conversation_test.go
+  s_26048aae4bfdf2::t_490e8df0f3317f 83-211,686
+go/realtime_session.go
+  s_26048aae4bfdf2::t_67575b1ae92878 34-48
+go/realtime_types.go
+  s_26048aae4bfdf2::t_11faf37d5ea1b3 128-131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "969667b0941f2e8213df12335c9f1ce4851707e7",
+  "prompts": {},
+  "sessions": {
+    "s_26048aae4bfdf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ab4a39e0f7251d95a",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
