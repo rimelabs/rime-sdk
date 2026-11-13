@@ -30,6 +30,7 @@ const NOT_READY = new Set([
   "typed_turn_busy",
   "instructions_busy",
   "proactive_unavailable",
+  "conversation_already_has_active_response",
 ]);
 const LIMIT = 128;
 const closeErrors = new WeakSet<object>();
@@ -555,6 +556,14 @@ export class RealtimeSession {
    * complete list. Replies already started keep their original settings.
    * Cancellation after submission does not undo an accepted update. */
   async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
+    if (
+      this.info.clientEndsTurns &&
+      (options.turnDetection !== undefined ||
+        options.interruptOnSpeech !== undefined)
+    )
+      throw new RimeInputError(
+        "Turn settings do not apply with clientEndsTurns",
+      );
     const settings: p.SessionPatch = {};
     if (options.speed !== undefined)
       settings.speed = speechSpeed(options.speed);
@@ -844,6 +853,62 @@ export class RealtimeSession {
       }),
     );
   }
+  /** Start the user's turn here, for example as a push-to-talk button goes
+   * down. Only with `clientEndsTurns`. Audio sent before this is not part of
+   * the turn. Prism announces the turn with `speech.started` and cuts off any
+   * reply. Prism sends no acknowledgment; a refusal arrives as an `error`
+   * event. */
+  async startTurn(options: t.RealtimeOperationOptions = {}): Promise<void> {
+    this.requireClientTurns();
+    return this.sendUnacknowledged("prism.input_audio_buffer.start", options);
+  }
+  /** End the user's turn at the audio sent so far, for example as a button
+   * goes up. With `clientEndsTurns`, Prism then waits for `replyToTurns`;
+   * otherwise it replies as when it ends the turn itself. Prism sends no
+   * acknowledgment; a refusal arrives as an `error` event. */
+  async endTurn(options: t.RealtimeOperationOptions = {}): Promise<void> {
+    // TODO(open decision D1): wait for the commit or its refusal, or return the
+    // event ID? A press under 100 ms is refused, and replyToTurns would then
+    // answer the last turn again.
+    return this.sendUnacknowledged("input_audio_buffer.commit", options);
+  }
+  /** Ask for the reply to the conversation as it is, after `endTurn`. Only
+   * with `clientEndsTurns`. The reply answers every turn ended since the last
+   * reply. While another reply runs, this waits for Prism to become idle. */
+  async replyToTurns(
+    options: t.ReplyRequestOptions = {},
+  ): Promise<t.ResponseRef> {
+    // TODO(open decision D3): say that this waits until the last reply has
+    // played, for at most readyS, and that two calls get two replies.
+    this.requireClientTurns();
+    const body: Record<string, unknown> =
+      options.metadata == null
+        ? {}
+        : { metadata: p.requestMetadata(options.metadata, {}) };
+    return this.operation(options, (signal) => this.create(body, signal));
+  }
+  private requireClientTurns(): void {
+    this.check();
+    if (!this.info.clientEndsTurns)
+      throw new RimeInputError(
+        "This needs a session opened with clientEndsTurns",
+      );
+  }
+  /** Prism answers these only with a correlated error, which reaches the
+   * event stream. Audio order holds: the event follows audio already sent. */
+  private async sendUnacknowledged(
+    type: string,
+    options: t.RealtimeOperationOptions,
+  ): Promise<void> {
+    return this.operation(options, (signal) =>
+      this.locked(this.audioLock, signal, () =>
+        this.send(
+          { type, event_id: `evt_${randomUUID().replaceAll("-", "")}` },
+          signal,
+        ),
+      ),
+    );
+  }
   async sendAudio(
     chunk: t.AudioChunk,
     options: t.RealtimeOperationOptions = {},
@@ -1056,6 +1121,9 @@ export class RealtimeSession {
           toolResultTimeoutS: view.toolResultTimeoutS,
           toolContinuationTimeoutS: view.toolContinuationTimeoutS,
           turnDetection: view.turnDetection,
+          // Only the first update decides this, so a later view cannot undo it.
+          clientEndsTurns:
+            view.clientEndsTurns || this.sessionInfo?.clientEndsTurns === true,
           settingsRevision: view.settingsRevision,
           truncation: view.truncation,
           requestId: view.requestId,

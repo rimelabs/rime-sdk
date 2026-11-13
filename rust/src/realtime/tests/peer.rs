@@ -44,16 +44,25 @@ impl Peer {
     }
     #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
     pub async fn with_paused_reads(pause: bool) -> Self {
-        Self::configured(pause, None, None).await
+        Self::configured(pause, None, None, false).await
     }
     pub async fn with_initial_interruption(interrupt: bool) -> Self {
-        Self::configured(false, Some(interrupt), None).await
+        Self::configured(false, Some(interrupt), None, false).await
     }
     pub async fn with_version_on_creation(version: &str) -> Self {
-        Self::configured(false, None, Some(version.into())).await
+        Self::configured(false, None, Some(version.into()), false).await
+    }
+    /// Echoes turn_detection null on the first update, as Prism does.
+    pub async fn with_client_ended_turns() -> Self {
+        Self::configured(false, None, None, true).await
     }
     #[allow(clippy::result_large_err)] // The WebSocket library fixes this callback type.
-    async fn configured(pause: bool, interrupt: Option<bool>, version: Option<String>) -> Self {
+    async fn configured(
+        pause: bool,
+        interrupt: Option<bool>,
+        version: Option<String>,
+        client_ends_turns: bool,
+    ) -> Self {
         super::schema::prepare();
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let endpoint = format!("ws://{}/v1/realtime", listener.local_addr().unwrap());
@@ -93,6 +102,10 @@ impl Peer {
             if let Some(interrupt) = interrupt {
                 initial_session["prism_effective_interrupt_response"] = json!(interrupt);
                 initial_session["prism_settings_revision"] = json!(1);
+            }
+            if client_ends_turns {
+                initial_session["turn_detection"] = Value::Null;
+                initial_session["prism_effective_interrupt_response"] = json!(false);
             }
             loop {
                 tokio::select! {

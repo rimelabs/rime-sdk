@@ -67,6 +67,13 @@ impl Worker {
                         .and_then(|previous| previous.version.clone());
                 }
                 info.session_id = self.id.clone();
+                // Only the first update decides this, so a later view cannot undo it.
+                info.client_ends_turns |= self
+                    .info
+                    .lock()
+                    .expect("session info mutex")
+                    .as_ref()
+                    .is_some_and(|previous| previous.client_ends_turns);
                 if !e.interrupt_known {
                     info.interrupt_on_speech = c.body["session"]["turn_detection"]
                         ["interrupt_response"]
@@ -273,6 +280,7 @@ impl Worker {
                             "typed_turn_busy",
                             "instructions_busy",
                             "proactive_unavailable",
+                            "conversation_already_has_active_response",
                         ]
                         .contains(&f.code.as_str());
                     if busy {

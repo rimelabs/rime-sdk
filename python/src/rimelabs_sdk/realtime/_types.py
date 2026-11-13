@@ -40,8 +40,9 @@ TurnEagerness: TypeAlias = Literal["low", "medium", "high", "auto"]
 #   starts a new turn.
 # - detector_changed: Prism switched between its main and backup turn detection while
 #   the user spoke; nothing the user did ended the turn.
+# - client_commit: the client's end_turn ended the turn.
 SpeechEndReason: TypeAlias = Literal[
-    "semantic", "timeout", "silence", "max_duration", "detector_changed"
+    "semantic", "timeout", "silence", "max_duration", "detector_changed", "client_commit"
 ]
 
 # Unicode White_Space, as used by Rust str::trim in the engine. Python's
@@ -349,6 +350,8 @@ class SessionInfo:
     tool_result_timeout_s: float | None = None
     tool_continuation_timeout_s: float | None = None
     turn_detection: TurnDetectionInfo = field(default_factory=TurnDetectionInfo)
+    # True when the client starts and ends each user turn; Prism then detects none.
+    client_ends_turns: bool = False
     # The x-request-id Prism's logs name this session by; None when the server does not
     # publish it.
     request_id: str | None = None

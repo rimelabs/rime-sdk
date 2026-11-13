@@ -460,6 +460,47 @@ valid, nonblank UTF-8 with at most 500 Unicode scalar values. Omit these setting
 to use server defaults. `session.Info()` returns a copy of the effective published
 settings.
 
+### Client-ended turns
+
+With `ClientEndsTurns: true`, Prism detects no turns. Your application starts
+and ends each user turn, for example with a push-to-talk button, and asks for
+each reply itself.
+
+```go
+session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{ClientEndsTurns: true})
+if err != nil { return err }
+defer session.Close()
+if err := session.StartTurn(ctx); err != nil { return err } // The button goes down.
+// Send the caller's audio with session.SendAudio, as usual.
+if err := session.EndTurn(ctx); err != nil { return err } // The button goes up.
+reply, err := session.ReplyToTurns(ctx)
+```
+
+- `StartTurn` starts the turn. Audio sent before it is not part of the turn.
+  Prism announces the turn with `SpeechStarted` and cuts off any reply, so stop
+  playback and report what the caller heard, as for any interruption.
+  `ConversationRunner` does this for you.
+- `EndTurn` ends the turn at the audio sent so far. Prism does not reply on its
+  own. A turn longer than 55 s keeps its last 55 s.
+- `ReplyToTurns` asks for the reply. It answers every turn ended since the last
+  reply. While another reply runs, it waits until Prism is idle, then sends the
+  request. `ReplyToTurnsWithOptions` adds labels for this reply.
+- Without `StartTurn`, the turn is the audio since the last `EndTurn` or
+  `ClearAudio`. Prism does not announce it, send transcript deltas for it, or
+  stop a reply. Stop a reply yourself with `Cancel` and `ReportPlayback`.
+
+`StartTurn` and `EndTurn` get no acknowledgment. Prism refuses an `EndTurn`
+with under 100 ms of audio with `input_audio_buffer_commit_empty`. The refusal
+arrives as a `FaultEvent` with that code.
+
+The setting is fixed for the session. With it, `Connect` returns an error
+matching `ErrInput` for `TurnDetection` or a false `InterruptOnSpeech`, and
+`Update` returns one for any `TurnDetection` or `InterruptOnSpeech`.
+`session.Info().ClientEndsTurns` is true once Prism confirms it, and
+`InterruptOnSpeech` is false, because speech alone interrupts nothing.
+`EndTurn` also works without this setting: it ends the turn under way, and
+Prism replies as usual.
+
 ### Update session settings
 
 ```go
@@ -550,6 +591,9 @@ their request shape, and replies to speech use session labels.
 | `Cancel` | Cancel a retained response. |
 | `SetResponseMetadata` | Replace the labels for later replies once Prism confirms. |
 | `SendAudio` / `ClearAudio` | Convert input PCM or clear the input buffer. |
+| `StartTurn` / `EndTurn` | Start or end the user's turn; see [Client-ended turns](#client-ended-turns). |
+| `ReplyToTurns` | Ask for the reply to the turns you ended, with `ClientEndsTurns`. |
+| `ReplyToTurnsWithOptions` | Ask for that reply with labels for this reply. |
 | `ReportPlayback` | Report measured device playback completion or interruption. |
 | `Recv` | Read one typed event; normal closure returns `io.EOF`. |
 | `Close` | Stop the session and wait for cleanup. |

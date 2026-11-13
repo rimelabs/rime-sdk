@@ -1055,17 +1055,6 @@
     "invalid": true
   },
   {
-    "name": "session timing: null turn detection",
-    "event": {
-      "type": "session.updated",
-      "session": {
-        "id": "session-1",
-        "turn_detection": null
-      }
-    },
-    "invalid": true
-  },
-  {
     "name": "session timing: nonobject turn detection",
     "event": {
       "type": "session.updated",
@@ -2423,5 +2412,15 @@
       }
     },
     "invalid": true
+  },
+  {
+    "name": "client commit speech end reason",
+    "event": { "type": "input_audio_buffer.speech_stopped", "item_id": "speech", "audio_end_ms": 50, "prism_end_reason": "client_commit" },
+    "expected_kind": "speech.stopped"
+  },
+  {
+    "name": "client-ended turns on session update",
+    "event": { "type": "session.updated", "session": { "id": "session-1", "turn_detection": null, "prism_effective_interrupt_response": false } },
+    "expected_kind": "session.updated"
   }
 ]

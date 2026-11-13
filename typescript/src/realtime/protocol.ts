@@ -5,6 +5,15 @@ import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
 import { listedItem } from "./history.js";
 
+export interface TurnSettings {
+  interrupt_response: boolean;
+  eagerness?: t.TurnEagerness;
+  prism_end_of_turn_timeout_ms?: number;
+  end_of_turn_min_silence_ms?: number;
+  interrupt_min_words?: number;
+  interrupt_phrases?: string[];
+  acknowledgment_phrases?: string[];
+}
 export interface SessionSettings {
   speed?: number;
   prism_review?: {
@@ -16,15 +25,8 @@ export interface SessionSettings {
     "auto" | "disabled" | { type: "retention_ratio"; retention_ratio: number };
   modalities: ("text" | "audio")[];
   input_audio_format: "pcm16";
-  turn_detection: {
-    interrupt_response: boolean;
-    eagerness?: t.TurnEagerness;
-    prism_end_of_turn_timeout_ms?: number;
-    end_of_turn_min_silence_ms?: number;
-    interrupt_min_words?: number;
-    interrupt_phrases?: string[];
-    acknowledgment_phrases?: string[];
-  };
+  /** Null when the client ends every turn. */
+  turn_detection: TurnSettings | null;
   tools: {
     type: "function";
     function: { name: string; description: string; parameters: t.JsonObject };
@@ -61,7 +63,7 @@ export interface SessionPatch {
   voice?: string;
   instructions?: string;
   tools?: SessionSettings["tools"];
-  turn_detection?: Partial<SessionSettings["turn_detection"]>;
+  turn_detection?: Partial<TurnSettings>;
 }
 export interface SessionView {
   speed?: number;
@@ -77,6 +79,7 @@ export interface SessionView {
   toolResultTimeoutS: number | null;
   toolContinuationTimeoutS: number | null;
   turnDetection: t.TurnDetectionInfo;
+  clientEndsTurns: boolean;
 }
 export interface SessionCreated {
   kind: "session.created";
@@ -373,8 +376,10 @@ function receivedReview(value: unknown): t.ReviewSettings {
 }
 function session(value: unknown): SessionView {
   const view = object(value, "session");
+  // turn_detection null: the client ends every turn, and there is no detection to report.
+  const clientEndsTurns = view.turn_detection === null;
   const detection =
-    view.turn_detection === undefined
+    view.turn_detection === undefined || clientEndsTurns
       ? {}
       : object(view.turn_detection, "session.turn_detection");
   let eagerness: t.TurnDetectionInfo["eagerness"] = null;
@@ -474,6 +479,7 @@ function session(value: unknown): SessionView {
       endOfTurnTimeoutMs,
       ...extended,
     }),
+    clientEndsTurns,
     toolResultTimeoutS: duration(waits.result_timeout_s, "result_timeout_s"),
     toolContinuationTimeoutS: duration(
       waits.continuation_timeout_s,
@@ -685,7 +691,8 @@ function decodeValue(
           reason === "timeout" ||
           reason === "silence" ||
           reason === "max_duration" ||
-          reason === "detector_changed"
+          reason === "detector_changed" ||
+          reason === "client_commit"
             ? reason
             : "unknown",
       };

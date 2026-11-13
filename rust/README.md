@@ -448,6 +448,53 @@ nonblank and have at most 500 Unicode scalar values. Omit these settings to use
 server defaults. `session.info()` returns the effective settings that Prism
 published.
 
+### Client-ended turns
+
+With `client_ends_turns(true)`, Prism detects no turns. Your application starts
+and ends each user turn, for example with a push-to-talk button, and asks for
+each reply itself.
+
+```rust,no_run
+use rimelabs_sdk::{Client, realtime::RealtimeConnectOptions};
+
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let client = Client::builder().build()?;
+let options = RealtimeConnectOptions::default().client_ends_turns(true);
+let session = client.realtime().connect(options).await?;
+session.start_turn().await?; // The button goes down.
+// Send the caller's audio with session.send_audio, as usual.
+session.end_turn().await?; // The button goes up.
+let reply = session.reply_to_turns().await?;
+# let _ = reply;
+# Ok(())
+# }
+```
+
+- `start_turn` starts the turn. Audio sent before it is not part of the turn.
+  Prism announces the turn with `SpeechStarted` and cuts off any reply, so stop
+  playback and report what the caller heard, as for any interruption.
+  `ConversationRunner` does this for you.
+- `end_turn` ends the turn at the audio sent so far. Prism does not reply on its
+  own. A turn longer than 55 s keeps its last 55 s.
+- `reply_to_turns` asks for the reply. It answers every turn ended since the
+  last reply. While another reply runs, it waits until Prism is idle, then sends
+  the request. `reply_to_turns_with_options` adds labels for this reply.
+- Without `start_turn`, the turn is the audio since the last `end_turn` or
+  `clear_audio`. Prism does not announce it, send transcript deltas for it, or
+  stop a reply. Stop a reply yourself with `cancel` and `report_playback`.
+
+`start_turn` and `end_turn` get no acknowledgment. Prism refuses an `end_turn`
+with under 100 ms of audio with `input_audio_buffer_commit_empty`. The refusal
+arrives as a `RealtimeEvent::Fault` with that code.
+
+The setting is fixed for the session. With it, `connect` returns
+`ErrorKind::Input` for `turn_detection` or `interrupt_on_speech(false)`, and
+`update` returns it for any `turn_detection` or `interrupt_on_speech`.
+`session.info().client_ends_turns` is `true` once Prism confirms it, and
+`interrupt_on_speech` is `false`, because speech alone interrupts nothing.
+`end_turn` also works without this setting: it ends the turn under way, and
+Prism replies as usual.
+
 ### Update session settings
 
 ```rust,no_run
@@ -539,6 +586,9 @@ their request shape, and replies to speech use session labels.
 | `cancel` | Cancel a retained response. |
 | `set_response_metadata` | Replace the labels for later replies once Prism confirms. |
 | `send_audio` / `clear_audio` | Convert input PCM or clear the input buffer. |
+| `start_turn` / `end_turn` | Start or end the user's turn; see [Client-ended turns](#client-ended-turns). |
+| `reply_to_turns` | Ask for the reply to the turns you ended, with `client_ends_turns`. |
+| `reply_to_turns_with_options` | Ask for that reply with labels for this reply. |
 | `report_playback` | Report measured device playback completion or interruption. |
 | `events` | Take the single owned `Stream<Item = Result<SessionEvent, Error>>`. |
 | `close` | Stop the session and wait for cleanup. |

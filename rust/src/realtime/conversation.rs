@@ -306,8 +306,10 @@ impl<O: ConversationOutput> PlaybackState<O> {
                     .rev()
                     .find(|reply| reply.pending_playback())
                     .is_some_and(|reply| reply.interrupt_on_speech);
+                // With client-ended turns, speech starts only at start_turn, which
+                // always cuts the reply off.
                 let all = matches!(&event.payload, RealtimeEvent::SpeechStarted { .. })
-                    && interrupt_on_speech;
+                    && (interrupt_on_speech || session.info().client_ends_turns);
                 if let RealtimeEvent::ResponseAbandoned { response } = &event.payload {
                     self.interrupted.insert(response.response_id.clone());
                 }

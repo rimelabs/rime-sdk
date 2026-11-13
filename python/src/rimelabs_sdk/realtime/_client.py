@@ -31,7 +31,15 @@ from ._protocol import SessionSettings, truncation_settings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
 from ._settings import review_settings, speed_setting, tool_settings, turn_settings
-from ._types import Labels, RealtimeTimeouts, Review, ToolDefinition, Truncation, TurnDetection
+from ._types import (
+    JsonValue,
+    Labels,
+    RealtimeTimeouts,
+    Review,
+    ToolDefinition,
+    Truncation,
+    TurnDetection,
+)
 
 if TYPE_CHECKING:
     from .._client import Rime
@@ -163,6 +171,7 @@ class Realtime:
         tools: Sequence[ToolDefinition] = (),
         interrupt_on_speech: bool = True,
         turn_detection: TurnDetection | None = None,
+        client_ends_turns: bool = False,
         speed: float | None = None,
         review: Review | None = None,
         timeouts: RealtimeTimeouts = _DEFAULT_TIMEOUTS,
@@ -174,6 +183,11 @@ class Realtime:
 
         Override endpoint with a full /v1/realtime WebSocket URL for another deployment.
         Omitted turn timing settings use the server defaults.
+
+        With client_ends_turns, Prism detects no turns: the session starts and ends
+        each one with start_turn and end_turn, and asks for replies with reply_to_turns.
+        Turn settings and interrupt_on_speech=False do not apply then. This cannot change
+        later in the session.
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
@@ -202,10 +216,11 @@ class Realtime:
             raise RimeInputError("Use wss:// outside localhost to protect credentials")
         if model != "prism":
             raise RimeInputError("The realtime model must be prism")
+        detection: dict[str, JsonValue] = {"interrupt_response": interrupt_on_speech}
         settings: SessionSettings = {
             "modalities": ["text", "audio"],
             "input_audio_format": "pcm16",
-            "turn_detection": {"interrupt_response": interrupt_on_speech},
+            "turn_detection": detection,
             "tools": tool_settings(tools),
         }
         if truncation is not None:
@@ -219,7 +234,14 @@ class Realtime:
         if turn_detection is not None:
             if not isinstance(turn_detection, TurnDetection):
                 raise RimeInputError("turn_detection must be a TurnDetection value")
-            settings["turn_detection"].update(turn_settings(turn_detection))
+            detection.update(turn_settings(turn_detection))
+        if not isinstance(client_ends_turns, bool):
+            raise RimeInputError("client_ends_turns must be a boolean")
+        if client_ends_turns:
+            # TODO(open decision D2): keep this a bool, or make who ends turns one setting?
+            if turn_detection is not None or interrupt_on_speech is not True:
+                raise RimeInputError("Turn settings do not apply with client_ends_turns")
+            settings["turn_detection"] = None
         if response_metadata is not None:
             settings["prism_response_metadata"] = _response_metadata(response_metadata)
         if request_id is not None and (

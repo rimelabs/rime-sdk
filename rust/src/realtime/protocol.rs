@@ -192,6 +192,7 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
         end_of_turn_timeout_ms: None,
         request_id: optional(&v["request_id"])?,
         response_metadata: None,
+        client_ends_turns: false,
     };
     if let Some(v) = o.get("voice") {
         s.voice = string(v)?
@@ -203,7 +204,10 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
     if let Some(v) = o.get("prism_effective_interrupt_response") {
         s.interrupt_on_speech = v.as_bool().ok_or_else(|| invalid("interrupt"))?
     }
-    if let Some(v) = o.get("turn_detection") {
+    // turn_detection null: the client ends every turn, and there is no detection to report.
+    if o.get("turn_detection").is_some_and(Value::is_null) {
+        s.client_ends_turns = true;
+    } else if let Some(v) = o.get("turn_detection") {
         let d = object(v)?;
         s.end_of_turn_min_silence_ms =
             min_silence(d, "session.turn_detection.end_of_turn_min_silence_ms")?;
@@ -441,6 +445,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                                     "silence",
                                     "max_duration",
                                     "detector_changed",
+                                    "client_commit",
                                 ],
                             )
                         })

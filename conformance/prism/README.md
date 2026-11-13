@@ -12,16 +12,9 @@ The fixtures follow `interfaces/speech_to_speech.asyncapi.yaml` in
 to that file when they were last updated. Update this one pin when you bring in
 newer server changes. The fixture differs from that file on purpose in these ways:
 
-- **Not yet supported by the SDK.** Client-ended turns (SERVE-273):
-  `input_audio_buffer.commit`, `prism.input_audio_buffer.start`, a `null`
-  `turn_detection`, a `response.create` without a cause, the `client_commit` end
-  reason, and the errors `input_audio_buffer_commit_empty`,
-  `input_audio_buffer_start_unavailable`, and
-  `conversation_already_has_active_response`. Recording controls:
-  `prism_recording`, `prism_effective_recording`, and `recording_not_allowed`.
-  Decoders treat the new end reason as `unknown`, pass the error codes through,
-  and ignore the recording fields. They reject a `null` `turn_detection` in the
-  session view, which Prism sends only when the client asks for it.
+- **Not yet supported by the SDK.** Recording controls: `prism_recording`,
+  `prism_effective_recording`, and `recording_not_allowed`. Decoders pass the
+  error code through and ignore the recording fields.
 - **Optional for older images.** Fields current servers always send stay
   optional here: `server_time_ms`, the cumulative `transcript` on transcription
   deltas, the session's `request_id`, `speed`, `version`, `truncation`,

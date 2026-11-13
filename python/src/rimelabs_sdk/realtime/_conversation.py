@@ -293,7 +293,11 @@ async def run_conversation(
                         or any(not output.receipt.done() for output in reply.outputs.values())
                     )
                 ]
-                if eligible and eligible[-1].interrupt_on_speech:
+                # With client-ended turns, speech starts only at start_turn, which
+                # always cuts the reply off.
+                if eligible and (
+                    eligible[-1].interrupt_on_speech or session.info.client_ends_turns
+                ):
                     interrupt(eligible)
             elif isinstance(payload, t.ResponseAbandoned):
                 if payload.response.response_id in parents:

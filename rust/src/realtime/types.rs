@@ -203,6 +203,7 @@ pub struct RealtimeConnectOptions {
     pub(crate) tools: Vec<ToolDefinition>,
     pub(crate) interrupt: bool,
     pub(crate) detection: TurnDetection,
+    pub(crate) client_ends_turns: bool,
     pub(crate) speed: Option<f64>,
     pub(crate) review: Option<Review>,
     pub(crate) truncation: Option<Truncation>,
@@ -219,6 +220,7 @@ impl Default for RealtimeConnectOptions {
             tools: vec![],
             interrupt: true,
             detection: TurnDetection::default(),
+            client_ends_turns: false,
             speed: None,
             review: None,
             truncation: None,
@@ -272,6 +274,14 @@ impl RealtimeConnectOptions {
     /// Set speech endpoint timing.
     pub fn turn_detection(mut self, value: TurnDetection) -> Self {
         self.detection = value;
+        self
+    }
+    /// Prism detects no turns: the session starts and ends each one with
+    /// `start_turn` and `end_turn`, and asks for replies with `reply_to_turns`.
+    /// Turn detection settings and `interrupt_on_speech(false)` do not apply
+    /// then. This cannot change later in the session.
+    pub fn client_ends_turns(mut self, value: bool) -> Self {
+        self.client_ends_turns = value;
         self
     }
     /// Set positive operation budgets.
@@ -501,6 +511,8 @@ pub struct SessionInfo {
     pub request_id: Option<String>,
     /// The labels replies carry, as Prism last confirmed them.
     pub response_metadata: Option<Labels>,
+    /// True when the client starts and ends each user turn; Prism then detects none.
+    pub client_ends_turns: bool,
 }
 impl SessionInfo {
     /// Build session settings with no published values, for example in tests.
@@ -528,6 +540,7 @@ impl SessionInfo {
             end_of_turn_timeout_ms: None,
             request_id: None,
             response_metadata: None,
+            client_ends_turns: false,
         }
     }
 }
@@ -734,7 +747,8 @@ pub enum RealtimeEvent {
         item_id: String,
         /// Audio end time.
         audio_end_ms: u64,
-        /// Semantic, timeout, silence, max_duration, detector_changed, or unknown.
+        /// Semantic, timeout, silence, max_duration, detector_changed,
+        /// client_commit (the client's `end_turn`), or unknown.
         end_reason: Option<String>,
         /// Minimum silence in force when the turn ended, absent on older images.
         /// With `eagerness` `auto` and no configured minimum, Prism adjusts it

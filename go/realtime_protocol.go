@@ -235,7 +235,10 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 		}
 		s.InterruptOnSpeech = b
 	}
-	if v, ok := o["turn_detection"]; ok {
+	// turn_detection null: the client ends every turn, and there is no detection to report.
+	if v, ok := o["turn_detection"]; ok && v == nil {
+		s.ClientEndsTurns = true
+	} else if ok {
 		d := decoder.object(v)
 		s.EndOfTurnMinSilenceMS = decoder.minSilence(d)
 		if v, present := d["interrupt_min_words"]; present {
@@ -426,7 +429,7 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		w.kind = "speech.stopped"
 		reason := ""
 		if v, ok := o["prism_end_reason"]; ok {
-			reason = rtEnum(decoder.string(v), "semantic", "timeout", "silence", "max_duration", "detector_changed")
+			reason = rtEnum(decoder.string(v), "semantic", "timeout", "silence", "max_duration", "detector_changed", "client_commit")
 		}
 		w.payload = SpeechStopped{
 			ItemID:                decoder.id(o["item_id"]),

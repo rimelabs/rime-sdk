@@ -1139,5 +1139,77 @@
       }
     },
     "valid": true
+  },
+  {
+    "name": "client commit speech end reason",
+    "schema": "speechEndReason",
+    "value": "client_commit",
+    "valid": true
+  },
+  {
+    "name": "commit microphone input",
+    "schema": "inputAudioBufferCommitEvent",
+    "value": { "type": "input_audio_buffer.commit", "event_id": "commit-1" },
+    "valid": true
+  },
+  {
+    "name": "commit rejects fields of its own",
+    "schema": "inputAudioBufferCommitEvent",
+    "value": { "type": "input_audio_buffer.commit", "event_id": "commit-2", "item_id": "item-1" },
+    "valid": false
+  },
+  {
+    "name": "client starts user speech",
+    "schema": "inputAudioBufferStartEvent",
+    "value": { "type": "prism.input_audio_buffer.start", "event_id": "start-1" },
+    "valid": true
+  },
+  {
+    "name": "client start rejects fields of its own",
+    "schema": "inputAudioBufferStartEvent",
+    "value": { "type": "prism.input_audio_buffer.start", "event_id": "start-2", "audio_start_ms": 0 },
+    "valid": false
+  },
+  {
+    "name": "client-ended turns in the first update",
+    "schema": "sessionUpdateEvent",
+    "value": { "type": "session.update", "event_id": "update-3", "session": { "turn_detection": null } },
+    "valid": true
+  },
+  {
+    "name": "reply to client-ended turns without a cause",
+    "schema": "responseCreateEvent",
+    "value": { "type": "response.create", "event_id": "reply-1" },
+    "valid": true
+  },
+  {
+    "name": "reply to client-ended turns with labels",
+    "schema": "responseCreateEvent",
+    "value": { "type": "response.create", "event_id": "reply-2", "response": { "metadata": { "order": "42" } } },
+    "valid": true
+  },
+  {
+    "name": "reply without a cause rejects an instruction",
+    "schema": "responseCreateEvent",
+    "value": { "type": "response.create", "event_id": "reply-3", "response": { "metadata": { "order": "42" }, "instructions": "Hurry" } },
+    "valid": false
+  },
+  {
+    "name": "empty commit error code",
+    "schema": "errorCode",
+    "value": "input_audio_buffer_commit_empty",
+    "valid": true
+  },
+  {
+    "name": "start unavailable error code",
+    "schema": "errorCode",
+    "value": "input_audio_buffer_start_unavailable",
+    "valid": true
+  },
+  {
+    "name": "active response error code",
+    "schema": "errorCode",
+    "value": "conversation_already_has_active_response",
+    "valid": true
   }
 ]

@@ -226,6 +226,24 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
         }
     }
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
+    if o.client_ends_turns {
+        // TODO(open decision D2): keep this a bool, or make who ends turns one
+        // setting?
+        let detection = &o.detection;
+        let tuned = detection.eagerness.is_some()
+            || detection.end_of_turn_timeout_ms.is_some()
+            || detection.end_of_turn_min_silence_ms.is_some()
+            || detection.interrupt_min_words.is_some()
+            || detection.interrupt_phrases.is_some()
+            || detection.acknowledgment_phrases.is_some();
+        if tuned || !o.interrupt {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "turn settings do not apply with client_ends_turns",
+            ));
+        }
+        result["turn_detection"] = Value::Null;
+    }
     if let Some(value) = &o.truncation {
         result["truncation"] = truncation(value)?;
     }

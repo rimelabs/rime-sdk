@@ -30,7 +30,7 @@ class _Tool(TypedDict):
 class SessionSettings(TypedDict):
     modalities: list[Literal["text", "audio"]]
     input_audio_format: Literal["pcm16"]
-    turn_detection: dict[str, t.JsonValue]
+    turn_detection: dict[str, t.JsonValue] | None
     tools: list[_Tool]
     voice: NotRequired[str]
     instructions: NotRequired[str]
@@ -81,6 +81,7 @@ class SessionView:
     tool_result_timeout_s: float | None
     tool_continuation_timeout_s: float | None
     turn_detection: t.TurnDetectionInfo
+    client_ends_turns: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -362,9 +363,11 @@ def _review(value: object) -> t.ReviewSettings:
 
 def _session(value: object) -> SessionView:
     view = _object(value, "session")
+    # turn_detection null: the client ends every turn, and there is no detection to report.
+    client_ends_turns = "turn_detection" in view and view["turn_detection"] is None
     detection = (
         _object(view["turn_detection"], "session.turn_detection")
-        if "turn_detection" in view
+        if "turn_detection" in view and not client_ends_turns
         else {}
     )
     eagerness = None
@@ -428,6 +431,7 @@ def _session(value: object) -> SessionView:
             interrupt_phrases=_phrases(detection, "interrupt_phrases"),
             acknowledgment_phrases=_phrases(detection, "acknowledgment_phrases"),
         ),
+        client_ends_turns=client_ends_turns,
         tool_result_timeout_s=_duration(waits.get("result_timeout_s"), "result_timeout_s"),
         tool_continuation_timeout_s=_duration(
             waits.get("continuation_timeout_s"), "continuation_timeout_s"
@@ -606,7 +610,15 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
                 t.SpeechEndReason | Literal["unknown"] | None,
                 reason
                 if reason
-                in (None, "semantic", "timeout", "silence", "max_duration", "detector_changed")
+                in (
+                    None,
+                    "semantic",
+                    "timeout",
+                    "silence",
+                    "max_duration",
+                    "detector_changed",
+                    "client_commit",
+                )
                 else "unknown",
             ),
             end_of_turn_min_silence_ms=_optional_integer(

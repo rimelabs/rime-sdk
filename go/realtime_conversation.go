@@ -389,7 +389,9 @@ func (r *ConversationRunner) Run(ctx context.Context) (result error) {
 					}
 				}
 			case SpeechStarted:
-				if rtSpeechInterrupts(replies) {
+				// With client-ended turns, speech starts only at StartTurn, which
+				// always cuts the reply off.
+				if rtSpeechInterrupts(replies) || r.Session.Info().ClientEndsTurns {
 					var eligible []*rtPlayReply
 					for _, reply := range replies {
 						if reply.pendingPlayback() {
