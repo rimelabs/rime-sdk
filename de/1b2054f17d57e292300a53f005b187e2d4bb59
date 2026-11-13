@@ -1,0 +1,57 @@
+rust/src/stream.rs
+  s_738d292339f96b::t_ecd59971c8af97 169-183,202-209
+go/stream.go
+  s_9dd35743e69511::t_5d3381397ec6da 193-197
+go/stream_state_test.go
+  s_9dd35743e69511::t_625d371917191e 7-8,49-90
+python/src/rimelabs_sdk/tts/_stream.py
+  s_df2e388e29c61d::t_2f382a48deae93 69,104-111,134,136-137
+python/tests/test_sdk.py
+  s_9dd35743e69511::t_dfb1ba0458fc50 551-564
+rust/src/tests/tts_features.rs
+  s_df2e388e29c61d::t_23d24913f1782e 1197-1211
+typescript/src/tts/stream.ts
+  s_a236ff38e0065d::t_7314344c0ea86b 98,119-129,237-239,298
+typescript/tests/sdk.test.mjs
+  s_a236ff38e0065d::t_d36e3bf9a4a325 586-605
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "de1b2054f17d57e292300a53f005b187e2d4bb59",
+  "prompts": {},
+  "sessions": {
+    "s_738d292339f96b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1cb62-4afc-7e60-b4c4-2d91fa4092bb",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_9dd35743e69511": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a49c085b67e366e77",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_a236ff38e0065d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a37b97f16c95d98b2",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_df2e388e29c61d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a258dbc73ba53b24a",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
