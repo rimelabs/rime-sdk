@@ -1,0 +1,53 @@
+rust/README.md
+  s_2721cfa5a46218::t_c9beb74367cc01 576-577,841-899
+rust/src/realtime/dispatch.rs
+  s_2721cfa5a46218::t_0ef11ee295479f 85-86,163
+rust/src/realtime/protocol.rs
+  s_2721cfa5a46218::t_5ac412302cbd24 303-307,309-314
+rust/src/realtime/session.rs
+  s_7dc08461236ed7::t_9a7faa9c04f9c6 120,220-221,264,631-652
+rust/src/realtime/tests/mod.rs
+  s_0e73b25dc04567::t_ad8c11410d7b13 6
+rust/src/realtime/tests/peer.rs
+  s_0e73b25dc04567::t_64e43d86a26350 47,50,53-57,60-65,112-114
+rust/src/realtime/tests/raw.rs
+  s_0e73b25dc04567::t_0e5e1f25222606 1-119
+rust/src/realtime/tests/submission.rs
+  s_2721cfa5a46218::t_f539b16a663d71 37
+rust/src/realtime/types.rs
+  s_7dc08461236ed7::t_8bd3665e985e4c 4-11,154-168,216,233,303-315
+rust/src/realtime/worker.rs
+  s_2721cfa5a46218::t_921d0e887ab749 89-95,475-476,500
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1503d6bcec52a43f05429382f9c6e7e79cd6c080",
+  "prompts": {},
+  "sessions": {
+    "s_0e73b25dc04567": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01cf5a3c732b0583",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_2721cfa5a46218": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a999de1fdf6c84354",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_7dc08461236ed7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a9f2c40266754f93d",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
