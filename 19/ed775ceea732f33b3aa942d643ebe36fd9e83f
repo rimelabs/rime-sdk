@@ -1,0 +1,23 @@
+rust/README.md
+  s_8ce4d03cbced0f::t_97e00cea4a8697 132-133
+rust/src/client.rs
+  s_8ce4d03cbced0f::t_e8229ad61f6649 198,298-299,314,349-363
+rust/src/tests.rs
+  s_8ce4d03cbced0f::t_2da5e62dbfe238 804-822
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "19ed775ceea732f33b3aa942d643ebe36fd9e83f",
+  "prompts": {},
+  "sessions": {
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
