@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.31](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.30...python-v0.1.0-alpha.31) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Config gains EnableTTSKeepalive. Replace positional Config literals with keyed fields, such as Config{APIKey: key, Model: "mistv3"}. HTTP/2 keepalive remains disabled by default; set EnableTTSKeepalive: true for the hosted Coda and Mist connections to opt in.
+* distinguish billing refusals from authentication failures ([#130](https://github.com/rimelabs/rime-sdk/issues/130))
+
+### Features
+
+* add opt-in TTS keepalive across SDKs ([#134](https://github.com/rimelabs/rime-sdk/issues/134)) ([586a747](https://github.com/rimelabs/rime-sdk/commit/586a7471fb5c621117351e1bfdff99c9998e2599))
+
+
+### Bug Fixes
+
+* distinguish billing refusals from authentication failures ([#130](https://github.com/rimelabs/rime-sdk/issues/130)) ([8a4dd0c](https://github.com/rimelabs/rime-sdk/commit/8a4dd0cf5b2dd592320dca10634eca7e6ab0e1bd))
+
 ## [0.1.0-alpha.30](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.29...python-v0.1.0-alpha.30) (2026-11-12)
 
 
