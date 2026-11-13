@@ -29,12 +29,18 @@ if TYPE_CHECKING:
 
 class _TTS:
     def __init__(
-        self, client: Rime, *, model: str, endpoint: str | None, timeout: float | timedelta | None
+        self,
+        client: Rime,
+        *,
+        model: str,
+        endpoint: str | None,
+        timeout: float | timedelta | None,
+        enable_keepalive: bool = False,
     ):
         self._client = client
         self._model = model
         self._timeout = _policy.timeout(timeout)
-        self._policy = _policy.resolve(model, endpoint)
+        self._policy = _policy.resolve(model, endpoint, enable_keepalive)
         self._channel: grpc.aio.Channel | None = None
         self._streams: set[AudioStream] = set()
         self._discovery_tasks: set[asyncio.Task[Any]] = set()

@@ -9,20 +9,34 @@ from rime_api import text_to_speech_pb2 as proto
 from .._errors import RimeAudioFormatError, RimeResourceLimitError, RimeStreamError
 from .._grpc import metadata_dict, rpc_error
 from .._grpc import request_id as _request_id
+from ._policy import HOSTED_TARGETS
 from ._timestamps import TimestampTrailer
 
 _MAX_SEND_BYTES = 131072
+_KEEPALIVE_TIMEOUT_MS = 20000
 
 
 def make_channel(policy):
+    options = [
+        ("grpc.enable_retries", 0),
+        ("grpc.max_receive_message_length", policy.receive_bytes),
+        ("grpc.max_send_message_length", _MAX_SEND_BYTES),
+    ]
+    if policy.enable_keepalive and policy.target in HOSTED_TARGETS:
+        options.extend(
+            [
+                ("grpc.keepalive_time_ms", 60000),
+                ("grpc.keepalive_timeout_ms", _KEEPALIVE_TIMEOUT_MS),
+                ("grpc.http2.ping_timeout_ms", _KEEPALIVE_TIMEOUT_MS),
+                ("grpc.keepalive_permit_without_calls", 1),
+                # Continue idle probes instead of stopping after two pings.
+                ("grpc.http2.max_pings_without_data", 0),
+            ]
+        )
     return grpc.aio.secure_channel(
         policy.target,
         grpc.ssl_channel_credentials(),
-        options=[
-            ("grpc.enable_retries", 0),
-            ("grpc.max_receive_message_length", policy.receive_bytes),
-            ("grpc.max_send_message_length", _MAX_SEND_BYTES),
-        ],
+        options=options,
     )
 
 

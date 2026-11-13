@@ -32,6 +32,8 @@ export interface RimeOptions {
   model?: string;
   endpoint?: string | null;
   timeout?: number | null;
+  /** Enable 60s/20s gRPC keepalive for hosted Coda/Mist TTS, including between calls. Defaults to false. */
+  enableTTSKeepalive?: boolean;
 }
 
 export class Rime {
@@ -79,7 +81,11 @@ export class Rime {
     if (typeof key !== "string" || !key.trim())
       throw new RimeAuthenticationError("Provide apiKey or set RIME_API_KEY");
     const defaultTimeout = timeout(options.timeout);
-    const deployment = resolve(options.model ?? "coda", options.endpoint);
+    const deployment = resolve(
+      options.model ?? "coda",
+      options.endpoint,
+      options.enableTTSKeepalive,
+    );
     this.credentials = new Credentials(key, deployment);
     this.sttClient = new STT(this.credentials, () => this.checkOpen());
     this.stt = {

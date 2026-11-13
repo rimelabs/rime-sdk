@@ -16,7 +16,7 @@ import {
   type MessageShape,
 } from "@bufbuild/protobuf";
 import * as schema from "@rimelabs/api";
-import { policy } from "./policy.js";
+import { policy, hostedTargets } from "./policy.js";
 import { abortable } from "../cancellation.js";
 import * as errors from "../errors.js";
 import { TimestampTrailer } from "./timestamps.js";
@@ -28,11 +28,18 @@ export interface PreparedConnection {
 }
 export type DiscoveryKind = "voices" | "languages";
 export const transport = {
-  makeClient: (target: string) =>
+  makeClient: (target: string, enableKeepalive = false) =>
     new grpc.Client(target, grpc.credentials.createSsl(), {
       "grpc.enable_retries": 0,
       "grpc.max_receive_message_length": policy.receiveBytes,
       "grpc.max_send_message_length": 131072,
+      ...(enableKeepalive && hostedTargets.has(target)
+        ? {
+            "grpc.keepalive_time_ms": 60000,
+            "grpc.keepalive_timeout_ms": 20000,
+            "grpc.keepalive_permit_without_calls": 1,
+          }
+        : {}),
     }),
 };
 export function connect(client: grpc.Client, signal: AbortSignal) {

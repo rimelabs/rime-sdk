@@ -111,6 +111,7 @@ pub struct ClientBuilder {
     model: Model,
     endpoint: Option<String>,
     timeout: Option<Duration>,
+    enable_tts_keepalive: bool,
 }
 
 impl fmt::Debug for ClientBuilder {
@@ -120,6 +121,7 @@ impl fmt::Debug for ClientBuilder {
             .field("model", &self.model)
             .field("endpoint", &self.endpoint)
             .field("timeout", &self.timeout)
+            .field("enable_tts_keepalive", &self.enable_tts_keepalive)
             .finish_non_exhaustive()
     }
 }
@@ -143,6 +145,12 @@ impl ClientBuilder {
     /// Set an overall TTS request timeout. The default is no overall timeout.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
+        self
+    }
+    /// Enable HTTP/2 keepalive on hosted Coda/Mist TTS connections, including between RPCs.
+    /// Disabled by default. Uses a 60-second interval and a 20-second response timeout.
+    pub fn enable_tts_keepalive(mut self, enabled: bool) -> Self {
+        self.enable_tts_keepalive = enabled;
         self
     }
     /// Validate configuration and create a client.
@@ -174,6 +182,19 @@ impl ClientBuilder {
                 Error::new(ErrorKind::Input, "invalid TLS configuration").caused_by(error)
             })?
             .connect_timeout(Duration::from_secs(10));
+        let normalized_target = format!(
+            "{}:{}",
+            endpoint
+                .uri()
+                .host()
+                .unwrap_or_default()
+                .to_ascii_lowercase(),
+            endpoint.uri().port_u16().unwrap_or(443)
+        );
+        let tts_keepalive_enabled = self.enable_tts_keepalive
+            && [Model::Coda, Model::MistV3]
+                .iter()
+                .any(|model| model.endpoint() == normalized_target);
         let cancellation = CancellationToken::new();
         let stt_endpoint = Endpoint::from_static("https://stt.api.rime.ai:443")
             .tls_config(ClientTlsConfig::new().with_native_roots())
@@ -191,6 +212,7 @@ impl ClientBuilder {
                 authorization,
                 model: self.model,
                 timeout: self.timeout,
+                tts_keepalive_enabled,
                 channel: OnceCell::new(),
                 cancellation,
                 tasks: TaskTracker::new(),
@@ -285,12 +307,13 @@ impl fmt::Debug for Client {
 pub(crate) struct Inner {
     pub(crate) endpoint: Endpoint,
     pub(crate) stt_endpoint: Endpoint,
-    stt_channel: OnceCell<Channel>,
+    stt_channel: OnceCell<Mutex<Option<Channel>>>,
     pub(crate) stt_limits: crate::stt::Limits,
     pub(crate) authorization: MetadataValue<Ascii>,
     pub(crate) model: Model,
     pub(crate) timeout: Option<Duration>,
-    channel: OnceCell<Channel>,
+    pub(crate) tts_keepalive_enabled: bool,
+    channel: OnceCell<Mutex<Option<Channel>>>,
     pub(crate) cancellation: CancellationToken,
     tasks: TaskTracker,
     admission: Mutex<()>,
@@ -315,9 +338,10 @@ impl Inner {
                         Error::new(ErrorKind::Unavailable, "could not connect to STT service")
                             .caused_by(error)
                     })
+                    .map(|channel| Mutex::new(Some(channel)))
             })
             .await?;
-        Ok(SpeechToTextClient::new(channel.clone())
+        Ok(SpeechToTextClient::new(self.active_channel(channel)?)
             .max_decoding_message_size(crate::stt::MAX_TRANSCRIPT_BYTES + 65_536)
             .max_encoding_message_size(131_072))
     }
@@ -337,22 +361,53 @@ impl Inner {
         let _admission = self.admission.lock().expect("admission mutex poisoned");
         self.cancellation.cancel();
         self.tasks.close();
+        for cache in [&self.channel, &self.stt_channel] {
+            if let Some(channel) = cache.get() {
+                channel.lock().expect("channel mutex poisoned").take();
+            }
+        }
+    }
+
+    fn active_channel(&self, cache: &Mutex<Option<Channel>>) -> Result<Channel, Error> {
+        let _admission = self.admission.lock().expect("admission mutex poisoned");
+        let mut channel = cache.lock().expect("channel mutex poisoned");
+        if self.cancellation.is_cancelled() {
+            channel.take();
+            return Err(Error::new(ErrorKind::Cancelled, "client is closed"));
+        }
+        channel
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| Error::new(ErrorKind::Cancelled, "client is closed"))
     }
 
     pub(crate) async fn stub(&self) -> Result<TextToSpeechClient<Channel>, Error> {
         let channel = self
             .channel
             .get_or_try_init(|| async {
-                self.endpoint.connect().await.map_err(|error| {
-                    Error::new(
-                        ErrorKind::Unavailable,
-                        "could not connect to the speech service",
-                    )
-                    .caused_by(error)
-                })
+                let endpoint = if self.tts_keepalive_enabled {
+                    self.endpoint
+                        .clone()
+                        .http2_keep_alive_interval(Duration::from_secs(60))
+                        .keep_alive_timeout(Duration::from_secs(20))
+                        .keep_alive_while_idle(true)
+                } else {
+                    self.endpoint.clone()
+                };
+                endpoint
+                    .connect()
+                    .await
+                    .map_err(|error| {
+                        Error::new(
+                            ErrorKind::Unavailable,
+                            "could not connect to the speech service",
+                        )
+                        .caused_by(error)
+                    })
+                    .map(|channel| Mutex::new(Some(channel)))
             })
             .await?;
-        Ok(TextToSpeechClient::new(channel.clone())
+        Ok(TextToSpeechClient::new(self.active_channel(channel)?)
             .max_decoding_message_size(4 * 1024 * 1024)
             .max_encoding_message_size(131_072))
     }

@@ -201,3 +201,12 @@ conformance cases. Keep `rust/testdata` identical to the corresponding files in
 Local checks, CI, and releases use the published `rimelabs-api` dependency
 from crates.io. No sibling API checkout or Cargo override is required.
 
+## Keepalive regression tests
+
+The normal package suites include keepalive configuration, endpoint scope,
+silent-stall recovery, and cleanup checks. Configuration assertions verify the
+production 60-second interval and 20-second response timeout before local peers
+use shorter test-only timings. Go uses its native minimum interval of 10 seconds;
+Python and Node.js use one second. Rust advances Tokio's virtual clock.
+These tests require no API credentials or public service connections.
+

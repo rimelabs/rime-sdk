@@ -55,6 +55,31 @@ These optional `Client::builder()` methods configure TTS. They do not configure 
 | `.model(model)` | Select `Model::Coda` or `Model::MistV3`. | No | `Model::Coda` |
 | `.endpoint(host)` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
 | `.timeout(duration)` | Overall TTS timeout as a positive `Duration`, such as `Duration::from_secs(60)`; zero is invalid. | No | No overall timeout. |
+| `.enable_tts_keepalive(enabled)` | Enable HTTP/2 keepalive for hosted Coda/Mist TTS connections. | No | `false` |
+
+### Connection keepalive
+
+The optional `.enable_tts_keepalive(enabled)` builder method is backward-compatible;
+valid existing client configurations need no changes.
+
+HTTP/2 keepalive is disabled by default. Opt in with
+`Client::builder().enable_tts_keepalive(true)` to configure a 60-second keepalive
+interval, a 20-second response timeout, and pings between RPCs. The policy applies
+to normalized `coda.api.rime.ai:443` and `mist.api.rime.ai:443` targets, including
+explicit endpoint overrides naming them. Other hosts and ports, STT, and Prism
+are excluded.
+
+Tonic does not impose Go's 30-minute channel idle retirement. An opted-in idle
+Rust connection can remain open until a peer closes it or the client releases
+it. Call `client.close().await` to cancel work and release cached gRPC channels;
+dropping the final client handle also ends its lifetime.
+
+When a probe fails, Tonic retires the transport; a subsequent call can reconnect
+through the same client. Synthesis is not replayed or resumed. A transport closure
+can interrupt every RPC sharing it. Keepalive checks the gateway connection,
+not model health. Keep overall deadlines and cancel unfinished streams: the
+progress timers pause while waiting for caller text or for buffered audio to
+be read, so keepalive does not bound an unfinished request's lifetime.
 
 ### Synthesis options
 
