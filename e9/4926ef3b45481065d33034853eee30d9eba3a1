@@ -1,0 +1,31 @@
+python/README.md
+  s_4367625ed389f8::t_c9d52fc4637486 100
+python/docs/realtime.md
+  s_4367625ed389f8::t_a90be8885263e8 109-116,164,401
+python/src/rimelabs_sdk/realtime/_conversation.py
+  s_4367625ed389f8::t_3b964960aa6bfd 15,275,288-300
+python/src/rimelabs_sdk/realtime/_session.py
+  s_4367625ed389f8::t_a12164f0c45a16 19,36
+python/src/rimelabs_sdk/realtime/_settings.py
+  s_4367625ed389f8::t_09f0c12ccda732 7
+python/src/rimelabs_sdk/realtime/_types.py
+  s_4367625ed389f8::t_3368a788f0b40f 412-418
+python/tests/test_conversation.py
+  s_4367625ed389f8::t_50c29421940ae5 148,176,326-330,335,337-338,340-342,942,945-946,949,951-952,956-960
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e94926ef3b45481065d33034853eee30d9eba3a1",
+  "prompts": {},
+  "sessions": {
+    "s_4367625ed389f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a425c22bb74276669",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
