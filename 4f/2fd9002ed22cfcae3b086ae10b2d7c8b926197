@@ -1,0 +1,71 @@
+conformance/prism/protocol.json
+  s_6e9791cf6bd12a::t_2af954422a3213 618-619,623,1018,1031-1051,1658,1669,1672,1683
+go/README.md
+  s_6e9791cf6bd12a::t_7db0e9a42261a8 410-412,794-799
+go/realtime.go
+  s_6e9791cf6bd12a::t_dd6423a53eb6ca 32,34-35,41
+go/realtime_prism_features_test.go
+  s_6e9791cf6bd12a::t_663083daac1bfc 46,53-69
+go/realtime_protocol.go
+  s_6e9791cf6bd12a::t_73c16fa4f02142 160,189-191,260
+go/realtime_protocol_test.go
+  s_6e9791cf6bd12a::t_8643b58055cd90 260
+go/realtime_types.go
+  s_6e9791cf6bd12a::t_c0ac4e63ddf25b 12-13,15-16,123-124
+go/testdata/prism/protocol.json
+  s_6e9791cf6bd12a::t_abff08eb18ccab 618-619,623,1018,1031-1051,1658,1669,1672,1683
+python/docs/realtime.md
+  s_6e9791cf6bd12a::t_18b867741933e3 190-194,674-677,682-690
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_6e9791cf6bd12a::t_a21d6ecde5f33a 186,294-295,298,303-314,328-331,335-336,362-371,400,416-418,422-423,759
+python/src/rimelabs_sdk/realtime/_settings.py
+  s_6e9791cf6bd12a::t_9fe60272f73b18 5,16-23
+python/src/rimelabs_sdk/realtime/_types.py
+  s_6e9791cf6bd12a::t_df2e64058b5704 156-157,174-176,186-187,191-192
+python/tests/test_realtime_configuration.py
+  s_6e9791cf6bd12a::t_6659df4a79cf78 203
+python/tests/test_realtime_prism_settings.py
+  s_6e9791cf6bd12a::t_dec368ab6c3291 11,380,444,447-448,456-468
+rust/README.md
+  s_6e9791cf6bd12a::t_35e16e1727664d 394-396,768-772,778-780
+rust/src/realtime/client.rs
+  s_6e9791cf6bd12a::t_d923636dc6bd1a 78,80-81,86
+rust/src/realtime/protocol.rs
+  s_6e9791cf6bd12a::t_e8fa25a2095bc7 118-120,124-128,131,134-137,147,158-166,203-206,216
+rust/src/realtime/tests/features.rs
+  s_6e9791cf6bd12a::t_e85f386602c013 137,155,177,259,278-303
+rust/src/realtime/types.rs
+  s_6e9791cf6bd12a::t_ac244d0a7c37dc 32-33,38,211-212,288-289
+rust/testdata/prism/protocol.json
+  s_6e9791cf6bd12a::t_bbab63eaee5df3 618-619,623,1018,1031-1051,1658,1669,1672,1683
+typescript/docs/realtime.md
+  s_6e9791cf6bd12a::t_426d6e828882f4 202-206,719-723,744-745,750-751
+typescript/src/realtime/protocol.ts
+  s_6e9791cf6bd12a::t_d8a55f76a65be9 297-299,303-305,327-330,334,372-378,381-383,386,419,445-449,610
+typescript/src/realtime/settings.ts
+  s_6e9791cf6bd12a::t_babf5f99fdcdba 14-16,27-31,37-38
+typescript/src/realtime/types.ts
+  s_6e9791cf6bd12a::t_444b0bda4ec5aa 65-66,68-69,115-116
+typescript/tests/realtime-configuration.test.mjs
+  s_6e9791cf6bd12a::t_14aaa1940ba340 274
+typescript/tests/realtime-prism-settings.test.mjs
+  s_6e9791cf6bd12a::t_d9267ca930be0b 10,144,155,170-189,271
+conformance/prism/README.md
+  s_6e9791cf6bd12a::t_6a72b9670e6c0c 31-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4f2fd9002ed22cfcae3b086ae10b2d7c8b926197",
+  "prompts": {},
+  "sessions": {
+    "s_6e9791cf6bd12a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a7d71b7d3e3e0ddeb",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
