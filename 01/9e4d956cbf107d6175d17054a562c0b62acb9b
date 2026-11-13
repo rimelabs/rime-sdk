@@ -1,0 +1,71 @@
+rust/README.md
+  s_5d6171e83b3aee::t_bc1754f4ac34c9 483-485,487,521-539,542,544,546-553,557-581,628-632
+rust/examples/realtime_tools.rs
+  s_5d6171e83b3aee::t_7aa1e60eae9494 35-36,52-53,70-77
+rust/src/realtime/conversation.rs
+  s_5d6171e83b3aee::t_1af89a26dc1331 178-180,188-193,196,292-296
+rust/src/realtime/dispatch.rs
+  s_9e80c9a1b7e70a::t_c1669bae2bfed7 33-34,149,164-165,170-177,271-275,277,279-290
+rust/src/realtime/mod.rs
+  s_5d6171e83b3aee::t_e761a0340a625f 19
+rust/src/realtime/protocol.rs
+  s_c609a42c2b80d2::t_fe301781752a47 6
+rust/src/realtime/session.rs
+  s_9e80c9a1b7e70a::t_81de8b59865f1d 18,22,115-118,278-279,283,293,537,575-577,589,595-601,626-630,642,645-651,655,693-698,709-710
+rust/src/realtime/tests/conversation.rs
+  s_c609a42c2b80d2::t_ff3dcd5c67e887 133-159,162-190
+rust/src/realtime/tests/history.rs
+  s_c11a1a968212dc::t_5bea3629cdea30 1-2
+rust/src/realtime/tests/lifetime.rs
+  s_c609a42c2b80d2::t_f958983c3b87ee 1,3,6-7,13,15-19,25,29,33-36,41,45-48,50-56,58-66,71,75-85
+rust/src/realtime/tests/session.rs
+  s_c11a1a968212dc::t_2c1126eddc8fa9 121-124,126,142-144,147-148,150,152-153,155-206,208-209,211-255
+rust/src/realtime/tests/updates.rs
+  s_c609a42c2b80d2::t_1ccefb4ef4e2cf 249,276
+rust/src/realtime/types.rs
+  s_5d6171e83b3aee::t_93c3b18df154c3 21-22,339-340,746
+rust/src/realtime/worker.rs
+  s_c609a42c2b80d2::t_993ec3927afd36 72-74,239-244,246-250,253-254,257,276-277,286,382,392,401,413-436,438-448
+conformance/prism/response-lifetime.md
+  s_c609a42c2b80d2::t_c3cb1259150506 36,53,55-63,65-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "019e4d956cbf107d6175d17054a562c0b62acb9b",
+  "prompts": {},
+  "sessions": {
+    "s_5d6171e83b3aee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad8f47f9d9551455e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_9e80c9a1b7e70a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a63d1422d2f0fa390",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_c11a1a968212dc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a5873ee1afb02e2b4",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_c609a42c2b80d2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a0521cb789bce7e43",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
