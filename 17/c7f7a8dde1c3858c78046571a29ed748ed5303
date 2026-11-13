@@ -1,0 +1,107 @@
+conformance/stt/README.md
+  s_8ce4d03cbced0f::t_6947d9b7f8b1d6 11-17
+go/client_test.go
+  s_692697608af3ae::t_3f7d72b6199f02 432,439-442,458-460,465
+go/stream.go
+  s_92203ed62b9a7b::t_13c5d2853510bf 332-338,346-347,372,374
+go/timestamps.go
+  s_92203ed62b9a7b::t_e2c2d806c40a8e 29,35,37-38,42,48-49,55-63,74-75
+go/timestamps_test.go
+  s_8ce4d03cbced0f::t_68dbaed206e9e1 163-165,186-205
+go/transcript_protocol.go
+  s_92203ed62b9a7b::t_05b0ff2a8c6575 5-6,8-9,15-18,25,29,34,37-41,48-53,55-61,63-70,75-78,80
+python/docs/stt.md
+  s_efa91b6c1dc943::t_cb1455838d2df0 105-106,153
+python/docs/tts.md
+  s_efa91b6c1dc943::t_c4c98c08f01249 244-248
+python/src/rimelabs_sdk/stt/_protocol.py
+  s_692697608af3ae::t_cd2dfe001f63da 1,11-12,22,25-28,31-33,37-38,50-52,54-56,59-65,68-73
+python/src/rimelabs_sdk/tts/_timestamps.py
+  s_efa91b6c1dc943::t_969d84dc38a2e8 38,42-47,55-59,63,66,69,73-75
+python/src/rimelabs_sdk/tts/_transport.py
+  s_efa91b6c1dc943::t_d7eb2e89102fff 233-238
+python/tests/test_timestamps.py
+  s_efa91b6c1dc943::t_37cbeb0e3e50bf 95-96,122-139
+python/tests/test_transport.py
+  s_692697608af3ae::t_b86f5bf511270d 177-189
+rust/src/stream.rs
+  s_92203ed62b9a7b::t_550905e89745c2 83-86,390-398,413
+rust/src/stt/protocol.rs
+  s_92203ed62b9a7b::t_35f0be4022eac9 3-5,7-8,13,19-20,28-32,49,51-54,58,60,63-69,72-73,76-77,81-82,85
+rust/src/tests/tts_features.rs
+  s_92203ed62b9a7b::t_37cffa82832cde 569-576,598-647
+rust/src/timestamps.rs
+  s_692697608af3ae::t_758a4800bc49e4 2,27,36,39,45,51-52,54-55,57-64,66-67,69-70,73,77-83
+typescript/docs/stt.md
+  s_efa91b6c1dc943::t_b91717b02f8473 100-101,153
+typescript/docs/tts.md
+  s_efa91b6c1dc943::t_5e90bf21e9d1fc 240-244
+typescript/src/stt/protocol.ts
+  s_692697608af3ae::t_dcb5b036fc1626 10,13,19-29,35-37,39-94
+typescript/src/tts/timestamps.ts
+  s_efa91b6c1dc943::t_af2a051f7c0e93 27,31-34,44-62,65-68
+typescript/src/tts/transport.ts
+  s_efa91b6c1dc943::t_093c7a01d4e778 208-213
+typescript/tests/timestamps.test.mjs
+  s_efa91b6c1dc943::t_cc93b7ca1d9ea7 107-108,158-177
+typescript/tests/transport.test.mjs
+  s_efa91b6c1dc943::t_7a0e7dbdafb6b7 195-212
+conformance/stt/transcripts.json
+  s_92203ed62b9a7b::t_5c07258bcd0ccf 126,138-143,145,148,151,154-155,163,165-166,169-171,173,176,180,183,186,188-190,197-198,202,205-207,214,217-219,230,234,237,245,249,256,260,262,298-308,339-349,374-380,398-404,439-445,476-482,507-508,652-662,689-695,776-782,819-825,850-856
+go/README.md
+  s_92203ed62b9a7b::t_f21f3635cb06a8 151,164-166
+go/testdata/stt/transcripts.json
+  s_92203ed62b9a7b::t_aed8fd262464a2 126,138-143,145,148,151,154-155,163,165-166,169-171,173,176,180,183,186,188-190,197-198,202,205-207,214,217-219,230,234,237,245,249,256,260,262,298-308,339-349,374-380,398-404,439-445,476-482,507-508,652-662,689-695,776-782,819-825,850-856
+go/transcription.go
+  s_92203ed62b9a7b::t_7ae970dfb7c6b1 78-81
+go/transcription_stream.go
+  s_92203ed62b9a7b::t_52d01030614fc3 248,261-263
+go/transcription_test.go
+  s_92203ed62b9a7b::t_dcafa34a34c586 242,282-303
+rust/README.md
+  s_92203ed62b9a7b::t_6376abb85efba5 145,158-160
+rust/src/stt/mod.rs
+  s_92203ed62b9a7b::t_4cdd22e409e790 114-115
+rust/testdata/stt/transcripts.json
+  s_92203ed62b9a7b::t_1e8c776ea2f54e 126,138-143,145,148,151,154-155,163,165-166,169-171,173,176,180,183,186,188-190,197-198,202,205-207,214,217-219,230,234,237,245,249,256,260,262,298-308,339-349,374-380,398-404,439-445,476-482,507-508,652-662,689-695,776-782,819-825,850-856
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "17c7f7a8dde1c3858c78046571a29ed748ed5303",
+  "prompts": {},
+  "sessions": {
+    "s_692697608af3ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a1bd45cc40e45f61e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_92203ed62b9a7b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae4619208eebf51f7",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_efa91b6c1dc943": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aedd029231cfa8d76",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
