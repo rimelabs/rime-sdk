@@ -1,0 +1,31 @@
+go/README.md
+  s_0e73b25dc04567::t_e0411ac220389e 497,637-638,880-934
+go/realtime.go
+  s_0e73b25dc04567::t_47d3ae0a647c4e 380
+go/realtime_peer_test.go
+  s_0e73b25dc04567::t_833be982964259 29-31,49,78
+go/realtime_protocol.go
+  s_0e73b25dc04567::t_35bcf38e1e8557 324-326,334-356
+go/realtime_raw_test.go
+  s_0e73b25dc04567::t_6aa1c433ea43de 1-132
+go/realtime_session.go
+  s_0e73b25dc04567::t_c4c7be4bf7d78c 8,36,477-497,631-648,943-944,1031-1032,1089
+go/realtime_types.go
+  s_0e73b25dc04567::t_9b79dc11309579 141-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c4c82830f837a8fa1ae2f72793335e3b5ccd5b45",
+  "prompts": {},
+  "sessions": {
+    "s_0e73b25dc04567": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a01cf5a3c732b0583",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
