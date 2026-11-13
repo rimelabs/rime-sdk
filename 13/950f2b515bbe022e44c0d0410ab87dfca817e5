@@ -1,0 +1,33 @@
+typescript/README.md
+  s_5d3041bc154804::t_fa92f4d669bdb4 121
+typescript/docs/realtime.md
+  s_5d3041bc154804::t_0a5455dd24e0c0 113-120,169,419,723-730
+typescript/src/realtime/conversation.ts
+  s_5d3041bc154804::t_8b139c1953edd9 10,312-313,315-323
+typescript/src/realtime/session.ts
+  s_5d3041bc154804::t_ceaea8f2f7dee8 21,210
+typescript/src/realtime/settings.ts
+  s_5d3041bc154804::t_b69f9716bd1e68 1
+typescript/src/realtime/types.ts
+  s_5d3041bc154804::t_1016eece761fe9 281-283
+typescript/tests/conversation.test.mjs
+  s_5d3041bc154804::t_7dd14ebb5290ce 389-428,939-962,964-965,967,969-981
+typescript/tests/realtime-tool-validation.test.mjs
+  s_5d3041bc154804::t_119ec6b06f75fc 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "13950f2b515bbe022e44c0d0410ab87dfca817e5",
+  "prompts": {},
+  "sessions": {
+    "s_5d3041bc154804": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa6afc2cbfbf5994e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
