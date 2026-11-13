@@ -1,0 +1,43 @@
+typescript/src/realtime/conversation.ts
+  s_9e80c9a1b7e70a::t_f28dcd9dcd5890 9,162-163,167,211
+typescript/src/realtime/session.ts
+  s_5d6171e83b3aee::t_ddbca2fadffc35 4,34-35,60,63,77-81,210-211,213-218,223-234,236-243,317,322-324,359-360,425-433,444-446,554-556,568,655-658,664,667,669-673,677-681,686,689,691,693-704,710,713,718-723,728-732,802-805,811,833-834,845,985,1028-1029,1035-1042,1047
+typescript/docs/realtime.md
+  s_5d6171e83b3aee::t_15d0ebb5138a59 120-121,277,282-284,311-313,380-384,390-405,441-444,446-451,473-476,504
+typescript/examples/realtime/manual-tools.ts
+  s_5d6171e83b3aee::t_dfcb1bdd5bb94a 100,102-104
+typescript/examples/realtime/tools.mjs
+  s_5d6171e83b3aee::t_56c8ebc25188eb 33-38,40,46,48-51,53,56,59-60,64-66
+typescript/tests/conversation.test.mjs
+  s_5d6171e83b3aee::t_4cc5bfb11b66f2 603-628
+typescript/tests/realtime-examples.test.mjs
+  s_5d6171e83b3aee::t_a2805b659134f7 89,93-102,111
+typescript/tests/realtime-lifetime.test.mjs
+  s_5d6171e83b3aee::t_ce9546cc677a12 1,4,22,28,32,34-38,41,43-44,47,49-57,59-69,71,73-79
+typescript/tests/realtime.test.mjs
+  s_5d6171e83b3aee::t_cc47159420c653 262-267,271-275,278-295,297-299,301,304-321,323,325,427,431-443,489-490,495-496,735-757,978,1005
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bf4040db5c5b45c27cb47899d7609e5def73c8b2",
+  "prompts": {},
+  "sessions": {
+    "s_5d6171e83b3aee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ad8f47f9d9551455e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_9e80c9a1b7e70a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a63d1422d2f0fa390",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
