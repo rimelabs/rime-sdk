@@ -1,0 +1,35 @@
+go/realtime_lifetime_test.go
+  s_9e80c9a1b7e70a::t_64fb8dfdf238e0 3-5,14,38-39,42-43,45-46,50,53-55,57,59-61,64-65,67-68,72,75-78,80-84,88,91-92,94-95,99,102-117
+go/realtime_session_test.go
+  s_9e80c9a1b7e70a::t_36f2d47b2d33e3 9,88-105,108-109,111,114-118,120-139,141-187
+go/README.md
+  s_9e80c9a1b7e70a::t_2355f42c15b0b6 402-404,499,501-502,504,580-618,621-625,629-647,659-663,761
+go/examples/realtime/tools/main.go
+  s_9e80c9a1b7e70a::t_02d466d5db69e0 10,34-35,47-53,55,65-66,68-69
+go/examples/realtime/tools/main_test.go
+  s_9e80c9a1b7e70a::t_487c1beeb7be5c 46-71
+go/realtime_conversation.go
+  s_9e80c9a1b7e70a::t_5b802ef1d0f53a 205,231-232,234,376,379-388
+go/realtime_conversation_test.go
+  s_9e80c9a1b7e70a::t_c6ce6686b85109 166-167,169,173-177,186-229,615
+go/realtime_session.go
+  s_9e80c9a1b7e70a::t_d316a21adb13f1 22-24,37-40,94-95,97-99,102-117,405-408,434-439,453-457,459,462-468,507-511,516,644,727-729,731,733-747,749-751,770-771,844,851,854,859,869,879,882-883,886,902,904-907,1095,1099-1101,1103-1104
+go/realtime_types.go
+  s_9e80c9a1b7e70a::t_b88b05b2c3d19e 142,160-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c1224914945bc1f2cd73d06983d2fb9bda533b78",
+  "prompts": {},
+  "sessions": {
+    "s_9e80c9a1b7e70a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a63d1422d2f0fa390",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
