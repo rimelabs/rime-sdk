@@ -1,0 +1,47 @@
+rust/README.md
+  s_fe22416756bd69::t_11245abe80b9bc 442-446,620-622
+rust/src/realtime/conversation.rs
+  s_fe22416756bd69::t_1a8ba4f89e72f2 82-86,312-314
+rust/src/realtime/dispatch.rs
+  s_4367625ed389f8::t_b002e3ee729352 129
+rust/src/realtime/session.rs
+  s_4367625ed389f8::t_b5a91b928ae80e 90
+rust/src/realtime/tests/conversation.rs
+  s_5d3041bc154804::t_9b7bafc3644003 432-437,454-461,466-472,476-501,503,506-516
+rust/src/realtime/types.rs
+  s_5d3041bc154804::t_41a4b699dd4c24 249-251
+rust/src/realtime/worker.rs
+  s_4367625ed389f8::t_5e7b84a55fc018 225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "58d15daf6492fc36b3cd9b7ef3b2a5cc3537e0e1",
+  "prompts": {},
+  "sessions": {
+    "s_4367625ed389f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a425c22bb74276669",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_5d3041bc154804": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-aa6afc2cbfbf5994e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_fe22416756bd69": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae07d460cb670d308",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
