@@ -1,0 +1,65 @@
+README.md
+  s_692697608af3ae::t_828b4feb8a9587 74-77
+conformance/contract.json
+  s_8ce4d03cbced0f::t_4e565d86c7ce0a 63-68,183
+go/README.md
+  s_692697608af3ae::t_da6414c9c397fe 53
+go/audio.go
+  s_692697608af3ae::t_6d6310b47f29fb 76-77
+go/client.go
+  s_692697608af3ae::t_928d195d3d9c68 37
+go/client_test.go
+  s_692697608af3ae::t_82efab86b176dc 63
+go/testdata/contract.json
+  s_8ce4d03cbced0f::t_c8119cf242d729 63-68,183
+python/README.md
+  s_692697608af3ae::t_aaa02478a95dab 132
+python/docs/tts.md
+  s_692697608af3ae::t_d37655c2c223ac 68,80-82
+python/src/rimelabs_sdk/tts/_audio.py
+  s_692697608af3ae::t_f85355579e93b3 45-46
+rust/README.md
+  s_692697608af3ae::t_b271b7bb3d5522 70
+rust/src/audio.rs
+  s_692697608af3ae::t_07b59d355d54bc 64,67
+rust/src/client.rs
+  s_692697608af3ae::t_32e0bc95044399 90-91
+rust/src/lib.rs
+  s_692697608af3ae::t_6e260d81e7d73e 5
+rust/src/tests/tts_features.rs
+  s_692697608af3ae::t_d7f1d2287ec4e2 915-921
+rust/testdata/contract.json
+  s_8ce4d03cbced0f::t_f10700343e43ee 63-68,183
+typescript/README.md
+  s_692697608af3ae::t_3baedd310645b7 154
+typescript/docs/tts.md
+  s_692697608af3ae::t_601ab05f0fb245 71,83-85
+typescript/src/tts/audio.ts
+  s_692697608af3ae::t_08aa99ab6bfb93 40-47
+typescript/src/tts/client.ts
+  s_692697608af3ae::t_5a524ed150c111 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "4793ef64fbcd995372f6ce8d1be1819283ea3580",
+  "prompts": {},
+  "sessions": {
+    "s_692697608af3ae": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-a1bd45cc40e45f61e",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    },
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
