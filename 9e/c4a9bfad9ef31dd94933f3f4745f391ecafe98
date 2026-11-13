@@ -1,0 +1,25 @@
+CONTRIBUTING.md
+  s_8ce4d03cbced0f::t_ca2b24538f4792 66,72,135,141-143
+README.md
+  s_8ce4d03cbced0f::t_88cec368a4d2fb 19-21,52-53,57,126
+RELEASING.md
+  s_8ce4d03cbced0f::t_ae48fa767f8409 3-5,117,162-166,181,248-249,280
+docs/examples.md
+  s_8ce4d03cbced0f::t_3e0b78fee0755b 17-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9ec4a9bfad9ef31dd94933f3f4745f391ecafe98",
+  "prompts": {},
+  "sessions": {
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
