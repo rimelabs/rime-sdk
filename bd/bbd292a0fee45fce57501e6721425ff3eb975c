@@ -1,0 +1,39 @@
+conformance/contract.json
+  s_3dcd284e426a38::t_53f860d97f7d34 141,146,151
+go/buffer.go
+  s_3dcd284e426a38::t_50bf7a14e1117c 36,43-45,47,55,60-61,63-68,73,75
+go/testdata/contract.json
+  s_3dcd284e426a38::t_4d36c4a950c15b 141,146,151
+python/src/rimelabs_sdk/tts/_buffer.py
+  s_3dcd284e426a38::t_38c31cd897a5e1 1,10-11,14,21,27-32,34-35
+python/src/rimelabs_sdk/tts/_client.py
+  s_3dcd284e426a38::t_a754a107a0c75c 119
+python/tests/test_audio_output.py
+  s_3dcd284e426a38::t_cb872b506523c9 66,68
+rust/src/buffer.rs
+  s_3dcd284e426a38::t_6faa79df894443 5-8,15,21-32,34,38,40
+rust/src/client.rs
+  s_3dcd284e426a38::t_39905a46b33a86 416
+rust/testdata/contract.json
+  s_3dcd284e426a38::t_cdbde81133c31b 141,146,151
+typescript/src/tts/buffer.ts
+  s_3dcd284e426a38::t_481d739741d8ad 5-6,8,21,26-31,33-34,36
+typescript/src/tts/client.ts
+  s_3dcd284e426a38::t_5774effd233409 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "bdbbd292a0fee45fce57501e6721425ff3eb975c",
+  "prompts": {},
+  "sessions": {
+    "s_3dcd284e426a38": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-acf2950da1576c03b",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
