@@ -1,0 +1,37 @@
+go/client.go
+  s_8ce4d03cbced0f::t_4c14c517d21ad3 247-251
+go/client_test.go
+  s_8ce4d03cbced0f::t_4b968baf311437 638-664
+python/src/rimelabs_sdk/_grpc.py
+  s_8ce4d03cbced0f::t_4b6cc222ce77c0 1,3,57-79
+python/src/rimelabs_sdk/stt/_client.py
+  s_8ce4d03cbced0f::t_48d7306312830b 19,142-144
+python/tests/test_endpoints.py
+  s_8ce4d03cbced0f::t_e4646e06df8b13 141-157
+typescript/src/grpc.ts
+  s_8ce4d03cbced0f::t_0d1d6e35118a4b 240-248,250-265
+python/src/rimelabs_sdk/tts/_client.py
+  s_8ce4d03cbced0f::t_da37623a24481f 12,176-178
+python/tests/test_stt.py
+  s_8ce4d03cbced0f::t_d4ab411b50fc84 603-606
+typescript/tests/endpoints.test.mjs
+  s_8ce4d03cbced0f::t_fbf2dbbee62feb 195-221
+typescript/tests/stt.test.mjs
+  s_8ce4d03cbced0f::t_79d07a92233a4d 636-639
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "35a429e50f89d4d62ea0e40a86f1b5190e9a6f00",
+  "prompts": {},
+  "sessions": {
+    "s_8ce4d03cbced0f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "88ccff6f-e4ad-40a9-a017-89e1ef98a86c",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
