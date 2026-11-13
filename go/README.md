@@ -40,6 +40,38 @@ These optional `rime.Config` fields configure TTS. They do not configure STT.
 | `Model` | Select `"coda"` or `"mistv3"`. | No | `"coda"` when empty. |
 | `Endpoint` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
 | `Timeout` | Overall TTS timeout as a `time.Duration`, such as `60 * time.Second`; zero disables it. | No | `0` |
+| `EnableTTSKeepalive` | Set `true` to enable the SDK's HTTP/2 keepalive policy on hosted TTS connections. | No | `false` |
+
+### Connection keepalive
+
+HTTP/2 keepalive is disabled by default. To enable it for a client, set:
+
+```go
+client, err := rime.NewClient(rime.Config{EnableTTSKeepalive: true})
+```
+
+When enabled for `coda.api.rime.ai:443` or `mist.api.rime.ai:443`, the SDK sends
+an HTTP/2 keepalive ping after 60 seconds without received activity, including
+between calls. If no response or other activity arrives within another
+20 seconds, gRPC closes that transport. A subsequent call can establish a new
+connection through the same client. Synthesis is not replayed or resumed
+automatically.
+
+This policy also applies when `Endpoint` explicitly names either standard hosted
+target. Other hostnames or ports, the separate STT connection, and Prism
+WebSockets do not use this TTS policy. The SDK retains gRPC's default channel
+idle retirement, so keepalive does not guarantee an indefinitely open connection.
+
+Leaving this option disabled preserves the underlying TCP keepalive behavior.
+TLS, operation deadlines, and gRPC connection recovery after detected failures
+apply with either setting. A failed keepalive check can interrupt all active
+RPCs sharing the transport. Pings check the connection to the gateway, not model
+health, so keep per-call deadlines and handle stream errors.
+
+The synthesis progress timers pause while waiting for caller-provided text or
+while audio is buffered for the reader. With no overall timeout, these pauses
+have no fixed time limit. Close unfinished streams and set `Timeout` when their
+lifetime must be bounded.
 
 ### Synthesis options
 

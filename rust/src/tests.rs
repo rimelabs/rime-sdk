@@ -29,6 +29,8 @@ use tonic::{
 type Responses =
     Pin<Box<dyn Stream<Item = Result<protocol::SynthesisResponseStream, Status>> + Send>>;
 
+mod keepalive;
+
 #[derive(Clone, Copy)]
 enum Mode {
     Echo,
@@ -228,6 +230,10 @@ impl Drop for Harness {
 
 impl Harness {
     async fn new(mode: Mode) -> Self {
+        Self::with_client(mode, Client::builder().api_key("test-key").build().unwrap()).await
+    }
+
+    async fn with_client(mode: Mode, mut client: Client) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let service = Service {
@@ -248,7 +254,6 @@ impl Harness {
                 .await
                 .unwrap();
         });
-        let mut client = Client::builder().api_key("test-key").build().unwrap();
         let inner = Arc::get_mut(&mut client.inner).unwrap();
         inner.endpoint = Endpoint::from_shared(format!("http://{address}")).unwrap();
         inner.first_audio_timeout = Duration::from_millis(200);

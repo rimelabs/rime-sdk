@@ -7,7 +7,8 @@ from rime_api import text_to_speech_pb2 as proto
 
 
 class FakeService:
-    def __init__(self):
+    def __init__(self, *, server_options=()):
+        self.server_options = server_options
         self.mode = "normal"
         self.rejection_status = grpc.StatusCode.UNAVAILABLE
         self.rejection_message = None
@@ -123,7 +124,7 @@ class FakeService:
         )
 
     async def __aenter__(self):
-        self.server = grpc.aio.server()
+        self.server = grpc.aio.server(options=self.server_options)
         from google.protobuf.message_factory import GetMessageClass
 
         handlers = {}

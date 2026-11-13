@@ -49,6 +49,10 @@ Select Mist v3 with `Rime(model="mistv3")`. Mist v1 and v2 are not supported.
 | `model` | `"coda"` | Model for speech and discovery |
 | `endpoint` | Model's standard endpoint | Custom hostname and optional port for speech and discovery |
 | `timeout` | `None` | Positive numeric seconds or `datetime.timedelta` for an overall deadline; `None` disables it |
+| `enable_tts_keepalive` | `False` | Enable fixed 60s/20s HTTP/2 keepalive for hosted Coda/Mist TTS, including between RPCs |
+
+See [connection keepalive](https://github.com/rimelabs/rime-sdk/blob/main/python/README.md#connection-keepalive)
+for endpoint scope, reconnection, and unfinished-stream lifetime limits.
 
 Authentication uses bearer tokens over TLS. The SDK does not load `.env` files.
 

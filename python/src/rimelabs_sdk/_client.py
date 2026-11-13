@@ -24,7 +24,12 @@ class Rime:
         model: str = "coda",
         endpoint: str | None = None,
         timeout: float | timedelta | None = None,
+        enable_tts_keepalive: bool = False,
     ):
+        """Create a lazy client; enable_tts_keepalive opts hosted TTS into 60s/20s pings.
+
+        Keepalive defaults to False and does not configure STT or Prism.
+        """
         key = os.getenv("RIME_API_KEY") if api_key is None else api_key
         if not isinstance(key, str) or not key.strip():
             raise RimeAuthenticationError("Provide api_key or set RIME_API_KEY")
@@ -32,7 +37,13 @@ class Rime:
         self._pid = os.getpid()
         self._closed = False
         self._close_task: asyncio.Task[None] | None = None
-        self.tts = _TTS(self, model=model, endpoint=endpoint, timeout=timeout)
+        self.tts = _TTS(
+            self,
+            model=model,
+            endpoint=endpoint,
+            timeout=timeout,
+            enable_keepalive=enable_tts_keepalive,
+        )
         self._credentials = Credentials(key, self.tts._policy)
         self.realtime = Realtime(self)
         self.stt = STT(self)

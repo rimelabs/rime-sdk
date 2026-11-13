@@ -18,7 +18,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
+)
+
+const (
+	hostedCodaTarget = "coda.api.rime.ai:443"
+	hostedMistTarget = "mist.api.rime.ai:443"
 )
 
 // Config selects credentials and a deployment. Zero values select Coda and no overall timeout.
@@ -27,6 +33,9 @@ type Config struct {
 	Model    string        // "coda" or "mistv3".
 	Endpoint string        // TLS hostname with optional port. No scheme or path.
 	Timeout  time.Duration // TTS overall timeout. Zero disables it; negative values are invalid.
+	// EnableTTSKeepalive turns on HTTP/2 pings on hosted Coda and Mist TTS connections.
+	// The default is false. It does not affect STT, Prism, or custom TTS endpoints.
+	EnableTTSKeepalive bool
 }
 
 // SynthesisOptions configures one stream. A nil Timeout inherits the client timeout.
@@ -69,6 +78,8 @@ type Client struct {
 	dialOptions        []grpc.DialOption // Private seam for tests with local services.
 	realtimeTransport  http.RoundTripper // Private seam for controlled WebSocket transport tests.
 	limits             streamLimits
+
+	enableTTSKeepalive bool
 }
 
 type TTSService struct{ client *Client }
@@ -113,9 +124,9 @@ func NewClient(config Config) (*Client, error) {
 	if model == "" {
 		model = "coda"
 	}
-	target, voice := "coda.api.rime.ai:443", "clementine"
+	target, voice := hostedCodaTarget, "clementine"
 	if model == "mistv3" {
-		target, voice = "mist.api.rime.ai:443", "astra"
+		target, voice = hostedMistTarget, "astra"
 	} else if model != "coda" {
 		return nil, failure(ErrInput, "model must be coda or mistv3")
 	}
@@ -128,6 +139,7 @@ func NewClient(config Config) (*Client, error) {
 		return nil, err
 	}
 	c := &Client{key: key, target: target, voice: voice, model: model, timeout: config.Timeout, operations: make(map[*operation]struct{}), limits: defaultStreamLimits}
+	c.enableTTSKeepalive = config.EnableTTSKeepalive
 	c.sttTarget, c.sttLimits = "stt.api.rime.ai:443", defaultTranscriptionLimits
 	c.Realtime = &RealtimeService{c}
 	c.STT = &STTService{c}
@@ -231,6 +243,13 @@ func (c *Client) prepareService(ctx context.Context, service rpcService) (*grpc.
 	}
 	if *slot == nil {
 		options := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(nil)), grpc.WithDisableRetry(), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(receiveLimit), grpc.MaxCallSendMsgSize(131072), grpc.MaxRetryRPCBufferSize(0))}
+		if service == synthesisService && c.enableTTSKeepalive && (target == hostedCodaTarget || target == hostedMistTarget) {
+			options = append(options, grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                time.Minute,
+				Timeout:             20 * time.Second,
+				PermitWithoutStream: true,
+			}))
+		}
 		options = append(options, dialOptions...)
 		var err error
 		*slot, err = grpc.NewClient(target, options...)

@@ -2,6 +2,10 @@ import { endpointAddress } from "../validation.js";
 export { timeout } from "../validation.js";
 import { RimeInputError } from "../errors.js";
 const codaHostname = "coda.api.rime.ai";
+const mistHostname = "mist.api.rime.ai";
+export const hostedTargets: ReadonlySet<string> = new Set(
+  [codaHostname, mistHostname].map((hostname) => `${hostname}:443`),
+);
 export const policy = {
   model: "coda",
   target: `${codaHostname}:443`,
@@ -18,16 +22,19 @@ export const policy = {
   progressTimeout: 60,
   discoveryTimeout: 10,
   cleanupTimeout: 2,
+  enableKeepalive: false,
 };
 export function resolve(
   model: string,
   endpoint?: string | null,
+  enableKeepalive = false,
 ): Readonly<typeof policy> {
-  const deployment = { ...policy, model };
+  if (typeof enableKeepalive !== "boolean")
+    throw new RimeInputError("enableTTSKeepalive must be a boolean");
+  const deployment = { ...policy, model, enableKeepalive };
   if (model === "mistv3") {
-    const hostname = "mist.api.rime.ai";
-    deployment.target = `${hostname}:443`;
-    deployment.audience = hostname;
+    deployment.target = `${mistHostname}:443`;
+    deployment.audience = mistHostname;
     deployment.defaultVoice = "astra";
   } else if (model !== "coda") {
     throw new RimeInputError("model must be 'coda' or 'mistv3'");

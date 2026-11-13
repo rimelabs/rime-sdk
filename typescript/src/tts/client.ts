@@ -70,7 +70,10 @@ export class TTS {
     this.checkOpen();
     const auth = await this.credentials.metadata(signal);
     this.checkOpen();
-    this.client ??= transport.makeClient(this.deployment.target);
+    this.client ??= transport.makeClient(
+      this.deployment.target,
+      this.deployment.enableKeepalive,
+    );
     await connect(this.client, signal);
     return { client: this.client, metadata: metadata(auth) };
   }

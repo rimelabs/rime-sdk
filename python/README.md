@@ -118,6 +118,26 @@ These optional `Rime(...)` arguments configure TTS. They do not configure STT or
 | `model` | Select `"coda"` or `"mistv3"`. | No | `"coda"` |
 | `endpoint` | Override the TTS TLS hostname and optional port, such as `"coda.api.rime.ai:443"`; no scheme or path. | No | `coda.api.rime.ai:443` for Coda; `mist.api.rime.ai:443` for Mist v3. |
 | `timeout` | Overall TTS timeout as positive numeric seconds or `datetime.timedelta`; `None` disables it. | No | `None` |
+| `enable_tts_keepalive` | Enable HTTP/2 keepalive for hosted Coda/Mist TTS connections. | No | `False` |
+
+### Connection keepalive
+
+HTTP/2 keepalive is disabled by default. Enable it with
+`Rime(enable_tts_keepalive=True)` to configure a 60-second keepalive interval,
+a 20-second response timeout, and pings between RPCs. Idle probes continue
+without an intervening speech request. The policy applies to normalized
+`coda.api.rime.ai:443` and `mist.api.rime.ai:443` targets, including explicit
+`endpoint` overrides naming them. Other hosts and ports, STT, and Prism are excluded.
+
+When a probe fails, gRPC retires the transport; a subsequent call can reconnect
+through the same client. Synthesis is not replayed or resumed. A transport closure
+can interrupt every RPC sharing it. Keepalive checks the gateway connection,
+not model health, and does not override gRPC's channel idle retirement.
+
+Keep overall deadlines and cancel unfinished streams. The SDK's progress timers
+pause while waiting for caller text or for buffered audio to be read, so a
+healthy connection can carry an unfinished request without a fixed lifetime
+when no overall timeout is set.
 
 ### Synthesis options
 
