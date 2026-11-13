@@ -1,0 +1,43 @@
+python/examples/realtime/manual_tools.py
+  s_e1ede02ad5c821::t_4b1566a3b36de5 69
+python/examples/realtime/tools.py
+  s_e1ede02ad5c821::t_07968f3bd0b8b4 13,49-56,58,65-67,73-74
+python/src/rimelabs_sdk/realtime/__init__.py
+  s_e1ede02ad5c821::t_d0125a1a837d67 10
+python/src/rimelabs_sdk/realtime/_conversation.py
+  s_e1ede02ad5c821::t_cc9ece1974363a 178-183,214
+python/tests/test_conversation.py
+  s_e1ede02ad5c821::t_bba46826be82d5 539-540,550,562
+python/tests/test_realtime.py
+  s_e1ede02ad5c821::t_06b5172b1059d4 468,470-472,475-488,492,494-510,519,525-542,546,549-550,554,556-557,559-560,710,728-737,883,1013,1016-1019,1022
+python/tests/test_realtime_history.py
+  s_e1ede02ad5c821::t_21a6a5df1fdbbd 6
+python/tests/test_realtime_lifetime.py
+  s_e1ede02ad5c821::t_901fc03459fe72 1,4,8,10-11,174-175,191-192,195,197-200,203,205-209,211-212,215,217-225,227-231
+conformance/prism/response-lifetime.md
+  s_e1ede02ad5c821::t_f3c46033a8416b 7-22,26-55,63-66
+python/README.md
+  s_e1ede02ad5c821::t_d136394aa26445 332-349
+python/docs/realtime.md
+  s_e1ede02ad5c821::t_67c14abb154de9 116-117,264,266-268,287-289,360-363,369-383,422-425,427-431,455-458,492
+python/src/rimelabs_sdk/realtime/_session.py
+  s_e1ede02ad5c821::t_5a6f2db5a4bb7c 18,41-42,68-69,72,90-93,179-180,185-190,192-198,255,261-264,297-298,302-305,320,353,369-377,480-484,492,541-554,559-567,575-582,585,590,592-596,598-599,651-657,659,671-674,847,886,891-897,899,903
+python/tests/test_examples.py
+  s_e1ede02ad5c821::t_cd19dd5d760028 97-104,106-107,113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e2dfb934e8c27e8cfdf2b187633fee165c1f3f44",
+  "prompts": {},
+  "sessions": {
+    "s_e1ede02ad5c821": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "agent-ae33f08e3d65982b1",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
