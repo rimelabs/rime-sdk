@@ -54,6 +54,26 @@ async def connected(monkeypatch, **options):
         yield current, peer
 
 
+def committed(peer, item_id="turn-1"):
+    peer.emit("input_audio_buffer.committed", item_id=item_id)
+
+
+def refused(peer, code, request=None):
+    """An error Prism sends; with request, correlated to it."""
+    owner = {"kind": "event", "event_id": request["event_id"]} if request else {"kind": "event"}
+    peer.emit(
+        "error",
+        error={
+            "type": "invalid_request_error",
+            "code": code,
+            "message": code,
+            "event_id": request["event_id"] if request else None,
+            "scope": "event",
+            "owner": owner,
+        },
+    )
+
+
 def speech(frames=320):
     return r.AudioChunk(data=b"\x00\x00" * frames, format=r.PCMFormat(sample_rate=16000))
 
@@ -78,9 +98,11 @@ async def test_push_to_talk_round_trip(monkeypatch):
         assert set(start) == {"type", "event_id"}
         await current.send_audio(speech())
         await peer.next("input_audio_buffer.append")
-        await current.end_turn()
+        ending = asyncio.create_task(current.end_turn())
         commit = await peer.next("input_audio_buffer.commit")
         assert set(commit) == {"type", "event_id"}
+        committed(peer)
+        await ending
 
         pending = asyncio.create_task(current.reply_to_turns())
         request = await peer.next("response.create")
@@ -123,29 +145,38 @@ async def test_reply_to_turns_waits_for_the_active_reply(monkeypatch):
         await pending
 
 
-async def test_end_turn_refusal_arrives_as_an_error_event(monkeypatch):
+async def test_end_turn_waits_until_prism_commits_the_turn(monkeypatch):
+    async with connected(monkeypatch, client_ends_turns=True) as (current, peer):
+        ending = asyncio.create_task(current.end_turn())
+        await peer.next("input_audio_buffer.commit")
+        await asyncio.sleep(0.05)
+        assert not ending.done()
+        committed(peer)
+        assert await ending is None
+
+
+@pytest.mark.parametrize("correlated", [True, False])
+async def test_end_turn_raises_when_prism_refuses_the_commit(monkeypatch, correlated):
+    # A press under 100 ms is refused with an error naming the commit. Speech
+    # over the pending audio budget is refused with an error naming nothing.
+    code = "input_audio_buffer_commit_empty" if correlated else "pending_speech_overflow"
     async with connected(monkeypatch, client_ends_turns=True) as (current, peer):
         events = current.events
-        await current.end_turn()
+        ending = asyncio.create_task(current.end_turn())
         commit = await peer.next("input_audio_buffer.commit")
-        peer.emit(
-            "error",
-            error={
-                "type": "invalid_request_error",
-                "code": "input_audio_buffer_commit_empty",
-                "message": "under 100 ms of audio",
-                "event_id": commit["event_id"],
-                "scope": "event",
-                "owner": {"kind": "event", "event_id": commit["event_id"]},
-            },
-        )
+        refused(peer, code, commit if correlated else None)
+        with pytest.raises(r.RimeRealtimeError) as raised:
+            await ending
+        assert raised.value.fault.code == code
         event = await anext(events)
         while not isinstance(event.payload, r.FaultEvent):
             event = await anext(events)
-        assert event.payload.error.code == "input_audio_buffer_commit_empty"
-        assert event.payload.error.request_id == commit["event_id"]
-        await current.end_turn()
+        assert event.payload.error.code == code
+        # The session stays usable.
+        ending = asyncio.create_task(current.end_turn())
         await peer.next("input_audio_buffer.commit")
+        committed(peer)
+        await ending
 
 
 async def test_end_turn_also_ends_a_turn_prism_detects(monkeypatch):
@@ -209,7 +240,7 @@ async def test_reply_to_turns_waits_for_readiness_after_the_turn(monkeypatch):
         peer.emit("input_audio_buffer.speech_started", item_id="turn-1", audio_start_ms=0)
         await current.send_audio(speech())
         await peer.next("input_audio_buffer.append")
-        await current.end_turn()
+        ending = asyncio.create_task(current.end_turn())
         await peer.next("input_audio_buffer.commit")
         peer.emit(
             "input_audio_buffer.speech_stopped",
@@ -217,7 +248,8 @@ async def test_reply_to_turns_waits_for_readiness_after_the_turn(monkeypatch):
             audio_end_ms=40,
             prism_end_reason="client_commit",
         )
-        peer.emit("input_audio_buffer.committed", item_id="turn-1")
+        committed(peer)
+        await ending
         while not isinstance((await anext(events)).payload, r.InputCommitted):
             pass
 
@@ -246,7 +278,9 @@ async def test_turn_controls_follow_audio_sent_before_them(monkeypatch, operatio
         await asyncio.sleep(0.05)
         assert peer.sent.empty(), "the turn control overtook audio sent before it"
         peer.emit("input_audio_buffer.cleared")
-        await asyncio.gather(clearing, sending, control)
         for _ in range(3):  # 120 ms of audio is three 40 ms appends.
             await peer.next("input_audio_buffer.append")
         await peer.next(kind)
+        if operation == "end_turn":
+            committed(peer)
+        await asyncio.gather(clearing, sending, control)

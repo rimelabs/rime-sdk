@@ -1,6 +1,6 @@
 import { test as nativeTest } from "node:test";
 import assert from "node:assert/strict";
-import { Rime, RimeInputError } from "../dist/index.js";
+import { Rime, RimeInputError, RimeRealtimeError } from "../dist/index.js";
 import { Peer } from "./realtime-peer.mjs";
 
 const test = (name, body) => nativeTest(name, { timeout: 5000 }, body);
@@ -36,6 +36,12 @@ async function nextOf(events, kind) {
   }
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function committed(peer, itemId = "turn-1") {
+  peer.emit("input_audio_buffer.committed", { item_id: itemId });
+}
+
 function speech() {
   return {
     data: new Uint8Array(640),
@@ -64,9 +70,11 @@ test("push-to-talk round trip", async (t) => {
   assert.deepEqual(Object.keys(start).sort(), ["event_id", "type"]);
   await session.sendAudio(speech());
   await peer.next("input_audio_buffer.append");
-  await session.endTurn();
+  const ending = session.endTurn();
   const commit = await peer.next("input_audio_buffer.commit");
   assert.deepEqual(Object.keys(commit).sort(), ["event_id", "type"]);
+  committed(peer);
+  await ending;
   const pending = session.replyToTurns();
   const request = await peer.next("response.create");
   assert.deepEqual(request.response, {});
@@ -100,18 +108,53 @@ test("replyToTurns waits while another reply is active", async (t) => {
   await pending;
 });
 
-test("an endTurn refusal arrives as an error event", async (t) => {
+test("endTurn waits until Prism commits the turn", async (t) => {
   const { session, peer } = await setup(t, { clientEndsTurns: true });
-  const events = session.events;
-  await session.endTurn();
-  const commit = await peer.next("input_audio_buffer.commit");
-  peer.fault(commit, "input_audio_buffer_commit_empty");
-  const event = await nextOf(events, "error");
-  assert.equal(event.payload.error.code, "input_audio_buffer_commit_empty");
-  assert.equal(event.payload.error.requestId, commit.event_id);
-  await session.endTurn();
+  let settled = false;
+  const ending = session.endTurn().finally(() => (settled = true));
   await peer.next("input_audio_buffer.commit");
+  await sleep(50);
+  assert.equal(settled, false);
+  committed(peer);
+  assert.equal(await ending, undefined);
 });
+
+// A press under 100 ms is refused with an error naming the commit. Speech
+// over the pending audio budget is refused with an error naming nothing.
+for (const [code, correlated] of [
+  ["input_audio_buffer_commit_empty", true],
+  ["pending_speech_overflow", false],
+]) {
+  test(`endTurn throws when Prism refuses the commit: ${code}`, async (t) => {
+    const { session, peer } = await setup(t, { clientEndsTurns: true });
+    const events = session.events;
+    const ending = session.endTurn();
+    const commit = await peer.next("input_audio_buffer.commit");
+    if (correlated) peer.fault(commit, code);
+    else
+      peer.emit("error", {
+        error: {
+          type: "invalid_request_error",
+          code,
+          message: code,
+          scope: "event",
+          owner: { kind: "event" },
+        },
+      });
+    await assert.rejects(
+      ending,
+      (error) =>
+        error instanceof RimeRealtimeError && error.fault.code === code,
+    );
+    const event = await nextOf(events, "error");
+    assert.equal(event.payload.error.code, code);
+    // The session stays usable.
+    const again = session.endTurn();
+    await peer.next("input_audio_buffer.commit");
+    committed(peer);
+    await again;
+  });
+}
 
 test("endTurn also ends a turn Prism detects", async (t) => {
   const { session, peer } = await setup(t);
@@ -183,8 +226,6 @@ test("client-ended turns refuse later turn settings", async (t) => {
   assert.equal(peer.requests.length, before);
 });
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 test("replyToTurns waits for readiness after the turn", async (t) => {
   // Prism's own order: the turn's start clears readiness, and its end restores it.
   const { session, peer } = await setup(t, { clientEndsTurns: true });
@@ -197,14 +238,15 @@ test("replyToTurns waits for readiness after the turn", async (t) => {
   });
   await session.sendAudio(speech());
   await peer.next("input_audio_buffer.append");
-  await session.endTurn();
+  const ending = session.endTurn();
   await peer.next("input_audio_buffer.commit");
   peer.emit("input_audio_buffer.speech_stopped", {
     item_id: "turn-1",
     audio_end_ms: 40,
     prism_end_reason: "client_commit",
   });
-  peer.emit("input_audio_buffer.committed", { item_id: "turn-1" });
+  committed(peer);
+  await ending;
   await nextOf(events, "input.committed");
   const pending = session.replyToTurns();
   await sleep(50);
@@ -242,9 +284,10 @@ for (const [operation, kind] of [
       "the turn control overtook audio sent before it",
     );
     peer.emit("input_audio_buffer.cleared");
-    await Promise.all([clearing, sending, control]);
     // 120 ms of audio is three 40 ms appends.
     for (let i = 0; i < 3; i++) await peer.next("input_audio_buffer.append");
     await peer.next(kind);
+    if (operation === "endTurn") committed(peer);
+    await Promise.all([clearing, sending, control]);
   });
 }

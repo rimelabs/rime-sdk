@@ -115,6 +115,10 @@ impl Worker {
             if c.kind == Kind::Clear && e.kind == "audio.cleared" {
                 matching = true
             }
+            // Commits wait for one another, so at most one waits for this answer.
+            if c.kind == Kind::Commit && !c.expected.is_empty() && e.kind == "input.committed" {
+                matching = true
+            }
             if c.kind == Kind::Truncate
                 && e.kind == "item.truncated"
                 && e.target == c.target
@@ -290,8 +294,16 @@ impl Worker {
                         if c.finished {
                             continue;
                         }
+                        // Prism refuses a commit over its pending audio budget
+                        // without naming it.
+                        let overflow = f.code == "pending_speech_overflow"
+                            && f.request_id.is_none()
+                            && c.submitted
+                            && c.kind == Kind::Commit
+                            && !c.expected.is_empty();
                         if (c.submitted
                             && f.request_id.as_deref() == Some(&format!("evt_{}", c.id)))
+                            || overflow
                             || (f.code == "typed_turn_superseded"
                                 && f.item_id
                                     .as_ref()

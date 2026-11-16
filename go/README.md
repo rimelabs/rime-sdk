@@ -480,8 +480,9 @@ reply, err := session.ReplyToTurns(ctx)
   Prism announces the turn with `SpeechStarted` and cuts off any reply, so stop
   playback and report what the caller heard, as for any interruption.
   `ConversationRunner` does this for you.
-- `EndTurn` ends the turn at the audio sent so far. Prism does not reply on its
-  own. A turn longer than 55 s keeps its last 55 s.
+- `EndTurn` ends the turn at the audio sent so far and returns once Prism
+  commits it. Prism does not reply on its own. A turn longer than 55 s keeps
+  its last 55 s.
 - `ReplyToTurns` asks for the reply. It answers every turn ended since the last
   reply. While another reply runs, it waits until Prism is idle, then sends the
   request. `ReplyToTurnsWithOptions` adds labels for this reply.
@@ -489,17 +490,18 @@ reply, err := session.ReplyToTurns(ctx)
   `ClearAudio`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `Cancel` and `ReportPlayback`.
 
-`StartTurn` and `EndTurn` get no acknowledgment. Prism refuses an `EndTurn`
-with under 100 ms of audio with `input_audio_buffer_commit_empty`. The refusal
-arrives as a `FaultEvent` with that code.
+If Prism refuses the turn, `EndTurn` returns an error carrying a
+`*RealtimeFault`. A press under 100 ms is refused with
+`input_audio_buffer_commit_empty`: nothing is committed, so don't ask for a
+reply. `StartTurn` gets no acknowledgment.
 
 The setting is fixed for the session. With it, `Connect` returns an error
 matching `ErrInput` for `TurnDetection` or a false `InterruptOnSpeech`, and
 `Update` returns one for any `TurnDetection` or `InterruptOnSpeech`.
 `session.Info().ClientEndsTurns` is true once Prism confirms it, and
 `InterruptOnSpeech` is false, because speech alone interrupts nothing.
-`EndTurn` also works without this setting: it ends the turn under way, and
-Prism replies as usual.
+`EndTurn` also works without this setting: it ends the turn under way and
+returns once sent, and Prism replies as usual.
 
 ### Update session settings
 

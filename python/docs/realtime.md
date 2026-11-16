@@ -231,8 +231,9 @@ async with client.realtime.connect(client_ends_turns=True) as session:
   Prism announces the turn with `SpeechStarted` and cuts off any reply, so stop
   playback and report what the caller heard, as for any interruption.
   `run_conversation` does this for you.
-- `end_turn()` ends the turn at the audio sent so far. Prism does not reply on
-  its own. A turn longer than 55 s keeps its last 55 s.
+- `end_turn()` ends the turn at the audio sent so far and returns once Prism
+  commits it. Prism does not reply on its own. A turn longer than 55 s keeps
+  its last 55 s.
 - `reply_to_turns(metadata=None)` asks for the reply. It answers every turn
   ended since the last reply. While another reply runs, it waits until Prism is
   idle, then sends the request.
@@ -240,9 +241,9 @@ async with client.realtime.connect(client_ends_turns=True) as session:
   `clear_audio()`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `cancel` and `report_playback`.
 
-`start_turn` and `end_turn` get no acknowledgment. Prism refuses an `end_turn`
-with under 100 ms of audio with `input_audio_buffer_commit_empty`. The refusal
-arrives as a `FaultEvent` with that code.
+If Prism refuses the turn, `end_turn` raises `RimeRealtimeError`. A press
+under 100 ms is refused with `input_audio_buffer_commit_empty`: nothing is
+committed, so don't ask for a reply. `start_turn` gets no acknowledgment.
 
 The setting is fixed for the session. With it, `connect` raises
 `RimeInputError` for `turn_detection` or `interrupt_on_speech=False`, and
@@ -250,7 +251,8 @@ The setting is fixed for the session. With it, `connect` raises
 `session.info.client_ends_turns` is
 `True` once Prism confirms it, and `session.info.interrupt_on_speech` is
 `False`, because speech alone interrupts nothing. `end_turn()` also works
-without this setting: it ends the turn under way, and Prism replies as usual.
+without this setting: it ends the turn under way and returns once sent, and
+Prism replies as usual.
 
 ## Update session settings
 
@@ -308,7 +310,7 @@ Each method is async. Arguments without a default are required.
 | `cancel(response)` | Request that generation stop. | `None` when the response is terminal |
 | `clear_audio()` | Clear buffered input and reset audio conversion. | `None` after acknowledgment |
 | `start_turn()` | Start the user's turn, with `client_ends_turns`. | `None` once sent |
-| `end_turn()` | End the user's turn at the audio sent so far. | `None` once sent |
+| `end_turn()` | End the user's turn at the audio sent so far. | `None` once committed, with `client_ends_turns`; else once sent |
 | `reply_to_turns(*, metadata=None)` | Ask for the reply to the turns you ended, with `client_ends_turns`. | `ResponseRef` at response creation |
 | `set_response_metadata(metadata)` | Replace the labels for later replies. | `None` once Prism confirms |
 | `report_playback(report)` | Report interrupted or finished playback. | `None` |

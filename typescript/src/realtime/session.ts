@@ -863,14 +863,20 @@ export class RealtimeSession {
     return this.sendUnacknowledged("prism.input_audio_buffer.start", options);
   }
   /** End the user's turn at the audio sent so far, for example as a button
-   * goes up. With `clientEndsTurns`, Prism then waits for `replyToTurns`;
-   * otherwise it replies as when it ends the turn itself. Prism sends no
-   * acknowledgment; a refusal arrives as an `error` event. */
+   * goes up. With `clientEndsTurns`, this resolves once Prism commits the turn,
+   * and rejects with `RimeRealtimeError` if Prism refuses it, as it refuses a
+   * press under 100 ms; Prism then waits for `replyToTurns`. Otherwise Prism
+   * replies as when it ends the turn itself; it sends no acknowledgment, and a
+   * refusal arrives as an `error` event. */
   async endTurn(options: t.RealtimeOperationOptions = {}): Promise<void> {
-    // TODO(open decision D1): wait for the commit or its refusal, or return the
-    // event ID? A press under 100 ms is refused, and replyToTurns would then
-    // answer the last turn again.
-    return this.sendUnacknowledged("input_audio_buffer.commit", options);
+    if (!this.info.clientEndsTurns)
+      // A commit just after Prism ended the turn itself gets no answer.
+      return this.sendUnacknowledged("input_audio_buffer.commit", options);
+    return this.operation(options, (signal) =>
+      this.locked(this.audioLock, signal, async () => {
+        await this.request(p.requests.commit, {}, signal);
+      }),
+    );
   }
   /** Ask for the reply to the conversation as it is, after `endTurn`. Only
    * with `clientEndsTurns`. The reply answers every turn ended since the last
@@ -1029,7 +1035,14 @@ export class RealtimeSession {
       pending.result.resolve(result);
     }
   }
-  private reject(key: string | null, error: RimeError) {
+  /** The audio lock keeps at most one commit waiting. With client-ended turns,
+   * only a commit commits a turn, so Prism's next answer about one is its own. */
+  private pendingCommit(): string | undefined {
+    for (const [key, pending] of this.pending)
+      if (pending.request === p.requests.commit) return key;
+    return undefined;
+  }
+  private reject(key: string | null | undefined, error: RimeError) {
     this.pending.get(key ?? "")?.result.reject(error);
   }
   private fail(error: RimeError) {
@@ -1188,6 +1201,9 @@ export class RealtimeSession {
         this.readyEpoch++;
         this.ready.set();
         break;
+      case "input.committed":
+        this.settle(this.pendingCommit(), payload);
+        break;
       case "speech.started":
         this.readyEpoch++;
         this.ready.clear();
@@ -1273,6 +1289,9 @@ export class RealtimeSession {
           error = new t.RimeRealtimeError(fault);
         if (NOT_READY.has(fault.code)) this.ready.clear();
         this.reject(fault.requestId, error);
+        if (fault.code === "pending_speech_overflow" && fault.requestId == null)
+          // Prism refuses a commit over its pending audio budget without naming it.
+          this.reject(this.pendingCommit(), error);
         if (fault.code === "typed_turn_superseded" && fault.itemId)
           for (const [key, pending] of this.pending)
             if (pending.itemId === fault.itemId) this.reject(key, error);

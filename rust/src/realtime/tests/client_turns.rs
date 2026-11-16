@@ -21,6 +21,17 @@ async fn client_turns() -> (Peer, crate::Client, RealtimeSession) {
     (peer, client, session)
 }
 
+/// End the turn in the background, since end_turn waits for Prism's answer.
+fn end_turn(session: &RealtimeSession) -> tokio::task::JoinHandle<Result<(), crate::Error>> {
+    let session = session.clone();
+    tokio::spawn(async move { session.end_turn().await })
+}
+
+async fn committed(peer: &Peer) {
+    peer.send(json!({"type":"input_audio_buffer.committed","item_id":"turn-1"}))
+        .await;
+}
+
 #[tokio::test]
 async fn client_ended_turns_send_null_turn_detection() {
     let (_peer, _client, session) = client_turns().await;
@@ -54,9 +65,11 @@ async fn push_to_talk_round_trip() {
         .await
         .unwrap();
     peer.next("input_audio_buffer.append").await;
-    session.end_turn().await.unwrap();
+    let ending = end_turn(&session);
     let commit = peer.next("input_audio_buffer.commit").await;
     assert_eq!(commit.as_object().unwrap().len(), 2);
+    committed(&peer).await;
+    ending.await.unwrap().unwrap();
     let pending = tokio::spawn(async move { session.reply_to_turns().await });
     let request = peer.next("response.create").await;
     assert_eq!(request["response"], json!({}));
@@ -98,22 +111,50 @@ async fn reply_to_turns_waits_for_the_active_reply() {
 }
 
 #[tokio::test]
-async fn end_turn_refusal_arrives_as_an_error_event() {
+async fn end_turn_waits_until_prism_commits_the_turn() {
     let (mut peer, _client, session) = client_turns().await;
-    let mut events = session.events().unwrap();
-    session.end_turn().await.unwrap();
-    let commit = peer.next("input_audio_buffer.commit").await;
-    peer.send(json!({"type":"error","error":{"code":"input_audio_buffer_commit_empty","scope":"event","owner":{"event_id":commit["event_id"]}}}))
-        .await;
-    loop {
-        if let RealtimeEvent::Fault(fault) = event(&mut events).await.payload {
-            assert_eq!(fault.code, "input_audio_buffer_commit_empty");
-            assert_eq!(fault.request_id.as_deref(), commit["event_id"].as_str());
-            break;
-        }
-    }
-    session.end_turn().await.unwrap();
+    let ending = end_turn(&session);
     peer.next("input_audio_buffer.commit").await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert!(!ending.is_finished());
+    committed(&peer).await;
+    ending.await.unwrap().unwrap();
+}
+
+/// A press under 100 ms is refused with an error naming the commit. Speech
+/// over the pending audio budget is refused with an error naming nothing.
+#[tokio::test]
+async fn end_turn_fails_when_prism_refuses_the_commit() {
+    for code in ["input_audio_buffer_commit_empty", "pending_speech_overflow"] {
+        let (mut peer, _client, session) = client_turns().await;
+        let mut events = session.events().unwrap();
+        let ending = end_turn(&session);
+        let commit = peer.next("input_audio_buffer.commit").await;
+        let owner = if code == "input_audio_buffer_commit_empty" {
+            json!({"event_id":commit["event_id"]})
+        } else {
+            json!({})
+        };
+        peer.send(json!({"type":"error","error":{"code":code,"scope":"event","owner":owner}}))
+            .await;
+        let error = tokio::time::timeout(Duration::from_secs(3), ending)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.realtime_fault().map(|f| f.code.as_str()), Some(code));
+        loop {
+            if let RealtimeEvent::Fault(fault) = event(&mut events).await.payload {
+                assert_eq!(fault.code, code);
+                break;
+            }
+        }
+        // The session stays usable.
+        let ending = end_turn(&session);
+        peer.next("input_audio_buffer.commit").await;
+        committed(&peer).await;
+        ending.await.unwrap().unwrap();
+    }
 }
 
 #[tokio::test]
@@ -210,12 +251,12 @@ async fn reply_to_turns_waits_for_readiness_after_the_turn() {
         .await
         .unwrap();
     peer.next("input_audio_buffer.append").await;
-    session.end_turn().await.unwrap();
+    let ending = end_turn(&session);
     peer.next("input_audio_buffer.commit").await;
     peer.send(json!({"type":"input_audio_buffer.speech_stopped","item_id":"turn-1","audio_end_ms":40,"prism_end_reason":"client_commit"}))
         .await;
-    peer.send(json!({"type":"input_audio_buffer.committed","item_id":"turn-1"}))
-        .await;
+    committed(&peer).await;
+    ending.await.unwrap().unwrap();
     while !matches!(
         event(&mut events).await.payload,
         RealtimeEvent::InputCommitted { .. }
@@ -262,13 +303,16 @@ async fn turn_controls_follow_audio_sent_before_them() {
         peer.no_request().await;
         peer.send(json!({"type":"input_audio_buffer.cleared"}))
             .await;
-        clearing.await.unwrap().unwrap();
-        sending.await.unwrap().unwrap();
-        controlling.await.unwrap().unwrap();
         // 120 ms of audio is three 40 ms appends.
         for _ in 0..3 {
             peer.next("input_audio_buffer.append").await;
         }
         peer.next(kind).await;
+        if kind == "input_audio_buffer.commit" {
+            committed(&peer).await;
+        }
+        clearing.await.unwrap().unwrap();
+        sending.await.unwrap().unwrap();
+        controlling.await.unwrap().unwrap();
     }
 }

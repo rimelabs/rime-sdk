@@ -517,13 +517,12 @@ func (s *RealtimeSession) StartTurn(ctx context.Context) error {
 }
 
 // EndTurn ends the user's turn at the audio sent so far, for example as a
-// button goes up. With ClientEndsTurns, Prism then waits for ReplyToTurns;
-// otherwise it replies as when it ends the turn itself. Prism sends no
-// acknowledgment; a refusal arrives as a FaultEvent.
+// button goes up. With ClientEndsTurns, it returns once Prism commits the turn,
+// and returns a *RealtimeFault error if Prism refuses it, as it refuses a press
+// under 100 ms; Prism then waits for ReplyToTurns. Otherwise Prism replies as
+// when it ends the turn itself; it sends no acknowledgment, and a refusal
+// arrives as a FaultEvent.
 func (s *RealtimeSession) EndTurn(ctx context.Context) error {
-	// TODO(open decision D1): wait for the commit or its refusal, or return the
-	// event ID? A press under 100 ms is refused, and ReplyToTurns would then
-	// answer the last turn again.
 	_, e := s.invoke(ctx, &rtCommand{kind: "commit", body: rtObject{}})
 	return e
 }
@@ -1028,11 +1027,16 @@ func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 		c.expected = "audio.cleared"
 	case "audio":
 		wire = "input_audio_buffer.append"
-	// Prism answers these only with a correlated error, which reaches Recv.
+	// Prism answers a start only with a correlated error, which reaches Recv.
 	case "start":
 		wire = "prism.input_audio_buffer.start"
 	case "commit":
 		wire = "input_audio_buffer.commit"
+		// With client-ended turns, only a commit commits a turn. With turn
+		// detection, a commit just after Prism ended the turn gets no answer.
+		if w.s.Info().ClientEndsTurns {
+			c.expected = "input.committed"
+		}
 	}
 	if c.id != "" {
 		return false, nil
@@ -1169,6 +1173,10 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		if e.kind == "audio.cleared" && c.kind == "clear" {
 			match = true
 		}
+		// Commits wait for one another, so at most one waits for this answer.
+		if e.kind == "input.committed" && c.kind == "commit" && c.expected != "" {
+			match = true
+		}
 		if e.kind == "item.truncated" && c.kind == "truncate" && c.target == e.target && e.index == 0 {
 			match = true
 		}
@@ -1288,7 +1296,9 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 			if c.finished {
 				continue
 			}
-			if (c.submitted && f.RequestID != "" && c.id == f.RequestID) || (f.Code == "typed_turn_superseded" && f.ItemID != "" && c.itemID == f.ItemID) {
+			// Prism refuses a commit over its pending audio budget without naming it.
+			overflow := f.Code == "pending_speech_overflow" && f.RequestID == "" && c.submitted && c.kind == "commit" && c.expected != ""
+			if (c.submitted && f.RequestID != "" && c.id == f.RequestID) || (f.Code == "typed_turn_superseded" && f.ItemID != "" && c.itemID == f.ItemID) || overflow {
 				if busy && (c.kind == "text" || c.kind == "reply") && c.ctx.Err() == nil {
 					c.id = ""
 					c.frames = nil

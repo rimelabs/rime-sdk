@@ -614,7 +614,14 @@ impl Worker {
             }
             Kind::Audio => "input_audio_buffer.append",
             Kind::Start => "prism.input_audio_buffer.start",
-            Kind::Commit => "input_audio_buffer.commit",
+            Kind::Commit => {
+                // With client-ended turns, only a commit commits a turn. With turn
+                // detection, a commit just after Prism ended the turn gets no answer.
+                if self.client_ends_turns() {
+                    c.expected = "input.committed";
+                }
+                "input_audio_buffer.commit"
+            }
             Kind::Review => "prism.review.result",
         };
         if c.kind == Kind::Cancel {
@@ -651,6 +658,16 @@ impl Worker {
 #[cfg(test)]
 #[path = "tests/submission.rs"]
 mod submission_tests;
+
+impl Worker {
+    fn client_ends_turns(&self) -> bool {
+        self.info
+            .lock()
+            .expect("session info mutex")
+            .as_ref()
+            .is_some_and(|info| info.client_ends_turns)
+    }
+}
 
 /// The commands that reach Prism in the order the caller sent them, so a turn's
 /// start and end fall where the caller put them in its audio.

@@ -127,6 +127,7 @@ export type Acknowledgment =
   | ItemCreated
   | ToolResultCreated
   | AudioCleared
+  | t.InputCommitted
   | t.ItemTruncated
   | t.ResponseStarted
   | ResponseEnded;
@@ -157,6 +158,7 @@ export type RequestKind =
   | "response.create"
   | "response.cancel"
   | "input_audio_buffer.clear"
+  | "input_audio_buffer.commit"
   | "conversation.item.truncate";
 
 /** A request carries its result type and checks it before exposing the result. */
@@ -222,6 +224,10 @@ export const requests = {
   clear: new Request(
     "input_audio_buffer.clear",
     (e): e is AudioCleared => e.kind === "audio.cleared",
+  ),
+  commit: new Request(
+    "input_audio_buffer.commit",
+    (e): e is t.InputCommitted => e.kind === "input.committed",
   ),
   truncate: new Request(
     "conversation.item.truncate",

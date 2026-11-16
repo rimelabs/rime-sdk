@@ -145,6 +145,7 @@ Acknowledgment: TypeAlias = (
     | ItemCreated
     | ToolResultCreated
     | AudioCleared
+    | t.InputCommitted
     | t.ItemTruncated
     | t.ResponseStarted
     | ResponseEnded
@@ -181,6 +182,7 @@ RequestKind: TypeAlias = Literal[
     "response.create",
     "response.cancel",
     "input_audio_buffer.clear",
+    "input_audio_buffer.commit",
     "conversation.item.truncate",
 ]
 ResultT_co = TypeVar("ResultT_co", bound=Acknowledgment, covariant=True)
@@ -211,6 +213,7 @@ CREATE = Request("response.create", t.ResponseStarted)
 TEXT = Request("response.create", t.ResponseStarted, allows_item_created=True)
 CANCEL = Request("response.cancel", ResponseEnded)
 CLEAR = Request("input_audio_buffer.clear", AudioCleared)
+COMMIT = Request("input_audio_buffer.commit", t.InputCommitted)
 TRUNCATE = Request("conversation.item.truncate", t.ItemTruncated)
 
 

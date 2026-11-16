@@ -20,6 +20,17 @@ func clientTurnsSession(t *testing.T) (*realtimePeer, *RealtimeSession) {
 	return p, s
 }
 
+// endTurn runs EndTurn in the background, since it waits for Prism's answer.
+func endTurn(s *RealtimeSession) chan error {
+	done := make(chan error, 1)
+	go func() { done <- s.EndTurn(context.Background()) }()
+	return done
+}
+
+func committed(p *realtimePeer) {
+	p.send(rtObject{"type": "input_audio_buffer.committed", "item_id": "turn-1"})
+}
+
 func eventOf[T any](t *testing.T, s *RealtimeSession) (SessionEvent, T) {
 	t.Helper()
 	for {
@@ -66,12 +77,12 @@ func TestClientEndedTurnsPushToTalk(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.next("input_audio_buffer.append")
-	if err := s.EndTurn(ctx); err != nil {
-		t.Fatal(err)
-	}
+	ending := endTurn(s)
 	if commit := p.next("input_audio_buffer.commit"); len(commit) != 2 {
 		t.Fatal(commit)
 	}
+	committed(p)
+	rtWait(t, ending)
 	done := make(chan ResponseRef, 1)
 	go func() {
 		ref, err := s.ReplyToTurns(ctx)
@@ -128,22 +139,52 @@ func TestReplyToTurnsWaitsForTheActiveReply(t *testing.T) {
 	rtWait(t, done)
 }
 
-func TestEndTurnRefusalArrivesAsAnErrorEvent(t *testing.T) {
+func TestEndTurnWaitsUntilPrismCommitsTheTurn(t *testing.T) {
 	p, s := clientTurnsSession(t)
-	ctx := context.Background()
-	if err := s.EndTurn(ctx); err != nil {
-		t.Fatal(err)
-	}
-	commit := p.next("input_audio_buffer.commit")
-	p.send(rtObject{"type": "error", "error": rtObject{"code": "input_audio_buffer_commit_empty", "scope": "event", "owner": rtObject{"event_id": commit["event_id"]}}})
-	_, fault := eventOf[FaultEvent](t, s)
-	if fault.Fault.Code != "input_audio_buffer_commit_empty" || fault.Fault.RequestID != commit["event_id"] {
-		t.Fatal(fault.Fault)
-	}
-	if err := s.EndTurn(ctx); err != nil {
-		t.Fatal(err)
-	}
+	ending := endTurn(s)
 	p.next("input_audio_buffer.commit")
+	select {
+	case err := <-ending:
+		t.Fatalf("returned before Prism committed the turn: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	committed(p)
+	rtWait(t, ending)
+}
+
+// A press under 100 ms is refused with an error naming the commit. Speech over
+// the pending audio budget is refused with an error naming nothing.
+func TestEndTurnFailsWhenPrismRefusesTheCommit(t *testing.T) {
+	for _, code := range []string{"input_audio_buffer_commit_empty", "pending_speech_overflow"} {
+		t.Run(code, func(t *testing.T) {
+			p, s := clientTurnsSession(t)
+			ending := endTurn(s)
+			commit := p.next("input_audio_buffer.commit")
+			owner := rtObject{}
+			if code == "input_audio_buffer_commit_empty" {
+				owner["event_id"] = commit["event_id"]
+			}
+			p.send(rtObject{"type": "error", "error": rtObject{"code": code, "scope": "event", "owner": owner}})
+			var err error
+			select {
+			case err = <-ending:
+			case <-time.After(3 * time.Second):
+				t.Fatal("EndTurn did not return")
+			}
+			var fault *RealtimeFault
+			if !errors.As(err, &fault) || fault.Code != code {
+				t.Fatalf("err = %v", err)
+			}
+			if _, event := eventOf[FaultEvent](t, s); event.Fault.Code != code {
+				t.Fatal(event.Fault)
+			}
+			// The session stays usable.
+			ending = endTurn(s)
+			p.next("input_audio_buffer.commit")
+			committed(p)
+			rtWait(t, ending)
+		})
+	}
 }
 
 func TestEndTurnAlsoEndsATurnPrismDetects(t *testing.T) {
@@ -256,12 +297,11 @@ func TestReplyToTurnsWaitsForReadinessAfterTheTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.next("input_audio_buffer.append")
-	if err := s.EndTurn(ctx); err != nil {
-		t.Fatal(err)
-	}
+	ending := endTurn(s)
 	p.next("input_audio_buffer.commit")
 	p.send(rtObject{"type": "input_audio_buffer.speech_stopped", "item_id": "turn-1", "audio_end_ms": 40, "prism_end_reason": "client_commit"})
-	p.send(rtObject{"type": "input_audio_buffer.committed", "item_id": "turn-1"})
+	committed(p)
+	rtWait(t, ending)
 	eventOf[InputCommitted](t, s)
 	done := make(chan ResponseRef, 1)
 	go func() {
@@ -315,13 +355,16 @@ func TestTurnControlsFollowAudioSentBeforeThem(t *testing.T) {
 			case <-time.After(50 * time.Millisecond):
 			}
 			p.send(rtObject{"type": "input_audio_buffer.cleared"})
-			rtWait(t, cleared)
-			rtWait(t, sent)
-			rtWait(t, controlled)
 			for range 3 { // 120 ms of audio is three 40 ms appends.
 				p.next("input_audio_buffer.append")
 			}
 			p.next(c.kind)
+			if c.kind == "input_audio_buffer.commit" {
+				committed(p)
+			}
+			rtWait(t, cleared)
+			rtWait(t, sent)
+			rtWait(t, controlled)
 		})
 	}
 }

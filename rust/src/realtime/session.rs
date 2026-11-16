@@ -718,14 +718,13 @@ impl RealtimeSession {
             .map(|_| ())
     }
     /// End the user's turn at the audio sent so far, for example as a button
-    /// goes up. With `client_ends_turns`, Prism then waits for
-    /// `reply_to_turns`; otherwise it replies as when it ends the turn itself.
-    /// Prism sends no acknowledgment; a refusal arrives as a
+    /// goes up. With `client_ends_turns`, this returns once Prism commits the
+    /// turn, and returns an error carrying a `RealtimeFault` if Prism refuses
+    /// it, as it refuses a press under 100 ms; Prism then waits for
+    /// `reply_to_turns`. Otherwise Prism replies as when it ends the turn
+    /// itself; it sends no acknowledgment, and a refusal arrives as a
     /// `RealtimeEvent::Fault`.
     pub async fn end_turn(&self) -> Result<(), Error> {
-        // TODO(open decision D1): wait for the commit or its refusal, or return
-        // the event ID? A press under 100 ms is refused, and reply_to_turns
-        // would then answer the last turn again.
         self.invoke(Command::new(Kind::Commit, json!({})))
             .await
             .map(|_| ())

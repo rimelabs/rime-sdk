@@ -243,8 +243,9 @@ const reply = await session.replyToTurns();
   Prism announces the turn with `speech.started` and cuts off any reply, so
   stop playback and report what the caller heard, as for any interruption.
   `runConversation` does this for you.
-- `endTurn()` ends the turn at the audio sent so far. Prism does not reply on
-  its own. A turn longer than 55 s keeps its last 55 s.
+- `endTurn()` ends the turn at the audio sent so far and resolves once Prism
+  commits it. Prism does not reply on its own. A turn longer than 55 s keeps
+  its last 55 s.
 - `replyToTurns({ metadata })` asks for the reply. It answers every turn ended
   since the last reply. While another reply runs, it waits until Prism is
   idle, then sends the request.
@@ -252,9 +253,9 @@ const reply = await session.replyToTurns();
   `clearAudio()`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `cancel` and `reportPlayback`.
 
-`startTurn` and `endTurn` get no acknowledgment. Prism refuses an `endTurn`
-with under 100 ms of audio with `input_audio_buffer_commit_empty`. The refusal
-arrives as an `error` event with that code.
+If Prism refuses the turn, `endTurn` rejects with `RimeRealtimeError`. A
+press under 100 ms is refused with `input_audio_buffer_commit_empty`: nothing
+is committed, so don't ask for a reply. `startTurn` gets no acknowledgment.
 
 The setting is fixed for the session. With it, `connect` throws
 `RimeInputError` for `turnDetection` or `interruptOnSpeech: false`, and
@@ -262,7 +263,8 @@ The setting is fixed for the session. With it, `connect` throws
 `session.info.clientEndsTurns` is
 `true` once Prism confirms it, and `session.info.interruptOnSpeech` is
 `false`, because speech alone interrupts nothing. `endTurn()` also works
-without this setting: it ends the turn under way, and Prism replies as usual.
+without this setting: it ends the turn under way and resolves once sent, and
+Prism replies as usual.
 
 ## Update session settings
 
@@ -324,7 +326,7 @@ Every method returns a promise. Arguments without `?` are required.
 | `cancel(response, options?)` | Requests generation cancellation and waits for a terminal response or refusal. |
 | `clearAudio(options?)` | Clears buffered input and resets audio conversion after acknowledgment. |
 | `startTurn(options?)` | Starts the user's turn, with `clientEndsTurns`. Resolves once sent. |
-| `endTurn(options?)` | Ends the user's turn at the audio sent so far. Resolves once sent. |
+| `endTurn(options?)` | Ends the user's turn at the audio sent so far. With `clientEndsTurns`, resolves once Prism commits it; otherwise once sent. |
 | `replyToTurns(options?)` | Asks for the reply to the turns you ended, with `clientEndsTurns`; returns `ResponseRef` at response creation. Options can include `metadata`. |
 | `setResponseMetadata(metadata, options?)` | Replaces the labels for later replies once Prism confirms. |
 | `reportPlayback(report, options?)` | Reports interrupted or finished playback. |
