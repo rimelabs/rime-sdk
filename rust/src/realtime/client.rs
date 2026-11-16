@@ -227,8 +227,6 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
     }
     let mut result = json!({"modalities":["text","audio"],"input_audio_format":"pcm16","turn_detection":d,"tools":tools});
     if o.client_ends_turns {
-        // TODO(open decision D2): keep this a bool, or make who ends turns one
-        // setting?
         let detection = &o.detection;
         let tuned = detection.eagerness.is_some()
             || detection.end_of_turn_timeout_ms.is_some()

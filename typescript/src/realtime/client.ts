@@ -115,8 +115,6 @@ export class Realtime {
     )
       throw new RimeInputError("clientEndsTurns must be a boolean");
     if (options.clientEndsTurns) {
-      // TODO(open decision D2): keep this a boolean, or make who ends turns one
-      // setting?
       if (
         options.turnDetection !== undefined ||
         options.interruptOnSpeech === false

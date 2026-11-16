@@ -247,8 +247,10 @@ const reply = await session.replyToTurns();
   commits it. Prism does not reply on its own. A turn longer than 55 s keeps
   its last 55 s.
 - `replyToTurns({ metadata })` asks for the reply. It answers every turn ended
-  since the last reply. While another reply runs, it waits until Prism is
-  idle, then sends the request.
+  since the last reply. It first waits until the last reply has ended and
+  finished playing, for at most `readyS`, then rejects with
+  `RealtimeAdmissionTimeout`. Each call asks for a reply, so two calls get two
+  replies.
 - Without `startTurn()`, the turn is the audio since the last `endTurn()` or
   `clearAudio()`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `cancel` and `reportPlayback`.

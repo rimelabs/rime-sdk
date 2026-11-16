@@ -322,7 +322,6 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
 	if o.ClientEndsTurns {
-		// TODO(open decision D2): keep this a bool, or make who ends turns one setting?
 		if !rtTurnDetectionEmpty(o.TurnDetection) || (o.InterruptOnSpeech != nil && !*o.InterruptOnSpeech) {
 			return "", nil, t, failure(ErrInput, "turn settings do not apply with ClientEndsTurns")
 		}

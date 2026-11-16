@@ -238,7 +238,6 @@ class Realtime:
         if not isinstance(client_ends_turns, bool):
             raise RimeInputError("client_ends_turns must be a boolean")
         if client_ends_turns:
-            # TODO(open decision D2): keep this a bool, or make who ends turns one setting?
             if turn_detection is not None or interrupt_on_speech is not True:
                 raise RimeInputError("Turn settings do not apply with client_ends_turns")
             settings["turn_detection"] = None

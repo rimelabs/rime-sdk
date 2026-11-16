@@ -529,15 +529,15 @@ func (s *RealtimeSession) EndTurn(ctx context.Context) error {
 
 // ReplyToTurns asks for the reply to the conversation as it is, after EndTurn.
 // It needs ClientEndsTurns. The reply answers every turn ended since the last
-// reply. While another reply runs, it waits for Prism to become idle.
+// reply. It first waits until the last reply has ended and finished playing,
+// for at most the Ready timeout, then returns an error matching ErrTimeout.
+// Each call asks for a reply, so two calls get two replies.
 func (s *RealtimeSession) ReplyToTurns(ctx context.Context) (ResponseRef, error) {
 	return s.ReplyToTurnsWithOptions(ctx, ReplyRequestOptions{})
 }
 
 // ReplyToTurnsWithOptions is ReplyToTurns with labels for this reply.
 func (s *RealtimeSession) ReplyToTurnsWithOptions(ctx context.Context, options ReplyRequestOptions) (ResponseRef, error) {
-	// TODO(open decision D3): say that this waits until the last reply has
-	// played, for at most the Ready timeout, and that two calls get two replies.
 	if e := s.requireClientTurns(); e != nil {
 		return ResponseRef{}, e
 	}

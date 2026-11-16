@@ -478,8 +478,10 @@ let reply = session.reply_to_turns().await?;
   commits it. Prism does not reply on its own. A turn longer than 55 s keeps
   its last 55 s.
 - `reply_to_turns` asks for the reply. It answers every turn ended since the
-  last reply. While another reply runs, it waits until Prism is idle, then sends
-  the request. `reply_to_turns_with_options` adds labels for this reply.
+  last reply. It first waits until the last reply has ended and finished
+  playing, for at most the `ready` timeout, then returns `ErrorKind::Timeout`.
+  Each call asks for a reply, so two calls get two replies.
+  `reply_to_turns_with_options` adds labels for this reply.
 - Without `start_turn`, the turn is the audio since the last `end_turn` or
   `clear_audio`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `cancel` and `report_playback`.

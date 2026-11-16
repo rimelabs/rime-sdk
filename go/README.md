@@ -484,8 +484,10 @@ reply, err := session.ReplyToTurns(ctx)
   commits it. Prism does not reply on its own. A turn longer than 55 s keeps
   its last 55 s.
 - `ReplyToTurns` asks for the reply. It answers every turn ended since the last
-  reply. While another reply runs, it waits until Prism is idle, then sends the
-  request. `ReplyToTurnsWithOptions` adds labels for this reply.
+  reply. It first waits until the last reply has ended and finished playing, for
+  at most the `Ready` timeout, then returns an error matching `ErrTimeout`. Each
+  call asks for a reply, so two calls get two replies. `ReplyToTurnsWithOptions`
+  adds labels for this reply.
 - Without `StartTurn`, the turn is the audio since the last `EndTurn` or
   `ClearAudio`. Prism does not announce it, send transcript deltas for it, or
   stop a reply. Stop a reply yourself with `Cancel` and `ReportPlayback`.

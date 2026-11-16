@@ -880,12 +880,13 @@ export class RealtimeSession {
   }
   /** Ask for the reply to the conversation as it is, after `endTurn`. Only
    * with `clientEndsTurns`. The reply answers every turn ended since the last
-   * reply. While another reply runs, this waits for Prism to become idle. */
+   * reply. This first waits until the last reply has ended and finished
+   * playing, for at most `readyS`, then rejects with
+   * `RealtimeAdmissionTimeout`. Each call asks for a reply, so two calls get
+   * two replies. */
   async replyToTurns(
     options: t.ReplyRequestOptions = {},
   ): Promise<t.ResponseRef> {
-    // TODO(open decision D3): say that this waits until the last reply has
-    // played, for at most readyS, and that two calls get two replies.
     this.requireClientTurns();
     const body: Record<string, unknown> =
       options.metadata == null

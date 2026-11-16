@@ -731,7 +731,10 @@ impl RealtimeSession {
     }
     /// Ask for the reply to the conversation as it is, after `end_turn`.
     /// Needs `client_ends_turns`. The reply answers every turn ended since the
-    /// last reply. While another reply runs, this waits for Prism to become idle.
+    /// last reply. This first waits until the last reply has ended and finished
+    /// playing, for at most the `ready` timeout, then returns
+    /// `ErrorKind::Timeout`. Each call asks for a reply, so two calls get two
+    /// replies.
     pub async fn reply_to_turns(&self) -> Result<ResponseRef, Error> {
         self.reply_to_turns_with_options(ReplyRequestOptions::default())
             .await
@@ -741,9 +744,6 @@ impl RealtimeSession {
         &self,
         options: ReplyRequestOptions,
     ) -> Result<ResponseRef, Error> {
-        // TODO(open decision D3): say that this waits until the last reply has
-        // played, for at most the ready timeout, and that two calls get two
-        // replies.
         self.require_client_turns()?;
         let response = if options.metadata.is_empty() {
             json!({})

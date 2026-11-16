@@ -738,10 +738,10 @@ class RealtimeSession:
         """Ask for the reply to the conversation as it is, after end_turn.
 
         Only with client_ends_turns. The reply answers every turn ended since the
-        last reply. While another reply runs, this waits for Prism to become idle.
+        last reply. This first waits until the last reply has ended and finished
+        playing, for at most ready_s, then raises RealtimeAdmissionTimeout. Each
+        call asks for a reply, so two calls get two replies.
         """
-        # TODO(open decision D3): say that this waits until the last reply has played, for at
-        # most ready_s, and that two calls get two replies.
         self._require_client_turns()
         body: dict[str, object] = {}
         if metadata is not None:
