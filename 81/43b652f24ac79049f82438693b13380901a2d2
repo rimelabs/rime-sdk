@@ -1,0 +1,79 @@
+conformance/prism/README.md
+  s_db9579ecbc97d3::t_76fe4e69476607 8-38,54,66,157-165
+conformance/prism/error-retry.json
+  s_db9579ecbc97d3::t_06c95a86de123c 13-14
+conformance/prism/protocol.json
+  s_db9579ecbc97d3::t_0d20dad6ae3e1e 466-615
+conformance/prism/schema.json
+  s_db9579ecbc97d3::t_3557a28bde60d8 295-368
+conformance/prism/speech_to_speech.asyncapi.yaml
+  s_db9579ecbc97d3::t_385029898ce286 853-854,860-861,963-964,1320-1323
+go/README.md
+  s_db9579ecbc97d3::t_27ca0eabe54139 846-864
+go/realtime.go
+  s_db9579ecbc97d3::t_bbfef0a84b8d52 293
+go/realtime_protocol.go
+  s_db9579ecbc97d3::t_75acf0ebe08d89 114-129,240,431-436
+go/realtime_protocol_test.go
+  s_db9579ecbc97d3::t_5ee490a1dca8cc 27-28,68-83
+go/realtime_types.go
+  s_db9579ecbc97d3::t_3b55f3bdfafece 281-284
+go/testdata/prism/error-retry.json
+  s_db9579ecbc97d3::t_ce7f9ce96f21d8 13-14
+go/testdata/prism/protocol.json
+  s_db9579ecbc97d3::t_1c2292d6594b2e 466-615
+go/testdata/prism/schema.json
+  s_db9579ecbc97d3::t_64a751354a7f0b 295-368
+go/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_db9579ecbc97d3::t_b62a6f853d3aa2 853-854,860-861,963-964,1320-1323
+python/docs/realtime.md
+  s_db9579ecbc97d3::t_e57babfa5a7448 385,398-408,694-701
+python/src/rimelabs_sdk/realtime/_protocol.py
+  s_db9579ecbc97d3::t_e004b06f8a39cc 612-614
+python/src/rimelabs_sdk/realtime/_types.py
+  s_db9579ecbc97d3::t_f01f2ef349cdf9 419-424,429
+python/tests/test_realtime_protocol.py
+  s_db9579ecbc97d3::t_652712ece00661 57-62
+rust/README.md
+  s_db9579ecbc97d3::t_c9947680107d55 376-404,829-845,887-891
+rust/src/realtime/protocol.rs
+  s_db9579ecbc97d3::t_8d7b525ef3b8b8 78-88,208-209,449
+rust/src/realtime/tests/protocol.rs
+  s_db9579ecbc97d3::t_3863cc96d5ecfc 150-172
+rust/src/realtime/types.rs
+  s_db9579ecbc97d3::t_a6f7ffc218d5e6 63,76-93,464,505-533,536,560-575,596,601-606,619,632-648,651,658-667,670,681-696,702,717,723,731,739-742,745,751,761,769,777,795,803,809,815,823,831,839,845,857,867-868,872,882-1003
+rust/testdata/prism/error-retry.json
+  s_db9579ecbc97d3::t_2bf21b23f83396 13-14
+rust/testdata/prism/protocol.json
+  s_db9579ecbc97d3::t_1574a695552518 466-615
+rust/testdata/prism/schema.json
+  s_db9579ecbc97d3::t_da6d8f3dd20bd3 295-368
+rust/testdata/prism/speech_to_speech.asyncapi.yaml
+  s_db9579ecbc97d3::t_d5ec606565c8ae 853-854,860-861,963-964,1320-1323
+rust/tests/realtime_pattern_compat.rs
+  s_db9579ecbc97d3::t_09c2ae4c0618d2 1-6,8-11,13,18,24-29,36-37,39-44,48-49,55-73,77-112,115-120
+typescript/docs/realtime.md
+  s_db9579ecbc97d3::t_6889494d5e7f4a 402,415-426,758-765
+typescript/src/realtime/protocol.ts
+  s_db9579ecbc97d3::t_fd796280eaa846 669-678
+typescript/src/realtime/types.ts
+  s_db9579ecbc97d3::t_0552b6389a93cc 305-308
+typescript/tests/realtime-protocol.test.mjs
+  s_db9579ecbc97d3::t_3d720bd4815325 218-234
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8143b652f24ac79049f82438693b13380901a2d2",
+  "prompts": {},
+  "sessions": {
+    "s_db9579ecbc97d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70e162fe-98cb-4dee-b505-7e5d1ac565f4",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
