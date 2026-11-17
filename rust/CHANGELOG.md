@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.20](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.19...rust-v0.1.0-alpha.20) (2026-11-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rust and Go only; Python and TypeScript need no changes. Rust: SessionEvent, SessionInfo, RealtimeFault, RealtimeIdleTimeout, ReviewRequest, ResponseUsage, ResponseTruncation, and RealtimeEvent variants with named fields are non-exhaustive; build them with the new constructors instead of struct literals, and add `..` to patterns that list every field. Go: use keyed SpeechStopped struct literals.
+
+### Features
+
+* report Prism's turn minimum silence and catch up the protocol fixture ([#136](https://github.com/rimelabs/rime-sdk/issues/136)) ([09f0322](https://github.com/rimelabs/rime-sdk/commit/09f03225fb37a7615ba016d1200b1fe2f549f972))
+
 ## [0.1.0-alpha.19](https://github.com/rimelabs/rime-sdk/compare/rust-v0.1.0-alpha.18...rust-v0.1.0-alpha.19) (2026-11-13)
 
 
