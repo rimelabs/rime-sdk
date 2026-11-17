@@ -10,6 +10,8 @@
   { "code": "voice_required", "retryable": false },
   { "code": "invalid_voice", "retryable": false },
   { "code": "item_not_found", "retryable": false },
+  { "code": "item_id_in_use", "retryable": false },
+  { "code": "call_id_in_use", "retryable": false },
   { "code": "invalid_content_index", "retryable": false },
   { "code": "truncate_not_current", "retryable": false },
   { "code": "response_cancel_not_active", "retryable": false },

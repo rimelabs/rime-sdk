@@ -850,11 +850,15 @@ components:
     responseEndReason:
       oneOf:
         - const: stop
+        - const: max_output_tokens
+        - const: audio_cut
         - const: client_cancelled
         - const: turn_detected
         - const: disconnected
         - const: turn_failed
         - const: response_timeout
+        - const: review_stopped
+        - const: review_timeout
     responseView:
       type: object
       required: [id, object, status, output, usage]
@@ -956,6 +960,8 @@ components:
         - const: voice_required
         - const: invalid_voice
         - const: item_not_found
+        - const: item_id_in_use
+        - const: call_id_in_use
         - const: invalid_content_index
         - const: truncate_not_current
         - const: response_cancel_not_active
@@ -1311,6 +1317,10 @@ components:
               minimum: 0
             prism_end_reason:
               $ref: '#/components/schemas/speechEndReason'
+            end_of_turn_min_silence_ms:
+              type: integer
+              minimum: 0
+              maximum: 5000
     speechEndReason:
       type: string
       enum: [semantic, timeout, silence, max_duration, detector_changed]

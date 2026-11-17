@@ -302,6 +302,10 @@ export interface SpeechStopped {
   readonly audioEndMs: number;
   /** Null means the server did not publish the field. */
   readonly endReason: SpeechEndReason | "unknown" | null;
+  /** Minimum silence in force when the turn ended; absent on older servers.
+   * With `eagerness: "auto"` and no configured minimum, Prism adjusts it
+   * during the call. */
+  readonly endOfTurnMinSilenceMs?: number;
 }
 export interface InputCommitted {
   readonly kind: "input.committed";

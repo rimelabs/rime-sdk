@@ -290,7 +290,7 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		return "", nil, t, err
 	}
 	if n := o.TurnDetection.EndOfTurnMinSilenceMS; n != nil {
-		if *n < 0 || *n > 5000 {
+		if *n < 0 || *n > maxMinSilenceMS {
 			return "", nil, t, failure(ErrInput, "minimum silence must be from 0 through 5000 ms")
 		}
 		d["end_of_turn_min_silence_ms"] = *n

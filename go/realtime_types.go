@@ -278,6 +278,10 @@ type SpeechStopped struct {
 	ItemID     string
 	AudioEndMS uint64
 	EndReason  string
+	// EndOfTurnMinSilenceMS is the minimum silence in force when the turn ended,
+	// or nil when the server did not publish it. With eagerness "auto" and no
+	// configured minimum, Prism adjusts it during the call.
+	EndOfTurnMinSilenceMS *uint64
 }
 type InputCommitted struct{ ItemID string }
 type TranscriptDelta struct {

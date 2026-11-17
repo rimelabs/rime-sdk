@@ -464,6 +464,156 @@
     "invalid": true
   },
   {
+    "name": "speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic",
+      "end_of_turn_min_silence_ms": 300
+    },
+    "expected_kind": "speech.stopped",
+    "expected_min_silence_ms": 300
+  },
+  {
+    "name": "zero speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic",
+      "end_of_turn_min_silence_ms": 0
+    },
+    "expected_kind": "speech.stopped",
+    "expected_min_silence_ms": 0
+  },
+  {
+    "name": "absent speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic"
+    },
+    "expected_kind": "speech.stopped",
+    "expected_min_silence_ms": null
+  },
+  {
+    "name": "speech minimum silence above range",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "end_of_turn_min_silence_ms": 5001
+    },
+    "invalid": true
+  },
+  {
+    "name": "negative speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "end_of_turn_min_silence_ms": -1
+    },
+    "invalid": true
+  },
+  {
+    "name": "fractional speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "end_of_turn_min_silence_ms": 300.5
+    },
+    "invalid": true
+  },
+  {
+    "name": "null speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "end_of_turn_min_silence_ms": null
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonnumeric speech minimum silence",
+    "event": {
+      "type": "input_audio_buffer.speech_stopped",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "end_of_turn_min_silence_ms": "300"
+    },
+    "invalid": true
+  },
+  {
+    "name": "response cut at its most output tokens",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "status_details": {"type": "completed", "reason": "max_output_tokens"}
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_reason": "max_output_tokens"
+  },
+  {
+    "name": "response speech cut before its text ended",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "status_details": {"type": "completed", "reason": "audio_cut"}
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_reason": "audio_cut"
+  },
+  {
+    "name": "response stopped by review",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "cancelled",
+        "status_details": {"type": "cancelled", "reason": "review_stopped"}
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_reason": "review_stopped"
+  },
+  {
+    "name": "response stopped by review timeout",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "cancelled",
+        "status_details": {"type": "cancelled", "reason": "review_timeout"}
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_reason": "review_timeout"
+  },
+  {
+    "name": "future response end reason",
+    "event": {
+      "type": "response.done",
+      "response": {
+        "id": "reply-1",
+        "status": "completed",
+        "status_details": {"type": "completed", "reason": "future_reason"}
+      }
+    },
+    "expected_kind": "response.ended",
+    "expected_reason": "future_reason"
+  },
+  {
     "name": "metadata array",
     "event": {
       "type": "response.created",

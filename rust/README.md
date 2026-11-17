@@ -373,9 +373,35 @@ Prism is available from `0.1.0-alpha.9`. Request IDs, reply labels, session upda
 `Error::server_kind()` are pending the next release. Use this checkout for those APIs.
 
 When you upgrade from alpha.9, `info()` returns an owned `SessionInfo` snapshot.
-Store it before borrowing its fields. Add `request_id`, `response_metadata`, and
-`settings_revision` to existing `SessionInfo` literals. Use `..` in
-`ResponseStarted` and `ResponseEnded` patterns to ignore fields you do not need.
+Store it before borrowing its fields.
+
+`RealtimeEvent`'s variants with named fields and the structs the SDK returns
+(`SessionEvent`, `SessionInfo`, `RealtimeFault`, `RealtimeIdleTimeout`,
+`ReviewRequest`, `ResponseUsage`, and `ResponseTruncation`) are
+`#[non_exhaustive]`, so later Prism fields do not break your code. `InputReady`
+and `Fault(..)` are unchanged; `Fault` wraps the non-exhaustive `RealtimeFault`. Match them with `..`, for example
+`RealtimeEvent::SpeechStopped { end_reason, .. }`. To build values in tests, use
+the constructors and set optional fields afterwards:
+
+```rust
+use rimelabs_sdk::{RealtimeEvent, SessionEvent, SessionInfo};
+
+let mut event = SessionEvent::new(
+    "session",
+    "event",
+    RealtimeEvent::speech_stopped("item", 1200)
+        .with_end_reason("semantic")
+        .with_end_of_turn_min_silence_ms(300),
+);
+event.server_time_ms = Some(1_763_380_000_000);
+let mut info = SessionInfo::new("session");
+info.voice = "aurora".into();
+```
+
+`RealtimeEvent` has constructors for the speech, transcript, and playback report
+events, and each listed struct has a `new` constructor. Events that hold response, output, or tool references come only from a
+session. Migration: replace struct literals of these types with the
+constructors, and add `..` to patterns that list every field.
 Service faults now have
 `ErrorKind::Realtime`; reserve `ErrorKind::Stream` handling for connection and
 protocol failures. Check a fault's `scope` to see whether the session ended.
@@ -800,6 +826,23 @@ is fixed at connection and must be less than the maximum silence. The server
 applies phrase matching and rejects invalid combinations. Active replies retain
 their earlier settings.
 
+Leave `end_of_turn_min_silence_ms` as `None` with eagerness `auto` to let Prism
+adjust the minimum silence during the call, from 0 through 900 ms. It waits
+longer after the caller keeps talking just after Prism ends their turn, and
+shorter after several turns without that. Setting a value, including 0, fixes it
+for the call. `session.info().end_of_turn_min_silence_ms` is `None` unless you
+set it; each `SpeechStopped` event's `end_of_turn_min_silence_ms` reports the
+value in force.
+
+`ResponseEnded`'s `reason` is Prism's value as sent. `max_output_tokens` and
+`audio_cut` mean a completed reply is shorter than the model's text: the output
+limit cut the text, or speech stopped before the text ended and the text,
+transcript, and history keep only the words spoken. `review_stopped` and
+`review_timeout` end a reviewed reply as `cancelled`. Prism adds new values over
+time. Response end reasons and error codes arrive as sent, so handle values you
+do not recognize. A status or speech end reason the SDK does not know arrives as
+`unknown`.
+
 `SessionEvent.server_time_ms` is the server send time in Unix milliseconds,
 when available. It is `None` for synthetic SDK events and old server messages.
 `TranscriptDelta.transcript` contains all words so far, when available. Replace
@@ -841,10 +884,8 @@ A timeout's `RealtimeFault` has scope `"review"`, `review_id`, and `response_id`
 It does not itself mean the response failed: `Speak` and `Say` can still
 complete it. Read `RealtimeEvent::ResponseEnded` for the outcome.
 
-This is a breaking Rust interface change. Add `..TurnDetection::default()` to
-input literals. Add `transcript: None` to constructed `TranscriptDelta` values,
-or `..` to patterns that do not use the new field. Add `server_time_ms: None` to
-constructed `SessionEvent` values. Constructed `SessionInfo` values must supply
-the new optional fields as well. Add `review_id: None` to constructed
-`RealtimeFault` values. Existing consumers that only read these values
-can keep their current behavior.
+Add `..TurnDetection::default()` to input literals. Build `SessionEvent`,
+`SessionInfo`, `RealtimeFault`, and transcript events with their constructors,
+as described under the upgrade notes above; struct literals of these types do
+not compile because they are non-exhaustive. Consumers that only read these
+values need `..` in patterns that do not list every field.

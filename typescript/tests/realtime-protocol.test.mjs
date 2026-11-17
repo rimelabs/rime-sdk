@@ -215,6 +215,23 @@ for (const item of cases) {
         assert.equal(fault.reviewId, item.expected_fault.review_id);
         assert.equal(fault.responseId, item.expected_fault.response_id);
       }
+      if ("expected_min_silence_ms" in item) {
+        const stopped = decode(raw, "session-1").payload;
+        assert.equal(stopped.kind, "speech.stopped");
+        assert.equal(
+          stopped.endOfTurnMinSilenceMs,
+          item.expected_min_silence_ms ?? undefined,
+        );
+        assert.equal(
+          "endOfTurnMinSilenceMs" in stopped,
+          item.expected_min_silence_ms !== null,
+        );
+      }
+      if ("expected_reason" in item) {
+        const ended = decode(raw, "session-1").payload;
+        assert.equal(ended.kind, "response.ended");
+        assert.equal(ended.reason, item.expected_reason);
+      }
       if ("expected_kept_text" in item) {
         assert.deepEqual(decode(raw, "session-1").payload, {
           kind: "item.truncated",

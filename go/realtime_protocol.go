@@ -111,6 +111,22 @@ func (decoder *rtDecoder) integer(v any) uint64 {
 	return uint64(x)
 }
 
+// maxMinSilenceMS is the longest end_of_turn_min_silence_ms Prism accepts.
+const maxMinSilenceMS = 5000
+
+// minSilence reads an optional end_of_turn_min_silence_ms within Prism's limit.
+func (decoder *rtDecoder) minSilence(o rtObject) *uint64 {
+	v, present := o["end_of_turn_min_silence_ms"]
+	if !present {
+		return nil
+	}
+	n := decoder.integer(v)
+	if n > maxMinSilenceMS {
+		decoder.bad("minimum silence")
+	}
+	return &n
+}
+
 func (decoder *rtDecoder) responseTruncation(response rtObject) *ResponseTruncation {
 	v, present := response["prism_truncation"]
 	if !present {
@@ -221,13 +237,7 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 	}
 	if v, ok := o["turn_detection"]; ok {
 		d := decoder.object(v)
-		if v, present := d["end_of_turn_min_silence_ms"]; present {
-			n := decoder.integer(v)
-			if n > 5000 {
-				decoder.bad("minimum silence")
-			}
-			s.EndOfTurnMinSilenceMS = &n
-		}
+		s.EndOfTurnMinSilenceMS = decoder.minSilence(d)
 		if v, present := d["interrupt_min_words"]; present {
 			n := decoder.integer(v)
 			if n < 1 || n > 10 {
@@ -418,7 +428,12 @@ func decodeRealtime(raw []byte, sessionID string) (w *rtWire, err error) {
 		if v, ok := o["prism_end_reason"]; ok {
 			reason = rtEnum(decoder.string(v), "semantic", "timeout", "silence", "max_duration", "detector_changed")
 		}
-		w.payload = SpeechStopped{decoder.id(o["item_id"]), decoder.integer(o["audio_end_ms"]), reason}
+		w.payload = SpeechStopped{
+			ItemID:                decoder.id(o["item_id"]),
+			AudioEndMS:            decoder.integer(o["audio_end_ms"]),
+			EndReason:             reason,
+			EndOfTurnMinSilenceMS: decoder.minSilence(o),
+		}
 	case "input_audio_buffer.committed":
 		w.kind = "input.committed"
 		w.payload = InputCommitted{decoder.id(o["item_id"])}

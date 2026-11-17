@@ -382,7 +382,7 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | `InputReady` | No data fields; `send_text` and `request_reply` handle this wait for you. |
 | `SpeechHint` | `audio_start_ms`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `SpeechStarted` | `item_id`, `audio_start_ms` |
-| `SpeechStopped` | `item_id`, `audio_end_ms`, `end_reason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or None from a server that does not send it |
+| `SpeechStopped` | `item_id`, `audio_end_ms`, `end_reason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or None from a server that does not send it; `end_of_turn_min_silence_ms`: the minimum silence in force when the turn ended, or None from an older server |
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |
 | `TranscriptFailed` | `item_id`, `error` |
@@ -394,6 +394,17 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | `ResponseEnded` | `response`, `status`; optional `reason` and `usage` |
 | `ResponseAbandoned` | `response`; the SDK is cancelling a response accepted after its caller was cancelled. |
 | `FaultEvent` | `error`, a `RealtimeFault` |
+
+`ResponseEnded.reason` is Prism's value as sent. Two reasons mean a completed
+reply is shorter than the model's text: `max_output_tokens` (the text stops
+where the output limit cut it, for example mid-sentence) and `audio_cut` (speech
+stopped before the text ended; the text, transcript, and history keep only the
+words spoken). `review_stopped` and `review_timeout` end a reviewed reply as
+`cancelled`.
+
+Prism adds new values over time. Response end reasons and error codes arrive as
+sent, so handle values you do not recognize. A status or speech end reason the
+SDK does not know arrives as `unknown`.
 
 References come from the SDK. Pass them back to identify the object you mean:
 
@@ -679,6 +690,14 @@ those last three fields on an open session. Omitted fields do not change server
 settings. An empty phrase list clears that list. Lists are copied on construction.
 The silence floor is connect-only. `turn_detection=None` keeps its existing
 automatic turn behavior.
+
+Leave `end_of_turn_min_silence_ms` unset with `eagerness="auto"` to let Prism
+adjust the minimum silence during the call, from 0 through 900 ms. It waits
+longer after the caller keeps talking just after Prism ends their turn, and
+shorter after several turns without that. Setting a value, including `0`, fixes
+it for the call. `session.info.turn_detection.end_of_turn_min_silence_ms` is None
+unless you set it; each `SpeechStopped.end_of_turn_min_silence_ms` reports the
+value in force.
 
 ```python
 from rimelabs_sdk import realtime as r

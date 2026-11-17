@@ -24,6 +24,8 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		InstructionItemID *string         `json:"expected_instruction_item_id"`
 		IdleTimeoutS      *float64        `json:"expected_idle_timeout_s"`
 		KeptText          *string         `json:"expected_kept_text"`
+		MinSilenceMS      json.RawMessage `json:"expected_min_silence_ms"`
+		Reason            *string         `json:"expected_reason"`
 		Fault             *struct {
 			Code       string `json:"code"`
 			Scope      string `json:"scope"`
@@ -61,6 +63,22 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 				fault := e.payload.(FaultEvent).Fault
 				if fault.Code != c.Fault.Code || fault.Scope != c.Fault.Scope || fault.ReviewID != c.Fault.ReviewID || fault.ResponseID != c.Fault.ResponseID {
 					t.Fatalf("unexpected fault: %#v", fault)
+				}
+			}
+			if c.MinSilenceMS != nil {
+				var want *uint64
+				if err := json.Unmarshal(c.MinSilenceMS, &want); err != nil {
+					t.Fatal(err)
+				}
+				payload, ok := e.payload.(SpeechStopped)
+				if !ok || !reflect.DeepEqual(payload.EndOfTurnMinSilenceMS, want) {
+					t.Fatalf("unexpected minimum silence: %#v", e.payload)
+				}
+			}
+			if c.Reason != nil {
+				payload, ok := e.payload.(ResponseEnded)
+				if !ok || payload.Reason != *c.Reason {
+					t.Fatalf("unexpected response end reason: %#v", e.payload)
 				}
 			}
 			if kind == "item.truncated" {

@@ -75,6 +75,17 @@ fn enumeration(s: String, known: &[&str]) -> String {
         "unknown".into()
     }
 }
+/// An optional `end_of_turn_min_silence_ms` within Prism's limits.
+fn min_silence(o: &Map<String, Value>, name: &str) -> Result<Option<u64>, Error> {
+    o.get("end_of_turn_min_silence_ms")
+        .map(|v| {
+            integer(v)
+                .ok()
+                .filter(|value| MIN_SILENCE_LIMITS.contains(value))
+                .ok_or_else(|| invalid(name))
+        })
+        .transpose()
+}
 fn revision(v: &Value) -> Result<Option<u64>, Error> {
     v.get("prism_settings_revision").map(integer).transpose()
 }
@@ -194,16 +205,9 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
     }
     if let Some(v) = o.get("turn_detection") {
         let d = object(v)?;
-        s.end_of_turn_min_silence_ms = d
-            .get("end_of_turn_min_silence_ms")
-            .map(integer)
-            .transpose()?;
+        s.end_of_turn_min_silence_ms =
+            min_silence(d, "session.turn_detection.end_of_turn_min_silence_ms")?;
         s.interrupt_min_words = d.get("interrupt_min_words").map(integer).transpose()?;
-        if s.end_of_turn_min_silence_ms
-            .is_some_and(|value| !MIN_SILENCE_LIMITS.contains(&value))
-        {
-            return Err(invalid("session.turn_detection.end_of_turn_min_silence_ms"));
-        }
         if s.interrupt_min_words
             .is_some_and(|value| !INTERRUPT_WORD_LIMITS.contains(&value))
         {
@@ -442,6 +446,7 @@ pub(super) fn decode(raw: &str, session_id: &str) -> Result<Option<Wire>, Error>
                         })
                     })
                     .transpose()?,
+                end_of_turn_min_silence_ms: min_silence(o, "end_of_turn_min_silence_ms")?,
             })
         }
         "input_audio_buffer.committed" => {

@@ -843,6 +843,25 @@ its setting unchanged; a non-nil empty list clears it. Minimum silence is fixed 
 connection. The server checks its relation to the maximum silence. Public settings
 change only after acknowledgment. An active reply keeps the rules it began with.
 
+Leave `EndOfTurnMinSilenceMS` nil with eagerness `auto` to let Prism adjust the
+minimum silence during the call, from 0 through 900 ms. It waits longer after the
+caller keeps talking just after Prism ends their turn, and shorter after several
+turns without that. Setting a value, including 0, fixes it for the call.
+`SessionInfo.EndOfTurnMinSilenceMS` is nil unless you set it; each
+`SpeechStopped.EndOfTurnMinSilenceMS` reports the value in force.
+
+Migration: `SpeechStopped` has a new field, so use keyed `SpeechStopped`
+struct literals. Existing unkeyed literals no longer compile.
+
+`ResponseEnded.Reason` is Prism's value as sent. `max_output_tokens` and
+`audio_cut` mean a completed reply is shorter than the model's text: the output
+limit cut the text, or speech stopped before the text ended and the text,
+transcript, and history keep only the words spoken. `review_stopped` and
+`review_timeout` end a reviewed reply as `cancelled`. Prism adds new values over
+time. Response end reasons and error codes arrive as sent, so handle values you
+do not recognize. A status or speech end reason the SDK does not know arrives as
+`unknown`.
+
 `SessionInfo` reports optional `Speed`, `Version`, `Review`, and applied turn
 settings. `Version` is an opaque release or commit string. It retains the last
 reported value if a later update omits it. A value never reported remains nil.

@@ -147,6 +147,29 @@ fn shared_protocol() {
             if let Some(expected) = c.get("expected_idle_timeout_s") {
                 assert_eq!(event.as_ref().unwrap().idle_timeout_s, expected.as_f64());
             }
+            if let Some(expected) = c.get("expected_min_silence_ms") {
+                let Some(crate::realtime::RealtimeEvent::SpeechStopped {
+                    end_of_turn_min_silence_ms,
+                    ..
+                }) = &event.as_ref().unwrap().payload
+                else {
+                    panic!("missing speech stop: {}", c["name"]);
+                };
+                assert_eq!(
+                    *end_of_turn_min_silence_ms,
+                    expected.as_u64(),
+                    "{}",
+                    c["name"]
+                );
+            }
+            if let Some(expected) = c.get("expected_reason") {
+                let Some(crate::realtime::RealtimeEvent::ResponseEnded { reason, .. }) =
+                    &event.as_ref().unwrap().payload
+                else {
+                    panic!("missing response end: {}", c["name"]);
+                };
+                assert_eq!(reason.as_deref(), expected.as_str(), "{}", c["name"]);
+            }
             if c.get("expected_kept_text").is_some() {
                 let Some(crate::realtime::RealtimeEvent::ItemTruncated {
                     item_id,

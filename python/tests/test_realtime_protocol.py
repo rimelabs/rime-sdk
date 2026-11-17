@@ -54,6 +54,12 @@ def test_shared_protocol_decoding(case):
         if "expected_idle_timeout_s" in case:
             assert isinstance(result.payload, protocol.SessionIdleTimeout)
             assert result.payload.idle_timeout_s == case["expected_idle_timeout_s"]
+        if "expected_min_silence_ms" in case:
+            assert isinstance(result.payload, r.SpeechStopped)
+            assert result.payload.end_of_turn_min_silence_ms == case["expected_min_silence_ms"]
+        if "expected_reason" in case:
+            assert isinstance(result.payload, r.ResponseEnded)
+            assert result.payload.reason == case["expected_reason"]
         if "expected_kept_text" in case:
             assert isinstance(result.payload, r.ItemTruncated)
             assert result.payload.kept_text == case["expected_kept_text"]

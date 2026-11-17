@@ -399,7 +399,7 @@ are exported from `@rimelabs/sdk`.
 | `input.ready` | No data fields. Turn methods handle the readiness wait. |
 | `speech.hint` | `audioStartMs`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `speech.started` | `itemId`, `audioStartMs` |
-| `speech.stopped` | `itemId`, `audioEndMs`, `endReason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or null from a server that does not send it |
+| `speech.stopped` | `itemId`, `audioEndMs`, `endReason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or null from a server that does not send it; optional `endOfTurnMinSilenceMs`: the minimum silence in force when the turn ended, absent from an older server |
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
 | `transcript.failed` | `itemId`, `error` |
@@ -411,6 +411,18 @@ are exported from `@rimelabs/sdk`.
 | `response.ended` | `response`, `status`, nullable `reason` and `usage` |
 | `response.abandoned` | `response`; the SDK requests cancellation after the requesting caller aborted. |
 | `error` | `error`, a `RealtimeFault` |
+
+`response.ended` carries Prism's `reason` as sent. Two reasons mean a completed
+reply is shorter than the model's text: `max_output_tokens` (the text stops
+where the output limit cut it, for example mid-sentence) and `audio_cut` (speech
+stopped before the text ended; the text, transcript, and history keep only the
+words spoken). `review_stopped` and `review_timeout` end a reviewed reply as
+`cancelled`.
+
+Prism adds new values over time. Response end reasons and error codes arrive as
+sent, so handle values you do not recognize. A status or speech end reason the
+SDK does not know arrives as `unknown`. Avoid a `switch` that treats a
+documented union as complete.
 
 References come from the SDK. Pass them back to identify the object you mean.
 
@@ -742,6 +754,14 @@ Read confirmed values from `session.info.turnDetection`.
 `endOfTurnMinSilenceMs` is an integer from 0 through 5000. Set it at connection
 only. It must be less than the server's end-of-turn timeout. Prism rejects an
 invalid combination. The SDK does not guess a default timeout for this check.
+
+Leave `endOfTurnMinSilenceMs` unset with `eagerness: "auto"` to let Prism adjust
+the minimum silence during the call, from 0 through 900 ms. It waits longer
+after the caller keeps talking just after Prism ends their turn, and shorter
+after several turns without that. Setting a value, including `0`, fixes it for
+the call. `session.info.turnDetection.endOfTurnMinSilenceMs` is absent unless you
+set it; each `speech.stopped` event's `endOfTurnMinSilenceMs` reports the value
+in force.
 
 The new turn settings need a supporting Prism image. They are omitted unless
 supplied, including minimum silence `0`. An older server can reject an explicit

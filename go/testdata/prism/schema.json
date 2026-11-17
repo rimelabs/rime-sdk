@@ -293,6 +293,80 @@
     "valid": false
   },
   {
+    "name": "speech stopped reports its minimum silence",
+    "schema": "inputAudioBufferSpeechStoppedEvent",
+    "value": {
+      "type": "input_audio_buffer.speech_stopped",
+      "event_id": "event-1",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic",
+      "end_of_turn_min_silence_ms": 300
+    },
+    "valid": true
+  },
+  {
+    "name": "speech stopped from an older server omits its minimum silence",
+    "schema": "inputAudioBufferSpeechStoppedEvent",
+    "value": {
+      "type": "input_audio_buffer.speech_stopped",
+      "event_id": "event-1",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic"
+    },
+    "valid": true
+  },
+  {
+    "name": "speech stopped minimum silence above range",
+    "schema": "inputAudioBufferSpeechStoppedEvent",
+    "value": {
+      "type": "input_audio_buffer.speech_stopped",
+      "event_id": "event-1",
+      "item_id": "speech",
+      "audio_end_ms": 50,
+      "prism_end_reason": "semantic",
+      "end_of_turn_min_silence_ms": 5001
+    },
+    "valid": false
+  },
+  {
+    "name": "response cut at its most output tokens",
+    "schema": "responseEndReason",
+    "value": "max_output_tokens",
+    "valid": true
+  },
+  {
+    "name": "response speech cut before its text ended",
+    "schema": "responseEndReason",
+    "value": "audio_cut",
+    "valid": true
+  },
+  {
+    "name": "response stopped by review",
+    "schema": "responseEndReason",
+    "value": "review_stopped",
+    "valid": true
+  },
+  {
+    "name": "response stopped by review timeout",
+    "schema": "responseEndReason",
+    "value": "review_timeout",
+    "valid": true
+  },
+  {
+    "name": "item id already in use error code",
+    "schema": "errorCode",
+    "value": "item_id_in_use",
+    "valid": true
+  },
+  {
+    "name": "call id already in use error code",
+    "schema": "errorCode",
+    "value": "call_id_in_use",
+    "valid": true
+  },
+  {
     "name": "partial session update",
     "schema": "sessionUpdateEvent",
     "value": {

@@ -5,11 +5,40 @@ tests. The schema uses AsyncAPI 3.0.0 and describes protocol version 1.0.0.
 Prism events and fields use `prism.` and `prism_`. The SDK does not send or
 recognize the former `prsm` names.
 
+## Source
+
+The fixtures follow `interfaces/speech_to_speech.asyncapi.yaml` in
+`rimelabs/rime` at `215aa4f0a539defb6bca1e6ecd6d11fc94f77852`, the latest change
+to that file when they were last updated. Update this one pin when you bring in
+newer server changes. The fixture differs from that file on purpose in these ways:
+
+- **Not yet supported by the SDK.** Client-ended turns (SERVE-273):
+  `input_audio_buffer.commit`, `prism.input_audio_buffer.start`, a `null`
+  `turn_detection`, a `response.create` without a cause, the `client_commit` end
+  reason, and the errors `input_audio_buffer_commit_empty`,
+  `input_audio_buffer_start_unavailable`, and
+  `conversation_already_has_active_response`. Recording controls:
+  `prism_recording`, `prism_effective_recording`, and `recording_not_allowed`.
+  Decoders treat the new end reason as `unknown`, pass the error codes through,
+  and ignore the recording fields. They reject a `null` `turn_detection` in the
+  session view, which Prism sends only when the client asks for it.
+- **Optional for older images.** Fields current servers always send stay
+  optional here: `server_time_ms`, the cumulative `transcript` on transcription
+  deltas, the session's `request_id`, `speed`, `version`, `truncation`,
+  `prism_settings_revision`, and `prism_response_metadata`, the turn detection
+  interrupt settings, the response's `prism_settings_revision`, and
+  `end_of_turn_min_silence_ms` on `input_audio_buffer.speech_stopped`.
+- **SDK rules.** Filler and review replacement text use the nonblank-text rule
+  described below. The error codes `invalid_request` and
+  `session_already_initialized` remain for older servers.
+- **Not yet reconciled.** The engine contract has since dropped `minLength` on
+  some item and call IDs, merged the function call output item shape, and limits
+  `requestMetadata` values to strings of at most 512 code points under keys of at
+  most 64. Review these before the next pin.
+
 - `speech_to_speech.asyncapi.yaml` contains message shapes and validation rules.
   It is a test fixture. Descriptive annotations and server connection settings
   are omitted.
-  The tool filler rules follow `interfaces/speech_to_speech.asyncapi.yaml` in
-  `rimelabs/rime` at commit `e0ce7ac08`, which added per-tool filler controls.
   The filler and review replacement schemas share a nonblank-text rule that
   spells out Unicode `White_Space` to match
   the engine's Rust validation in both Python and JavaScript. Their `\S`
@@ -22,7 +51,7 @@ recognize the former `prsm` names.
   instruction IDs, and idle timeouts.
 - `error-retry.json` checks retry classification for every code in the schema
   fixture and unknown codes. The classification and `context_length_exceeded`
-  follow `rimelabs/rime#3356` at commit `61ddc5429`. Only `capacity_exceeded`,
+  follow `rimelabs/rime#3356`. Only `capacity_exceeded`,
   `unavailable`, and `response_timeout` are retryable. This is SDK metadata,
   derived from the code, not a field sent by Prism. Existing error codes in this
   fixture remain supported even if newer contracts replace them.
@@ -34,9 +63,7 @@ A future server value can fail the current schema check and still be accepted
 by the SDK decoder. The SDK does not use this fixture to reject incoming events.
 
 Review faults carry scope `review` and name their chunk in `owner.review_id`,
-alongside `owner.response_id`. The error schemas and ownership cases follow
-`interfaces/speech_to_speech.asyncapi.yaml` in `rimelabs/rime` at
-`20a1b933cc9edecc9bb6fc83e4c195b4561ef7f0`. A review timeout applies the
+alongside `owner.response_id`. A review timeout applies the
 session's timeout policy; `speak` and `say` can still complete the response.
 
 Each SDK runs the cases in `schema.json` against the schema fixture. Local test
@@ -79,7 +106,6 @@ For SDK usage and connection settings, see the
 [Python realtime guide](../../python/docs/realtime.md) or the
 [Node.js realtime guide](../../typescript/docs/realtime.md).
 
-Session updates follow `rimelabs/rime` at `d83e3bbf40068d16c2c0a10d14789cc35ac9f276`.
 The fixture includes `prism_settings_revision` on session and response views,
 and `session_setting_fixed`. Revision fields remain optional here so the same
 fixture can validate messages from older servers. Decoder cases reject malformed
@@ -125,12 +151,18 @@ The [response lifetime contract](response-lifetime.md) records the common
 ownership rules and links to executable language tests. It does not change the
 Prism wire schema.
 
-The optional speed, version, timestamp, cumulative transcript, interruption,
-silence-floor, and review shapes follow `rimelabs/rime` at `0c61366ab`.
 The schema keeps newer server fields optional so older image fixtures remain
 valid. Typed input, proactive instructions, and history text have no local
 4,000-character limit. New client settings remain absent unless requested.
-SERVE-273 manual turn controls are excluded from this update.
+
+`input_audio_buffer.speech_stopped` carries `end_of_turn_min_silence_ms`, the
+minimum silence in force when the turn ended (`rimelabs/rime#4323`). With
+eagerness `auto` and no configured minimum, Prism adjusts it during the call, and
+the session's `turn_detection` then omits it. The shared cases distinguish
+absent from `0` and reject values outside 0 through 5000, fractions, `null`, and
+strings. `response.done` reasons now include `max_output_tokens`, `audio_cut`,
+`review_stopped`, and `review_timeout`; decoders pass every reason through as
+sent, including future ones.
 
 The engine schema requires nonempty cumulative transcript text but permits an
 empty delta for a correction. SDK decoders also accept an empty cumulative
