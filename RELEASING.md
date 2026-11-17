@@ -140,6 +140,32 @@ migration steps in the PR body. Before squash merging, copy that footer into
 the commit body. Check that the generated release PR includes those steps
 before you merge it.
 
+Release Please copies a commit's `BREAKING CHANGE:` footer into the changelog of
+every package the commit touches. When a breaking change affects only some
+SDKs, either:
+
+- put the affected SDKs in their own PR, so the footer reaches only their
+  changelogs, or
+- start the footer by naming the affected and unaffected SDKs, for example
+  `BREAKING CHANGE: Rust and Go only; Python and TypeScript need no changes.`
+  Then give each affected SDK's migration steps.
+
+To correct release notes after merging, add a commit override to the end of the
+merged PR's description. Keep `(#<number>)` on the first line so the changelog
+still links the PR:
+
+```text
+BEGIN_COMMIT_OVERRIDE
+feat!: <PR title> (#<number>)
+
+BREAKING CHANGE: <corrected footer>
+END_COMMIT_OVERRIDE
+```
+
+Then run **Release** from Actions on `main` with no inputs. It only regenerates
+the open release PR; nothing is published until that PR is merged. Check the
+regenerated notes for every package before merging.
+
 After Python or TypeScript publication succeeds, the release workflow runs
 **Check published SDK examples**. It copies examples from the release tag into
 a temporary directory outside the workspace, installs the exact published SDK,
