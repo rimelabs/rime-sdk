@@ -1,0 +1,21 @@
+AGENTS.md
+  s_db9579ecbc97d3::t_482363275601ef 5-7
+RELEASING.md
+  s_db9579ecbc97d3::t_3972214f954037 143-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "69acfe8ee94a1e4e8e93cf2fb82aae7e3931ab2e",
+  "prompts": {},
+  "sessions": {
+    "s_db9579ecbc97d3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70e162fe-98cb-4dee-b505-7e5d1ac565f4",
+        "model": "unknown"
+      },
+      "human_author": "naszzz <naszagorov@gmail.com>"
+    }
+  }
+}
