@@ -473,7 +473,7 @@ defer session.Close()
 if err := session.StartTurn(ctx); err != nil { return err } // The button goes down.
 // Send the caller's audio with session.SendAudio, as usual.
 if err := session.EndTurn(ctx); err != nil { return err } // The button goes up.
-reply, err := session.ReplyToTurns(ctx)
+if _, err := session.ReplyToTurns(ctx); err != nil { return err } // Ask for the reply.
 ```
 
 - `StartTurn` starts the turn. Audio sent before it is not part of the turn.
