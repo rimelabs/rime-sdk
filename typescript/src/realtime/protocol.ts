@@ -666,6 +666,16 @@ function decodeValue(
           ? null
           : string(event.prism_end_reason, "prism_end_reason");
       payload = {
+        ...(event.end_of_turn_min_silence_ms === undefined
+          ? {}
+          : {
+              endOfTurnMinSilenceMs: receivedNumber(
+                event.end_of_turn_min_silence_ms,
+                "end_of_turn_min_silence_ms",
+                0,
+                5000,
+              ),
+            }),
         kind: "speech.stopped",
         itemId: id(event.item_id, "item_id"),
         audioEndMs: integer(event.audio_end_ms, "audio_end_ms"),

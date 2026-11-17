@@ -60,6 +60,7 @@ pub struct TurnDetectionUpdate {
 }
 /// One provisional speech chunk. Its response need not have started yet.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ReviewRequest {
     /// Review identifier, unique in this session.
     pub review_id: String,
@@ -71,6 +72,24 @@ pub struct ReviewRequest {
     pub index: u64,
     /// Proposed speech, not proof that the text was spoken.
     pub text: String,
+}
+impl ReviewRequest {
+    /// Build a request, for example to test a review callback.
+    pub fn new(
+        review_id: impl Into<String>,
+        response_id: impl Into<String>,
+        item_id: impl Into<String>,
+        index: u64,
+        text: impl Into<String>,
+    ) -> Self {
+        Self {
+            review_id: review_id.into(),
+            response_id: response_id.into(),
+            item_id: item_id.into(),
+            index,
+            text: text.into(),
+        }
+    }
 }
 /// A decision on one proposed chunk.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -442,6 +461,7 @@ impl OutputRef {
 }
 /// Effective settings supplied by Prism. None means the field was not published.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct SessionInfo {
     /// Opaque server release or commit, absent on older images.
     pub version: Option<String>,
@@ -482,8 +502,38 @@ pub struct SessionInfo {
     /// The labels replies carry, as Prism last confirmed them.
     pub response_metadata: Option<Labels>,
 }
+impl SessionInfo {
+    /// Build session settings with no published values, for example in tests.
+    ///
+    /// Interruption is on and the voice is empty. Set other public fields after
+    /// construction.
+    pub fn new(session_id: impl Into<String>) -> Self {
+        Self {
+            version: None,
+            speed: None,
+            review: None,
+            end_of_turn_min_silence_ms: None,
+            interrupt_min_words: None,
+            interrupt_phrases: None,
+            acknowledgment_phrases: None,
+            truncation: None,
+            settings_revision: None,
+            model: "prism",
+            session_id: session_id.into(),
+            voice: String::new(),
+            interrupt_on_speech: true,
+            tool_result_timeout_s: None,
+            tool_continuation_timeout_s: None,
+            eagerness: None,
+            end_of_turn_timeout_ms: None,
+            request_id: None,
+            response_metadata: None,
+        }
+    }
+}
 /// Structured service error, available from Error::realtime_fault.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct RealtimeFault {
     /// Service error code.
     pub code: String,
@@ -507,6 +557,22 @@ pub struct RealtimeFault {
     pub parameter: Option<String>,
 }
 impl RealtimeFault {
+    /// Build a fault with an unknown scope and no owners, for example in tests.
+    /// Set other public fields after construction.
+    pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            scope: "unknown".into(),
+            request_id: None,
+            response_id: None,
+            review_id: None,
+            item_id: None,
+            call_ids: Vec::new(),
+            correlation_id: None,
+            parameter: None,
+        }
+    }
     /// Whether the same request, unchanged, may succeed on another attempt.
     ///
     /// Only `capacity_exceeded`, `unavailable`, and `response_timeout` return true.
@@ -527,9 +593,16 @@ impl fmt::Display for RealtimeFault {
 impl std::error::Error for RealtimeFault {}
 /// Prism's idle limit when it closes a conversation.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct RealtimeIdleTimeout {
     /// Seconds of inactivity allowed by the server.
     pub idle_timeout_s: f64,
+}
+impl RealtimeIdleTimeout {
+    /// Build an idle timeout, for example in tests.
+    pub fn new(idle_timeout_s: f64) -> Self {
+        Self { idle_timeout_s }
+    }
 }
 impl fmt::Display for RealtimeIdleTimeout {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -543,6 +616,7 @@ impl fmt::Display for RealtimeIdleTimeout {
 impl std::error::Error for RealtimeIdleTimeout {}
 /// One event with protocol correlation.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct SessionEvent {
     /// Server send time as Unix milliseconds. Absent for old images and local events.
     pub server_time_ms: Option<u64>,
@@ -555,16 +629,45 @@ pub struct SessionEvent {
     /// Typed event contents.
     pub payload: RealtimeEvent,
 }
+impl SessionEvent {
+    /// Build an event without a request ID or server time, for example in tests.
+    /// Set those public fields after construction.
+    pub fn new(
+        session_id: impl Into<String>,
+        event_id: impl Into<String>,
+        payload: RealtimeEvent,
+    ) -> Self {
+        Self {
+            server_time_ms: None,
+            session_id: session_id.into(),
+            event_id: event_id.into(),
+            request_id: None,
+            payload,
+        }
+    }
+}
 /// History items excluded from a reply's prompt, not deleted from history.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ResponseTruncation {
     /// Number of excluded items, not turns. Already hidden items are not counted.
     pub items_left_out: u64,
     /// Oldest retained item; None when no earlier item was retained.
     pub first_kept_item_id: Option<String>,
 }
+impl ResponseTruncation {
+    /// Build a summary with no retained item, for example in tests.
+    /// Set `first_kept_item_id` after construction.
+    pub fn new(items_left_out: u64) -> Self {
+        Self {
+            items_left_out,
+            first_kept_item_id: None,
+        }
+    }
+}
 /// Model tokens counted for a reply.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ResponseUsage {
     /// Tokens in the prompt, including speech.
     pub input_tokens: u64,
@@ -575,11 +678,28 @@ pub struct ResponseUsage {
     /// Maximum shared context size.
     pub context_window: u64,
 }
+impl ResponseUsage {
+    /// Build token counts, for example in tests.
+    pub fn new(
+        input_tokens: u64,
+        output_tokens: u64,
+        total_tokens: u64,
+        context_window: u64,
+    ) -> Self {
+        Self {
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            context_window,
+        }
+    }
+}
 /// Typed Prism event contents. Unknown wire events are ignored.
 #[derive(Clone, Debug)]
 #[non_exhaustive]
 pub enum RealtimeEvent {
     /// A playback report was recorded, with the text retained in history.
+    #[non_exhaustive]
     ItemTruncated {
         /// Conversation item identifier. No retained response reference is needed.
         item_id: String,
@@ -594,11 +714,13 @@ pub enum RealtimeEvent {
     /// A typed or proactive turn can be submitted.
     InputReady,
     /// Possible speech; applications can lower playback volume.
+    #[non_exhaustive]
     SpeechHint {
         /// Audio start time.
         audio_start_ms: u64,
     },
     /// Confirmed user speech.
+    #[non_exhaustive]
     SpeechStarted {
         /// Input item.
         item_id: String,
@@ -606,6 +728,7 @@ pub enum RealtimeEvent {
         audio_start_ms: u64,
     },
     /// End of a user speech turn.
+    #[non_exhaustive]
     SpeechStopped {
         /// Input item.
         item_id: String,
@@ -613,13 +736,19 @@ pub enum RealtimeEvent {
         audio_end_ms: u64,
         /// Semantic, timeout, silence, max_duration, detector_changed, or unknown.
         end_reason: Option<String>,
+        /// Minimum silence in force when the turn ended, absent on older images.
+        /// With `eagerness` `auto` and no configured minimum, Prism adjusts it
+        /// during the call.
+        end_of_turn_min_silence_ms: Option<u64>,
     },
     /// Input audio committed.
+    #[non_exhaustive]
     InputCommitted {
         /// Input item.
         item_id: String,
     },
     /// Incremental input transcription.
+    #[non_exhaustive]
     TranscriptDelta {
         /// All words so far, when supplied. Replace captions even when this is empty.
         transcript: Option<String>,
@@ -629,6 +758,7 @@ pub enum RealtimeEvent {
         delta: String,
     },
     /// Final input transcription.
+    #[non_exhaustive]
     TranscriptFinal {
         /// Input item.
         item_id: String,
@@ -636,6 +766,7 @@ pub enum RealtimeEvent {
         text: String,
     },
     /// Input transcription failed.
+    #[non_exhaustive]
     TranscriptFailed {
         /// Input item.
         item_id: String,
@@ -643,6 +774,7 @@ pub enum RealtimeEvent {
         fault: RealtimeFault,
     },
     /// A new response was accepted.
+    #[non_exhaustive]
     ResponseStarted {
         /// Settings revision the reply began with, if published.
         settings_revision: Option<u64>,
@@ -660,6 +792,7 @@ pub enum RealtimeEvent {
         input_item_ids: Vec<String>,
     },
     /// A nudge instruction was saved for later replies.
+    #[non_exhaustive]
     ResponseInstructionSaved {
         /// Response that used the instruction.
         response: ResponseRef,
@@ -667,16 +800,19 @@ pub enum RealtimeEvent {
         item_id: String,
     },
     /// A caller cancelled a submitted reply request.
+    #[non_exhaustive]
     ResponseAbandoned {
         /// Accepted response to discard.
         response: ResponseRef,
     },
     /// Assistant output began.
+    #[non_exhaustive]
     MessageStarted {
         /// Output reference.
         output: OutputRef,
     },
     /// Incremental assistant text.
+    #[non_exhaustive]
     TextDelta {
         /// Output reference.
         output: OutputRef,
@@ -684,6 +820,7 @@ pub enum RealtimeEvent {
         delta: String,
     },
     /// Complete assistant text.
+    #[non_exhaustive]
     TextDone {
         /// Output reference.
         output: OutputRef,
@@ -691,6 +828,7 @@ pub enum RealtimeEvent {
         text: String,
     },
     /// Assistant PCM audio.
+    #[non_exhaustive]
     AudioDelta {
         /// Output reference.
         output: OutputRef,
@@ -698,11 +836,13 @@ pub enum RealtimeEvent {
         audio: AudioChunk,
     },
     /// No more audio for this output.
+    #[non_exhaustive]
     AudioDone {
         /// Output reference.
         output: OutputRef,
     },
     /// An application must execute a function.
+    #[non_exhaustive]
     ToolCall {
         /// Function reference.
         call: ToolCallRef,
@@ -714,6 +854,7 @@ pub enum RealtimeEvent {
         arguments: Map<String, Value>,
     },
     /// A response finished generating. Audio can still be playing.
+    #[non_exhaustive]
     ResponseEnded {
         /// Settings revision the reply began with, if published.
         settings_revision: Option<u64>,
@@ -723,10 +864,12 @@ pub enum RealtimeEvent {
         response: ResponseRef,
         /// Completed, cancelled, failed, or unknown.
         status: String,
-        /// Optional reason.
+        /// Why it ended, as Prism sent it, for example `stop`, `max_output_tokens`,
+        /// `audio_cut`, or `review_stopped`. Prism may add values.
         reason: Option<String>,
     },
     /// Prism counted model tokens for a completed reply.
+    #[non_exhaustive]
     ResponseUsageRecorded {
         /// Response whose tokens were counted.
         response: ResponseRef,
@@ -735,6 +878,128 @@ pub enum RealtimeEvent {
     },
     /// A nonterminal service error.
     Fault(RealtimeFault),
+}
+/// Constructors for events an application can build, for example in tests.
+///
+/// Events that hold response, output, or tool references come only from a
+/// session. Optional fields start as `None`; set them with the `with_` methods.
+impl RealtimeEvent {
+    /// A recorded playback report.
+    pub fn item_truncated(
+        item_id: impl Into<String>,
+        content_index: u64,
+        audio_end_ms: u64,
+    ) -> Self {
+        Self::ItemTruncated {
+            item_id: item_id.into(),
+            content_index,
+            audio_end_ms,
+            kept_text: None,
+        }
+    }
+    /// Possible speech.
+    pub fn speech_hint(audio_start_ms: u64) -> Self {
+        Self::SpeechHint { audio_start_ms }
+    }
+    /// Confirmed user speech.
+    pub fn speech_started(item_id: impl Into<String>, audio_start_ms: u64) -> Self {
+        Self::SpeechStarted {
+            item_id: item_id.into(),
+            audio_start_ms,
+        }
+    }
+    /// The end of a user speech turn.
+    pub fn speech_stopped(item_id: impl Into<String>, audio_end_ms: u64) -> Self {
+        Self::SpeechStopped {
+            item_id: item_id.into(),
+            audio_end_ms,
+            end_reason: None,
+            end_of_turn_min_silence_ms: None,
+        }
+    }
+    /// Committed input audio.
+    pub fn input_committed(item_id: impl Into<String>) -> Self {
+        Self::InputCommitted {
+            item_id: item_id.into(),
+        }
+    }
+    /// Incremental input transcription.
+    pub fn transcript_delta(item_id: impl Into<String>, delta: impl Into<String>) -> Self {
+        Self::TranscriptDelta {
+            transcript: None,
+            item_id: item_id.into(),
+            delta: delta.into(),
+        }
+    }
+    /// Final input transcription.
+    pub fn transcript_final(item_id: impl Into<String>, text: impl Into<String>) -> Self {
+        Self::TranscriptFinal {
+            item_id: item_id.into(),
+            text: text.into(),
+        }
+    }
+    /// Failed input transcription.
+    pub fn transcript_failed(item_id: impl Into<String>, fault: RealtimeFault) -> Self {
+        Self::TranscriptFailed {
+            item_id: item_id.into(),
+            fault,
+        }
+    }
+    /// Set the text a playback report kept.
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the event is `ItemTruncated`.
+    #[must_use]
+    pub fn with_kept_text(mut self, text: impl Into<String>) -> Self {
+        match &mut self {
+            Self::ItemTruncated { kept_text, .. } => *kept_text = Some(text.into()),
+            _ => panic!("with_kept_text applies to ItemTruncated"),
+        }
+        self
+    }
+    /// Set what ended a speech turn.
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the event is `SpeechStopped`.
+    #[must_use]
+    pub fn with_end_reason(mut self, reason: impl Into<String>) -> Self {
+        match &mut self {
+            Self::SpeechStopped { end_reason, .. } => *end_reason = Some(reason.into()),
+            _ => panic!("with_end_reason applies to SpeechStopped"),
+        }
+        self
+    }
+    /// Set the minimum silence in force when a speech turn ended.
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the event is `SpeechStopped`.
+    #[must_use]
+    pub fn with_end_of_turn_min_silence_ms(mut self, silence_ms: u64) -> Self {
+        match &mut self {
+            Self::SpeechStopped {
+                end_of_turn_min_silence_ms,
+                ..
+            } => *end_of_turn_min_silence_ms = Some(silence_ms),
+            _ => panic!("with_end_of_turn_min_silence_ms applies to SpeechStopped"),
+        }
+        self
+    }
+    /// Set all transcribed words so far.
+    ///
+    /// # Panics
+    ///
+    /// Panics unless the event is `TranscriptDelta`.
+    #[must_use]
+    pub fn with_transcript(mut self, text: impl Into<String>) -> Self {
+        match &mut self {
+            Self::TranscriptDelta { transcript, .. } => *transcript = Some(text.into()),
+            _ => panic!("with_transcript applies to TranscriptDelta"),
+        }
+        self
+    }
 }
 /// Device playback measurements.
 #[derive(Clone, Debug)]

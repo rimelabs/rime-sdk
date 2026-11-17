@@ -609,6 +609,9 @@ def _decode_value(value: object, session_id: str | None) -> ServerEvent | None:
                 in (None, "semantic", "timeout", "silence", "max_duration", "detector_changed")
                 else "unknown",
             ),
+            end_of_turn_min_silence_ms=_optional_integer(
+                event, "end_of_turn_min_silence_ms", 0, 5000
+            ),
         )
     elif kind == "input_audio_buffer.committed":
         payload = t.InputCommitted(item_id=_id(event.get("item_id"), "item_id"))

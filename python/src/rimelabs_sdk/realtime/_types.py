@@ -416,11 +416,17 @@ class SpeechStarted:
 
 @dataclass(frozen=True, kw_only=True)
 class SpeechStopped:
-    """None in end_reason means the server did not publish the field."""
+    """None in end_reason or end_of_turn_min_silence_ms means the server did not publish it.
+
+    ``end_of_turn_min_silence_ms`` is the minimum silence in force when the turn
+    ended. With ``eagerness="auto"`` and no configured minimum, Prism adjusts it
+    during the call.
+    """
 
     item_id: str
     audio_end_ms: int
     end_reason: SpeechEndReason | Literal["unknown"] | None = None
+    end_of_turn_min_silence_ms: int | None = None
     kind: Literal["speech.stopped"] = field(default="speech.stopped", init=False)
 
 
