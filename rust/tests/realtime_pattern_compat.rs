@@ -10,31 +10,36 @@ use rimelabs_sdk::{
     ReviewRequest, SessionEvent, SessionInfo,
 };
 
-fn match_with_rest_patterns(event: &RealtimeEvent) {
+// Binding fields by name proves they exist; `..` covers fields added later.
+fn match_with_rest_patterns(event: &RealtimeEvent) -> usize {
     match event {
         RealtimeEvent::ResponseStarted {
-            response: _,
-            cause: _,
-            ..
-        } => {}
+            response, cause, ..
+        } => response.response_id().len() + cause.len(),
         RealtimeEvent::ResponseEnded {
-            response: _,
-            status: _,
-            reason: _,
+            response,
+            status,
+            reason,
             ..
-        } => {}
+        } => response.response_id().len() + status.len() + reason.as_ref().map_or(0, String::len),
         RealtimeEvent::SpeechStopped {
-            end_reason: _,
-            end_of_turn_min_silence_ms: _,
+            end_reason,
+            end_of_turn_min_silence_ms,
             ..
-        } => {}
-        _ => {}
+        } => {
+            end_reason.as_ref().map_or(0, String::len)
+                + end_of_turn_min_silence_ms.map_or(0, |ms| ms as usize)
+        }
+        _ => 0,
     }
 }
 
 #[test]
 fn rest_patterns_and_root_exports_compile() {
-    let _ = match_with_rest_patterns as fn(&RealtimeEvent);
+    let stopped = RealtimeEvent::speech_stopped("item", 50)
+        .with_end_reason("semantic")
+        .with_end_of_turn_min_silence_ms(300);
+    assert_eq!(match_with_rest_patterns(&stopped), "semantic".len() + 300);
     let _ = ReplyRequestOptions::default();
     let usage = ResponseUsage::new(10, 5, 15, 32_768);
     assert_eq!(usage.total_tokens, 15);
