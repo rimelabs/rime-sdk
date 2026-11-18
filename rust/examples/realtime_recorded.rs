@@ -1,23 +1,46 @@
-//! Stream a raw 16 kHz mono PCM16 recording to Prism, then send one second of silence.
+//! Stream a raw 16 kHz mono PCM16 recording to Prism, then send silence until the reply ends.
 //! Usage: cargo run --example realtime_recorded -- utterance.pcm
 use futures_util::StreamExt;
 use rimelabs_sdk::{
     realtime::{AudioChunk, RealtimeConnectOptions, RealtimeEvent},
     Client, Error, PcmFormat,
 };
-use tokio::io::AsyncReadExt;
+use std::time::Duration;
+
+/// 40 ms of 16 kHz mono PCM16.
+const CHUNK_BYTES: usize = 1280;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = std::env::args()
         .nth(1)
         .ok_or("supply a raw 16 kHz mono PCM16 file")?;
+    let recording = tokio::fs::read(path).await?;
     let client = Client::builder().build()?;
     let session = client
         .realtime()
         .connect(RealtimeConnectOptions::default())
         .await?;
     let mut events = session.events()?;
-    let consumer = tokio::spawn(async move {
+    // Prism finds the end of a turn in the audio that it receives. Like a live
+    // microphone, keep sending audio at capture speed until the reply ends.
+    let send = async {
+        let silence = [0; CHUNK_BYTES];
+        let chunks = recording
+            .chunks(CHUNK_BYTES)
+            .chain(std::iter::repeat(&silence[..]));
+        for chunk in chunks {
+            session
+                .send_audio(AudioChunk {
+                    data: chunk.to_vec().into(),
+                    format: PcmFormat::default(),
+                })
+                .await?;
+            tokio::time::sleep(Duration::from_millis(40)).await;
+        }
+        Ok::<_, Error>(())
+    };
+    let receive = async {
         while let Some(event) = events.next().await {
             match event?.payload {
                 RealtimeEvent::TranscriptFinal { text, .. } => println!("You: {text}"),
@@ -27,49 +50,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Ok::<_, Error>(())
-    });
-    let sent = async {
-        let mut file = tokio::fs::File::open(path).await.map_err(Error::input)?;
-        loop {
-            let mut data = vec![0; 1280];
-            let mut count = 0;
-            while count < data.len() {
-                let n = file.read(&mut data[count..]).await.map_err(Error::input)?;
-                if n == 0 {
-                    break;
-                }
-                count += n
-            }
-            if count == 0 {
-                break;
-            }
-            data.truncate(count);
-            session
-                .send_audio(AudioChunk {
-                    data: data.into(),
-                    format: PcmFormat::default(),
-                })
-                .await?;
-            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+    };
+    // `send` returns only on an error, so this ends when the reply ends or either side fails.
+    let result = tokio::time::timeout(Duration::from_secs(60), async {
+        tokio::select! {
+            sent = send => sent,
+            received = receive => received,
         }
-        for _ in 0..25 {
-            session
-                .send_audio(AudioChunk {
-                    data: vec![0; 1280].into(),
-                    format: PcmFormat::default(),
-                })
-                .await?;
-            tokio::time::sleep(std::time::Duration::from_millis(40)).await
-        }
-        Ok::<_, Error>(())
-    }
+    })
     .await;
-    if sent.is_err() {
-        session.close().await;
-    }
-    let received = tokio::time::timeout(std::time::Duration::from_secs(60), consumer).await;
     client.close().await;
-    sent?;
-    received???;
+    result??;
     Ok(())
 }
