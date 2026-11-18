@@ -161,6 +161,7 @@ Use `session.set_response_metadata` to replace reply labels.
 | `tools: Sequence[ToolDefinition]` | No | `()`. Sends an empty tool list when omitted. |
 | `interrupt_on_speech: bool` | No | `True`. Requests interruption when the server confirms user speech. |
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
+| `client_ends_turns: bool` | No | `False`. `True` makes your application start and end each user turn; see [Client-ended turns](#client-ended-turns). |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `request_id: str \| None` | No | Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK raises `RimeInputError`. Prism replaces IDs longer than 128 characters. A gateway can replace shorter IDs too. Read `session.info.request_id` for the ID Prism actually used. |
@@ -211,6 +212,49 @@ server reported in its initialization acknowledgment. A missing field is
 `None`; the SDK does not substitute a requested value or assume a server
 default. An unrecognized server eagerness becomes `"unknown"`.
 `interrupt_on_speech` remains a separate connection option.
+
+## Client-ended turns
+
+With `client_ends_turns=True`, Prism detects no turns. Your application starts
+and ends each user turn, for example with a push-to-talk button, and asks for
+each reply itself.
+
+```python
+async with client.realtime.connect(client_ends_turns=True) as session:
+    await session.start_turn()  # The button goes down.
+    # Send the caller's audio with session.send_audio, as usual.
+    await session.end_turn()  # The button goes up.
+    reply = await session.reply_to_turns()
+```
+
+- `start_turn()` starts the turn. Audio sent before it is not part of the turn.
+  Prism announces the turn with `SpeechStarted` and cuts off any reply, so stop
+  playback and report what the caller heard, as for any interruption.
+  `run_conversation` does this for you.
+- `end_turn()` ends the turn at the audio sent so far and returns once Prism
+  commits it. Prism does not reply on its own. A turn longer than 55 s keeps
+  its last 55 s.
+- `reply_to_turns(*, metadata=None)` asks for the reply. It answers every turn
+  ended since the last reply. It first waits until the last reply has ended and
+  finished playing, for at most `ready_s`, then raises
+  `RealtimeAdmissionTimeout`. Each call asks for a reply, so two calls get two
+  replies.
+- Without `start_turn()`, the turn is the audio since the last `end_turn()` or
+  `clear_audio()`. Prism does not announce it, send transcript deltas for it, or
+  stop a reply. Stop a reply yourself with `cancel` and `report_playback`.
+
+If Prism refuses the turn, `end_turn` raises `RimeRealtimeError`. A press
+under 100 ms is refused with `input_audio_buffer_commit_empty`: nothing is
+committed, so don't ask for a reply. `start_turn` gets no acknowledgment.
+
+The setting is fixed for the session. With it, `connect` raises
+`RimeInputError` for `turn_detection` or `interrupt_on_speech=False`, and
+`update` raises it for any `turn_detection` or `interrupt_on_speech`.
+`session.info.client_ends_turns` is
+`True` once Prism confirms it, and `session.info.interrupt_on_speech` is
+`False`, because speech alone interrupts nothing. `end_turn()` also works
+without this setting: it ends the turn under way and returns once sent, and
+Prism replies as usual.
 
 ## Update session settings
 
@@ -267,6 +311,9 @@ Each method is async. Arguments without a default are required.
 | `continue_reply(parent, *, metadata=None)` | Continue a tool round after parent completion and all result acknowledgments. | New `ResponseRef` |
 | `cancel(response)` | Request that generation stop. | `None` when the response is terminal |
 | `clear_audio()` | Clear buffered input and reset audio conversion. | `None` after acknowledgment |
+| `start_turn()` | Start the user's turn, with `client_ends_turns`. | `None` once sent |
+| `end_turn()` | End the user's turn at the audio sent so far. | `None` once committed, with `client_ends_turns`; else once sent |
+| `reply_to_turns(*, metadata=None)` | Ask for the reply to the turns you ended, with `client_ends_turns`. | `ResponseRef` at response creation |
 | `set_response_metadata(metadata)` | Replace the labels for later replies. | `None` once Prism confirms |
 | `report_playback(report)` | Report interrupted or finished playback. | `None` |
 | `close()` | Close the session and release its resources. | `None`; safe to repeat |
@@ -382,7 +429,7 @@ nullable `request_id`, and a typed `payload` with a fixed `kind` string.
 | `InputReady` | No data fields; `send_text` and `request_reply` handle this wait for you. |
 | `SpeechHint` | `audio_start_ms`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `SpeechStarted` | `item_id`, `audio_start_ms` |
-| `SpeechStopped` | `item_id`, `audio_end_ms`, `end_reason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or None from a server that does not send it; `end_of_turn_min_silence_ms`: the minimum silence in force when the turn ended, or None from an older server |
+| `SpeechStopped` | `item_id`, `audio_end_ms`, `end_reason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration`, `detector_changed` or `client_commit`), `unknown` for a newer value, or None from a server that does not send it; `end_of_turn_min_silence_ms`: the minimum silence in force when the turn ended, or None from an older server |
 | `InputCommitted` | `item_id` |
 | `TranscriptDelta`, `TranscriptFinal` | `item_id` and `delta` or `text` |
 | `TranscriptFailed` | `item_id`, `error` |

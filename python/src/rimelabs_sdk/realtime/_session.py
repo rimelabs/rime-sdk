@@ -39,7 +39,12 @@ from ._settings import InterruptionPolicies, speed_setting, tool_settings, turn_
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
-_NOT_READY = {"typed_turn_busy", "instructions_busy", "proactive_unavailable"}
+_NOT_READY = {
+    "typed_turn_busy",
+    "instructions_busy",
+    "proactive_unavailable",
+    "conversation_already_has_active_response",
+}
 _LIMIT = 128
 _close_errors: WeakSet[RimeError] = WeakSet()
 
@@ -384,7 +389,7 @@ class RealtimeSession:
             settings = body.get("session")
             if isinstance(settings, dict):
                 pending.interrupt_on_speech = cast(
-                    bool | None, settings.get("turn_detection", {}).get("interrupt_response")
+                    bool | None, (settings.get("turn_detection") or {}).get("interrupt_response")
                 )
         item = body.get("item")
         if request is p.HISTORY_ITEM or request is p.HISTORY_RESULT:
@@ -496,6 +501,10 @@ class RealtimeSession:
         Cancellation after submission does not undo an accepted update.
         """
         self._check()
+        if self.info.client_ends_turns and (
+            turn_detection is not None or interrupt_on_speech is not None
+        ):
+            raise RimeInputError("Turn settings do not apply with client_ends_turns")
         settings: p.SessionPatch = {}
         if truncation is not None:
             settings["truncation"] = p.truncation_settings(truncation)
@@ -698,6 +707,56 @@ class RealtimeSession:
         async with self._audio_lock, self._clear_lock:
             await self._request(p.CLEAR, {})
 
+    async def start_turn(self) -> None:
+        """Start the user's turn here, for example as a push-to-talk button goes down.
+
+        Only with client_ends_turns. Audio sent before this is not part of the turn.
+        Prism announces the turn with SpeechStarted and cuts off any reply.
+        Prism sends no acknowledgment; a refusal arrives as a FaultEvent.
+        """
+        self._require_client_turns()
+        async with self._audio_lock:
+            await self._send_unacknowledged("prism.input_audio_buffer.start")
+
+    async def end_turn(self) -> None:
+        """End the user's turn at the audio sent so far, for example as a button goes up.
+
+        With client_ends_turns, this returns once Prism commits the turn, and raises
+        RimeRealtimeError if Prism refuses it, as it refuses a press under 100 ms.
+        Prism then waits for reply_to_turns. Otherwise Prism replies as when it ends
+        the turn itself; it sends no acknowledgment, and a refusal arrives as a
+        FaultEvent.
+        """
+        async with self._audio_lock:
+            if self.info.client_ends_turns:
+                await self._request(p.COMMIT, {})
+            else:
+                # A commit just after Prism ended the turn itself gets no answer.
+                await self._send_unacknowledged("input_audio_buffer.commit")
+
+    async def reply_to_turns(self, *, metadata: t.Labels | None = None) -> t.ResponseRef:
+        """Ask for the reply to the conversation as it is, after end_turn.
+
+        Only with client_ends_turns. The reply answers every turn ended since the
+        last reply. This first waits until the last reply has ended and finished
+        playing, for at most ready_s, then raises RealtimeAdmissionTimeout. Each
+        call asks for a reply, so two calls get two replies.
+        """
+        self._require_client_turns()
+        body: dict[str, object] = {}
+        if metadata is not None:
+            body["metadata"] = p.request_metadata(metadata, {})
+        return await self._create(body)
+
+    def _require_client_turns(self) -> None:
+        self._check()
+        if not self.info.client_ends_turns:
+            raise RimeInputError("This needs a session opened with client_ends_turns")
+
+    async def _send_unacknowledged(self, kind: str) -> None:
+        # Prism answers these only with a correlated error, which reaches the event stream.
+        await self._send({"type": kind, "event_id": "evt_" + uuid.uuid4().hex})
+
     async def send_audio(self, chunk: t.AudioChunk) -> None:
         """Send one bounded chunk with transport backpressure.
 
@@ -776,6 +835,14 @@ class RealtimeSession:
             pending.request.result(result)
             if not pending.future.done():
                 pending.future.set_result(result)
+
+    def _pending_commit(self) -> str | None:
+        # The audio lock keeps at most one commit waiting. With client-ended turns,
+        # only a commit commits a turn, so Prism's next answer about one is its own.
+        return next(
+            (key for key, pending in self._pending.items() if pending.request is p.COMMIT),
+            None,
+        )
 
     def _reject(self, key: str | None, error: RimeError) -> None:
         pending = self._pending.get(key or "")
@@ -909,6 +976,9 @@ class RealtimeSession:
                 tool_result_timeout_s=view.tool_result_timeout_s,
                 tool_continuation_timeout_s=view.tool_continuation_timeout_s,
                 turn_detection=view.turn_detection,
+                # Only the first update decides this, so a later view cannot undo it.
+                client_ends_turns=view.client_ends_turns
+                or (self._info is not None and self._info.client_ends_turns),
                 settings_revision=view.settings_revision,
                 truncation=view.truncation,
                 request_id=view.request_id,
@@ -1048,6 +1118,8 @@ class RealtimeSession:
                 raise RimeResourceLimitError("Too many protected realtime responses")
             state.calls[call_id] = None
             self._prune_responses()
+        elif isinstance(payload, t.InputCommitted):
+            self._settle(self._pending_commit(), payload)
         elif isinstance(payload, t.MessageStarted):
             state = self._responses[payload.output.response.response_id]
             if len(state.outputs) >= 128:
@@ -1062,6 +1134,9 @@ class RealtimeSession:
             if fault.code in _NOT_READY:
                 self._ready.clear()
             self._reject(fault.request_id, error)
+            if fault.code == "pending_speech_overflow" and fault.request_id is None:
+                # Prism refuses a commit over its pending audio budget without naming it.
+                self._reject(self._pending_commit(), error)
             if fault.code == "typed_turn_superseded":
                 for key, pending in self._pending.items():
                     if pending.item_id == fault.item_id and fault.item_id:

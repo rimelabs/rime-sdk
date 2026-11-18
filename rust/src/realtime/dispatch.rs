@@ -67,6 +67,13 @@ impl Worker {
                         .and_then(|previous| previous.version.clone());
                 }
                 info.session_id = self.id.clone();
+                // Only the first update decides this, so a later view cannot undo it.
+                info.client_ends_turns |= self
+                    .info
+                    .lock()
+                    .expect("session info mutex")
+                    .as_ref()
+                    .is_some_and(|previous| previous.client_ends_turns);
                 if !e.interrupt_known {
                     info.interrupt_on_speech = c.body["session"]["turn_detection"]
                         ["interrupt_response"]
@@ -106,6 +113,10 @@ impl Worker {
             }
             let mut matching = e.request_id.as_deref() == Some(&format!("evt_{}", c.id));
             if c.kind == Kind::Clear && e.kind == "audio.cleared" {
+                matching = true
+            }
+            // Commits wait for one another, so at most one waits for this answer.
+            if c.kind == Kind::Commit && !c.expected.is_empty() && e.kind == "input.committed" {
                 matching = true
             }
             if c.kind == Kind::Truncate
@@ -273,6 +284,7 @@ impl Worker {
                             "typed_turn_busy",
                             "instructions_busy",
                             "proactive_unavailable",
+                            "conversation_already_has_active_response",
                         ]
                         .contains(&f.code.as_str());
                     if busy {
@@ -282,8 +294,16 @@ impl Worker {
                         if c.finished {
                             continue;
                         }
+                        // Prism refuses a commit over its pending audio budget
+                        // without naming it.
+                        let overflow = f.code == "pending_speech_overflow"
+                            && f.request_id.is_none()
+                            && c.submitted
+                            && c.kind == Kind::Commit
+                            && !c.expected.is_empty();
                         if (c.submitted
                             && f.request_id.as_deref() == Some(&format!("evt_{}", c.id)))
+                            || overflow
                             || (f.code == "typed_turn_superseded"
                                 && f.item_id
                                     .as_ref()

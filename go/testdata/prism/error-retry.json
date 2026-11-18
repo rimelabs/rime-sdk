@@ -52,5 +52,8 @@
   {
     "code": "review_timeout",
     "retryable": false
-  }
+  },
+  { "code": "input_audio_buffer_commit_empty", "retryable": false },
+  { "code": "input_audio_buffer_start_unavailable", "retryable": false },
+  { "code": "conversation_already_has_active_response", "retryable": false }
 ]

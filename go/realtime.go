@@ -249,6 +249,12 @@ func rtRequestMetadata(labels map[string]string, reserved rtObject) (rtObject, e
 	}
 	return metadata, nil
 }
+
+// rtTurnDetectionEmpty reports whether no turn setting was supplied.
+func rtTurnDetectionEmpty(d TurnDetection) bool {
+	return d.Eagerness == "" && d.EndOfTurnTimeoutMS == 0 && d.EndOfTurnMinSilenceMS == nil &&
+		d.InterruptMinWords == nil && d.InterruptPhrases == nil && d.AcknowledgmentPhrases == nil
+}
 func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, error) {
 	t := o.Timeouts
 	for _, p := range []*time.Duration{&t.Connect, &t.Ready, &t.Request} {
@@ -315,6 +321,12 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 		return "", nil, t, failure(ErrInput, "request ID must be nonblank printable ASCII")
 	}
 	settings := rtObject{"modalities": []string{"text", "audio"}, "input_audio_format": "pcm16", "turn_detection": d, "tools": ts}
+	if o.ClientEndsTurns {
+		if !rtTurnDetectionEmpty(o.TurnDetection) || (o.InterruptOnSpeech != nil && !*o.InterruptOnSpeech) {
+			return "", nil, t, failure(ErrInput, "turn settings do not apply with ClientEndsTurns")
+		}
+		settings["turn_detection"] = nil
+	}
 	if o.Speed != nil {
 		if err := rtSpeed(*o.Speed); err != nil {
 			return "", nil, t, err

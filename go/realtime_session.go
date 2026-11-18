@@ -400,6 +400,9 @@ func (s *RealtimeSession) invoke(ctx context.Context, c *rtCommand) (rtResult, e
 // Replies already started keep their settings. Cancellation after submission
 // does not undo an accepted update.
 func (s *RealtimeSession) Update(ctx context.Context, options RealtimeUpdateOptions) (SessionInfo, error) {
+	if s.Info().ClientEndsTurns && (options.TurnDetection != nil || options.InterruptOnSpeech != nil) {
+		return SessionInfo{}, failure(ErrInput, "turn settings do not apply with ClientEndsTurns")
+	}
 	settings, err := rtPatch(options)
 	if err != nil {
 		return SessionInfo{}, err
@@ -501,6 +504,61 @@ func (s *RealtimeSession) ClearAudio(ctx context.Context) error {
 	return e
 }
 
+// StartTurn starts the user's turn here, for example as a push-to-talk button
+// goes down. It needs ClientEndsTurns. Audio sent before it is not part of the
+// turn. Prism announces the turn with SpeechStarted and cuts off any reply.
+// Prism sends no acknowledgment; a refusal arrives as a FaultEvent.
+func (s *RealtimeSession) StartTurn(ctx context.Context) error {
+	if e := s.requireClientTurns(); e != nil {
+		return e
+	}
+	_, e := s.invoke(ctx, &rtCommand{kind: "start", body: rtObject{}})
+	return e
+}
+
+// EndTurn ends the user's turn at the audio sent so far, for example as a
+// button goes up. With ClientEndsTurns, it returns once Prism commits the turn,
+// and returns a *RealtimeFault error if Prism refuses it, as it refuses a press
+// under 100 ms; Prism then waits for ReplyToTurns. Otherwise Prism replies as
+// when it ends the turn itself; it sends no acknowledgment, and a refusal
+// arrives as a FaultEvent.
+func (s *RealtimeSession) EndTurn(ctx context.Context) error {
+	_, e := s.invoke(ctx, &rtCommand{kind: "commit", body: rtObject{}})
+	return e
+}
+
+// ReplyToTurns asks for the reply to the conversation as it is, after EndTurn.
+// It needs ClientEndsTurns. The reply answers every turn ended since the last
+// reply. It first waits until the last reply has ended and finished playing,
+// for at most the Ready timeout, then returns an error matching ErrTimeout.
+// Each call asks for a reply, so two calls get two replies.
+func (s *RealtimeSession) ReplyToTurns(ctx context.Context) (ResponseRef, error) {
+	return s.ReplyToTurnsWithOptions(ctx, ReplyRequestOptions{})
+}
+
+// ReplyToTurnsWithOptions is ReplyToTurns with labels for this reply.
+func (s *RealtimeSession) ReplyToTurnsWithOptions(ctx context.Context, options ReplyRequestOptions) (ResponseRef, error) {
+	if e := s.requireClientTurns(); e != nil {
+		return ResponseRef{}, e
+	}
+	b := rtObject{}
+	if options.Metadata != nil {
+		metadata, err := rtRequestMetadata(options.Metadata, rtObject{})
+		if err != nil {
+			return ResponseRef{}, err
+		}
+		b["metadata"] = metadata
+	}
+	r, e := s.invoke(ctx, &rtCommand{kind: "reply", body: rtObject{"response": b}})
+	return r.ref, e
+}
+func (s *RealtimeSession) requireClientTurns() error {
+	if !s.Info().ClientEndsTurns {
+		return failure(ErrInput, "this needs a session opened with ClientEndsTurns")
+	}
+	return nil
+}
+
 // SendAudio converts and submits PCM16 input. Cancellation before submission sends
 // nothing. Cancellation during socket submission closes the session without replay.
 func (s *RealtimeSession) SendAudio(ctx context.Context, chunk AudioChunk) error {
@@ -579,7 +637,11 @@ func (s *RealtimeSession) run(address, key, requestID string, settings rtObject)
 	socketDone.Add(2)
 	go func() { defer socketDone.Done(); rtReadLoop(ctx, conn, reads) }()
 	go func() { defer socketDone.Done(); rtWriteLoop(ctx, conn, writes, written, s.timeouts.Request) }()
-	w := rtWorker{s: s, responses: map[string]*rtResponse{}, interrupt: settings["turn_detection"].(map[string]any)["interrupt_response"].(bool)}
+	interrupt := false
+	if detection, ok := settings["turn_detection"].(map[string]any); ok {
+		interrupt = detection["interrupt_response"].(bool)
+	}
+	w := rtWorker{s: s, responses: map[string]*rtResponse{}, interrupt: interrupt}
 	defer w.cancelReviews("")
 	initDeadline := time.NewTimer(time.Until(connectionDeadline))
 	defer initDeadline.Stop()
@@ -845,13 +907,19 @@ func (w *rtWorker) advance(writes chan<- rtWrite) error {
 	}
 	return w.pruneResponses()
 }
+
+// rtAudioOrdered names the commands that reach Prism in the order the caller sent
+// them, so a turn's start and end fall where the caller put them in its audio.
+func rtAudioOrdered(kind string) bool {
+	return kind == "audio" || kind == "clear" || kind == "start" || kind == "commit"
+}
 func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 	// Serialize uncorrelated controls and tool results without blocking the worker.
 	for _, p := range w.pending {
 		if p == c {
 			break
 		}
-		if !p.finished && (p.kind == c.kind || ((p.kind == "audio" || p.kind == "clear") && (c.kind == "audio" || c.kind == "clear"))) && (c.kind == "tool" || c.kind == "clear" || c.kind == "truncate" || c.kind == "audio" || c.kind == "cancel") {
+		if !p.finished && (p.kind == c.kind || (rtAudioOrdered(p.kind) && rtAudioOrdered(c.kind))) && (c.kind == "tool" || c.kind == "truncate" || rtAudioOrdered(c.kind) || c.kind == "cancel") {
 			return true, nil
 		}
 	}
@@ -959,6 +1027,16 @@ func (w *rtWorker) prepare(c *rtCommand) (bool, error) {
 		c.expected = "audio.cleared"
 	case "audio":
 		wire = "input_audio_buffer.append"
+	// Prism answers a start only with a correlated error, which reaches Recv.
+	case "start":
+		wire = "prism.input_audio_buffer.start"
+	case "commit":
+		wire = "input_audio_buffer.commit"
+		// With client-ended turns, only a commit commits a turn. With turn
+		// detection, a commit just after Prism ended the turn gets no answer.
+		if w.s.Info().ClientEndsTurns {
+			c.expected = "input.committed"
+		}
 	}
 	if c.id != "" {
 		return false, nil
@@ -1072,6 +1150,8 @@ func (w *rtWorker) applySessionInfo(c *rtCommand, e *rtWire) {
 			}
 		}
 	}
+	// Only the first update decides this, so a later view cannot undo it.
+	info.ClientEndsTurns = info.ClientEndsTurns || w.s.Info().ClientEndsTurns
 	w.interrupt = info.InterruptOnSpeech
 	w.s.setInfo(info)
 	e.info = info
@@ -1091,6 +1171,10 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		}
 		match := e.requestID != "" && e.requestID == c.id
 		if e.kind == "audio.cleared" && c.kind == "clear" {
+			match = true
+		}
+		// Commits wait for one another, so at most one waits for this answer.
+		if e.kind == "input.committed" && c.kind == "commit" && c.expected != "" {
 			match = true
 		}
 		if e.kind == "item.truncated" && c.kind == "truncate" && c.target == e.target && e.index == 0 {
@@ -1204,7 +1288,7 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 		if f.Scope == "session" {
 			return rtFaultError(f)
 		}
-		busy := f.Scope == "event" && (f.Code == "typed_turn_busy" || f.Code == "instructions_busy" || f.Code == "proactive_unavailable")
+		busy := f.Scope == "event" && (f.Code == "typed_turn_busy" || f.Code == "instructions_busy" || f.Code == "proactive_unavailable" || f.Code == "conversation_already_has_active_response")
 		if busy {
 			w.ready = false
 		}
@@ -1212,7 +1296,9 @@ func (w *rtWorker) dispatch(e *rtWire) error {
 			if c.finished {
 				continue
 			}
-			if (c.submitted && f.RequestID != "" && c.id == f.RequestID) || (f.Code == "typed_turn_superseded" && f.ItemID != "" && c.itemID == f.ItemID) {
+			// Prism refuses a commit over its pending audio budget without naming it.
+			overflow := f.Code == "pending_speech_overflow" && f.RequestID == "" && c.submitted && c.kind == "commit" && c.expected != ""
+			if (c.submitted && f.RequestID != "" && c.id == f.RequestID) || (f.Code == "typed_turn_superseded" && f.ItemID != "" && c.itemID == f.ItemID) || overflow {
 				if busy && (c.kind == "text" || c.kind == "reply") && c.ctx.Err() == nil {
 					c.id = ""
 					c.frames = nil

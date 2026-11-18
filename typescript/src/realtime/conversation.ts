@@ -324,7 +324,13 @@ export async function runConversation(
               (!reply.ended ||
                 [...reply.outputs.values()].some((output) => !output.measured)),
           );
-          if (eligible.at(-1)?.interruptOnSpeech) interrupt(eligible);
+          // With client-ended turns, speech starts only at startTurn, which
+          // always cuts the reply off.
+          if (
+            eligible.at(-1)?.interruptOnSpeech ||
+            (eligible.length > 0 && session.info.clientEndsTurns)
+          )
+            interrupt(eligible);
           break;
         }
         case "response.abandoned": {

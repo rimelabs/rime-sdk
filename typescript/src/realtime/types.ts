@@ -122,6 +122,11 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly tools?: readonly ToolDefinition[];
   readonly interruptOnSpeech?: boolean;
   readonly turnDetection?: TurnDetection;
+  /** Prism detects no turns: the session starts and ends each one with
+   * `startTurn` and `endTurn`, and asks for replies with `replyToTurns`.
+   * `turnDetection` and `interruptOnSpeech: false` do not apply then.
+   * This cannot change later in the session. */
+  readonly clientEndsTurns?: boolean;
   readonly timeouts?: RealtimeTimeouts;
   /** Sent as the upgrade's `x-request-id`. It must be nonblank printable ASCII, or
    * `connect` throws `RimeInputError`. Prism replaces IDs longer than 128 characters.
@@ -221,6 +226,9 @@ export interface SessionInfo {
   readonly toolResultTimeoutS: number | null;
   readonly toolContinuationTimeoutS: number | null;
   readonly turnDetection: TurnDetectionInfo;
+  /** True when the client starts and ends each user turn; Prism then detects
+   * none. Optional on caller-created values for compatibility. */
+  readonly clientEndsTurns?: boolean;
 }
 export interface RealtimeFault {
   readonly code: string;
@@ -293,9 +301,15 @@ export interface SpeechStarted {
  * - `max_duration`: the user spoke for the longest turn Prism takes; what
  *   they say next starts a new turn.
  * - `detector_changed`: Prism switched between its main and backup turn
- *   detection while the user spoke; nothing the user did ended the turn. */
+ *   detection while the user spoke; nothing the user did ended the turn.
+ * - `client_commit`: the client's `endTurn` ended the turn. */
 export type SpeechEndReason =
-  "semantic" | "timeout" | "silence" | "max_duration" | "detector_changed";
+  | "semantic"
+  | "timeout"
+  | "silence"
+  | "max_duration"
+  | "detector_changed"
+  | "client_commit";
 export interface SpeechStopped {
   readonly kind: "speech.stopped";
   readonly itemId: string;

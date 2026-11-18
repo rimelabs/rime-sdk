@@ -490,13 +490,9 @@ impl Worker {
         if self.pending.iter().any(|p| {
             !p.finished
                 && p.submitted
-                && (p.kind == c.kind
-                    || (matches!(p.kind, Kind::Audio | Kind::Clear)
-                        && matches!(c.kind, Kind::Audio | Kind::Clear)))
-                && matches!(
-                    c.kind,
-                    Kind::Tool | Kind::Clear | Kind::Truncate | Kind::Audio | Kind::Cancel
-                )
+                && (p.kind == c.kind || (audio_ordered(p.kind) && audio_ordered(c.kind)))
+                && (audio_ordered(c.kind)
+                    || matches!(c.kind, Kind::Tool | Kind::Truncate | Kind::Cancel))
         }) {
             return Ok(true);
         }
@@ -617,6 +613,15 @@ impl Worker {
                 "input_audio_buffer.clear"
             }
             Kind::Audio => "input_audio_buffer.append",
+            Kind::Start => "prism.input_audio_buffer.start",
+            Kind::Commit => {
+                // With client-ended turns, only a commit commits a turn. With turn
+                // detection, a commit just after Prism ended the turn gets no answer.
+                if self.client_ends_turns() {
+                    c.expected = "input.committed";
+                }
+                "input_audio_buffer.commit"
+            }
             Kind::Review => "prism.review.result",
         };
         if c.kind == Kind::Cancel {
@@ -653,3 +658,19 @@ impl Worker {
 #[cfg(test)]
 #[path = "tests/submission.rs"]
 mod submission_tests;
+
+impl Worker {
+    fn client_ends_turns(&self) -> bool {
+        self.info
+            .lock()
+            .expect("session info mutex")
+            .as_ref()
+            .is_some_and(|info| info.client_ends_turns)
+    }
+}
+
+/// The commands that reach Prism in the order the caller sent them, so a turn's
+/// start and end fall where the caller put them in its audio.
+fn audio_ordered(kind: Kind) -> bool {
+    matches!(kind, Kind::Audio | Kind::Clear | Kind::Start | Kind::Commit)
+}

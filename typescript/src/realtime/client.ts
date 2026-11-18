@@ -16,7 +16,7 @@ import {
   reviewSettings,
 } from "./settings.js";
 import { responseMetadata, truncationSettings } from "./protocol.js";
-import type { SessionSettings } from "./protocol.js";
+import type { SessionSettings, TurnSettings } from "./protocol.js";
 
 const DEFAULT_ENDPOINT = "wss://prism.api.rime.ai/v1/realtime";
 
@@ -92,10 +92,13 @@ export class Realtime {
       typeof options.interruptOnSpeech !== "boolean"
     )
       throw new RimeInputError("interruptOnSpeech must be a boolean");
+    const detection: TurnSettings = {
+      interrupt_response: options.interruptOnSpeech ?? true,
+    };
     const settings: SessionSettings = {
       modalities: ["text", "audio"],
       input_audio_format: "pcm16",
-      turn_detection: { interrupt_response: options.interruptOnSpeech ?? true },
+      turn_detection: detection,
       tools: toolSettings(options.tools ?? []),
     };
     if (options.truncation !== undefined)
@@ -105,10 +108,22 @@ export class Realtime {
     if (options.review !== undefined)
       settings.prism_review = reviewSettings(options.review);
     if (options.turnDetection !== undefined)
-      Object.assign(
-        settings.turn_detection,
-        turnSettings(options.turnDetection, true),
-      );
+      Object.assign(detection, turnSettings(options.turnDetection, true));
+    if (
+      options.clientEndsTurns !== undefined &&
+      typeof options.clientEndsTurns !== "boolean"
+    )
+      throw new RimeInputError("clientEndsTurns must be a boolean");
+    if (options.clientEndsTurns) {
+      if (
+        options.turnDetection !== undefined ||
+        options.interruptOnSpeech === false
+      )
+        throw new RimeInputError(
+          "Turn settings do not apply with clientEndsTurns",
+        );
+      settings.turn_detection = null;
+    }
     if (options.responseMetadata != null)
       settings.prism_response_metadata = responseMetadata(
         options.responseMetadata,

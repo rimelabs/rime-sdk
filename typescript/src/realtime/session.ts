@@ -30,6 +30,7 @@ const NOT_READY = new Set([
   "typed_turn_busy",
   "instructions_busy",
   "proactive_unavailable",
+  "conversation_already_has_active_response",
 ]);
 const LIMIT = 128;
 const closeErrors = new WeakSet<object>();
@@ -555,6 +556,14 @@ export class RealtimeSession {
    * complete list. Replies already started keep their original settings.
    * Cancellation after submission does not undo an accepted update. */
   async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
+    if (
+      this.info.clientEndsTurns &&
+      (options.turnDetection !== undefined ||
+        options.interruptOnSpeech !== undefined)
+    )
+      throw new RimeInputError(
+        "Turn settings do not apply with clientEndsTurns",
+      );
     const settings: p.SessionPatch = {};
     if (options.speed !== undefined)
       settings.speed = speechSpeed(options.speed);
@@ -844,6 +853,69 @@ export class RealtimeSession {
       }),
     );
   }
+  /** Start the user's turn here, for example as a push-to-talk button goes
+   * down. Only with `clientEndsTurns`. Audio sent before this is not part of
+   * the turn. Prism announces the turn with `speech.started` and cuts off any
+   * reply. Prism sends no acknowledgment; a refusal arrives as an `error`
+   * event. */
+  async startTurn(options: t.RealtimeOperationOptions = {}): Promise<void> {
+    this.requireClientTurns();
+    return this.sendUnacknowledged("prism.input_audio_buffer.start", options);
+  }
+  /** End the user's turn at the audio sent so far, for example as a button
+   * goes up. With `clientEndsTurns`, this resolves once Prism commits the turn,
+   * and rejects with `RimeRealtimeError` if Prism refuses it, as it refuses a
+   * press under 100 ms; Prism then waits for `replyToTurns`. Otherwise Prism
+   * replies as when it ends the turn itself; it sends no acknowledgment, and a
+   * refusal arrives as an `error` event. */
+  async endTurn(options: t.RealtimeOperationOptions = {}): Promise<void> {
+    if (!this.info.clientEndsTurns)
+      // A commit just after Prism ended the turn itself gets no answer.
+      return this.sendUnacknowledged("input_audio_buffer.commit", options);
+    return this.operation(options, (signal) =>
+      this.locked(this.audioLock, signal, async () => {
+        await this.request(p.requests.commit, {}, signal);
+      }),
+    );
+  }
+  /** Ask for the reply to the conversation as it is, after `endTurn`. Only
+   * with `clientEndsTurns`. The reply answers every turn ended since the last
+   * reply. This first waits until the last reply has ended and finished
+   * playing, for at most `readyS`, then rejects with
+   * `RealtimeAdmissionTimeout`. Each call asks for a reply, so two calls get
+   * two replies. */
+  async replyToTurns(
+    options: t.ReplyRequestOptions = {},
+  ): Promise<t.ResponseRef> {
+    this.requireClientTurns();
+    const body: Record<string, unknown> =
+      options.metadata == null
+        ? {}
+        : { metadata: p.requestMetadata(options.metadata, {}) };
+    return this.operation(options, (signal) => this.create(body, signal));
+  }
+  private requireClientTurns(): void {
+    this.check();
+    if (!this.info.clientEndsTurns)
+      throw new RimeInputError(
+        "This needs a session opened with clientEndsTurns",
+      );
+  }
+  /** Prism answers these only with a correlated error, which reaches the
+   * event stream. Audio order holds: the event follows audio already sent. */
+  private async sendUnacknowledged(
+    type: string,
+    options: t.RealtimeOperationOptions,
+  ): Promise<void> {
+    return this.operation(options, (signal) =>
+      this.locked(this.audioLock, signal, () =>
+        this.send(
+          { type, event_id: `evt_${randomUUID().replaceAll("-", "")}` },
+          signal,
+        ),
+      ),
+    );
+  }
   async sendAudio(
     chunk: t.AudioChunk,
     options: t.RealtimeOperationOptions = {},
@@ -964,7 +1036,14 @@ export class RealtimeSession {
       pending.result.resolve(result);
     }
   }
-  private reject(key: string | null, error: RimeError) {
+  /** The audio lock keeps at most one commit waiting. With client-ended turns,
+   * only a commit commits a turn, so Prism's next answer about one is its own. */
+  private pendingCommit(): string | undefined {
+    for (const [key, pending] of this.pending)
+      if (pending.request === p.requests.commit) return key;
+    return undefined;
+  }
+  private reject(key: string | null | undefined, error: RimeError) {
     this.pending.get(key ?? "")?.result.reject(error);
   }
   private fail(error: RimeError) {
@@ -1056,6 +1135,9 @@ export class RealtimeSession {
           toolResultTimeoutS: view.toolResultTimeoutS,
           toolContinuationTimeoutS: view.toolContinuationTimeoutS,
           turnDetection: view.turnDetection,
+          // Only the first update decides this, so a later view cannot undo it.
+          clientEndsTurns:
+            view.clientEndsTurns || this.sessionInfo?.clientEndsTurns === true,
           settingsRevision: view.settingsRevision,
           truncation: view.truncation,
           requestId: view.requestId,
@@ -1119,6 +1201,9 @@ export class RealtimeSession {
       case "input.ready":
         this.readyEpoch++;
         this.ready.set();
+        break;
+      case "input.committed":
+        this.settle(this.pendingCommit(), payload);
         break;
       case "speech.started":
         this.readyEpoch++;
@@ -1205,6 +1290,9 @@ export class RealtimeSession {
           error = new t.RimeRealtimeError(fault);
         if (NOT_READY.has(fault.code)) this.ready.clear();
         this.reject(fault.requestId, error);
+        if (fault.code === "pending_speech_overflow" && fault.requestId == null)
+          // Prism refuses a commit over its pending audio budget without naming it.
+          this.reject(this.pendingCommit(), error);
         if (fault.code === "typed_turn_superseded" && fault.itemId)
           for (const [key, pending] of this.pending)
             if (pending.itemId === fault.itemId) this.reject(key, error);

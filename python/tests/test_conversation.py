@@ -175,7 +175,15 @@ async def until(condition):
 
 
 @asynccontextmanager
-async def run(monkeypatch, *, enabled=True, callback=None, revision=None, before_run=None):
+async def run(
+    monkeypatch,
+    *,
+    enabled=True,
+    callback=None,
+    revision=None,
+    before_run=None,
+    client_ends_turns=False,
+):
     peer = Peer()
     emit = peer.emit
 
@@ -184,6 +192,8 @@ async def run(monkeypatch, *, enabled=True, callback=None, revision=None, before
             body["session"].setdefault("prism_effective_interrupt_response", enabled)
             if revision is not None:
                 body["session"].setdefault("prism_settings_revision", revision)
+            if client_ends_turns:
+                body["session"]["turn_detection"] = None
         emit(kind, **body)
 
     peer.emit = configured
@@ -194,7 +204,9 @@ async def run(monkeypatch, *, enabled=True, callback=None, revision=None, before
     monkeypatch.setattr(_client, "connect", connect)
     async with (
         Rime(api_key="test") as client,
-        client.realtime.connect(endpoint="ws://localhost/v1/realtime") as current,
+        client.realtime.connect(
+            endpoint="ws://localhost/v1/realtime", client_ends_turns=client_ends_turns
+        ) as current,
     ):
         if before_run is not None:
             await before_run(current, peer)
@@ -327,6 +339,28 @@ async def test_interruption_late_audio_and_old_receipt_cannot_stop_new_output(mo
             )
         )
         assert not second.interrupted and not task.done()
+
+
+async def test_turn_start_cuts_playback_when_the_client_ends_turns(monkeypatch):
+    async with run(monkeypatch, enabled=False, client_ends_turns=True) as (
+        current,
+        peer,
+        _,
+        playback,
+        _,
+        events,
+    ):
+        assert current.info.client_ends_turns and not current.info.interrupt_on_speech
+        begin(peer)
+        await until(lambda: "first" in playback.outputs)
+        output = playback.outputs["first"]
+        # Prism announces the turn that start_turn began, and cuts the reply off.
+        speech(peer)
+        await until(lambda: any(isinstance(e, r.SpeechStarted) for e in events))
+        assert output.interrupted
+        peer.ended("first")
+        output.done.set_result(17)
+        ack_cut(peer, await peer.next("conversation.item.truncate"))
 
 
 @pytest.mark.parametrize("enabled", [True, False])

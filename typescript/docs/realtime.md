@@ -167,6 +167,7 @@ Use `session.setResponseMetadata` to replace reply labels.
 | `tools` | No | `[]`. Each tool requires `name` and a JSON Schema `parameters` object. `description` defaults to `""`. |
 | `interruptOnSpeech` | No | `true`. Requests interruption when the server confirms user speech. |
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
+| `clientEndsTurns` | No | `false`. `true` makes your application start and end each user turn; see [Client-ended turns](#client-ended-turns). |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
 | `model` | No | `"prism"`, the only accepted value. |
 | `requestId` | No | Sent as `x-request-id`. It must be nonblank printable ASCII, or the SDK throws `RimeInputError`. Prism replaces IDs longer than 128 characters. A gateway can replace shorter IDs too. Read `session.info.requestId` for the ID Prism actually used. |
@@ -223,6 +224,49 @@ server reported in its initialization acknowledgment. A missing field is
 `null`; the SDK does not substitute a requested value or assume a server
 default. An unrecognized server eagerness becomes `"unknown"`.
 `interruptOnSpeech` remains a separate connection option.
+
+## Client-ended turns
+
+With `clientEndsTurns: true`, Prism detects no turns. Your application starts
+and ends each user turn, for example with a push-to-talk button, and asks for
+each reply itself.
+
+```typescript
+const session = await client.realtime.connect({ clientEndsTurns: true });
+await session.startTurn(); // The button goes down.
+// Send the caller's audio with session.sendAudio, as usual.
+await session.endTurn(); // The button goes up.
+const reply = await session.replyToTurns();
+```
+
+- `startTurn()` starts the turn. Audio sent before it is not part of the turn.
+  Prism announces the turn with `speech.started` and cuts off any reply, so
+  stop playback and report what the caller heard, as for any interruption.
+  `runConversation` does this for you.
+- `endTurn()` ends the turn at the audio sent so far and resolves once Prism
+  commits it. Prism does not reply on its own. A turn longer than 55 s keeps
+  its last 55 s.
+- `replyToTurns({ metadata })` asks for the reply. It answers every turn ended
+  since the last reply. It first waits until the last reply has ended and
+  finished playing, for at most `readyS`, then rejects with
+  `RealtimeAdmissionTimeout`. Each call asks for a reply, so two calls get two
+  replies.
+- Without `startTurn()`, the turn is the audio since the last `endTurn()` or
+  `clearAudio()`. Prism does not announce it, send transcript deltas for it, or
+  stop a reply. Stop a reply yourself with `cancel` and `reportPlayback`.
+
+If Prism refuses the turn, `endTurn` rejects with `RimeRealtimeError`. A
+press under 100 ms is refused with `input_audio_buffer_commit_empty`: nothing
+is committed, so don't ask for a reply. `startTurn` gets no acknowledgment.
+
+The setting is fixed for the session. With it, `connect` throws
+`RimeInputError` for `turnDetection` or `interruptOnSpeech: false`, and
+`update` throws it for any `turnDetection` or `interruptOnSpeech`.
+`session.info.clientEndsTurns` is
+`true` once Prism confirms it, and `session.info.interruptOnSpeech` is
+`false`, because speech alone interrupts nothing. `endTurn()` also works
+without this setting: it ends the turn under way and resolves once sent, and
+Prism replies as usual.
 
 ## Update session settings
 
@@ -283,14 +327,18 @@ Every method returns a promise. Arguments without `?` are required.
 | `continueReply(parent, options?)` | Waits for parent completion and all tool result acknowledgments, then returns a new `ResponseRef`. |
 | `cancel(response, options?)` | Requests generation cancellation and waits for a terminal response or refusal. |
 | `clearAudio(options?)` | Clears buffered input and resets audio conversion after acknowledgment. |
+| `startTurn(options?)` | Starts the user's turn, with `clientEndsTurns`. Resolves once sent. |
+| `endTurn(options?)` | Ends the user's turn at the audio sent so far. With `clientEndsTurns`, resolves once Prism commits it; otherwise once sent. |
+| `replyToTurns(options?)` | Asks for the reply to the turns you ended, with `clientEndsTurns`; returns `ResponseRef` at response creation. Options can include `metadata`. |
 | `setResponseMetadata(metadata, options?)` | Replaces the labels for later replies once Prism confirms. |
 | `reportPlayback(report, options?)` | Reports interrupted or finished playback. |
 | `close()` | Closes the session and releases its resources. |
 
 Operation options accept `signal?: AbortSignal`. `requestReply` accepts its
 instruction, tool call, and signal in one object. `update` returns
-`Promise<SessionInfo>`. `sendText`, `requestReply`, and `continueReply` return
-`Promise<ResponseRef>`. `addMessage` and `createItem` return `Promise<ItemRef>`.
+`Promise<SessionInfo>`. `sendText`, `requestReply`, `continueReply`, and
+`replyToTurns` return `Promise<ResponseRef>`. `addMessage` and `createItem`
+return `Promise<ItemRef>`.
 `getHistory` returns `Promise<readonly HistoryItem[]>`. The other methods return
 `Promise<void>`.
 
@@ -399,7 +447,7 @@ are exported from `@rimelabs/sdk`.
 | `input.ready` | No data fields. Turn methods handle the readiness wait. |
 | `speech.hint` | `audioStartMs`; the user may have started speaking over a playing reply. It can be a false alarm: lower playback, do not stop it. |
 | `speech.started` | `itemId`, `audioStartMs` |
-| `speech.stopped` | `itemId`, `audioEndMs`, `endReason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration` or `detector_changed`), `unknown` for a newer value, or null from a server that does not send it; optional `endOfTurnMinSilenceMs`: the minimum silence in force when the turn ended, absent from an older server |
+| `speech.stopped` | `itemId`, `audioEndMs`, `endReason`: what ended the turn (`semantic`, `timeout`, `silence`, `max_duration`, `detector_changed` or `client_commit`), `unknown` for a newer value, or null from a server that does not send it; optional `endOfTurnMinSilenceMs`: the minimum silence in force when the turn ended, absent from an older server |
 | `input.committed` | `itemId` |
 | `transcript.delta`, `transcript.final` | `itemId` and `delta` or `text` |
 | `transcript.failed` | `itemId`, `error` |

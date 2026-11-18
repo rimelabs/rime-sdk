@@ -210,6 +210,10 @@ enum Kind {
     Cancel,
     Clear,
     Audio,
+    /// Start the user's turn: Prism answers only with a correlated error.
+    Start,
+    /// End the user's turn: Prism answers only with a correlated error.
+    Commit,
     Truncate,
     Drain,
     Update,
@@ -369,7 +373,7 @@ pub(super) async fn connect(
             sequence: 0,
             converter: None,
             timeouts: options.timeouts,
-            interrupt: options.interrupt,
+            interrupt: options.interrupt && !options.client_ends_turns,
             interrupt_policies: InterruptPolicies::default(),
             initialized: Some(tx),
             info: worker_info,
@@ -464,6 +468,14 @@ impl RealtimeSession {
     /// started keep their settings. Dropping the future after submission does
     /// not undo an accepted update.
     pub async fn update(&self, options: RealtimeUpdateOptions) -> Result<SessionInfo, Error> {
+        if self.info().client_ends_turns
+            && (options.detection.is_some() || options.interrupt.is_some())
+        {
+            return Err(Error::new(
+                ErrorKind::Input,
+                "turn settings do not apply with client_ends_turns",
+            ));
+        }
         let settings = super::client::patch(options)?;
         self.invoke(Command::new(Kind::Update, json!({"session": settings})))
             .await?
@@ -693,6 +705,65 @@ impl RealtimeSession {
         self.invoke(Command::new(Kind::Clear, json!({})))
             .await
             .map(|_| ())
+    }
+    /// Start the user's turn here, for example as a push-to-talk button goes
+    /// down. Needs `client_ends_turns`. Audio sent before it is not part of the
+    /// turn. Prism announces the turn with `SpeechStarted` and cuts off any
+    /// reply. Prism sends no acknowledgment; a refusal arrives as a
+    /// `RealtimeEvent::Fault`.
+    pub async fn start_turn(&self) -> Result<(), Error> {
+        self.require_client_turns()?;
+        self.invoke(Command::new(Kind::Start, json!({})))
+            .await
+            .map(|_| ())
+    }
+    /// End the user's turn at the audio sent so far, for example as a button
+    /// goes up. With `client_ends_turns`, this returns once Prism commits the
+    /// turn, and returns an error carrying a `RealtimeFault` if Prism refuses
+    /// it, as it refuses a press under 100 ms; Prism then waits for
+    /// `reply_to_turns`. Otherwise Prism replies as when it ends the turn
+    /// itself; it sends no acknowledgment, and a refusal arrives as a
+    /// `RealtimeEvent::Fault`.
+    pub async fn end_turn(&self) -> Result<(), Error> {
+        self.invoke(Command::new(Kind::Commit, json!({})))
+            .await
+            .map(|_| ())
+    }
+    /// Ask for the reply to the conversation as it is, after `end_turn`.
+    /// Needs `client_ends_turns`. The reply answers every turn ended since the
+    /// last reply. This first waits until the last reply has ended and finished
+    /// playing, for at most the `ready` timeout, then returns
+    /// `ErrorKind::Timeout`. Each call asks for a reply, so two calls get two
+    /// replies.
+    pub async fn reply_to_turns(&self) -> Result<ResponseRef, Error> {
+        self.reply_to_turns_with_options(ReplyRequestOptions::default())
+            .await
+    }
+    /// Ask for the reply to client-ended turns, with labels for this reply.
+    pub async fn reply_to_turns_with_options(
+        &self,
+        options: ReplyRequestOptions,
+    ) -> Result<ResponseRef, Error> {
+        self.require_client_turns()?;
+        let response = if options.metadata.is_empty() {
+            json!({})
+        } else {
+            json!({"metadata": request_metadata(&options.metadata, &[])?})
+        };
+        self.invoke(Command::new(Kind::Reply, json!({"response": response})))
+            .await?
+            .response
+            .ok_or_else(|| Error::new(ErrorKind::Stream, "missing response"))
+    }
+    fn require_client_turns(&self) -> Result<(), Error> {
+        if self.info().client_ends_turns {
+            Ok(())
+        } else {
+            Err(Error::new(
+                ErrorKind::Input,
+                "this needs a session opened with client_ends_turns",
+            ))
+        }
     }
     /// Convert and submit a bounded chunk of complete PCM16 frames.
     /// Dropping this future before submission sends nothing. Dropping it during

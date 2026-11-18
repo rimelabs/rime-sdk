@@ -212,7 +212,13 @@ async function until(condition) {
 }
 async function setup(
   t,
-  { enabled = true, callback, revision, beforeRun } = {},
+  {
+    enabled = true,
+    callback,
+    revision,
+    beforeRun,
+    clientEndsTurns = false,
+  } = {},
 ) {
   const peer = await new Peer().start();
   peer.autoInitialize = false;
@@ -227,13 +233,17 @@ async function setup(
           ...(revision === undefined
             ? {}
             : { prism_settings_revision: revision }),
+          ...(clientEndsTurns ? { turn_detection: null } : {}),
         },
       });
     } else if (peer.waiters.length) peer.waiters.shift()(request);
     else peer.queue.push(request);
   };
   const client = new Rime({ apiKey: "test" });
-  const session = await client.realtime.connect({ endpoint: peer.endpoint });
+  const session = await client.realtime.connect({
+    endpoint: peer.endpoint,
+    clientEndsTurns,
+  });
   await beforeRun?.(session, peer);
   const source = new Source(),
     playback = new Playback(),
@@ -389,6 +399,29 @@ for (const stage of ["before_message", "before_audio", "draining"]) {
     },
   );
 }
+
+test(
+  "a turn start cuts playback when the client ends turns",
+  { timeout: 4000 },
+  async (t) => {
+    const { session, peer, playback, events } = await setup(t, {
+      enabled: false,
+      clientEndsTurns: true,
+    });
+    assert.equal(session.info.clientEndsTurns, true);
+    assert.equal(session.info.interruptOnSpeech, false);
+    begin(peer);
+    await until(() => playback.outputs.has("first"));
+    const output = playback.outputs.get("first");
+    // Prism announces the turn that startTurn began, and cuts the reply off.
+    speech(peer);
+    await until(() => events.some((e) => e.kind === "speech.started"));
+    assert.equal(output.interrupted, true);
+    peer.ended("first");
+    output.done.resolve(17);
+    ack(peer, await peer.next("conversation.item.truncate"));
+  },
+);
 
 for (const [enabled, revision] of [
   [true, undefined],

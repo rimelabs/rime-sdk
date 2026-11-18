@@ -127,7 +127,12 @@ type RealtimeConnectOptions struct {
 	Tools                         []ToolDefinition
 	InterruptOnSpeech             *bool // Nil means true.
 	TurnDetection                 TurnDetection
-	Timeouts                      RealtimeTimeouts
+	// ClientEndsTurns means Prism detects no turns: the session starts and ends
+	// each one with StartTurn and EndTurn, and asks for replies with ReplyToTurns.
+	// TurnDetection and a false InterruptOnSpeech do not apply then. This cannot
+	// change later in the session.
+	ClientEndsTurns bool
+	Timeouts        RealtimeTimeouts
 	// RequestID is sent as the upgrade's x-request-id. It must be nonblank
 	// printable ASCII, or Connect returns ErrInput. Prism replaces IDs longer than
 	// 128 characters. A gateway can replace shorter IDs too. Info reports the ID
@@ -226,6 +231,9 @@ type SessionInfo struct {
 	RequestID *string
 	// ResponseMetadata holds the labels replies carry, as Prism last confirmed them.
 	ResponseMetadata map[string]string
+	// ClientEndsTurns is true when the client starts and ends each user turn;
+	// Prism then detects none.
+	ClientEndsTurns bool
 }
 
 // RealtimeFault preserves structured service fault details. Use errors.As.
@@ -277,7 +285,9 @@ type SpeechStarted struct {
 type SpeechStopped struct {
 	ItemID     string
 	AudioEndMS uint64
-	EndReason  string
+	// EndReason is semantic, timeout, silence, max_duration, detector_changed,
+	// client_commit (the client's EndTurn), unknown, or empty when not published.
+	EndReason string
 	// EndOfTurnMinSilenceMS is the minimum silence in force when the turn ended,
 	// or nil when the server did not publish it. With eagerness "auto" and no
 	// configured minimum, Prism adjusts it during the call.

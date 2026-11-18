@@ -31,6 +31,10 @@ channels:
         $ref: '#/components/messages/inputAudioBufferAppend'
       inputAudioBufferClear:
         $ref: '#/components/messages/inputAudioBufferClear'
+      inputAudioBufferCommit:
+        $ref: '#/components/messages/inputAudioBufferCommit'
+      inputAudioBufferStart:
+        $ref: '#/components/messages/inputAudioBufferStart'
       conversationItemCreate:
         $ref: '#/components/messages/conversationItemCreate'
       responseCreate:
@@ -106,6 +110,8 @@ operations:
       - $ref: '#/channels/realtime/messages/conversationGet'
       - $ref: '#/channels/realtime/messages/inputAudioBufferAppend'
       - $ref: '#/channels/realtime/messages/inputAudioBufferClear'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferCommit'
+      - $ref: '#/channels/realtime/messages/inputAudioBufferStart'
       - $ref: '#/channels/realtime/messages/conversationItemCreate'
       - $ref: '#/channels/realtime/messages/responseCreate'
       - $ref: '#/channels/realtime/messages/responseCancel'
@@ -170,6 +176,16 @@ components:
       title: Clear microphone input
       payload:
         $ref: '#/components/schemas/inputAudioBufferClearEvent'
+    inputAudioBufferCommit:
+      name: input_audio_buffer.commit
+      title: Commit microphone input
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferCommitEvent'
+    inputAudioBufferStart:
+      name: prism.input_audio_buffer.start
+      title: User speech started, by the client
+      payload:
+        $ref: '#/components/schemas/inputAudioBufferStartEvent'
     conversationItemCreate:
       name: conversation.item.create
       title: Add a conversation item
@@ -535,8 +551,9 @@ components:
         input_audio_format:
           $ref: '#/components/schemas/audioFormat'
         turn_detection:
-          allOf:
+          oneOf:
           - $ref: '#/components/schemas/turnDetection'
+          - type: 'null'
         prism_client_caps:
           type: array
           uniqueItems: true
@@ -625,7 +642,9 @@ components:
         input_audio_format:
           $ref: '#/components/schemas/audioFormat'
         turn_detection:
-          $ref: '#/components/schemas/turnDetectionView'
+          oneOf:
+            - $ref: '#/components/schemas/turnDetectionView'
+            - type: 'null'
         prism_effective_interrupt_response:
           type: boolean
         prism_tool_waits:
@@ -984,6 +1003,9 @@ components:
         - const: response_superseded
         - const: pending_speech_overflow
         - const: deferred_capture_overflow
+        - const: input_audio_buffer_commit_empty
+        - const: input_audio_buffer_start_unavailable
+        - const: conversation_already_has_active_response
         - const: capacity_exceeded
         - const: unavailable
         - const: invalid_request
@@ -1111,6 +1133,24 @@ components:
           const: input_audio_buffer.clear
         event_id:
           $ref: '#/components/schemas/clientEventId'
+    inputAudioBufferCommitEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: input_audio_buffer.commit
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
+    inputAudioBufferStartEvent:
+      type: object
+      additionalProperties: false
+      required: [type]
+      properties:
+        type:
+          const: prism.input_audio_buffer.start
+        event_id:
+          $ref: '#/components/schemas/clientEventId'
 
     conversationItemCreateEvent:
       type: object
@@ -1155,6 +1195,13 @@ components:
             - $ref: '#/components/schemas/typedTurnRequest'
             - $ref: '#/components/schemas/toolContinuationRequest'
             - $ref: '#/components/schemas/nudgeRequest'
+            - type: object
+              additionalProperties: false
+              properties:
+                metadata:
+                  $ref: '#/components/schemas/labels'
+                instructions:
+                  type: 'null'
         metadata:
           allOf:
             - $ref: '#/components/schemas/requestMetadata'
@@ -1323,7 +1370,7 @@ components:
               maximum: 5000
     speechEndReason:
       type: string
-      enum: [semantic, timeout, silence, max_duration, detector_changed]
+      enum: [semantic, timeout, silence, max_duration, detector_changed, client_commit]
     inputAudioBufferCommittedEvent:
       allOf:
         - $ref: '#/components/schemas/serverEvent'

@@ -665,3 +665,43 @@ async fn runner_forwards_truncation_without_retained_response() {
         .unwrap_err();
     c.close().await;
 }
+
+#[tokio::test]
+async fn turn_start_cuts_playback_when_the_client_ends_turns() {
+    let mut p = Peer::with_client_ended_turns().await;
+    let (c, s) = p
+        .setup_with(crate::RealtimeConnectOptions::default().client_ends_turns(true))
+        .await;
+    assert!(s.info().client_ends_turns && !s.info().interrupt_on_speech);
+    let (opened, mut outputs) = mpsc::channel(4);
+    let playback = Playback {
+        opened,
+        outputs: Arc::new(Mutex::new(HashMap::new())),
+        stopped: Arc::new(AtomicBool::new(false)),
+    };
+    let stop = CancellationToken::new();
+    let task = tokio::spawn(
+        ConversationRunner::new(
+            s.clone(),
+            Source(Arc::new(AtomicBool::new(false))),
+            playback,
+        )
+        .run(stop.clone()),
+    );
+    p.send(json!({"type":"response.created","response":{"id":"r1"}}))
+        .await;
+    emit(&p, "r1", "i1").await;
+    let output = outputs.recv().await.unwrap();
+    // Prism announces the turn that start_turn began, and cuts the reply off.
+    p.send(
+        json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
+    )
+    .await;
+    assert_eq!(p.next("conversation.item.truncate").await["item_id"], "i1");
+    assert!(output.done.is_cancelled(), "playback was not interrupted");
+    stop.cancel();
+    let _ = tokio::time::timeout(Duration::from_secs(3), task)
+        .await
+        .unwrap();
+    c.close().await;
+}

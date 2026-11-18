@@ -8,7 +8,7 @@ import type {
   Review,
   ReviewDecision,
 } from "./types.js";
-import type { SessionSettings } from "./protocol.js";
+import type { SessionSettings, TurnSettings } from "./protocol.js";
 
 export function speechSpeed(value: number): number {
   if (
@@ -24,10 +24,10 @@ export function speechSpeed(value: number): number {
 export function turnSettings(
   value: TurnDetection | TurnDetectionUpdate,
   initial = false,
-): Partial<SessionSettings["turn_detection"]> {
+): Partial<TurnSettings> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new RimeInputError("turnDetection must be an object");
-  const result: Partial<SessionSettings["turn_detection"]> = {};
+  const result: Partial<TurnSettings> = {};
   for (const [name, wire, min, max] of [
     ["interruptMinWords", "interrupt_min_words", 1, 10],
     ["endOfTurnMinSilenceMs", "end_of_turn_min_silence_ms", 0, 5000],
