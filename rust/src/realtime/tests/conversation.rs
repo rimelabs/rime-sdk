@@ -691,13 +691,14 @@ async fn turn_start_cuts_playback_when_the_client_ends_turns() {
     p.send(json!({"type":"response.created","response":{"id":"r1"}}))
         .await;
     emit(&p, "r1", "i1").await;
-    outputs.recv().await.unwrap();
+    let output = outputs.recv().await.unwrap();
     // Prism announces the turn that start_turn began, and cuts the reply off.
     p.send(
         json!({"type":"input_audio_buffer.speech_started","item_id":"speech","audio_start_ms":0}),
     )
     .await;
     assert_eq!(p.next("conversation.item.truncate").await["item_id"], "i1");
+    assert!(output.done.is_cancelled(), "playback was not interrupted");
     stop.cancel();
     let _ = tokio::time::timeout(Duration::from_secs(3), task)
         .await
