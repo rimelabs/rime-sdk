@@ -160,7 +160,7 @@ func TestEndTurnFailsWhenPrismRefusesTheCommit(t *testing.T) {
 			p, s := clientTurnsSession(t)
 			ending := endTurn(s)
 			commit := p.next("input_audio_buffer.commit")
-			owner := rtObject{}
+			owner := rtObject{"kind": "event", "event_id": nil}
 			if code == "input_audio_buffer_commit_empty" {
 				owner["event_id"] = commit["event_id"]
 			}

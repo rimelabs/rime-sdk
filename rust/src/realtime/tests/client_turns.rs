@@ -131,9 +131,9 @@ async fn end_turn_fails_when_prism_refuses_the_commit() {
         let ending = end_turn(&session);
         let commit = peer.next("input_audio_buffer.commit").await;
         let owner = if code == "input_audio_buffer_commit_empty" {
-            json!({"event_id":commit["event_id"]})
+            json!({"kind":"event","event_id":commit["event_id"]})
         } else {
-            json!({})
+            json!({"kind":"event","event_id":null})
         };
         peer.send(json!({"type":"error","error":{"code":code,"scope":"event","owner":owner}}))
             .await;

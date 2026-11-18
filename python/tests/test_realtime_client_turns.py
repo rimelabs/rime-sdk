@@ -59,19 +59,20 @@ def committed(peer, item_id="turn-1"):
 
 
 def refused(peer, code, request=None):
-    """An error Prism sends; with request, correlated to it."""
-    owner = {"kind": "event", "event_id": request["event_id"]} if request else {"kind": "event"}
-    peer.emit(
-        "error",
-        error={
-            "type": "invalid_request_error",
-            "code": code,
-            "message": code,
-            "event_id": request["event_id"] if request else None,
-            "scope": "event",
-            "owner": owner,
-        },
-    )
+    """An error as Prism sends it, checked against the contract; with request, correlated to it."""
+    event_id = request["event_id"] if request else None
+    error = {
+        "type": "invalid_request_error",
+        "code": code,
+        "message": code,
+        "param": None,
+        "event_id": event_id,
+        "correlation_id": "diagnostic-1",
+        "scope": "event",
+        "owner": {"kind": "event", "event_id": event_id},
+    }
+    _VALIDATORS["error"].validate({"type": "error", "event_id": "server-event", "error": error})
+    peer.emit("error", error=error)
 
 
 def speech(frames=320):
@@ -125,17 +126,7 @@ async def test_reply_to_turns_waits_for_the_active_reply(monkeypatch):
     async with connected(monkeypatch, client_ends_turns=True) as (current, peer):
         pending = asyncio.create_task(current.reply_to_turns())
         first = await peer.next("response.create")
-        peer.emit(
-            "error",
-            error={
-                "type": "invalid_request_error",
-                "code": "conversation_already_has_active_response",
-                "message": "a reply is running",
-                "event_id": first["event_id"],
-                "scope": "event",
-                "owner": {"kind": "event", "event_id": first["event_id"]},
-            },
-        )
+        refused(peer, "conversation_already_has_active_response", first)
         await asyncio.sleep(0.05)
         assert not pending.done()
         peer.emit("prism.typed_input.ready")

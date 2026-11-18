@@ -138,7 +138,7 @@ for (const [code, correlated] of [
           code,
           message: code,
           scope: "event",
-          owner: { kind: "event" },
+          owner: { kind: "event", event_id: null },
         },
       });
     await assert.rejects(
