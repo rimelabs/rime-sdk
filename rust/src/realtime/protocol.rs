@@ -115,6 +115,28 @@ fn response_usage(response: &Value) -> Result<Option<ResponseUsage>, Error> {
         context_window: integer(&value["context_window"])?,
     }))
 }
+fn context_terms(value: &Value) -> Result<Vec<String>, Error> {
+    value
+        .as_array()
+        .ok_or_else(|| invalid("session.context_terms"))?
+        .iter()
+        .map(string)
+        .collect()
+}
+fn custom_lexicon(value: &Value) -> Result<Vec<crate::PronunciationEntry>, Error> {
+    value
+        .as_array()
+        .ok_or_else(|| invalid("session.custom_lexicon"))?
+        .iter()
+        .map(|entry| {
+            object(entry)?;
+            Ok(crate::PronunciationEntry::new(
+                string(&entry["spelling"])?,
+                string(&entry["pronunciation"])?,
+            ))
+        })
+        .collect()
+}
 fn strings(value: &Value) -> Result<Vec<String>, Error> {
     value
         .as_array()
@@ -192,6 +214,8 @@ fn view(v: &Value) -> Result<SessionInfo, Error> {
         end_of_turn_timeout_ms: None,
         request_id: optional(&v["request_id"])?,
         response_metadata: None,
+        context_terms: o.get("context_terms").map(context_terms).transpose()?,
+        custom_lexicon: o.get("custom_lexicon").map(custom_lexicon).transpose()?,
     };
     if let Some(v) = o.get("voice") {
         s.voice = string(v)?

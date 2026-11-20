@@ -1,3 +1,4 @@
+mod context_terms_and_lexicon;
 mod conversation;
 mod errors;
 mod lifecycle;

@@ -1,5 +1,6 @@
 import type { PCMFormat } from "../pcm.js";
 export type { PCMFormat } from "../pcm.js";
+import type { PronunciationEntry } from "../tts/lexicon.js";
 import { RimeError, RimeTimeoutError } from "../errors.js";
 import { normalizeFault } from "./faults.js";
 
@@ -120,6 +121,12 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
   readonly voice?: string | null;
   readonly instructions?: string | null;
   readonly tools?: readonly ToolDefinition[];
+  /** Words and phrases speech-to-text favors in the caller's turns, such as
+   * `["Skyvale"]`. Omitted sends none, since older Prism releases refuse it. */
+  readonly contextTerms?: readonly string[];
+  /** How replies say words, as Coda's custom lexicon takes it. Omitted sends
+   * none, since older Prism releases refuse it. */
+  readonly customLexicon?: readonly PronunciationEntry[];
   readonly interruptOnSpeech?: boolean;
   readonly turnDetection?: TurnDetection;
   readonly timeouts?: RealtimeTimeouts;
@@ -134,13 +141,16 @@ export interface RealtimeConnectOptions extends RealtimeOperationOptions {
    * refuses keys starting with `prism_`. Omitted or `null` sets none. */
   readonly responseMetadata?: Labels | null;
 }
-/** Omitted fields keep their values. Empty instructions or tools clear them. */
+/** Omitted fields keep their values. Empty instructions, tools, context terms
+ * or custom lexicon clear them; a supplied list replaces the whole list. */
 export interface RealtimeUpdateOptions extends RealtimeOperationOptions {
   readonly speed?: number;
   readonly turnDetection?: TurnDetectionUpdate;
   readonly truncation?: Truncation;
   readonly instructions?: string;
   readonly tools?: readonly ToolDefinition[];
+  readonly contextTerms?: readonly string[];
+  readonly customLexicon?: readonly PronunciationEntry[];
   readonly voice?: string;
   readonly interruptOnSpeech?: boolean;
 }
@@ -215,6 +225,14 @@ export interface SessionInfo {
   /** The labels replies carry, as Prism last confirmed them. Null when the
    * server does not publish them. */
   readonly responseMetadata: Labels | null;
+  /** The words speech-to-text favors, as Prism last confirmed them. Null when
+   * the server does not publish them. Optional on caller-created values for
+   * compatibility. */
+  readonly contextTerms?: readonly string[] | null;
+  /** How replies say words, as Prism last confirmed them. Null when the
+   * server does not publish them. Optional on caller-created values for
+   * compatibility. */
+  readonly customLexicon?: readonly PronunciationEntry[] | null;
   readonly model: "prism";
   readonly voice: string;
   readonly interruptOnSpeech: boolean;

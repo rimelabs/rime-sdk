@@ -1,4 +1,4 @@
-use crate::PcmFormat;
+use crate::{PcmFormat, PronunciationEntry};
 use bytes::Bytes;
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, fmt, future::Future, pin::Pin, sync::Arc, time::Duration};
@@ -209,6 +209,8 @@ pub struct RealtimeConnectOptions {
     pub(crate) timeouts: RealtimeTimeouts,
     pub(crate) request_id: Option<String>,
     pub(crate) response_metadata: Option<Labels>,
+    pub(crate) context_terms: Option<Vec<String>>,
+    pub(crate) custom_lexicon: Option<Vec<PronunciationEntry>>,
 }
 impl Default for RealtimeConnectOptions {
     fn default() -> Self {
@@ -225,6 +227,8 @@ impl Default for RealtimeConnectOptions {
             timeouts: RealtimeTimeouts::default(),
             request_id: None,
             response_metadata: None,
+            context_terms: None,
+            custom_lexicon: None,
         }
     }
 }
@@ -292,6 +296,18 @@ impl RealtimeConnectOptions {
         self.response_metadata = Some(value);
         self
     }
+    /// Words and phrases speech-to-text favors in the caller's turns, such as
+    /// "Skyvale". Omission sends none, since older Prism releases refuse it.
+    pub fn context_terms(mut self, value: Vec<String>) -> Self {
+        self.context_terms = Some(value);
+        self
+    }
+    /// How replies say words, as Coda's custom lexicon takes it. Omission sends
+    /// none, since older Prism releases refuse it.
+    pub fn custom_lexicon(mut self, value: Vec<PronunciationEntry>) -> Self {
+        self.custom_lexicon = Some(value);
+        self
+    }
 }
 /// Partial settings for an existing session. Omitted fields keep their values.
 #[derive(Clone, Debug, Default)]
@@ -300,6 +316,8 @@ pub struct RealtimeUpdateOptions {
     pub(crate) detection: Option<TurnDetectionUpdate>,
     pub(crate) instructions: Option<String>,
     pub(crate) tools: Option<Vec<ToolDefinition>>,
+    pub(crate) context_terms: Option<Vec<String>>,
+    pub(crate) custom_lexicon: Option<Vec<PronunciationEntry>>,
     pub(crate) voice: Option<String>,
     pub(crate) interrupt: Option<bool>,
     pub(crate) truncation: Option<Truncation>,
@@ -328,6 +346,16 @@ impl RealtimeUpdateOptions {
     /// Replace the complete tool list. An empty list removes all tools.
     pub fn tools(mut self, value: Vec<ToolDefinition>) -> Self {
         self.tools = Some(value);
+        self
+    }
+    /// Replace the complete context term list. An empty list clears it.
+    pub fn context_terms(mut self, value: Vec<String>) -> Self {
+        self.context_terms = Some(value);
+        self
+    }
+    /// Replace the complete custom lexicon. An empty list clears it.
+    pub fn custom_lexicon(mut self, value: Vec<PronunciationEntry>) -> Self {
+        self.custom_lexicon = Some(value);
         self
     }
     /// Change voice. An empty string selects the deployment default.
@@ -501,6 +529,10 @@ pub struct SessionInfo {
     pub request_id: Option<String>,
     /// The labels replies carry, as Prism last confirmed them.
     pub response_metadata: Option<Labels>,
+    /// The words speech-to-text favors, as Prism last confirmed them.
+    pub context_terms: Option<Vec<String>>,
+    /// How replies say words, as Prism last confirmed it.
+    pub custom_lexicon: Option<Vec<PronunciationEntry>>,
 }
 impl SessionInfo {
     /// Build session settings with no published values, for example in tests.
@@ -528,6 +560,8 @@ impl SessionInfo {
             end_of_turn_timeout_ms: None,
             request_id: None,
             response_metadata: None,
+            context_terms: None,
+            custom_lexicon: None,
         }
     }
 }

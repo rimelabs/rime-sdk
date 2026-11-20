@@ -228,6 +228,30 @@ func (decoder *rtDecoder) view(v any) SessionInfo {
 	if v, ok := o["prism_response_metadata"]; ok {
 		s.ResponseMetadata = rtLabels(decoder.object(v))
 	}
+	if v, ok := o["context_terms"]; ok {
+		terms, ok := v.([]any)
+		if !ok {
+			decoder.bad("session.context_terms")
+		}
+		s.ContextTerms = make([]string, 0, len(terms))
+		for _, term := range terms {
+			s.ContextTerms = append(s.ContextTerms, decoder.string(term))
+		}
+	}
+	if v, ok := o["custom_lexicon"]; ok {
+		entries, ok := v.([]any)
+		if !ok {
+			decoder.bad("session.custom_lexicon")
+		}
+		s.CustomLexicon = make([]PronunciationEntry, 0, len(entries))
+		for _, value := range entries {
+			entry := decoder.object(value)
+			s.CustomLexicon = append(s.CustomLexicon, PronunciationEntry{
+				Spelling:      decoder.string(entry["spelling"]),
+				Pronunciation: decoder.string(entry["pronunciation"]),
+			})
+		}
+	}
 	if v, ok := o["prism_effective_interrupt_response"]; ok {
 		b, ok := v.(bool)
 		if !ok {

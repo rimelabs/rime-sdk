@@ -9,6 +9,35 @@ import type {
   ReviewDecision,
 } from "./types.js";
 import type { SessionSettings } from "./protocol.js";
+import { snapshot, type PronunciationEntry } from "../tts/lexicon.js";
+
+/** Copy the terms in order. Prism refuses an update that breaks
+ * speech-to-text's limits. */
+export function contextTermsSetting(
+  terms: readonly string[],
+): NonNullable<SessionSettings["context_terms"]> {
+  // Array.from also visits holes, which are not strings.
+  if (
+    !Array.isArray(terms) ||
+    Array.from(terms).some((term) => typeof term !== "string")
+  )
+    throw new RimeInputError("contextTerms must be an array of strings");
+  // Unicode mode matches lone surrogates without rejecting valid UTF-16 pairs.
+  if (terms.some((term) => /[\uD800-\uDFFF]/u.test(term)))
+    throw new RimeInputError("contextTerms must contain valid Unicode");
+  return [...terms];
+}
+
+/** Copy the entries in order. Prism refuses an update over its limits or with
+ * bad X-SAMPA. */
+export function customLexiconSetting(
+  entries: readonly PronunciationEntry[],
+): NonNullable<SessionSettings["custom_lexicon"]> {
+  return snapshot(entries).map(({ spelling, pronunciation }) => ({
+    spelling,
+    pronunciation,
+  }));
+}
 
 export function speechSpeed(value: number): number {
   if (

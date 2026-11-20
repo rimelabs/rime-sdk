@@ -227,6 +227,16 @@ for (const item of cases) {
           item.expected_min_silence_ms !== null,
         );
       }
+      if ("expected_context_terms" in item)
+        assert.deepEqual(
+          decode(raw, "session-1").payload.session.contextTerms,
+          item.expected_context_terms,
+        );
+      if ("expected_custom_lexicon" in item)
+        assert.deepEqual(
+          decode(raw, "session-1").payload.session.customLexicon,
+          item.expected_custom_lexicon,
+        );
       if ("expected_reason" in item) {
         const ended = decode(raw, "session-1").payload;
         assert.equal(ended.kind, "response.ended");

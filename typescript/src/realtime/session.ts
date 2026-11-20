@@ -20,6 +20,8 @@ import * as p from "./protocol.js";
 import { historyId, itemSettings } from "./history.js";
 import {
   InterruptionPolicies,
+  contextTermsSetting,
+  customLexiconSetting,
   toolSettings,
   turnSettings,
   speechSpeed,
@@ -551,9 +553,10 @@ export class RealtimeSession {
       release();
     }
   }
-  /** Apply supplied settings and wait for acknowledgment. Tools replace the
-   * complete list. Replies already started keep their original settings.
-   * Cancellation after submission does not undo an accepted update. */
+  /** Apply supplied settings and wait for acknowledgment. Tools, context terms
+   * and the custom lexicon each replace the complete list. Replies already
+   * started keep their original settings. Cancellation after submission does
+   * not undo an accepted update. */
   async update(options: t.RealtimeUpdateOptions = {}): Promise<t.SessionInfo> {
     const settings: p.SessionPatch = {};
     if (options.speed !== undefined)
@@ -572,6 +575,10 @@ export class RealtimeSession {
     }
     if (options.tools !== undefined)
       settings.tools = toolSettings(options.tools);
+    if (options.contextTerms !== undefined)
+      settings.context_terms = contextTermsSetting(options.contextTerms);
+    if (options.customLexicon !== undefined)
+      settings.custom_lexicon = customLexiconSetting(options.customLexicon);
     if (options.interruptOnSpeech !== undefined) {
       if (typeof options.interruptOnSpeech !== "boolean")
         throw new RimeInputError("interruptOnSpeech must be a boolean");
@@ -1060,6 +1067,8 @@ export class RealtimeSession {
           truncation: view.truncation,
           requestId: view.requestId,
           responseMetadata: view.responseMetadata,
+          contextTerms: view.contextTerms,
+          customLexicon: view.customLexicon,
         });
         this.interruptionPolicies.record(
           view.settingsRevision,

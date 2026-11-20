@@ -25,6 +25,8 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 		IdleTimeoutS      *float64        `json:"expected_idle_timeout_s"`
 		KeptText          *string         `json:"expected_kept_text"`
 		MinSilenceMS      json.RawMessage `json:"expected_min_silence_ms"`
+		ContextTerms      json.RawMessage `json:"expected_context_terms"`
+		CustomLexicon     json.RawMessage `json:"expected_custom_lexicon"`
 		Reason            *string         `json:"expected_reason"`
 		Fault             *struct {
 			Code       string `json:"code"`
@@ -73,6 +75,24 @@ func TestRealtimeSharedProtocol(t *testing.T) {
 				payload, ok := e.payload.(SpeechStopped)
 				if !ok || !reflect.DeepEqual(payload.EndOfTurnMinSilenceMS, want) {
 					t.Fatalf("unexpected minimum silence: %#v", e.payload)
+				}
+			}
+			if c.ContextTerms != nil {
+				var want []string
+				if err := json.Unmarshal(c.ContextTerms, &want); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(e.info.ContextTerms, want) {
+					t.Fatalf("unexpected context terms: %#v", e.info.ContextTerms)
+				}
+			}
+			if c.CustomLexicon != nil {
+				var want []PronunciationEntry
+				if err := json.Unmarshal(c.CustomLexicon, &want); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(e.info.CustomLexicon, want) {
+					t.Fatalf("unexpected custom lexicon: %#v", e.info.CustomLexicon)
 				}
 			}
 			if c.Reason != nil {
