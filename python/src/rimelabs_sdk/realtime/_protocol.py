@@ -27,11 +27,18 @@ class _Tool(TypedDict):
     prism_filler: NotRequired[t.JsonObject]
 
 
+class _LexiconEntry(TypedDict):
+    spelling: str
+    pronunciation: str
+
+
 class SessionSettings(TypedDict):
     modalities: list[Literal["text", "audio"]]
     input_audio_format: Literal["pcm16"]
     turn_detection: dict[str, t.JsonValue]
     tools: list[_Tool]
+    context_terms: NotRequired[list[str]]
+    custom_lexicon: NotRequired[list[_LexiconEntry]]
     voice: NotRequired[str]
     instructions: NotRequired[str]
     prism_response_metadata: NotRequired[t.Labels]
@@ -62,6 +69,8 @@ class SessionPatch(TypedDict, total=False):
     voice: str
     instructions: str
     tools: list[_Tool]
+    context_terms: list[str]
+    custom_lexicon: list[_LexiconEntry]
     turn_detection: dict[str, t.JsonValue]
     speed: float
 
@@ -70,6 +79,8 @@ class SessionPatch(TypedDict, total=False):
 class SessionView:
     speed: float | None = None
     version: str | None = None
+    context_terms: tuple[str, ...] | None = None
+    custom_lexicon: tuple[t.PronunciationEntry, ...] | None = None
     review: t.ReviewSettings | None = None
     truncation: t.Truncation | None = None
     settings_revision: int | None = None
@@ -338,6 +349,27 @@ def _phrases(view: dict[str, object], name: str) -> tuple[str, ...] | None:
     return tuple(_string(item, name) for item in value)
 
 
+def _context_terms(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        _invalid("session.context_terms")
+    return tuple(_string(term, "session.context_terms") for term in value)
+
+
+def _custom_lexicon(value: object) -> tuple[t.PronunciationEntry, ...]:
+    if not isinstance(value, list):
+        _invalid("session.custom_lexicon")
+    entries = [_object(entry, "session.custom_lexicon") for entry in value]
+    return tuple(
+        t.PronunciationEntry(
+            spelling=_string(entry.get("spelling"), "session.custom_lexicon.spelling"),
+            pronunciation=_string(
+                entry.get("pronunciation"), "session.custom_lexicon.pronunciation"
+            ),
+        )
+        for entry in entries
+    )
+
+
 def _review(value: object) -> t.ReviewSettings:
     view = _object(value, "prism_review")
     action = view.get("on_timeout")
@@ -406,6 +438,10 @@ def _session(value: object) -> SessionView:
     return SessionView(
         speed=speed,
         version=_string(view["version"], "session.version") if "version" in view else None,
+        context_terms=_context_terms(view["context_terms"]) if "context_terms" in view else None,
+        custom_lexicon=_custom_lexicon(view["custom_lexicon"])
+        if "custom_lexicon" in view
+        else None,
         review=_review(view["prism_review"]) if "prism_review" in view else None,
         truncation=_truncation(view["truncation"]) if "truncation" in view else None,
         settings_revision=_revision(view, "session.prism_settings_revision"),

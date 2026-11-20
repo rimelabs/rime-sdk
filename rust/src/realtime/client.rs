@@ -1,5 +1,5 @@
 use super::{session, types::*};
-use crate::{Client, Error, ErrorKind};
+use crate::{Client, Error, ErrorKind, PronunciationEntry};
 use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::http::Uri;
 
@@ -129,6 +129,14 @@ pub(super) fn review_settings(value: &ReviewSettings) -> Result<Value, Error> {
     };
     Ok(result)
 }
+/// The entries in order and unchanged. Prism refuses an update over its limits
+/// or with bad X-SAMPA.
+fn custom_lexicon_settings(entries: &[PronunciationEntry]) -> Value {
+    entries
+        .iter()
+        .map(|entry| json!({"spelling": entry.spelling, "pronunciation": entry.pronunciation}))
+        .collect()
+}
 pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
     let mut result = json!({});
     if let Some(value) = o.speed {
@@ -145,6 +153,12 @@ pub(super) fn patch(o: RealtimeUpdateOptions) -> Result<Value, Error> {
     }
     if let Some(value) = o.tools {
         result["tools"] = json!(tool_settings(&value)?)
+    }
+    if let Some(terms) = &o.context_terms {
+        result["context_terms"] = json!(terms)
+    }
+    if let Some(entries) = &o.custom_lexicon {
+        result["custom_lexicon"] = custom_lexicon_settings(entries)
     }
     let mut detection = json!({});
     if let Some(value) = o.interrupt {
@@ -237,6 +251,12 @@ pub(super) fn settings(o: &RealtimeConnectOptions) -> Result<Value, Error> {
     }
     if let Some(labels) = &o.response_metadata {
         result["prism_response_metadata"] = json!(labels)
+    }
+    if let Some(terms) = &o.context_terms {
+        result["context_terms"] = json!(terms)
+    }
+    if let Some(entries) = &o.custom_lexicon {
+        result["custom_lexicon"] = custom_lexicon_settings(entries)
     }
     for (key, value) in [("voice", &o.voice), ("instructions", &o.instructions)] {
         if let Some(s) = value {

@@ -666,6 +666,38 @@ responses, 128 tools or outputs per response, and 256 queued events. Incoming me
 `ErrResourceLimit`. Known malformed events fail the session. Unknown events and
 fields are ignored; unknown enum values become `unknown`.
 
+### Context terms and custom lexicon
+
+Available in the next SDK release, with a Prism release that takes these
+fields. Older releases refuse them, so the SDK sends each only when it is not
+`nil`.
+
+```go
+session, err := client.Realtime.Connect(ctx, rime.RealtimeConnectOptions{
+    ContextTerms: []string{"Skyvale", "Doctor Chen"},
+    CustomLexicon: []rime.PronunciationEntry{
+        {Spelling: "kubectl", Pronunciation: `" k u b . k @ n . % t r\ oU l`},
+    },
+})
+if err != nil {
+    return err
+}
+info, err := session.Update(ctx, rime.RealtimeUpdateOptions{ContextTerms: []string{"Velkora"}})
+```
+
+`ContextTerms` are words and phrases speech-to-text favors in the caller's
+turns, under the rules of STT's `ContextTerms`: joined with `", "`, they take at
+most 1024 bytes. `CustomLexicon` says how replies pronounce a word or phrase, as
+Coda's custom lexicon takes it: at most 500 entries with X-SAMPA pronunciations.
+Prism checks these rules. A refusal returns a `*RealtimeFault` with code
+`invalid_client_event` for a limit, or `invalid_session` for an ill-formed
+pronunciation or one the deployment cannot say, and the update changes nothing.
+
+A supplied slice replaces the whole list; a non-nil empty slice clears it.
+`SessionInfo.ContextTerms` and `SessionInfo.CustomLexicon` are the lists Prism
+confirmed, empty but not `nil` when cleared, and `nil` on a server that does not
+publish them.
+
 ### Conversation runner and examples
 
 `ConversationRunner` accepts application-owned `ConversationSource` and

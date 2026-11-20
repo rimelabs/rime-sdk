@@ -1,4 +1,4 @@
-"""Shared validation and snapshots for connection and session tool settings."""
+"""Shared validation and snapshots for connection and session settings."""
 
 import copy
 import json
@@ -6,9 +6,33 @@ from collections import deque
 from collections.abc import Sequence
 
 from .._errors import RimeInputError, RimeResourceLimitError
+from ..tts._lexicon import PronunciationEntry, snapshot
 from . import _types as t
-from ._protocol import _Tool
+from ._protocol import _LexiconEntry, _Tool
 from ._types import JsonObject, PrismFiller, ToolDefinition
+
+
+def context_terms_setting(terms: Sequence[str]) -> list[str]:
+    """Copy the terms in order. Prism refuses an update that breaks speech-to-text's limits."""
+    if isinstance(terms, (str, bytes)) or not isinstance(terms, Sequence):
+        raise RimeInputError("context_terms must be a sequence of strings")
+    result = list(terms)
+    for term in result:
+        if not isinstance(term, str):
+            raise RimeInputError("context_terms must contain strings")
+        try:
+            term.encode("utf-8")
+        except UnicodeEncodeError:
+            raise RimeInputError("context_terms must be valid UTF-8") from None
+    return result
+
+
+def custom_lexicon_setting(entries: Sequence[PronunciationEntry]) -> list[_LexiconEntry]:
+    """Copy the entries in order. Prism refuses an update over its limits or with bad X-SAMPA."""
+    return [
+        {"spelling": entry.spelling, "pronunciation": entry.pronunciation}
+        for entry in snapshot(entries)
+    ]
 
 
 def speed_setting(value: float) -> float:

@@ -8,7 +8,7 @@ import pytest
 from jsonschema import Draft7Validator
 from test_realtime import _CONTRACT, _VALIDATORS, accepted_turn, session
 
-from rimelabs_sdk import RimeInputError, RimeStreamError
+from rimelabs_sdk import PronunciationEntry, RimeInputError, RimeStreamError
 from rimelabs_sdk import realtime as r
 from rimelabs_sdk.realtime import _protocol as protocol
 
@@ -57,6 +57,16 @@ def test_shared_protocol_decoding(case):
         if "expected_min_silence_ms" in case:
             assert isinstance(result.payload, r.SpeechStopped)
             assert result.payload.end_of_turn_min_silence_ms == case["expected_min_silence_ms"]
+        if "expected_context_terms" in case:
+            expected = case["expected_context_terms"]
+            assert result.payload.session.context_terms == (
+                None if expected is None else tuple(expected)
+            )
+        if "expected_custom_lexicon" in case:
+            expected = case["expected_custom_lexicon"]
+            assert result.payload.session.custom_lexicon == (
+                None if expected is None else tuple(PronunciationEntry(**e) for e in expected)
+            )
         if "expected_reason" in case:
             assert isinstance(result.payload, r.ResponseEnded)
             assert result.payload.reason == case["expected_reason"]

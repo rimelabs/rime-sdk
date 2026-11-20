@@ -8,7 +8,7 @@ recognize the former `prsm` names.
 ## Source
 
 The fixtures follow `interfaces/speech_to_speech.asyncapi.yaml` in
-`rimelabs/rime` at `215aa4f0a539defb6bca1e6ecd6d11fc94f77852`, the latest change
+`rimelabs/rime` at `60de2768f9409fbd10a1cc629ed35e2e861d1dfd`, the latest change
 to that file when they were last updated. Update this one pin when you bring in
 newer server changes. The fixture differs from that file on purpose in these ways:
 
@@ -25,9 +25,10 @@ newer server changes. The fixture differs from that file on purpose in these way
 - **Optional for older images.** Fields current servers always send stay
   optional here: `server_time_ms`, the cumulative `transcript` on transcription
   deltas, the session's `request_id`, `speed`, `version`, `truncation`,
-  `prism_settings_revision`, and `prism_response_metadata`, the turn detection
-  interrupt settings, the response's `prism_settings_revision`, and
-  `end_of_turn_min_silence_ms` on `input_audio_buffer.speech_stopped`.
+  `prism_settings_revision`, `prism_response_metadata`, `context_terms`, and
+  `custom_lexicon`, the turn detection interrupt settings, the response's
+  `prism_settings_revision`, and `end_of_turn_min_silence_ms` on
+  `input_audio_buffer.speech_stopped`.
 - **SDK rules.** Filler and review replacement text use the nonblank-text rule
   described below. The error codes `invalid_request` and
   `session_already_initialized` remain for older servers.
@@ -39,11 +40,13 @@ newer server changes. The fixture differs from that file on purpose in these way
 - `speech_to_speech.asyncapi.yaml` contains message shapes and validation rules.
   It is a test fixture. Descriptive annotations and server connection settings
   are omitted.
-  The filler and review replacement schemas share a nonblank-text rule that
-  spells out Unicode `White_Space` to match
+  The filler, review replacement, context term, and lexicon spelling schemas
+  share a nonblank-text rule that spells out Unicode `White_Space` to match
   the engine's Rust validation in both Python and JavaScript. Their `\S`
-  patterns use different whitespace sets. SDK tests also reject invalid UTF-8
-  before connection setup, as required by the engine's JSON parser.
+  patterns use different whitespace sets. The SDKs apply the rule to filler and
+  review text only; Prism refuses blank context terms and spellings. SDK tests
+  also reject invalid UTF-8 before connection setup, as required by the engine's
+  JSON parser.
 - `schema.json` checks whether values match the current protocol schema,
   including rejection of requests with the former prefix.
 - `protocol.json` checks all four SDK decoders, including malformed messages,
@@ -173,3 +176,13 @@ server values.
 Review results permit an omitted `event_id` in the engine contract. SDK writers
 still supply one for error correlation. The fixture follows the engine's optional
 field rule rather than making the SDK's stricter sending convention mandatory.
+
+## Context terms and custom lexicon
+
+`session.update` and the session view carry `context_terms` and
+`custom_lexicon` (`rimelabs/rime#4430`, `rimelabs/rime#4431`). The SDKs send
+each list only when the caller supplies one, because older Prism releases refuse
+fields they do not declare. Prism owns the limits: the 1024-byte term budget,
+blank terms, 500 entries, and X-SAMPA checks. The SDKs return its refusal as
+sent. The shared cases distinguish an absent list from an empty one and accept
+unknown fields in a lexicon entry.
