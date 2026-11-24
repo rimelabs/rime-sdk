@@ -683,6 +683,10 @@ if err != nil {
     return err
 }
 info, err := session.Update(ctx, rime.RealtimeUpdateOptions{ContextTerms: []string{"Velkora"}})
+if err != nil {
+    return err
+}
+fmt.Println(info.ContextTerms) // [Velkora]
 ```
 
 `ContextTerms` are words and phrases speech-to-text favors in the caller's
