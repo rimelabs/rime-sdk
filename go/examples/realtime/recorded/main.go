@@ -1,34 +1,30 @@
-// Command recorded streams a raw 16 kHz mono PCM16 recording to Prism.
+// Command recorded streams a raw 16 kHz mono PCM16 recording to Prism, then
+// silence until the reply ends.
 package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	rime "github.com/rimelabs/rime-sdk/go"
-	"io"
 	"log"
 	"os"
 	"time"
 )
 
-func send(ctx context.Context, s *rime.RealtimeSession, path string) error {
-	f, e := os.Open(path)
-	if e != nil {
-		return e
-	}
-	defer f.Close()
-	for {
-		data := make([]byte, 1280)
-		n, e := io.ReadFull(f, data)
-		if n > 0 {
-			if err := s.SendAudio(ctx, rime.AudioChunk{Data: data[:n]}); err != nil {
-				return err
-			}
+// chunkBytes is 40 ms of 16 kHz mono PCM16.
+const chunkBytes = 1280
+
+// send streams the recording at capture speed, then silence until ctx ends.
+// Prism finds the end of a turn in the audio that it receives, as from a live
+// microphone.
+func send(ctx context.Context, s *rime.RealtimeSession, recording []byte) error {
+	for offset := 0; ; offset += chunkBytes {
+		data := make([]byte, chunkBytes)
+		if offset < len(recording) {
+			copy(data, recording[offset:])
 		}
-		if e == io.EOF || e == io.ErrUnexpectedEOF {
-			break
-		}
-		if e != nil {
+		if e := s.SendAudio(ctx, rime.AudioChunk{Data: data}); e != nil {
 			return e
 		}
 		select {
@@ -37,23 +33,16 @@ func send(ctx context.Context, s *rime.RealtimeSession, path string) error {
 			return ctx.Err()
 		}
 	}
-	for i := 0; i < 25; i++ {
-		if e := s.SendAudio(ctx, rime.AudioChunk{Data: make([]byte, 1280)}); e != nil {
-			return e
-		}
-		select {
-		case <-time.After(40 * time.Millisecond):
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	return nil
 }
 func run() error {
 	if len(os.Args) != 2 {
 		return fmt.Errorf("supply a raw 16 kHz mono PCM16 file")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	recording, e := os.ReadFile(os.Args[1])
+	if e != nil {
+		return e
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	client, e := rime.NewClient(rime.Config{})
 	if e != nil {
@@ -64,11 +53,13 @@ func run() error {
 	if e != nil {
 		return e
 	}
+	sending, stopSending := context.WithCancel(ctx)
+	defer stopSending()
 	sent := make(chan error, 1)
 	go func() {
-		e := send(ctx, s, os.Args[1])
+		e := send(sending, s, recording)
 		sent <- e
-		if e != nil {
+		if !errors.Is(e, context.Canceled) {
 			_ = s.Close()
 		}
 	}()
@@ -93,7 +84,11 @@ func run() error {
 			if p.Status != "completed" {
 				return fmt.Errorf("response %s: %s", p.Status, p.Reason)
 			}
-			return <-sent
+			stopSending()
+			if e := <-sent; !errors.Is(e, context.Canceled) {
+				return e
+			}
+			return nil
 		case rime.FaultEvent:
 			if p.Fault.Scope == "event" {
 				switch p.Fault.Code {
