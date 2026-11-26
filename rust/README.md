@@ -259,8 +259,8 @@ Import `PcmFormat`, `TranscriptionMode`, and `TranscriptionOptions` from `rimela
 
 | Constructor or builder | Purpose and values | Required | Default |
 | --- | --- | --- | --- |
-| `TranscriptionOptions::new(language)` | Spoken BCP-47 language tag, such as `"en"` or `"es"`; passed to the service. | Yes | None; no automatic detection. |
-| `.mode(mode)` | `TranscriptionMode::Written` normalizes written text; `Verbatim` prefers spoken wording. | No | `Written` |
+| `TranscriptionOptions::new(language)` | Spoken BCP-47 language tag from the 13-language [STT catalog](https://docs.rime.ai/docs/stt/recognition#language) (such as `"en"` or `"es"`); passed unchanged to the service. | Yes | None; no SDK automatic detection. |
+| `.mode(mode)` | `TranscriptionMode::Written` normalizes written text; `Verbatim` prefers spoken wording (not supported for Indonesian `"id"`). | No | `Written` |
 | `.context_terms(terms)` | `Vec<String>` recognition hints, such as `vec!["Rime".into()]`; hints do not force a match. | No | Empty vector. |
 | `.input_format(format)` | `PcmFormat { sample_rate: 16000, channels: 1 }`: rates `8000`, `16000`, `24000`, `48000`; channels `1` or `2`. | No | `PcmFormat::default()`: 16 kHz mono PCM16. |
 | `.timeout(budget)` | `Some(Duration)` overall budget, including source/consumer pauses; `None` disables it. Zero is invalid. | No | `None`; independent of the client timeout. |
