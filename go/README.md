@@ -283,8 +283,8 @@ Pass these fields in `rime.TranscriptionOptions`.
 
 | Option | Purpose and values | Required | Default |
 | --- | --- | --- | --- |
-| `Language` | Spoken BCP-47 language tag, such as `"en"` or `"es"`; passed to the service. | Yes | None; no automatic detection. |
-| `Mode` | `rime.TranscriptionWritten` normalizes written text; `rime.TranscriptionVerbatim` prefers spoken wording. | No | `TranscriptionWritten` when empty. |
+| `Language` | Spoken BCP-47 language tag from the 13-language [STT catalog](https://docs.rime.ai/docs/stt/recognition#language) (such as `"en"` or `"es"`); passed unchanged to the service. | Yes | None; no SDK automatic detection. |
+| `Mode` | `rime.TranscriptionWritten` normalizes written text; `rime.TranscriptionVerbatim` prefers spoken wording (not supported for Indonesian `"id"`). | No | `TranscriptionWritten` when empty. |
 | `ContextTerms` | `[]string` recognition hints, such as `[]string{"Rime"}`; hints do not force a match. | No | Empty slice. |
 | `InputFormat` | `rime.PCMFormat{SampleRate: 16000, Channels: 1}`: rates `8000`, `16000`, `24000`, `48000`; channels `1` or `2`. | No | 16 kHz mono PCM16; zero fields select these defaults. |
 | `Timeout` | `*time.Duration` overall budget, including source/consumer pauses; `nil` or a pointer to zero disables it. Negative values are invalid. | No | `nil`; independent of the client timeout. |

@@ -112,8 +112,8 @@ revised hypotheses for earlier provisional text and corrections across windows.
 
 | Option | Meaning |
 | --- | --- |
-| `language` | Required spoken BCP-47 tag. Passed unchanged to the service; no detection or SDK language allowlist. The deployed catalog currently supports English and Spanish. |
-| `mode` | `"written"` (default) or `"verbatim"`. Formatting intent, not a guarantee of exact tokens. |
+| `language` | Required spoken BCP-47 tag. Passed unchanged to the service; no SDK language allowlist, and the SDK does not yet support automatic language detection. The deployed catalog supports 13 languages (`ar`, `cmn`, `de`, `en`, `es`, `fr`, `hi`, `id`, `it`, `ja`, `ko`, `nl`, `pt`); see the [language table](https://docs.rime.ai/docs/stt/recognition#language). |
+| `mode` | `"written"` (default) or `"verbatim"` (not supported for Indonesian `id`). Formatting intent, not a guarantee of exact tokens. |
 | `contextTerms` | Sequence of recognition hints, copied unchanged and in order. The service validates terms and prompt budgets. |
 | `outputContract` | `"revised_hypotheses"` (default) or `"append_fragments"`. Streaming only. |
 | `inputFormat` | `PCMFormat`: signed little-endian PCM16 at 8, 16, 24 or 48 kHz, mono or interleaved stereo. Defaults to 16 kHz mono. |
@@ -144,8 +144,8 @@ non-partial update is final. Append deltas exactly; replace text with partials
 or the confirmed final.
 
 The source is not consumed until the server accepts the configuration. Audio
-upload and transcript reading run concurrently. Decoding currently uses cumulative
-two-second audio windows, so a partial is not promised for each audio packet.
+upload and transcript reading run concurrently. Decoding runs every one second
+of buffered audio, so a partial is not promised for each audio packet.
 Silence can finish successfully with empty final text and no partials.
 
 Exhausting the source half-closes gRPC input. The SDK continues reading and emits
