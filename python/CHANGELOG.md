@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.33](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.32...python-v0.1.0-alpha.33) (2026-11-27)
+
+
+### Documentation
+
+* update STT language catalog and decode cadence for STT v2.2 ([#141](https://github.com/rimelabs/rime-sdk/issues/141)) ([b00fec3](https://github.com/rimelabs/rime-sdk/commit/b00fec34aab91c14426e3fe52e5e10c13e2cb51f))
+
 ## [0.1.0-alpha.32](https://github.com/rimelabs/rime-sdk/compare/python-v0.1.0-alpha.31...python-v0.1.0-alpha.32) (2026-11-17)
 
 
