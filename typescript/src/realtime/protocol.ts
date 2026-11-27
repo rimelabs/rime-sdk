@@ -4,6 +4,7 @@ import { RimeInputError, RimeStreamError } from "../errors.js";
 import { normalizeFault } from "./faults.js";
 import * as t from "./types.js";
 import { listedItem } from "./history.js";
+import type { PronunciationEntry } from "../tts/lexicon.js";
 
 export interface SessionSettings {
   speed?: number;
@@ -30,6 +31,8 @@ export interface SessionSettings {
     function: { name: string; description: string; parameters: t.JsonObject };
     prism_filler?: t.PrismFiller;
   }[];
+  context_terms?: string[];
+  custom_lexicon?: { spelling: string; pronunciation: string }[];
   voice?: string;
   instructions?: string;
   prism_response_metadata?: t.Labels;
@@ -61,6 +64,8 @@ export interface SessionPatch {
   voice?: string;
   instructions?: string;
   tools?: SessionSettings["tools"];
+  context_terms?: SessionSettings["context_terms"];
+  custom_lexicon?: SessionSettings["custom_lexicon"];
   turn_detection?: Partial<SessionSettings["turn_detection"]>;
 }
 export interface SessionView {
@@ -72,6 +77,8 @@ export interface SessionView {
   id: string;
   requestId: string | null;
   responseMetadata: t.Labels | null;
+  contextTerms: readonly string[] | null;
+  customLexicon: readonly PronunciationEntry[] | null;
   voice: string;
   interruptOnSpeech: boolean | null;
   toolResultTimeoutS: number | null;
@@ -371,6 +378,27 @@ function receivedReview(value: unknown): t.ReviewSettings {
     onTimeout: Object.freeze({ action: review.on_timeout as "stop" | "speak" }),
   });
 }
+function contextTerms(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) invalid("session.context_terms");
+  return Object.freeze(
+    (value as unknown[]).map((term) => string(term, "session.context_terms")),
+  );
+}
+function customLexicon(value: unknown): readonly PronunciationEntry[] {
+  if (!Array.isArray(value)) invalid("session.custom_lexicon");
+  return Object.freeze(
+    (value as unknown[]).map((item) => {
+      const entry = object(item, "session.custom_lexicon");
+      return Object.freeze({
+        spelling: string(entry.spelling, "session.custom_lexicon.spelling"),
+        pronunciation: string(
+          entry.pronunciation,
+          "session.custom_lexicon.pronunciation",
+        ),
+      });
+    }),
+  );
+}
 function session(value: unknown): SessionView {
   const view = object(value, "session");
   const detection =
@@ -467,6 +495,14 @@ function session(value: unknown): SessionView {
               "session.prism_response_metadata",
             ),
           ),
+    contextTerms:
+      view.context_terms === undefined
+        ? null
+        : contextTerms(view.context_terms),
+    customLexicon:
+      view.custom_lexicon === undefined
+        ? null
+        : customLexicon(view.custom_lexicon),
     voice: view.voice === undefined ? "" : string(view.voice, "session.voice"),
     interruptOnSpeech: interrupt ?? null,
     turnDetection: Object.freeze({

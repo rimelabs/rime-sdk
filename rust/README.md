@@ -654,6 +654,49 @@ For `context_length_exceeded`, the server message contains token counts.
 Unchanged attempts will fail until the conversation is shorter. Start a new
 session with shorter context. Use the history deletion method to remove items before retrying.
 
+### Context terms and custom lexicon
+
+Available in the next SDK release, with a Prism release that takes these
+fields. Older releases refuse them, so the SDK sends each only when you set it.
+
+```rust,no_run
+use rimelabs_sdk::{
+    Client, Error, PronunciationEntry, RealtimeConnectOptions, RealtimeUpdateOptions,
+};
+
+async fn connect_with_names(client: &Client) -> Result<(), Error> {
+    let session = client
+        .realtime()
+        .connect(
+            RealtimeConnectOptions::default()
+                .context_terms(vec!["Skyvale".into(), "Doctor Chen".into()])
+                .custom_lexicon(vec![PronunciationEntry::new(
+                    "kubectl",
+                    r#"" k u b . k @ n . % t r\ oU l"#,
+                )]),
+        )
+        .await?;
+    let info = session
+        .update(RealtimeUpdateOptions::default().context_terms(vec!["Velkora".into()]))
+        .await?;
+    println!("{:?}", info.context_terms);
+    Ok(())
+}
+```
+
+`context_terms` are words and phrases speech-to-text favors in the caller's
+turns, under the rules of STT's `context_terms`: joined with `", "`, they take at
+most 1024 bytes. `custom_lexicon` says how replies pronounce a word or phrase,
+as Coda's custom lexicon takes it: at most 500 entries with X-SAMPA
+pronunciations. Prism checks these rules. A refusal returns an error whose
+`realtime_fault()` code is `invalid_client_event` for a limit, or
+`invalid_session` for an ill-formed pronunciation or one the deployment cannot
+say, and the update changes nothing.
+
+A supplied list replaces the whole list; an empty one clears it.
+`SessionInfo::context_terms` and `SessionInfo::custom_lexicon` are the lists
+Prism confirmed, or `None` on a server that does not publish them.
+
 ### Conversation runner and examples
 
 `ConversationRunner::new(session, source, playback)` accepts application-owned

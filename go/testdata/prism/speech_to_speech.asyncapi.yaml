@@ -530,6 +530,17 @@ components:
           default: []
           items:
             $ref: '#/components/schemas/tool'
+        context_terms:
+          type: array
+          default: []
+          items:
+            $ref: '#/components/schemas/nonBlankText'
+        custom_lexicon:
+          type: array
+          maxItems: 500
+          default: []
+          items:
+            $ref: '#/components/schemas/pronunciationEntry'
         tool_choice:
           $ref: '#/components/schemas/toolChoice'
         input_audio_format:
@@ -554,6 +565,18 @@ components:
         prism_review:
           allOf:
           - $ref: '#/components/schemas/reviewSettings'
+
+    pronunciationEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - spelling
+      - pronunciation
+      properties:
+        spelling:
+          $ref: '#/components/schemas/nonBlankText'
+        pronunciation:
+          type: string
 
     truncation:
       oneOf:
@@ -620,6 +643,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/tool'
+        context_terms:
+          type: array
+          items:
+            type: string
+        custom_lexicon:
+          type: array
+          items:
+            $ref: '#/components/schemas/pronunciationEntry'
         tool_choice:
           $ref: '#/components/schemas/toolChoice'
         input_audio_format:

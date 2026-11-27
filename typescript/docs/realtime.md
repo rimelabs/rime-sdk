@@ -165,6 +165,8 @@ Use `session.setResponseMetadata` to replace reply labels.
 | `voice` | If the server has no default voice | Omitted or `null` uses the server default. Supplied strings must be nonblank. |
 | `instructions` | No | Omitted or `null` uses server defaults. Supplied strings must be nonblank. |
 | `tools` | No | `[]`. Each tool requires `name` and a JSON Schema `parameters` object. `description` defaults to `""`. |
+| `contextTerms` | No | Omitted sends none. Words speech-to-text favors; see [Context terms and custom lexicon](#context-terms-and-custom-lexicon). |
+| `customLexicon` | No | Omitted sends none. How replies say words; see [Context terms and custom lexicon](#context-terms-and-custom-lexicon). |
 | `interruptOnSpeech` | No | `true`. Requests interruption when the server confirms user speech. |
 | `turnDetection` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts` | No | `{ connectS: 10, readyS: 30, requestS: 10 }`. Each field is optional. Units are seconds. |
@@ -241,9 +243,9 @@ await session.submitToolResult(call, "Transferred to billing.");
 await session.continueReply(parent);
 ```
 
-`RealtimeUpdateOptions` has optional `instructions`, `tools`, `voice`,
-`interruptOnSpeech`, and `signal` fields. Omitted fields and `undefined` keep
-their values. `null` is not accepted.
+`RealtimeUpdateOptions` has optional `instructions`, `tools`, `contextTerms`,
+`customLexicon`, `voice`, `interruptOnSpeech`, and `signal` fields. Omitted
+fields and `undefined` keep their values. `null` is not accepted.
 
 Omitted fields keep their values. A supplied tool list replaces the complete
 list. Empty instructions clear the prompt; an empty tool list removes all tools.
@@ -264,6 +266,35 @@ Modalities, eagerness, and the end-of-turn timeout cannot change mid-session.
 It is `null` when the server does not publish it. The field is optional on
 caller-created values. Users do not need to manage it. Use each reply's revision
 to identify its settings, rather than the latest session revision.
+
+## Context terms and custom lexicon
+
+Available in the next SDK release, with a Prism release that takes these
+fields. Older releases refuse them, so the SDK sends each only when you set it.
+
+```ts
+const session = await client.realtime.connect({
+  contextTerms: ["Skyvale", "Doctor Chen"],
+  customLexicon: [
+    { spelling: "kubectl", pronunciation: '" k u b . k @ n . % t r\\ oU l' },
+  ],
+});
+const info = await session.update({ contextTerms: ["Velkora"] });
+console.log(info.contextTerms); // ["Velkora"]
+```
+
+`contextTerms` are words and phrases speech-to-text favors in the caller's
+turns, under the rules of [STT's `contextTerms`](https://github.com/rimelabs/rime-sdk/blob/main/typescript/docs/stt.md):
+joined with `", "`, they take at most 1024 bytes. `customLexicon` says how
+replies pronounce a word or phrase, as Coda's custom lexicon takes it: at most
+500 entries with X-SAMPA pronunciations. Prism checks these rules. A refusal
+rejects with `RimeRealtimeError` code `invalid_client_event` for a limit, or
+`invalid_session` for an ill-formed pronunciation or one the deployment cannot
+say, and the update changes nothing.
+
+A supplied list replaces the whole list; `[]` clears it. `session.info.contextTerms`
+and `session.info.customLexicon` are the lists Prism confirmed, or `null` on a
+server that does not publish them.
 
 ## Choose an operation
 

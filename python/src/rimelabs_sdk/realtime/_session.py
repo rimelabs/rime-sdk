@@ -35,7 +35,14 @@ from . import _protocol as p
 from . import _types as t
 from ._history import history_id, item_settings
 from ._review import Reviews
-from ._settings import InterruptionPolicies, speed_setting, tool_settings, turn_settings
+from ._settings import (
+    InterruptionPolicies,
+    context_terms_setting,
+    custom_lexicon_setting,
+    speed_setting,
+    tool_settings,
+    turn_settings,
+)
 
 _ResultT = TypeVar("_ResultT", bound=p.Acknowledgment)
 
@@ -483,6 +490,8 @@ class RealtimeSession:
         *,
         instructions: str | None = None,
         tools: Sequence[t.ToolDefinition] | None = None,
+        context_terms: Sequence[str] | None = None,
+        custom_lexicon: Sequence[t.PronunciationEntry] | None = None,
         voice: str | None = None,
         interrupt_on_speech: bool | None = None,
         speed: float | None = None,
@@ -491,9 +500,10 @@ class RealtimeSession:
     ) -> t.SessionInfo:
         """Apply supplied settings and wait for the server acknowledgment.
 
-        None keeps a setting. Empty instructions or tools clear it. A supplied
-        tool list replaces all tools. Replies already started keep their settings.
-        Cancellation after submission does not undo an accepted update.
+        None keeps a setting. Empty instructions, tools, context terms, or custom
+        lexicon clear it. A supplied list replaces the whole list. Replies already
+        started keep their settings. Cancellation after submission does not undo an
+        accepted update.
         """
         self._check()
         settings: p.SessionPatch = {}
@@ -509,6 +519,10 @@ class RealtimeSession:
                     settings["voice"] = value
         if tools is not None:
             settings["tools"] = tool_settings(tools)
+        if context_terms is not None:
+            settings["context_terms"] = context_terms_setting(context_terms)
+        if custom_lexicon is not None:
+            settings["custom_lexicon"] = custom_lexicon_setting(custom_lexicon)
         if speed is not None:
             settings["speed"] = speed_setting(speed)
         if turn_detection is not None:
@@ -913,6 +927,8 @@ class RealtimeSession:
                 truncation=view.truncation,
                 request_id=view.request_id,
                 response_metadata=view.response_metadata,
+                context_terms=view.context_terms,
+                custom_lexicon=view.custom_lexicon,
             )
             self._interruption_policies.record(
                 view.settings_revision, self._info.interrupt_on_speech

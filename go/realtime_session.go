@@ -245,6 +245,8 @@ func cloneSessionInfo(info SessionInfo) SessionInfo {
 	}
 	v.InterruptPhrases = slices.Clone(v.InterruptPhrases)
 	v.AcknowledgmentPhrases = slices.Clone(v.AcknowledgmentPhrases)
+	v.ContextTerms = slices.Clone(v.ContextTerms)
+	v.CustomLexicon = slices.Clone(v.CustomLexicon)
 	if v.Truncation != nil {
 		t := *v.Truncation
 		v.Truncation = &t

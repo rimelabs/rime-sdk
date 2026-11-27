@@ -162,6 +162,26 @@ fn shared_protocol() {
                     c["name"]
                 );
             }
+            if let Some(expected) = c.get("expected_context_terms") {
+                let info = event.as_ref().unwrap().info.as_ref().expect("session view");
+                let want: Option<Vec<String>> = serde_json::from_value(expected.clone()).unwrap();
+                assert_eq!(info.context_terms, want, "{}", c["name"]);
+            }
+            if let Some(expected) = c.get("expected_custom_lexicon") {
+                let info = event.as_ref().unwrap().info.as_ref().expect("session view");
+                let want = expected.as_array().map(|entries| {
+                    entries
+                        .iter()
+                        .map(|entry| {
+                            crate::PronunciationEntry::new(
+                                entry["spelling"].as_str().unwrap(),
+                                entry["pronunciation"].as_str().unwrap(),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                });
+                assert_eq!(info.custom_lexicon, want, "{}", c["name"]);
+            }
             if let Some(expected) = c.get("expected_reason") {
                 let Some(crate::realtime::RealtimeEvent::ResponseEnded { reason, .. }) =
                     &event.as_ref().unwrap().payload

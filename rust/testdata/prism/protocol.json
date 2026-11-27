@@ -2423,5 +2423,203 @@
       }
     },
     "invalid": true
+  },
+  {
+    "name": "session context terms and custom lexicon on creation",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "context_terms": [
+          "Skyvale",
+          "Doctor Chen"
+        ],
+        "custom_lexicon": [
+          {
+            "spelling": "kubectl",
+            "pronunciation": "\" k u b . k @ n . % t r\\ oU l"
+          }
+        ]
+      }
+    },
+    "expected_kind": "session.created",
+    "expected_context_terms": [
+      "Skyvale",
+      "Doctor Chen"
+    ],
+    "expected_custom_lexicon": [
+      {
+        "spelling": "kubectl",
+        "pronunciation": "\" k u b . k @ n . % t r\\ oU l"
+      }
+    ]
+  },
+  {
+    "name": "session context terms and custom lexicon on update",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "context_terms": [
+          "Skyvale"
+        ],
+        "custom_lexicon": [
+          {
+            "spelling": "kubectl",
+            "pronunciation": "\" k u b . k @ n . % t r\\ oU l"
+          }
+        ]
+      }
+    },
+    "expected_kind": "session.updated",
+    "expected_context_terms": [
+      "Skyvale"
+    ],
+    "expected_custom_lexicon": [
+      {
+        "spelling": "kubectl",
+        "pronunciation": "\" k u b . k @ n . % t r\\ oU l"
+      }
+    ]
+  },
+  {
+    "name": "session context terms and custom lexicon cleared",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "context_terms": [],
+        "custom_lexicon": []
+      }
+    },
+    "expected_kind": "session.updated",
+    "expected_context_terms": [],
+    "expected_custom_lexicon": []
+  },
+  {
+    "name": "session context terms and custom lexicon omitted by older servers",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1"
+      }
+    },
+    "expected_kind": "session.updated",
+    "expected_context_terms": null,
+    "expected_custom_lexicon": null
+  },
+  {
+    "name": "session lexicon entry keeps known fields from future server objects",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "custom_lexicon": [
+          {
+            "spelling": "kubectl",
+            "pronunciation": "\" k u b . k @ n . % t r\\ oU l",
+            "future_server_field": true
+          }
+        ]
+      }
+    },
+    "expected_kind": "session.updated",
+    "expected_custom_lexicon": [
+      {
+        "spelling": "kubectl",
+        "pronunciation": "\" k u b . k @ n . % t r\\ oU l"
+      }
+    ]
+  },
+  {
+    "name": "null session context terms",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "context_terms": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "string session context terms",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "context_terms": "Skyvale"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonstring session context term",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "context_terms": [
+          "Skyvale",
+          1
+        ]
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "null session custom lexicon",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "custom_lexicon": null
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "nonobject session lexicon entry",
+    "event": {
+      "type": "session.created",
+      "session": {
+        "id": "session-1",
+        "custom_lexicon": [
+          "kubectl"
+        ]
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session lexicon entry without a pronunciation",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "custom_lexicon": [
+          {
+            "spelling": "kubectl"
+          }
+        ]
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "session lexicon entry with a nonstring spelling",
+    "event": {
+      "type": "session.updated",
+      "session": {
+        "id": "session-1",
+        "custom_lexicon": [
+          {
+            "spelling": 1,
+            "pronunciation": "k"
+          }
+        ]
+      }
+    },
+    "invalid": true
   }
 ]

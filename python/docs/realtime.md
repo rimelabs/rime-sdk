@@ -159,6 +159,8 @@ Use `session.set_response_metadata` to replace reply labels.
 | `voice: str \| None` | If the server has no default voice | `None` uses the server default. A supplied string must be nonblank. |
 | `instructions: str \| None` | No | `None` uses server defaults. A supplied string must be nonblank. |
 | `tools: Sequence[ToolDefinition]` | No | `()`. Sends an empty tool list when omitted. |
+| `context_terms: Sequence[str] \| None` | No | `None` sends none. Words speech-to-text favors; see [Context terms and custom lexicon](#context-terms-and-custom-lexicon). |
+| `custom_lexicon: Sequence[PronunciationEntry] \| None` | No | `None` sends none. How replies say words; see [Context terms and custom lexicon](#context-terms-and-custom-lexicon). |
 | `interrupt_on_speech: bool` | No | `True`. Requests interruption when the server confirms user speech. |
 | `turn_detection: TurnDetection \| None` | No | Omitted settings use the server's turn timing defaults. |
 | `timeouts: RealtimeTimeouts` | No | Connection 10 s, readiness 30 s, request 10 s. |
@@ -258,7 +260,7 @@ Each method is async. Arguments without a default are required.
 
 | Method | Use it to | Result |
 | --- | --- | --- |
-| `update(*, instructions=None, tools=None, voice=None, interrupt_on_speech=None)` | Change supplied settings without reconnecting. | `SessionInfo` after acknowledgment |
+| `update(*, instructions=None, tools=None, context_terms=None, custom_lexicon=None, voice=None, interrupt_on_speech=None)` | Change supplied settings without reconnecting. | `SessionInfo` after acknowledgment |
 | `send_text(text, *, metadata=None)` | Start a new user turn after readiness. | `ResponseRef` at response creation |
 | `send_audio(chunk)` | Send microphone audio. | `None` |
 | `request_reply(*, instruction=None, tool_call=None, metadata=None)` | Ask for a reply without new user input, optionally about a recorded tool result. | `ResponseRef` at response creation |
@@ -674,6 +676,35 @@ if isinstance(event.payload, ResponseEnded) and event.payload.truncation is not 
     summary = event.payload.truncation
     print(summary.items_left_out, summary.first_kept_item_id)
 ```
+
+## Context terms and custom lexicon
+
+Available in the next SDK release, with a Prism release that takes these
+fields. Older releases refuse them, so the SDK sends each only when you set it.
+
+```python
+from rimelabs_sdk import PronunciationEntry
+
+async with client.realtime.connect(
+    context_terms=["Skyvale", "Doctor Chen"],
+    custom_lexicon=[PronunciationEntry("kubectl", '" k u b . k @ n . % t r\\ oU l')],
+) as session:
+    info = await session.update(context_terms=["Velkora"])
+    print(info.context_terms)  # ('Velkora',)
+```
+
+`context_terms` are words and phrases speech-to-text favors in the caller's
+turns, under the rules of [STT's `context_terms`](https://github.com/rimelabs/rime-sdk/blob/main/python/docs/stt.md): joined with `", "`,
+they take at most 1024 bytes. `custom_lexicon` says how replies pronounce a word
+or phrase, as Coda's custom lexicon takes it: at most 500 entries with X-SAMPA
+pronunciations. Prism checks these rules. A refusal raises `RimeRealtimeError`
+with code `invalid_client_event` for a limit, or `invalid_session` for an
+ill-formed pronunciation or one the deployment cannot say, and the update
+changes nothing.
+
+A supplied list replaces the whole list; an empty one clears it.
+`session.info.context_terms` and `session.info.custom_lexicon` are the lists
+Prism confirmed, or `None` on a server that does not publish them.
 
 ## Optional Prism settings and speech review
 

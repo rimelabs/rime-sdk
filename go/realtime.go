@@ -158,6 +158,31 @@ func rtTools(tools []ToolDefinition) ([]any, error) {
 	return ts, nil
 }
 
+// rtContextTerms copies the terms in order. Prism refuses an update that breaks
+// speech-to-text's limits, so only what JSON would silently alter is refused here.
+func rtContextTerms(terms []string) ([]string, error) {
+	for _, term := range terms {
+		if !utf8.ValidString(term) {
+			return nil, failure(ErrInput, "context terms must be valid UTF-8")
+		}
+	}
+	return append([]string{}, terms...), nil
+}
+
+// rtCustomLexicon copies the entries in order. Prism refuses an update over its
+// limits or with bad X-SAMPA.
+func rtCustomLexicon(lexicon []PronunciationEntry) ([]rtObject, error) {
+	entries, err := snapshotLexicon(lexicon)
+	if err != nil {
+		return nil, err
+	}
+	wire := make([]rtObject, 0, len(entries))
+	for _, entry := range entries {
+		wire = append(wire, rtObject{"spelling": entry.Spelling, "pronunciation": entry.Pronunciation})
+	}
+	return wire, nil
+}
+
 func rtTruncation(value Truncation) (any, error) {
 	switch value.Mode {
 	case TruncationAuto, TruncationDisabled:
@@ -200,6 +225,20 @@ func rtPatch(o RealtimeUpdateOptions) (rtObject, error) {
 			return nil, err
 		}
 		settings["tools"] = tools
+	}
+	if o.ContextTerms != nil {
+		terms, err := rtContextTerms(o.ContextTerms)
+		if err != nil {
+			return nil, err
+		}
+		settings["context_terms"] = terms
+	}
+	if o.CustomLexicon != nil {
+		lexicon, err := rtCustomLexicon(o.CustomLexicon)
+		if err != nil {
+			return nil, err
+		}
+		settings["custom_lexicon"] = lexicon
 	}
 	detection := rtObject{}
 	if o.InterruptOnSpeech != nil {
@@ -340,6 +379,20 @@ func rtSettings(o RealtimeConnectOptions) (string, rtObject, RealtimeTimeouts, e
 	}
 	if o.ResponseMetadata != nil {
 		settings["prism_response_metadata"] = o.ResponseMetadata
+	}
+	if o.ContextTerms != nil {
+		terms, err := rtContextTerms(o.ContextTerms)
+		if err != nil {
+			return "", nil, t, err
+		}
+		settings["context_terms"] = terms
+	}
+	if o.CustomLexicon != nil {
+		lexicon, err := rtCustomLexicon(o.CustomLexicon)
+		if err != nil {
+			return "", nil, t, err
+		}
+		settings["custom_lexicon"] = lexicon
 	}
 	for k, v := range map[string]string{"voice": o.Voice, "instructions": o.Instructions} {
 		if v != "" {

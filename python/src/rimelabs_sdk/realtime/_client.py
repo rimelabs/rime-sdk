@@ -27,10 +27,18 @@ from .._errors import (
     RimeTimeoutError,
     RimeUnavailableError,
 )
+from ..tts._lexicon import PronunciationEntry
 from ._protocol import SessionSettings, truncation_settings
 from ._protocol import response_metadata as _response_metadata
 from ._session import RealtimeSession
-from ._settings import review_settings, speed_setting, tool_settings, turn_settings
+from ._settings import (
+    context_terms_setting,
+    custom_lexicon_setting,
+    review_settings,
+    speed_setting,
+    tool_settings,
+    turn_settings,
+)
 from ._types import Labels, RealtimeTimeouts, Review, ToolDefinition, Truncation, TurnDetection
 
 if TYPE_CHECKING:
@@ -161,6 +169,8 @@ class Realtime:
         voice: str | None = None,
         instructions: str | None = None,
         tools: Sequence[ToolDefinition] = (),
+        context_terms: Sequence[str] | None = None,
+        custom_lexicon: Sequence[PronunciationEntry] | None = None,
         interrupt_on_speech: bool = True,
         turn_detection: TurnDetection | None = None,
         speed: float | None = None,
@@ -173,11 +183,13 @@ class Realtime:
         """Open and initialize a session on the public Prism endpoint.
 
         Override endpoint with a full /v1/realtime WebSocket URL for another deployment.
-        Omitted turn timing settings use the server defaults.
+        Omitted turn timing settings use the server defaults. Omitted context terms and
+        custom lexicon stay out of the request, since older Prism releases refuse them.
 
         Credentials use Authorization: Bearer with the Rime API key. The endpoint
         must support this handshake. Use ws:// only for a local development server.
-        Use session.update to change instructions, tools, voice, or interruption.
+        Use session.update to change instructions, tools, context terms, custom lexicon,
+        voice, or interruption.
 
         request_id is sent as the upgrade's x-request-id. It must be nonblank printable ASCII, or
         connect raises RimeInputError. Prism replaces IDs longer than 128 characters.
@@ -208,6 +220,10 @@ class Realtime:
             "turn_detection": {"interrupt_response": interrupt_on_speech},
             "tools": tool_settings(tools),
         }
+        if context_terms is not None:
+            settings["context_terms"] = context_terms_setting(context_terms)
+        if custom_lexicon is not None:
+            settings["custom_lexicon"] = custom_lexicon_setting(custom_lexicon)
         if truncation is not None:
             settings["truncation"] = truncation_settings(truncation)
         if speed is not None:

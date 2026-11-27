@@ -9,6 +9,7 @@ from typing import Literal, TypeAlias
 
 from .._errors import RimeAudioFormatError, RimeError, RimeInputError, RimeTimeoutError
 from .._pcm import PCMFormat
+from ..tts._lexicon import PronunciationEntry
 
 
 class RealtimeAdmissionTimeout(RimeTimeoutError):
@@ -355,6 +356,12 @@ class SessionInfo:
     # The labels replies carry, as Prism last confirmed them; None when the server does not
     # publish them.
     response_metadata: Labels | None = None
+    # The words speech-to-text favors in the caller's turns, as Prism last confirmed them;
+    # None when the server does not publish them.
+    context_terms: tuple[str, ...] | None = None
+    # How replies say words, as Prism last confirmed it; None when the server does not
+    # publish it.
+    custom_lexicon: tuple[PronunciationEntry, ...] | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

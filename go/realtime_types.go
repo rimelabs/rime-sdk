@@ -137,6 +137,12 @@ type RealtimeConnectOptions struct {
 	// keys up to 64 characters without the prism_ prefix, values up to 512.
 	// Change them with SetResponseMetadata.
 	ResponseMetadata map[string]string
+	// ContextTerms are words and phrases speech-to-text favors in the caller's
+	// turns, such as "Skyvale". Nil sends none, since older Prism releases refuse it.
+	ContextTerms []string
+	// CustomLexicon says how replies say words, as Coda's custom lexicon takes it.
+	// Nil sends none, since older Prism releases refuse it.
+	CustomLexicon []PronunciationEntry
 }
 
 // ReplyOptions request a proactive reply, optionally about a recorded tool result.
@@ -191,7 +197,8 @@ func (r OutputRef) ContentIndex() uint64  { return r.contentIndex }
 
 // RealtimeUpdateOptions change only supplied settings on the existing connection.
 // Nil fields keep their values. An empty string clears instructions; an empty,
-// non-nil Tools slice removes all tools. Tools replaces the complete list.
+// non-nil Tools, ContextTerms or CustomLexicon slice clears that list. A
+// supplied list replaces the complete list.
 type RealtimeUpdateOptions struct {
 	Speed         *float64
 	TurnDetection *TurnDetectionUpdate
@@ -199,6 +206,8 @@ type RealtimeUpdateOptions struct {
 	Truncation        *Truncation
 	Instructions      *string
 	Tools             []ToolDefinition
+	ContextTerms      []string
+	CustomLexicon     []PronunciationEntry
 	Voice             *string
 	InterruptOnSpeech *bool
 }
@@ -226,6 +235,12 @@ type SessionInfo struct {
 	RequestID *string
 	// ResponseMetadata holds the labels replies carry, as Prism last confirmed them.
 	ResponseMetadata map[string]string
+	// ContextTerms holds the words speech-to-text favors, as Prism last confirmed
+	// them; nil when the server does not publish them.
+	ContextTerms []string
+	// CustomLexicon holds how replies say words, as Prism last confirmed it; nil
+	// when the server does not publish it.
+	CustomLexicon []PronunciationEntry
 }
 
 // RealtimeFault preserves structured service fault details. Use errors.As.

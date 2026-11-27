@@ -10,6 +10,8 @@ import { RealtimeSession } from "./session.js";
 import { RealtimeConnection } from "./transport.js";
 import type { RealtimeConnectOptions, RealtimeTimeouts } from "./types.js";
 import {
+  contextTermsSetting,
+  customLexiconSetting,
   toolSettings,
   turnSettings,
   speechSpeed,
@@ -98,6 +100,10 @@ export class Realtime {
       turn_detection: { interrupt_response: options.interruptOnSpeech ?? true },
       tools: toolSettings(options.tools ?? []),
     };
+    if (options.contextTerms !== undefined)
+      settings.context_terms = contextTermsSetting(options.contextTerms);
+    if (options.customLexicon !== undefined)
+      settings.custom_lexicon = customLexiconSetting(options.customLexicon);
     if (options.truncation !== undefined)
       settings.truncation = truncationSettings(options.truncation);
     if (options.speed !== undefined)
